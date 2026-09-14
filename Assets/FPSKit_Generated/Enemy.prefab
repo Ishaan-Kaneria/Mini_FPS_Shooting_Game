@@ -89,7 +89,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 2d61057107f8a6547a21ceacf231d124, type: 2}
+  - {fileID: 2100000, guid: e9ddd5db072f48238ae759d9759eeb39, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -250,7 +250,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 816730f811a38864cb5d6a7f31e33315, type: 2}
+  - {fileID: 2100000, guid: 5c0d9f65117e5549a95ed1f6cb0a89cb, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -398,7 +398,7 @@ MonoBehaviour:
   preferredRangedDistance: 12
   rangedHitMask:
     serializedVersion: 2
-    m_Bits: 1335
+    m_Bits: 4294966783
   alertClip: {fileID: 0}
   attackClip: {fileID: 0}
   deathClip: {fileID: 0}

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./Tools/unity-batch.sh)",
+      "Bash(./Tools/unity-batch.sh *)",
+      "Bash(Tools/unity-batch.sh)",
+      "Bash(Tools/unity-batch.sh *)"
+    ]
+  }
+}

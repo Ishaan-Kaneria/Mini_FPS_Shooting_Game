@@ -29,9 +29,11 @@ MonoBehaviour:
   ambientSky: {r: 0.09, g: 0.09, b: 0.1, a: 1}
   ambientEquator: {r: 0.06, g: 0.06, b: 0.07, a: 1}
   ambientGround: {r: 0.02, g: 0.02, b: 0.02, a: 1}
-  arenaSize: 44
+  arenaSize: 70
   wallHeight: 5
   randomSeed: 13
+  scaleLayoutWithArea: 1
+  layoutReferenceSize: 60
   roomCount: 4
   platformCount: 1
   coverWallCount: 10
@@ -56,7 +58,14 @@ MonoBehaviour:
   accentLightIntensity: 9
   accentLightRange: 11
   accentLightHeight: 4.2
+  floorMaterial: {fileID: 0}
+  floorTextureSize: 4
+  wallMaterial: {fileID: 0}
+  wallTextureSize: 4
+  coverMaterial: {fileID: 0}
+  crateMaterial: {fileID: 0}
   propPrefabs: []
+  propCount: 40
   weatherPrefab: {fileID: 0}
   ambienceLoop: {fileID: 0}
   ambienceVolume: 0.35

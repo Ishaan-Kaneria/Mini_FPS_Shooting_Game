@@ -29,13 +29,15 @@ MonoBehaviour:
   ambientSky: {r: 0.45, g: 0.5, b: 0.6, a: 1}
   ambientEquator: {r: 0.3, g: 0.3, b: 0.33, a: 1}
   ambientGround: {r: 0.15, g: 0.14, b: 0.13, a: 1}
-  arenaSize: 60
+  arenaSize: 110
   wallHeight: 4
   randomSeed: 7
+  scaleLayoutWithArea: 1
+  layoutReferenceSize: 60
   roomCount: 3
   platformCount: 2
-  coverWallCount: 4
-  crateStackCount: 2
+  coverWallCount: 8
+  crateStackCount: 8
   pillarCount: 5
   coverHeightRange: {x: 1.2, y: 3.4}
   coverWidthRange: {x: 2, y: 5}

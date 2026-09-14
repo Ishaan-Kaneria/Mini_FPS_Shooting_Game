@@ -394,7 +394,7 @@ MonoBehaviour:
   attackWindup: 0.35
   shotsPerAttack: 1
   burstInterval: 0.12
-  detectionRadius: 45
+  detectionRadius: 77
   fieldOfView: 150
   sightBlockers:
     serializedVersion: 2

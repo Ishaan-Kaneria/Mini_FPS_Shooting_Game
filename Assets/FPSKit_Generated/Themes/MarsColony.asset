@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 992cb97f9f9be6049911edcaff11c498, type: 3}
+  m_Name: MarsColony
+  m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
+  themeName: Mars Colony
+  description: Rust sky, thin light, drifting dust.
+  skyboxOverride: {fileID: 0}
+  skyTint: {r: 0.72, g: 0.42, b: 0.28, a: 1}
+  skyGroundColor: {r: 0.42, g: 0.22, b: 0.14, a: 1}
+  atmosphereThickness: 1.8
+  skyExposure: 1
+  sunColor: {r: 1, g: 0.8, b: 0.62, a: 1}
+  sunIntensity: 1.05
+  sunAngles: {x: 26, y: 300}
+  shadowStrength: 0.85
+  fogEnabled: 1
+  fogColor: {r: 0.58, g: 0.35, b: 0.24, a: 1}
+  fogDensity: 0.014
+  ambientSky: {r: 0.55, g: 0.34, b: 0.24, a: 1}
+  ambientEquator: {r: 0.36, g: 0.24, b: 0.18, a: 1}
+  ambientGround: {r: 0.2, g: 0.12, b: 0.09, a: 1}
+  arenaSize: 64
+  wallHeight: 5
+  randomSeed: 66
+  roomCount: 3
+  platformCount: 3
+  coverWallCount: 7
+  crateStackCount: 6
+  pillarCount: 5
+  coverHeightRange: {x: 1.1, y: 1.5}
+  coverWidthRange: {x: 4, y: 9}
+  floorColor: {r: 0.44, g: 0.26, b: 0.18, a: 1}
+  wallColor: {r: 0.52, g: 0.5, b: 0.49, a: 1}
+  coverColors:
+  - {r: 0.55, g: 0.53, b: 0.52, a: 1}
+  - {r: 0.48, g: 0.3, b: 0.2, a: 1}
+  - {r: 0.62, g: 0.58, b: 0.54, a: 1}
+  floorSmoothness: 0.2
+  wallSmoothness: 0.15
+  coverMetallic: 0.35
+  floorTag: Concrete
+  wallTag: Concrete
+  coverTag: Metal
+  accentLightCount: 6
+  accentLightColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+  accentLightIntensity: 10
+  accentLightRange: 14
+  accentLightHeight: 3.5
+  propPrefabs: []
+  weatherPrefab: {fileID: 0}
+  ambienceLoop: {fileID: 0}
+  ambienceVolume: 0.35
+  enablePostProcessing: 1
+  bloomIntensity: 0.45
+  postExposure: 0
+  saturation: 8
+  contrast: 12
+  colorFilter: {r: 1, g: 1, b: 1, a: 1}
+  vignetteIntensity: 0.28
+  filmGrain: 0.2

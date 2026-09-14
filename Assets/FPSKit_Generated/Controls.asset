@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 816a95928c4f8784da2f11b62b050fa3, type: 3}
+  m_Name: Controls
+  m_EditorClassIdentifier: Assembly-CSharp::ControlSettings
+  moveForward: 273
+  moveBack: 274
+  moveLeft: 276
+  moveRight: 275
+  altForward: 119
+  altBack: 115
+  altLeft: 97
+  altRight: 100
+  fire: 323
+  jump: 32
+  aim: 324
+  reload: 114
+  crouch: 306
+  altCrouch: 99
+  sprintByDoubleTap: 0
+  sprintKey: 304
+  doubleTapWindow: 0.3
+  sprintEndsWhenNotAdvancing: 1
+  lookLeft: 0
+  lookRight: 0
+  lookUp: 0
+  lookDown: 0

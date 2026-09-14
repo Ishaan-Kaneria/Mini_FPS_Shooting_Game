@@ -1,0 +1,130 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 992cb97f9f9be6049911edcaff11c498, type: 3}
+  m_Name: IndustrialWarehouse
+  m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
+  themeName: Industrial Warehouse
+  description: Overcast steel and concrete. The neutral baseline.
+  skyboxOverride: {fileID: 0}
+  skyTint: {r: 0.52, g: 0.55, b: 0.6, a: 1}
+  skyGroundColor: {r: 0.3, g: 0.29, b: 0.28, a: 1}
+  atmosphereThickness: 1.4
+  skyExposure: 1
+  sunColor: {r: 0.95, g: 0.96, b: 1, a: 1}
+  sunIntensity: 1.15
+  sunAngles: {x: 48, y: 32}
+  shadowStrength: 0.85
+  fogEnabled: 1
+  fogColor: {r: 0.5, g: 0.53, b: 0.58, a: 1}
+  fogDensity: 0.009
+  ambientSky: {r: 0.45, g: 0.5, b: 0.6, a: 1}
+  ambientEquator: {r: 0.3, g: 0.3, b: 0.33, a: 1}
+  ambientGround: {r: 0.15, g: 0.14, b: 0.13, a: 1}
+  arenaSize: 60
+  wallHeight: 4
+  randomSeed: 7
+  roomCount: 3
+  platformCount: 2
+  coverWallCount: 4
+  crateStackCount: 2
+  pillarCount: 5
+  coverHeightRange: {x: 1.2, y: 3.4}
+  coverWidthRange: {x: 2, y: 5}
+  floorColor: {r: 0.33, g: 0.33, b: 0.35, a: 1}
+  wallColor: {r: 0.46, g: 0.47, b: 0.49, a: 1}
+  coverColors:
+  - {r: 0.4, g: 0.42, b: 0.45, a: 1}
+  - {r: 0.52, g: 0.45, b: 0.3, a: 1}
+  - {r: 0.3, g: 0.33, b: 0.36, a: 1}
+  floorSmoothness: 0.2
+  wallSmoothness: 0.15
+  coverMetallic: 0
+  floorTag: Concrete
+  wallTag: Concrete
+  coverTag: Metal
+  accentLightCount: 0
+  accentLightColor: {r: 1, g: 0.6, b: 0.25, a: 1}
+  accentLightIntensity: 8
+  accentLightRange: 14
+  accentLightHeight: 3.5
+  floorMaterial: {fileID: 2100000, guid: 999517f045d65924db469ec2a4a5c833, type: 2}
+  floorTextureSize: 4
+  wallMaterial: {fileID: 2100000, guid: 4b2c2bed67203ed45aa381875cc556bb, type: 2}
+  wallTextureSize: 4
+  coverMaterial: {fileID: 2100000, guid: 4b2c2bed67203ed45aa381875cc556bb, type: 2}
+  crateMaterial: {fileID: 2100000, guid: 1a087c65608607042accf116f4319d39, type: 2}
+  propPrefabs:
+  - {fileID: 1000012087368230, guid: a22c0c7e17126fa4f89534dc98bcac8f, type: 3}
+  - {fileID: 1000011599446456, guid: 17002e90aebb00b40a69cf6fe9083dfc, type: 3}
+  - {fileID: 1000012581530574, guid: 85a8f6f8dca77df4e9c05f21b5e8ed87, type: 3}
+  - {fileID: 1000012001423700, guid: efaf0e3818a9ab240983b51198f0a77a, type: 3}
+  - {fileID: 1000013510172720, guid: ddf0187b9b9cef54bab5c9c49969758a, type: 3}
+  - {fileID: 1000012407837468, guid: 9732a241b7bd0fa4a8e59553d6d8a2b0, type: 3}
+  - {fileID: 1000012364095318, guid: a62abbb708e3f49489bde29e5cfc3ebd, type: 3}
+  - {fileID: 1000011585897626, guid: 9d1bb44d500a3ad489d3cb3a6900199f, type: 3}
+  - {fileID: 1000010811274378, guid: 6857ff1d3761e21479727f3b27cc8f68, type: 3}
+  - {fileID: 1000013580012832, guid: a50af88759b02d74b8328377b33ab3e8, type: 3}
+  - {fileID: 1000010619805496, guid: 395dcd74773407e4faa9906eedf6f75d, type: 3}
+  - {fileID: 1000011523426384, guid: 84147b87204d0a0478bae9558d656ea2, type: 3}
+  - {fileID: 1000014059977858, guid: 39d44540e05010d4b93511df0bd6e20b, type: 3}
+  - {fileID: 1000010111314322, guid: bd78ceace8eb93d42a9ee0bde8dbc598, type: 3}
+  - {fileID: 1000013244651740, guid: 75e99e987b1c5aa48b7b9e465f768fa3, type: 3}
+  - {fileID: 1000013479777962, guid: 9615d776614809e4890301d5377aeb9f, type: 3}
+  - {fileID: 1000010817437606, guid: 58d97d456aead63499ac7d5316541f78, type: 3}
+  - {fileID: 1000013718478842, guid: c2028b62d7877e04194d5001429cff6b, type: 3}
+  - {fileID: 1000013482175582, guid: 7efb7a11251ce1342b172668cbdc65c8, type: 3}
+  - {fileID: 1000014012932500, guid: 94a643c50b8c98e488ed29457fc57cb6, type: 3}
+  - {fileID: 1000010037619014, guid: 721671003a026be4fb47107988831b38, type: 3}
+  - {fileID: 1000014291894318, guid: b2be9b4ffc291194c96942bd60bdc25c, type: 3}
+  - {fileID: 1000010192389154, guid: 39485138b2c1f4d41bdd3846e259ffea, type: 3}
+  - {fileID: 1000010325068422, guid: 4aacf79f5a0dae44687cf65a42a1b825, type: 3}
+  - {fileID: 1000011804541950, guid: f6bcabe29ce92584f8125c196a931d73, type: 3}
+  - {fileID: 1000013040479746, guid: 46472ef0a5e771447837601c9fb0d67e, type: 3}
+  - {fileID: 1000013628716364, guid: ee5ce8c8eaa133d43a291b519c442236, type: 3}
+  - {fileID: 1000010628347772, guid: 46132fa6877a42947bf1f7f15c09f435, type: 3}
+  - {fileID: 1000012006241372, guid: 6d21e769def7d504ea22abcb06173633, type: 3}
+  - {fileID: 1000011569870456, guid: 7664aa771caa1ce42965283fa24dbbd2, type: 3}
+  - {fileID: 1000013871382564, guid: fe9a19d4f0d796c40bf4fc6b69dd7b81, type: 3}
+  - {fileID: 1000010467075504, guid: 4944c29dadd7e02468c053eafe48e485, type: 3}
+  - {fileID: 1000012270689622, guid: ef77372ba45b400439d547071a884266, type: 3}
+  - {fileID: 1000010251953910, guid: dc6d044e41bc7d943964e919cfcc6226, type: 3}
+  - {fileID: 1000012735014440, guid: 4eca2a8b85d9ab648b2c49464d3dcafb, type: 3}
+  - {fileID: 1000014235361942, guid: 404e0d08b5d27db459ef2c1d46ef305a, type: 3}
+  - {fileID: 1000010112106462, guid: 848f24f4b70670d4293d66f84bb2c61d, type: 3}
+  - {fileID: 1000013666616400, guid: 761e577b5d2438945bdea48c763b901d, type: 3}
+  - {fileID: 1000012561662182, guid: 4cc39b10f272c9345884a20abee62cf7, type: 3}
+  - {fileID: 1000010154822876, guid: 14dec0535eb23e449b5b7deed8f9b5d5, type: 3}
+  - {fileID: 1000012783210888, guid: 7dbd2ee79c8b629469f6dbd92581b292, type: 3}
+  - {fileID: 1000014174014318, guid: 203991bdbc52b3d448d843f20040d830, type: 3}
+  - {fileID: 1000013176325546, guid: 99914c1bbcbb9244d8d61fe025c942d0, type: 3}
+  - {fileID: 1000012873753972, guid: a97286fdcded46841aa52392962756a4, type: 3}
+  - {fileID: 1000013704295854, guid: 68f38248a13ec9a429658644346a663b, type: 3}
+  - {fileID: 1000013602833482, guid: a56eaa3ce8d72a24388bc82778095530, type: 3}
+  - {fileID: 1000011526307046, guid: d0eba2199d4a88c45bd25714be118f49, type: 3}
+  - {fileID: 1000010576925618, guid: d4da4b7bb17bec247bc560a6a6e3d7aa, type: 3}
+  - {fileID: 1000014207229772, guid: e0f5747462d907f419db4fc671cb8551, type: 3}
+  - {fileID: 1000010521890458, guid: 5222f7f213505a24881db771cd3afa9e, type: 3}
+  - {fileID: 1000013497408264, guid: 55096903922d4314698414d961ceac0c, type: 3}
+  - {fileID: 1000010005835110, guid: 845bb3e01ad4efe44adb29f965b2150b, type: 3}
+  - {fileID: 1000010396969842, guid: c81b1a60bcf0cb64fa403060ac10ed0d, type: 3}
+  propCount: 60
+  weatherPrefab: {fileID: 0}
+  ambienceLoop: {fileID: 0}
+  ambienceVolume: 0.35
+  enablePostProcessing: 1
+  bloomIntensity: 0.45
+  postExposure: 0
+  saturation: 0
+  contrast: 6
+  colorFilter: {r: 1, g: 1, b: 1, a: 1}
+  vignetteIntensity: 0.28
+  filmGrain: 0.2

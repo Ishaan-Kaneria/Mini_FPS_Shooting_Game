@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 992cb97f9f9be6049911edcaff11c498, type: 3}
+  m_Name: NightRooftop
+  m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
+  themeName: Night Rooftop
+  description: City night. Dark sky, warm practicals, heavy bloom.
+  skyboxOverride: {fileID: 0}
+  skyTint: {r: 0.1, g: 0.13, b: 0.22, a: 1}
+  skyGroundColor: {r: 0.06, g: 0.07, b: 0.1, a: 1}
+  atmosphereThickness: 0.4
+  skyExposure: 0.45
+  sunColor: {r: 0.55, g: 0.65, b: 0.95, a: 1}
+  sunIntensity: 0.35
+  sunAngles: {x: 32, y: 250}
+  shadowStrength: 0.6
+  fogEnabled: 1
+  fogColor: {r: 0.09, g: 0.11, b: 0.17, a: 1}
+  fogDensity: 0.016
+  ambientSky: {r: 0.12, g: 0.15, b: 0.24, a: 1}
+  ambientEquator: {r: 0.09, g: 0.1, b: 0.14, a: 1}
+  ambientGround: {r: 0.04, g: 0.04, b: 0.05, a: 1}
+  arenaSize: 56
+  wallHeight: 5
+  randomSeed: 88
+  roomCount: 3
+  platformCount: 4
+  coverWallCount: 8
+  crateStackCount: 7
+  pillarCount: 6
+  coverHeightRange: {x: 1.1, y: 1.5}
+  coverWidthRange: {x: 4, y: 9}
+  floorColor: {r: 0.14, g: 0.14, b: 0.16, a: 1}
+  wallColor: {r: 0.18, g: 0.19, b: 0.22, a: 1}
+  coverColors:
+  - {r: 0.16, g: 0.17, b: 0.2, a: 1}
+  - {r: 0.22, g: 0.2, b: 0.18, a: 1}
+  - {r: 0.1, g: 0.12, b: 0.15, a: 1}
+  floorSmoothness: 0.2
+  wallSmoothness: 0.15
+  coverMetallic: 0
+  floorTag: Concrete
+  wallTag: Concrete
+  coverTag: Metal
+  accentLightCount: 10
+  accentLightColor: {r: 1, g: 0.58, b: 0.22, a: 1}
+  accentLightIntensity: 14
+  accentLightRange: 16
+  accentLightHeight: 3.5
+  propPrefabs: []
+  weatherPrefab: {fileID: 0}
+  ambienceLoop: {fileID: 0}
+  ambienceVolume: 0.35
+  enablePostProcessing: 1
+  bloomIntensity: 1.1
+  postExposure: 0.35
+  saturation: 0
+  contrast: 8
+  colorFilter: {r: 1, g: 1, b: 1, a: 1}
+  vignetteIntensity: 0.38
+  filmGrain: 0.35

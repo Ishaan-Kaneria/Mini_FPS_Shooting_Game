@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 992cb97f9f9be6049911edcaff11c498, type: 3}
+  m_Name: SnowboundStation
+  m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
+  themeName: Snowbound Station
+  description: Low winter sun, thick fog, short engagements.
+  skyboxOverride: {fileID: 0}
+  skyTint: {r: 0.62, g: 0.68, b: 0.78, a: 1}
+  skyGroundColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
+  atmosphereThickness: 2.2
+  skyExposure: 1.15
+  sunColor: {r: 0.82, g: 0.88, b: 1, a: 1}
+  sunIntensity: 0.95
+  sunAngles: {x: 18, y: 200}
+  shadowStrength: 0.85
+  fogEnabled: 1
+  fogColor: {r: 0.76, g: 0.81, b: 0.88, a: 1}
+  fogDensity: 0.028
+  ambientSky: {r: 0.6, g: 0.68, b: 0.8, a: 1}
+  ambientEquator: {r: 0.45, g: 0.5, b: 0.58, a: 1}
+  ambientGround: {r: 0.3, g: 0.34, b: 0.4, a: 1}
+  arenaSize: 54
+  wallHeight: 5
+  randomSeed: 44
+  roomCount: 4
+  platformCount: 2
+  coverWallCount: 9
+  crateStackCount: 9
+  pillarCount: 4
+  coverHeightRange: {x: 1.1, y: 1.5}
+  coverWidthRange: {x: 4, y: 9}
+  floorColor: {r: 0.78, g: 0.81, b: 0.86, a: 1}
+  wallColor: {r: 0.6, g: 0.64, b: 0.7, a: 1}
+  coverColors:
+  - {r: 0.7, g: 0.74, b: 0.8, a: 1}
+  - {r: 0.42, g: 0.47, b: 0.54, a: 1}
+  - {r: 0.55, g: 0.58, b: 0.62, a: 1}
+  floorSmoothness: 0.2
+  wallSmoothness: 0.15
+  coverMetallic: 0
+  floorTag: Concrete
+  wallTag: Concrete
+  coverTag: Metal
+  accentLightCount: 0
+  accentLightColor: {r: 1, g: 0.6, b: 0.25, a: 1}
+  accentLightIntensity: 8
+  accentLightRange: 14
+  accentLightHeight: 3.5
+  propPrefabs: []
+  weatherPrefab: {fileID: 0}
+  ambienceLoop: {fileID: 0}
+  ambienceVolume: 0.35
+  enablePostProcessing: 1
+  bloomIntensity: 0.6
+  postExposure: 0
+  saturation: -18
+  contrast: 4
+  colorFilter: {r: 1, g: 1, b: 1, a: 1}
+  vignetteIntensity: 0.28
+  filmGrain: 0.2

@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6077009092455da449d8fceb0c88662d, type: 3}
+  m_Name: TestRifle
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponData
+  weaponName: Test Rifle
+  fireMode: 2
+  roundsPerMinute: 650
+  damage: 24
+  maxRange: 200
+  pelletsPerShot: 1
+  burstCount: 3
+  burstInterval: 0.07
+  falloffStart: 40
+  falloffEnd: 120
+  minDamageFactor: 0.55
+  magazineSize: 30
+  reserveAmmo: 150
+  reloadTime: 2.1
+  autoReloadWhenEmpty: 1
+  baseSpread: 0.6
+  spreadPerShot: 0.45
+  maxSpread: 5
+  spreadRecovery: 6
+  adsSpreadMultiplier: 0.15
+  movementSpreadPenalty: 1.6
+  airborneSpreadPenalty: 2.5
+  recoilVertical: 1.15
+  recoilHorizontal: 0.4
+  recoilRecovery: 9
+  adsRecoilMultiplier: 0.7
+  visualKickback: 0.045
+  adsFieldOfView: 40
+  adsPosition: {x: 0, y: -0.02, z: 0.12}
+  adsSpeed: 12
+  muzzleFlashDuration: 0.045
+  impactForce: 35
+  fireClip: {fileID: 0}
+  reloadClip: {fileID: 0}
+  emptyClip: {fileID: 0}
+  pitchVariance: 0.06
+  muzzleFlashPrefab: {fileID: 0}
+  tracerPrefab: {fileID: 0}
+  tracerSpeed: 240
+  impacts: {fileID: 11400000, guid: 368d78fa5d59c944f81a0100fd9381c3, type: 2}

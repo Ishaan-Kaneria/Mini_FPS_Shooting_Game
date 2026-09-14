@@ -8,5 +8,15 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity
+    guid: e22de6949a649e44f80d5400bc80c5c6
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost.unity
+    guid: f9da13b8ab0e5fe4bae5e273c3dc8e64
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/SnowboundStation.unity
+    guid: 47ed480e9bf82324fa77bce50f7b74e9
   m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

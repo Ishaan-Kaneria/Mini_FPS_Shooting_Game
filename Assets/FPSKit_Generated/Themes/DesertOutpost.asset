@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 992cb97f9f9be6049911edcaff11c498, type: 3}
+  m_Name: DesertOutpost
+  m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
+  themeName: Desert Outpost
+  description: High sun, bleached sand, heat haze. Long sightlines.
+  skyboxOverride: {fileID: 0}
+  skyTint: {r: 0.72, g: 0.66, b: 0.52, a: 1}
+  skyGroundColor: {r: 0.55, g: 0.44, b: 0.3, a: 1}
+  atmosphereThickness: 0.7
+  skyExposure: 1.35
+  sunColor: {r: 1, g: 0.94, b: 0.78, a: 1}
+  sunIntensity: 1.7
+  sunAngles: {x: 68, y: 140}
+  shadowStrength: 0.85
+  fogEnabled: 1
+  fogColor: {r: 0.78, g: 0.71, b: 0.56, a: 1}
+  fogDensity: 0.004
+  ambientSky: {r: 0.68, g: 0.62, b: 0.5, a: 1}
+  ambientEquator: {r: 0.48, g: 0.42, b: 0.33, a: 1}
+  ambientGround: {r: 0.32, g: 0.26, b: 0.18, a: 1}
+  arenaSize: 72
+  wallHeight: 5
+  randomSeed: 21
+  roomCount: 2
+  platformCount: 3
+  coverWallCount: 6
+  crateStackCount: 5
+  pillarCount: 8
+  coverHeightRange: {x: 1.1, y: 1.5}
+  coverWidthRange: {x: 4, y: 9}
+  floorColor: {r: 0.62, g: 0.54, b: 0.38, a: 1}
+  wallColor: {r: 0.7, g: 0.62, b: 0.46, a: 1}
+  coverColors:
+  - {r: 0.66, g: 0.58, b: 0.42, a: 1}
+  - {r: 0.5, g: 0.45, b: 0.34, a: 1}
+  - {r: 0.45, g: 0.4, b: 0.36, a: 1}
+  floorSmoothness: 0.2
+  wallSmoothness: 0.15
+  coverMetallic: 0
+  floorTag: Concrete
+  wallTag: Concrete
+  coverTag: Concrete
+  accentLightCount: 0
+  accentLightColor: {r: 1, g: 0.6, b: 0.25, a: 1}
+  accentLightIntensity: 8
+  accentLightRange: 14
+  accentLightHeight: 3.5
+  propPrefabs: []
+  weatherPrefab: {fileID: 0}
+  ambienceLoop: {fileID: 0}
+  ambienceVolume: 0.35
+  enablePostProcessing: 1
+  bloomIntensity: 0.45
+  postExposure: 0
+  saturation: -6
+  contrast: 10
+  colorFilter: {r: 1, g: 1, b: 1, a: 1}
+  vignetteIntensity: 0.28
+  filmGrain: 0.12

@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: Harbinger
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Harbinger
+  description: Boss. Hangs back and shells the arena in bursts.
+  role: 2
+  bodyColor: {r: 0.12, g: 0.24, b: 0.3, a: 1}
+  headColor: {r: 0.3, g: 0.6, b: 0.7, a: 1}
+  glowColor: {r: 0.3, g: 1.8, b: 2.2, a: 1}
+  scaleMultiplier: 1.9
+  unlockWave: 10
+  baseWeight: 1
+  weightGrowthPerWave: 0
+  maxWeight: 12
+  retireWave: 0
+  healthMultiplier: 8
+  shieldFraction: 0.8
+  damageMultiplier: 1.3
+  speedMultiplier: 0.95
+  ranged: 1
+  attackRange: 34
+  attackCooldown: 2.4
+  attackWindup: 0.75
+  shotsPerAttack: 5
+  rangedSpread: 3.5
+  preferredRangedDistance: 20
+  strafeAmount: 0.6
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 0
+  scoreValue: 3200
+  healthDropChance: 1
+  shieldDropChance: 0.06
+  ammoDropChance: 0

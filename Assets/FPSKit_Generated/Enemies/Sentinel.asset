@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: Sentinel
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Sentinel
+  description: Shielded burst-fire elite. Break the armour first.
+  role: 1
+  bodyColor: {r: 0.2, g: 0.3, b: 0.55, a: 1}
+  headColor: {r: 0.45, g: 0.6, b: 0.9, a: 1}
+  glowColor: {r: 0.2, g: 0.7, b: 1.6, a: 1}
+  scaleMultiplier: 1.1
+  unlockWave: 7
+  baseWeight: 0.6
+  weightGrowthPerWave: 0.14
+  maxWeight: 3.5
+  retireWave: 0
+  healthMultiplier: 1.8
+  shieldFraction: 1
+  damageMultiplier: 0.7
+  speedMultiplier: 0.85
+  ranged: 1
+  attackRange: 24
+  attackCooldown: 2.6
+  attackWindup: 0.55
+  shotsPerAttack: 3
+  rangedSpread: 2.4
+  preferredRangedDistance: 14
+  strafeAmount: 0.5
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 40
+  scoreValue: 450
+  healthDropChance: 0.3
+  shieldDropChance: 0.35
+  ammoDropChance: 0

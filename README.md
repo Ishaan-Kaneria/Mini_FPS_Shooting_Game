@@ -72,6 +72,15 @@ Waves are endless and each one is bigger and meaner than the last. Three separat
 - **Behaviour** sharpens up to wave 18 — shorter attack cooldowns, harder circling, tighter ranged accuracy, longer memory of where you went.
 - **The roster drifts.** Grunts start as the bulk of a wave and thin out completely by the mid-twenties, while the nastier variants become more common as they unlock.
 
+A wave ends when you clear it **or** when its clock runs out — clearing is the fast way through, not a requirement. Waiting on a total wipe is a softlock in any real level: an enemy that drops through a gap in the geometry never dies, never arrives, and never stops being counted.
+
+Two systems keep that from happening:
+
+- **The enemy leash.** Anything that gets more than ~95 m away, falls more than 60 m below you, or whose agent leaves the NavMesh is removed after a few seconds' grace. Discarding is not killing — it scores nothing and drops nothing.
+- **The wave clock.** A backstop for whatever the leash misses: something wedged on geometry, stuck behind a door, or standing on an island of NavMesh it cannot leave. Survivors are cleared when it expires so the intermission is a real break.
+
+Enemies arrive from every direction. Spawn bearings advance by the golden angle rather than being drawn independently, because independent random draws clump — roll a dozen and several land within a few degrees, which is what funnels a whole wave through one corner of the map.
+
 The attack wind-up is the one number the difficulty curve is *not* allowed to grind away — it compresses only part way and never past a floor, because that telegraph is the player's reaction window. Difficulty without it is just unfairness.
 
 ### Wave modifiers
@@ -148,6 +157,16 @@ The archetype is stamped onto an instance of the shared `Enemy.prefab` at spawn.
 
 **FPSKit → Add Gameplay To Current Scene** is the non-destructive path. It injects the player, enemies, wave manager, HUD, post-FX and a baked NavMesh into whatever scene is open, leaving your geometry and baked lighting alone. Colliders get moved to the Environment layer and meshes without colliders get one, so AI sight lines and bullet hits work.
 
+This is the path for an imported environment, and the WaveManager's defaults are tuned for one. The knobs worth checking against your map:
+
+| Field | Default | What to watch for |
+|---|---|---|
+| `Min Spawn Distance From Player` | 20 m | Your breathing room. Raise it if waves arrive on top of you. |
+| `Max Spawn Distance From Player` | 30 m+ | Must sit inside your baked NavMesh or spawns fail. |
+| `Despawn Distance` | 95 m | Kept above the spawn ring automatically — a leash shorter than the ring would delete enemies on arrival. |
+| `Fall Kill Depth` | 60 m | Lower it if your level has legitimate drops deeper than this. |
+| `Wave Time Limit` | 45 s + 5 s/enemy | Set to 0 to go back to requiring a total wipe. |
+
 > ⚠️ **`Build Scene` is destructive.** It replaces the open scene entirely and overwrites the saved theme scene. Fix generated scene content by editing the builder, not the `.unity` file — the next build discards hand edits.
 
 ---
@@ -179,7 +198,11 @@ Tools/unity-batch.sh                                    # compile check only
 Tools/unity-batch.sh FPSKitBatch.BuildAllThemes         # rebuild every scene
 Tools/unity-batch.sh FPSKitBatch.BuildTheme -fpskitTheme "Mars Colony"
 Tools/unity-batch.sh FPSKitBatch.VerifyBuild            # build one scene, assert it is playable
+Tools/unity-batch.sh FPSKitBatch.VerifyWaves            # a wave that cannot be cleared must still end
+Tools/unity-batch.sh FPSKitBatch.VerifyReplay           # play three times over, assert every run is clean
 ```
+
+`VerifyWaves` and `VerifyReplay` enter real play mode and fail on any console error. `VerifyWaves` waits for a wave, drops every enemy through the floor, and checks both that the leash removes them and that the round still reaches the next wave with the kill count at zero. `VerifyReplay` plays a fresh session, an in-game restart and a second session after play mode has been stopped and started — the shape that catches state leaking between runs, which this project is prone to because domain reload is disabled.
 
 `VerifyBuild` is the one worth running in CI. A build that throws no exception proves very little — the builder wires dozens of references by hand, and a null one shows up as a black screen or a wave that never starts, not as an error. It checks the things that fail silently: the player rig and its camera, the weapon's data asset, the wave roster and its boss entry, every HUD binding, and whether the NavMesh actually baked.
 

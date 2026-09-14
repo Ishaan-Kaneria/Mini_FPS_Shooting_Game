@@ -87,6 +87,13 @@ namespace FPSKit.EditorTools
         public static void VerifyReplay() => FPSKitPlayTest.VerifyReplay();
 
         /// <summary>
+        /// Proves a wave that cannot be cleared still ends. Delegates to
+        /// <see cref="FPSKitWaveTest"/>, which drives play mode asynchronously and
+        /// pushes its own exit code, so it must not go through Run.
+        /// </summary>
+        public static void VerifyWaves() => FPSKitWaveTest.VerifyWaves();
+
+        /// <summary>
         /// Builds one scene and then asserts it is actually playable.
         ///
         /// A build that throws no exception still proves very little: the builder wires

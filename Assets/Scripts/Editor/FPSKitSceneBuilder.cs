@@ -1147,8 +1147,20 @@ namespace FPSKit.EditorTools
             wm.modifierChance = 0.55f;
             wm.waveClearBonus = 250;
 
-            wm.minSpawnDistanceFromPlayer = 14f;
-            wm.maxSpawnDistanceFromPlayer = Mathf.Max(24f, _theme.arenaSize * 0.55f);
+            // Far enough that a wave has to cross open ground to reach you, which is the
+            // breathing room between fights; close enough that it still arrives.
+            wm.minSpawnDistanceFromPlayer = 20f;
+            wm.maxSpawnDistanceFromPlayer = Mathf.Max(30f, _theme.arenaSize * 0.55f);
+
+            // The leash sits well outside the spawn ring so nothing is culled on arrival.
+            wm.despawnDistance = Mathf.Max(95f, wm.maxSpawnDistanceFromPlayer * 1.6f);
+            wm.despawnGraceTime = 4f;
+            wm.fallKillDepth = 60f;
+            wm.despawnOffNavMesh = true;
+
+            wm.waveTimeLimit = 45f;
+            wm.waveTimeLimitPerEnemy = 5f;
+            wm.clearLeftoversOnTimeout = true;
             wm.useDynamicSpawnPoints = true;
             wm.avoidPlayerView = true;
             wm.playerViewAngle = 70f;

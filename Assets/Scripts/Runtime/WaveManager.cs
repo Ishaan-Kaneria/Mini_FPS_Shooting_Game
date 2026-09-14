@@ -114,6 +114,39 @@ public class WaveManager : MonoBehaviour
     public GameObject spawnEffectPrefab;
     public float spawnEffectLifetime = 3f;
 
+    [Header("Enemy Leash")]
+    [Tooltip("Enemies further away than this are removed. Deliberately large -- this is a " +
+             "safety net for a real level, not a gameplay rule. It is what stops an enemy " +
+             "that fell down a hole, wedged on geometry or wandered off the map from " +
+             "counting against you forever.")]
+    public float despawnDistance = 95f;
+
+    [Tooltip("Seconds an enemy has to stay lost before it is removed, so one that is " +
+             "legitimately taking the long way round is not deleted mid-approach.")]
+    public float despawnGraceTime = 4f;
+
+    [Tooltip("Metres below you an enemy has to fall before it counts as gone. An imported " +
+             "level almost always has a gap somewhere, and whatever goes down it keeps " +
+             "falling forever.")]
+    public float fallKillDepth = 60f;
+
+    [Tooltip("Treat an enemy whose agent has left the NavMesh as lost. This is the fastest " +
+             "way to catch a fall, long before it is far enough away to trip the distance check.")]
+    public bool despawnOffNavMesh = true;
+
+    [Header("Wave Completion")]
+    [Tooltip("Seconds a wave may run before it ends whatever is still alive, on top of the " +
+             "per-enemy allowance below. Clearing the arena still ends a wave immediately -- " +
+             "this only removes the requirement, so one unreachable enemy can never stall " +
+             "the round. 0 restores the old behaviour of waiting for a total wipe.")]
+    public float waveTimeLimit = 45f;
+
+    public float waveTimeLimitPerEnemy = 5f;
+
+    [Tooltip("Remove whatever is still alive when a wave times out, so the intermission is " +
+             "an actual break. Turn this off and stragglers keep hunting you through it.")]
+    public bool clearLeftoversOnTimeout = true;
+
     [Header("Per-Wave Scaling")]
     public float healthGrowthPerWave = 0.12f;
     public float damageGrowthPerWave = 0.06f;
@@ -157,6 +190,14 @@ public class WaveManager : MonoBehaviour
 
     public int EnemiesRemaining => _alive.Count + _pendingSpawns;
 
+    /// <summary>Seconds left before the wave ends on its own. 0 when no limit applies.</summary>
+    public float WaveTimeRemaining { get; private set; }
+
+    public bool WaveHasTimeLimit => waveTimeLimit > 0f || waveTimeLimitPerEnemy > 0f;
+
+    /// <summary>Enemies removed for being lost rather than killed. Diagnostic only.</summary>
+    public int EnemiesDiscarded { get; private set; }
+
     /// <summary>0 on wave 1, 1 once the behaviour ramp has topped out.</summary>
     public float Aggression01 => Mathf.Clamp01((CurrentWave - 1f) / Mathf.Max(1, aggressionRampWaves));
 
@@ -164,8 +205,24 @@ public class WaveManager : MonoBehaviour
     public event Action<int> WaveCleared;
     public event Action<int> GameOver;
 
-    readonly List<GameObject> _alive = new List<GameObject>();
+    /// <summary>
+    /// One live enemy plus the bookkeeping the leash needs. A class rather than a
+    /// struct so the stranded clock can be updated in place while it sits in the list.
+    /// </summary>
+    class Tracked
+    {
+        public GameObject go;
+        public Health health;
+        public NavMeshAgent agent;
+
+        /// <summary>When it was first judged lost, or -1 while it is behaving.</summary>
+        public float strandedSince = -1f;
+    }
+
+    readonly List<Tracked> _alive = new List<Tracked>();
     int _pendingSpawns;
+    int _lastWaveTotal;
+    float _spawnAngle;
     Health _playerHealth;
     GameDirector _director;
 
@@ -205,6 +262,18 @@ public class WaveManager : MonoBehaviour
             return;
         }
 
+        // A leash shorter than the spawn ring deletes enemies the instant they arrive,
+        // which reads as "nothing ever spawns" and is miserable to diagnose from the
+        // symptom. Push it clear of the ring and say so rather than let it happen.
+        float minimumLeash = maxSpawnDistanceFromPlayer * 1.4f;
+        if (despawnDistance > 0f && despawnDistance < minimumLeash)
+        {
+            Debug.LogWarning($"[WaveManager] Despawn Distance ({despawnDistance:0}m) is too close to " +
+                             $"Max Spawn Distance ({maxSpawnDistanceFromPlayer:0}m); enemies would be " +
+                             $"culled on arrival. Raised to {minimumLeash:0}m.", this);
+            despawnDistance = minimumLeash;
+        }
+
         StartCoroutine(RunWaves());
     }
 
@@ -216,19 +285,95 @@ public class WaveManager : MonoBehaviour
         _playerHealth.Damaged -= OnPlayerDamaged;
     }
 
-    void Update() => SweepDead();
+    void Update() => SweepEnemies();
 
     /// <summary>
-    /// Drops entries whose GameObject is gone. Counting kills through the Died event
-    /// alone is not enough: an enemy destroyed any other way -- falling out of the
-    /// world, a scene tear-down, anything calling Destroy directly -- would leave the
-    /// tally permanently above zero and the wave loop would wait forever for a corpse
-    /// that already left.
+    /// Drops entries whose GameObject is gone, and removes the ones that are still
+    /// there but no longer part of the fight.
+    ///
+    /// Counting kills through the Died event alone is not enough. An enemy destroyed
+    /// any other way would leave the tally permanently above zero; and in a real
+    /// imported level an enemy that drops through a gap never dies at all -- it just
+    /// falls, forever, alive, with the round waiting on it.
     /// </summary>
-    void SweepDead()
+    void SweepEnemies()
     {
         for (int i = _alive.Count - 1; i >= 0; i--)
-            if (_alive[i] == null) _alive.RemoveAt(i);
+        {
+            var tracked = _alive[i];
+
+            if (tracked.go == null)
+            {
+                _alive.RemoveAt(i);
+                continue;
+            }
+
+            if (player == null) continue;
+
+            if (!IsLost(tracked))
+            {
+                tracked.strandedSince = -1f;
+                continue;
+            }
+
+            if (tracked.strandedSince < 0f)
+            {
+                tracked.strandedSince = Time.time;
+                continue;
+            }
+
+            if (Time.time - tracked.strandedSince < despawnGraceTime) continue;
+
+            Discard(i);
+            EnemiesDiscarded++;
+        }
+    }
+
+    /// <summary>
+    /// True when an enemy has stopped being a threat you could reasonably deal with:
+    /// far away, fallen out of the level, or standing somewhere it cannot path from.
+    /// </summary>
+    bool IsLost(Tracked tracked)
+    {
+        Vector3 position = tracked.go.transform.position;
+
+        // Fallen through the floor. Checked first because it is the unrecoverable one.
+        if (fallKillDepth > 0f && player.position.y - position.y > fallKillDepth) return true;
+
+        if (despawnDistance > 0f &&
+            (position - player.position).sqrMagnitude > despawnDistance * despawnDistance)
+            return true;
+
+        // An agent off the NavMesh cannot reach you by any route. This catches a fall
+        // the frame it starts, long before the body is far enough away to be culled.
+        if (despawnOffNavMesh && tracked.agent != null && tracked.agent.enabled &&
+            !tracked.agent.isOnNavMesh)
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Removes a tracked enemy without crediting a kill. Discarding is not killing:
+    /// no score, no combo, no drop.
+    /// </summary>
+    void Discard(int index)
+    {
+        var tracked = _alive[index];
+        _alive.RemoveAt(index);
+
+        if (tracked.health != null) tracked.health.Died -= OnEnemyDied;
+        if (ActiveBoss == tracked.health) ActiveBoss = null;
+        if (tracked.go != null) Destroy(tracked.go);
+    }
+
+    void DiscardAll()
+    {
+        for (int i = _alive.Count - 1; i >= 0; i--)
+        {
+            Discard(i);
+            EnemiesDiscarded++;
+        }
     }
 
     // ======================================================================
@@ -247,10 +392,7 @@ public class WaveManager : MonoBehaviour
             WaveStarted?.Invoke(CurrentWave);
 
             yield return SpawnWave(CurrentWave);
-
-            // Wait until the arena is clear.
-            while (!GameIsOver && EnemiesRemaining > 0)
-                yield return null;
+            yield return RunUntilWaveEnds();
 
             if (GameIsOver) yield break;
 
@@ -264,6 +406,52 @@ public class WaveManager : MonoBehaviour
             yield return Countdown(intermissionDuration);
             IsIntermission = false;
         }
+    }
+
+    /// <summary>
+    /// Holds the wave open until the arena clears or the clock runs out.
+    ///
+    /// Clearing still ends a wave the moment it happens, so wiping them out is the
+    /// fast way through. What is gone is the *requirement*: waiting on a total wipe
+    /// is a softlock in any level with a hole in it, because an enemy that falls
+    /// through never dies, never arrives and never stops being counted. The leash
+    /// catches most of those within seconds; this clock is the backstop for whatever
+    /// it misses -- something wedged on geometry, stuck behind a door, standing on
+    /// an island of NavMesh it can't leave.
+    /// </summary>
+    IEnumerator RunUntilWaveEnds()
+    {
+        if (!WaveHasTimeLimit)
+        {
+            while (!GameIsOver && EnemiesRemaining > 0) yield return null;
+            yield break;
+        }
+
+        float limit = waveTimeLimit + waveTimeLimitPerEnemy * Mathf.Max(1, _lastWaveTotal);
+        float deadline = Time.time + limit;
+
+        WaveTimeRemaining = limit;
+
+        while (!GameIsOver && EnemiesRemaining > 0 && Time.time < deadline)
+        {
+            WaveTimeRemaining = deadline - Time.time;
+            yield return null;
+        }
+
+        WaveTimeRemaining = 0f;
+
+        if (GameIsOver || _alive.Count == 0) yield break;
+
+        // Timed out with survivors. Whatever is left has had a full wave to reach you
+        // and has not managed it, so it is almost certainly stuck -- and leaving it
+        // alive would mean the intermission is not the break it is supposed to be.
+        int leftovers = _alive.Count;
+
+        if (clearLeftoversOnTimeout) DiscardAll();
+
+        Debug.Log($"[WaveManager] Wave {CurrentWave} ran out its {limit:0}s clock with " +
+                  $"{leftovers} enemy(s) unreachable. " +
+                  (clearLeftoversOnTimeout ? "Removed them." : "Left them in play."), this);
     }
 
     IEnumerator Countdown(float duration)
@@ -291,6 +479,7 @@ public class WaveManager : MonoBehaviour
         }
 
         _pendingSpawns = total;
+        _lastWaveTotal = total;
 
         // A spawn can legitimately fail -- a cornered player, a NavMesh with no room
         // in the ring. Retrying forever would stall the wave with nothing on screen,
@@ -389,7 +578,13 @@ public class WaveManager : MonoBehaviour
         if (health != null) health.Died += OnEnemyDied;
         else Debug.LogWarning($"[WaveManager] {enemy.name} has no Health; it will never be counted as dead.", enemy);
 
-        _alive.Add(enemy);
+        _alive.Add(new Tracked
+        {
+            go = enemy,
+            health = health,
+            agent = enemy.GetComponent<NavMeshAgent>()
+        });
+
         return enemy;
     }
 
@@ -458,7 +653,7 @@ public class WaveManager : MonoBehaviour
 
             for (int attempt = 0; attempt < 24; attempt++)
             {
-                float angle = UnityEngine.Random.value * Mathf.PI * 2f;
+                float angle = NextSpawnAngle();
                 float distance = UnityEngine.Random.Range(minSpawnDistanceFromPlayer,
                                                           maxSpawnDistanceFromPlayer);
 
@@ -475,6 +670,24 @@ public class WaveManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// The compass bearing for the next spawn attempt.
+    ///
+    /// Independent random draws clump: roll a dozen and several land within a few
+    /// degrees of each other, which is why plain randomness tends to funnel a wave
+    /// through one corner of the map. Advancing by the golden angle instead spaces
+    /// consecutive spawns about as far apart on the circle as it is possible to get,
+    /// and the jitter keeps it from reading as a pattern. Attacks then come at you
+    /// from genuinely every direction.
+    /// </summary>
+    float NextSpawnAngle()
+    {
+        const float goldenAngle = 2.39996323f;   // radians; pi * (3 - sqrt 5)
+
+        _spawnAngle = Mathf.Repeat(_spawnAngle + goldenAngle, Mathf.PI * 2f);
+        return _spawnAngle + UnityEngine.Random.Range(-0.35f, 0.35f);
     }
 
     /// <summary>Rotation that faces the player, so nothing arrives with its back turned.</summary>
@@ -646,7 +859,9 @@ public class WaveManager : MonoBehaviour
     void OnEnemyDied(Health health)
     {
         health.Died -= OnEnemyDied;
-        _alive.Remove(health.gameObject);
+
+        for (int i = _alive.Count - 1; i >= 0; i--)
+            if (_alive[i].health == health) { _alive.RemoveAt(i); break; }
 
         if (ActiveBoss == health) ActiveBoss = null;
 
@@ -703,10 +918,8 @@ public class WaveManager : MonoBehaviour
     {
         for (int i = _alive.Count - 1; i >= 0; i--)
         {
-            if (_alive[i] == null) continue;
-
-            var health = _alive[i].GetComponent<Health>();
-            if (health != null) health.Kill();
+            var health = _alive[i].health;
+            if (health != null && !health.IsDead) health.Kill();
         }
     }
 }

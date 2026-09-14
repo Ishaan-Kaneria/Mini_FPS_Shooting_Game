@@ -16,7 +16,7 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs` |
 | Weapons  | `Weapon.cs`, `WeaponData.cs` (ScriptableObject, `FireMode` Single/Burst/Auto), `ImpactLibrary.cs` |
 | Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs` |
-| Waves    | `WaveManager.cs` — endless spawner, per-wave growth, boss waves, `WaveModifier`, dynamic NavMesh ring spawns that avoid the player's view |
+| Waves    | `WaveManager.cs` — endless spawner, per-wave growth, boss waves, `WaveModifier`, golden-angle ring spawns that avoid the player's view, an enemy leash and a wave clock so no wave can stall |
 | Run state | `GameDirector.cs` — score, combo, pause, game over, restart, PlayerPrefs records |
 | Feedback | `HUDController.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs` |
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
@@ -69,6 +69,17 @@ That makes a specific bug class very easy to write and very hard to spot: the ga
 So: **any static field that carries state must be cleared in a `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` hook on its own class.** That hook runs before the first scene loads on every play session, with or without a domain reload. The classes that currently own one are `PlayerMotor`, `GameDirector`, `DamageNumber`, `EnemyHealthBar` and `MobileInput`. `Time.timeScale` is not a static but persists the same way, and `GameDirector` resets it in the same hook.
 
 `Tools/unity-batch.sh FPSKitBatch.VerifyReplay` is the regression test: it plays two real sessions back to back, ends the first on the game over screen (the messiest state a player can leave), and fails if the second does not start clean.
+
+## Waves never require a total wipe
+
+A wave ends on **clear or clock**, whichever comes first. This is deliberate and must not be "simplified" back to waiting for `EnemiesRemaining == 0`: the kit is meant to run in imported levels, and in a real level an enemy that falls through a gap stays alive forever, so a wipe requirement is a guaranteed softlock.
+
+Two independent safety nets, both in `WaveManager`:
+
+- **The leash** (`SweepEnemies` / `IsLost`) discards an enemy that is too far, has fallen too far below the player, or whose agent has left the NavMesh. Discarding deliberately awards no score, no combo and no drop — it is not a kill.
+- **The wave clock** (`RunUntilWaveEnds`) ends the wave regardless of survivors, and clears them so the intermission is a real break.
+
+`despawnDistance` is force-raised at `Start` if it is not comfortably clear of `maxSpawnDistanceFromPlayer`, because a leash inside the spawn ring deletes enemies on arrival and presents as "nothing spawns".
 
 ## Project conventions
 

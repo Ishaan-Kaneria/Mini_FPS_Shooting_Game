@@ -246,15 +246,30 @@ public class HUDController : MonoBehaviour
         if (waveText != null)
             waveText.text = $"WAVE {waveManager.CurrentWave}";
 
-        if (enemiesLeftText != null)
-            enemiesLeftText.text = waveManager.IsIntermission
-                ? string.Empty
-                : $"{waveManager.EnemiesRemaining} LEFT";
+        if (enemiesLeftText != null) enemiesLeftText.text = EnemiesLeftLabel();
 
         if (intermissionText != null)
             intermissionText.text = waveManager.IsIntermission && !waveManager.GameIsOver
                 ? $"NEXT WAVE IN {Mathf.CeilToInt(waveManager.IntermissionRemaining)}"
                 : string.Empty;
+    }
+
+    /// <summary>
+    /// Enemies left, plus the wave clock once it is running. The clock matters because
+    /// the wave no longer requires a total wipe: without it, a player hunting the last
+    /// enemy has no way to know the round will move on by itself.
+    /// </summary>
+    string EnemiesLeftLabel()
+    {
+        if (waveManager.IsIntermission) return string.Empty;
+
+        string left = $"{waveManager.EnemiesRemaining} LEFT";
+
+        float remaining = waveManager.WaveTimeRemaining;
+        if (remaining <= 0f) return left;
+
+        int seconds = Mathf.CeilToInt(remaining);
+        return $"{left}   <size=75%>{seconds / 60}:{seconds % 60:00}</size>";
     }
 
     // ======================================================================

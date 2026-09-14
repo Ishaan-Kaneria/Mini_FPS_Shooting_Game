@@ -112,3 +112,7 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Claude Code personal overrides -- machine-specific paths and private
+# permission rules. The shared .claude/settings.json stays tracked.
+/.claude/settings.local.json

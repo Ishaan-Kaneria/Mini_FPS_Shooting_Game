@@ -180,6 +180,13 @@ namespace FPSKit.EditorTools
             audio.spatialBlend = 1f;
             audio.maxDistance = 40f;
 
+            // ---- floating health bar ----
+            // Rigged enemies get the same readable health as the greybox capsule, sat
+            // above the model's real height rather than a guessed one.
+            var bar = root.AddComponent<EnemyHealthBar>();
+            bar.barMaterial = FPSKitSceneBuilder.GetOrCreateBarMaterial();
+            bar.heightOffset = capsule.height + 0.5f;
+
             // ---- ragdoll ----
             int boneCount = 0;
             if (_buildRagdoll)

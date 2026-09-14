@@ -50,7 +50,13 @@ public class TouchControls : MonoBehaviour
         }
     }
 
-    void OnDisable() => MobileInput.Reset();
+    void OnDisable()
+    {
+        // With the touch layer gone there is nothing driving MobileInput, so it must
+        // stop claiming to be active or the desktop input path stays suppressed.
+        MobileInput.Active = false;
+        MobileInput.Reset();
+    }
 
     void Update()
     {

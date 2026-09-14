@@ -18,13 +18,19 @@ public class Hitbox : MonoBehaviour
         if (owner == null) owner = GetComponentInParent<Health>();
     }
 
-    /// <summary>Applies the multiplier and forwards. Returns the resolved hit.</summary>
+    /// <summary>
+    /// Applies the multiplier and forwards. The returned amount is what actually
+    /// landed, not what was requested -- a corpse still has ragdoll colliders soaking
+    /// raycasts, and an immunity window swallows a hit outright. Reporting the request
+    /// instead would hand the shooter a hitmarker and a damage number for a body that
+    /// took nothing.
+    /// </summary>
     public DamageInfo Receive(DamageInfo info)
     {
         info.amount *= damageMultiplier;
         info.isHeadshot = isHeadshot;
+        info.amount = owner != null ? owner.ApplyDamage(info) : 0f;
 
-        if (owner != null && !owner.IsDead) owner.ApplyDamage(info);
         return info;
     }
 }

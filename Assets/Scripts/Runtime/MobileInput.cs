@@ -55,6 +55,19 @@ public static class MobileInput
     /// Static state survives play-mode restarts in the editor, so the touch UI
     /// clears it on enable and disable.
     /// </summary>
+    /// <summary>
+    /// Clears Active as well as the per-frame state. Domain reload is disabled here, so
+    /// a session that had the touch layer up leaves Active true forever: the next run
+    /// takes the mobile path, skips locking the cursor, and mouse look stops working
+    /// on a desktop scene that has no on-screen controls at all.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStaticState()
+    {
+        Active = false;
+        Reset();
+    }
+
     public static void Reset()
     {
         Move = Vector2.zero;

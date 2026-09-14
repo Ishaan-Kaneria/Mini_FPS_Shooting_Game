@@ -29,6 +29,10 @@ public class WeaponData : ScriptableObject
     [Header("Ammo")]
     public int magazineSize = 30;
     public int reserveAmmo = 150;
+
+    [Tooltip("Ceiling the reserve can be topped up to by pickups. 0 means no ceiling. " +
+             "Without one, a long run turns ammo drops into litter.")]
+    [Min(0)] public int maxReserveAmmo = 360;
     public float reloadTime = 2.1f;
     public bool autoReloadWhenEmpty = true;
 
@@ -64,6 +68,10 @@ public class WeaponData : ScriptableObject
     [Header("Feel")]
     public float muzzleFlashDuration = 0.045f;
     public float impactForce = 35f;
+
+    [Tooltip("Camera shake per shot, 0 to 1. Kept low on an automatic -- shake stacked " +
+             "over a held trigger is the fastest way to make a gun unaimable.")]
+    [Range(0f, 1f)] public float cameraShake = 0.18f;
 
     [Header("Audio (optional)")]
     public AudioClip fireClip;

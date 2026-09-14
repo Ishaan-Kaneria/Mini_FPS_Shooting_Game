@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -59,11 +60,18 @@ public class PlayerMotor : MonoBehaviour
     public float sprintSpeed = 8.2f;
     public float crouchSpeed = 2.8f;
 
-    [Tooltip("High values give the near-instant starts and stops of Valorant/CS. " +
-             "Drop toward 15 for a heavier, Battlefield-style ramp.")]
-    public float groundAcceleration = 40f;
-    public float airAcceleration = 9f;
-    public float friction = 35f;
+    [Tooltip("Metres per second squared, as a real acceleration. 55 reaches walking " +
+             "speed in about a tenth of a second -- the near-instant starts of " +
+             "Valorant/CS with just enough ramp to feel like weight. Drop toward 18 " +
+             "for a heavier, Battlefield-style push-off.")]
+    public float groundAcceleration = 55f;
+
+    [Tooltip("Air control. Well below ground acceleration on purpose: being able to " +
+             "change direction freely mid-jump is what makes a shooter feel floaty.")]
+    public float airAcceleration = 16f;
+
+    [Tooltip("Metres per second squared of braking when you let go of the stick.")]
+    public float friction = 50f;
 
     [Header("Jump and Gravity")]
     [Tooltip("Apex height in metres. Real shooters sit near 0.9; this is deliberately " +
@@ -91,17 +99,59 @@ public class PlayerMotor : MonoBehaviour
     public float bobAmplitude = 0.045f;
     public float bobLerpSpeed = 10f;
 
+    [Tooltip("Metres the camera dips on a hard landing. Small: this is a punctuation " +
+             "mark on the jump, not a stumble.")]
+    public float landDipAmount = 0.12f;
+
+    public float landDipRecovery = 6f;
+
+    [Tooltip("Impact speed below which a touchdown is ignored. isGrounded flickers off " +
+             "for a frame on slopes and floor seams, and without a floor here every seam " +
+             "would fire a landing thump and reset the footstep rhythm.")]
+    public float landImpactThreshold = 4.5f;
+
+    [Header("Camera Shake")]
+    [Tooltip("Degrees of shake at full strength. Weapon fire and damage both feed this.")]
+    public float shakeMagnitude = 1.6f;
+
+    [Tooltip("How fast a shake impulse dies away. Higher is snappier.")]
+    public float shakeDecay = 4.5f;
+
+    public float shakeFrequency = 22f;
+
+    [Header("Fall Damage")]
+    [Tooltip("Off by default. The arena has double jumps and low platforms, so falls are " +
+             "normally the player's own business -- turn this on for a level with real drops.")]
+    public bool fallDamage;
+
+    [Tooltip("Impact speed you can take for free, in metres per second.")]
+    public float safeFallSpeed = 16f;
+
+    [Tooltip("Damage per metre-per-second above the safe speed.")]
+    public float fallDamagePerSpeed = 4f;
+
     [Header("Footsteps (optional)")]
     public AudioSource footstepSource;
     public AudioClip[] footstepClips;
+    public AudioClip landClip;
     public float stepDistance = 2.4f;
     [Range(0f, 1f)] public float footstepVolume = 0.5f;
 
     /// <summary>
-    /// Global input gate. HUDController switches this off on game over and back
-    /// on when a scene loads, so movement and firing both stop at once.
+    /// Global input gate. The GameDirector switches this off on pause and game over
+    /// and back on when a scene loads, so movement and firing both stop at once.
     /// </summary>
     public static bool InputEnabled = true;
+
+    /// <summary>
+    /// This project runs with Enter Play Mode Options on and domain reload disabled,
+    /// so a static keeps whatever the last play session left in it. Any run that ended
+    /// paused or on the game over screen leaves this gate false, and without this hook
+    /// the next run starts with a player who cannot move, look or shoot -- the game
+    /// looks broken while every build check still passes.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStaticState() => InputEnabled = true;
 
     // ---- state read by the weapon, sway and HUD --------------------------
     public bool IsSprinting { get; private set; }
@@ -117,23 +167,39 @@ public class PlayerMotor : MonoBehaviour
     /// <summary>Degrees the view turned this frame (x = yaw, y = pitch). Drives weapon sway.</summary>
     public Vector2 LookDeltaDegrees { get; private set; }
 
+    /// <summary>Impact speed in metres per second. Useful for landing audio and effects.</summary>
+    public event Action<float> Landed;
+
     CharacterController _cc;
+    Health _health;
     Vector3 _velocity;                    // world space, includes vertical
     float _yaw, _pitch;
     float _recoilPitch, _recoilYaw;
     float _recoilRecovery = 9f;
+    float _shake, _shakeSeed;
     float _lastGroundedTime, _lastJumpPressedTime;
     int _jumpsUsed;
     float _lastSprintTapTime = -99f;
     bool _sprintLatched;
     float _bobTimer, _stepAccumulator;
     Vector3 _bobOffset;
+    float _landDip;
+    bool _wasGrounded = true;
+    int _ceilingMask;
 
     void Awake()
     {
         _cc = GetComponent<CharacterController>();
+        _health = GetComponent<Health>();
+
+        // The controller's own height is the source of truth; the inspector value is
+        // only a fallback for a rig assembled without one.
         standHeight = _cc.height;
         _yaw = transform.eulerAngles.y;
+
+        // Never let the stand-up check hit the player's own capsule.
+        _ceilingMask = ~(1 << gameObject.layer);
+        _shakeSeed = UnityEngine.Random.Range(0f, 100f);
 
         if (cameraHolder == null && Camera.main != null)
             cameraHolder = Camera.main.transform.parent;
@@ -166,10 +232,10 @@ public class PlayerMotor : MonoBehaviour
     // ======================================================================
     void HandleCursor()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
-            SetCursorLocked(false);
-        else if (lockCursor && !MobileInput.Active && Input.GetMouseButtonDown(0) &&
-                 Cursor.lockState != CursorLockMode.Locked)
+        // Escape is the GameDirector's pause key, not a cursor key -- unlocking the
+        // mouse while the game kept running just got you killed in a menu.
+        if (lockCursor && !MobileInput.Active && Input.GetMouseButtonDown(0) &&
+            Cursor.lockState != CursorLockMode.Locked)
             SetCursorLocked(true);
     }
 
@@ -239,10 +305,34 @@ public class PlayerMotor : MonoBehaviour
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0f, decay);
         _recoilYaw = Mathf.Lerp(_recoilYaw, 0f, decay);
 
+        _shake = Mathf.MoveTowards(_shake, 0f, shakeDecay * Time.deltaTime);
+
         transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
 
-        if (cameraHolder != null)
-            cameraHolder.localRotation = Quaternion.Euler(_pitch - _recoilPitch, _recoilYaw, 0f);
+        if (cameraHolder == null) return;
+
+        Vector3 shake = CurrentShake();
+        cameraHolder.localRotation = Quaternion.Euler(
+            _pitch - _recoilPitch + shake.x,
+            _recoilYaw + shake.y,
+            shake.z);
+    }
+
+    /// <summary>
+    /// Perlin rather than Random: consecutive frames stay correlated, so the view
+    /// swims instead of buzzing. White-noise shake reads as a broken camera.
+    /// </summary>
+    Vector3 CurrentShake()
+    {
+        if (_shake <= 0.0001f) return Vector3.zero;
+
+        float t = Time.time * shakeFrequency + _shakeSeed;
+        float amount = _shake * _shake * shakeMagnitude;   // squared: dies away fast
+
+        return new Vector3(
+            (Mathf.PerlinNoise(t, 0f) - 0.5f) * 2f * amount,
+            (Mathf.PerlinNoise(0f, t) - 0.5f) * 2f * amount,
+            (Mathf.PerlinNoise(t, t) - 0.5f) * 2f * amount * 0.6f);
     }
 
     /// <summary>
@@ -250,6 +340,28 @@ public class PlayerMotor : MonoBehaviour
     /// Input Manager scaling. This 1:1 response is what separates a shooter that
     /// feels tight from one that feels like dragging the view through syrup.
     /// </summary>
+    Vector2 ReadMouseCounts()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (rawMouseInput && Mouse.current != null) return Mouse.current.delta.ReadValue();
+#endif
+        return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * legacyAxisScale;
+    }
+
+    /// <summary>Called by Weapon on every shot. Vertical is degrees up, horizontal is plus/minus yaw.</summary>
+    public void AddRecoil(float vertical, float horizontal, float recovery = 9f)
+    {
+        _recoilPitch += vertical;
+        _recoilYaw += UnityEngine.Random.Range(-horizontal, horizontal);
+        _recoilRecovery = Mathf.Max(0.1f, recovery);
+    }
+
+    /// <summary>
+    /// Adds a camera shake impulse, 0 to 1. Impulses take the strongest rather than
+    /// summing, so a burst of fire cannot stack into an unplayable screen.
+    /// </summary>
+    public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount));
+
     /// <summary>
     /// Sprint is a double-tap rather than a held key, so the sprint key can double
     /// as the fire key. The first tap still fires -- that is unavoidable when one
@@ -268,8 +380,10 @@ public class PlayerMotor : MonoBehaviour
             _lastSprintTapTime = Time.time;
         }
 
-        // Drop out of the sprint once you stop advancing.
+        // Drop out of the sprint once you stop advancing, or once you crouch --
+        // otherwise standing back up silently resumes a sprint you never asked for.
         if (controls.sprintEndsWhenNotAdvancing && moveInput.y <= 0.1f) _sprintLatched = false;
+        if (IsCrouching) _sprintLatched = false;
 
         return _sprintLatched;
     }
@@ -294,22 +408,6 @@ public class PlayerMotor : MonoBehaviour
 
         // Joystick wins when it is being pushed, so the two never fight.
         return MobileInput.Move.sqrMagnitude > 0.001f ? MobileInput.Move : keyboard;
-    }
-
-    Vector2 ReadMouseCounts()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (rawMouseInput && Mouse.current != null) return Mouse.current.delta.ReadValue();
-#endif
-        return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * legacyAxisScale;
-    }
-
-    /// <summary>Called by Weapon on every shot. Vertical is degrees up, horizontal is plus/minus yaw.</summary>
-    public void AddRecoil(float vertical, float horizontal, float recovery = 9f)
-    {
-        _recoilPitch += vertical;
-        _recoilYaw += Random.Range(-horizontal, horizontal);
-        _recoilRecovery = Mathf.Max(0.1f, recovery);
     }
 
     // ======================================================================
@@ -337,7 +435,7 @@ public class PlayerMotor : MonoBehaviour
         float distance = Mathf.Max(0.05f, standHeight - _cc.height + 0.05f);
 
         return Physics.SphereCast(origin, _cc.radius * 0.95f, Vector3.up, out _, distance,
-                                  ~0, QueryTriggerInteraction.Ignore);
+                                  _ceilingMask, QueryTriggerInteraction.Ignore);
     }
 
     // ======================================================================
@@ -364,10 +462,13 @@ public class PlayerMotor : MonoBehaviour
         Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);
         float accel = IsGrounded ? groundAcceleration : airAcceleration;
 
+        // Acceleration is metres per second squared, full stop. The old code scaled it
+        // by the target speed as well, which turned "40" into 224 m/s^2 and made every
+        // ramp instantaneous -- the knob existed but could not be felt.
         if (input.sqrMagnitude > 0.001f)
-            planar = Vector3.MoveTowards(planar, wish, accel * targetSpeed * Time.deltaTime);
+            planar = Vector3.MoveTowards(planar, wish, accel * Time.deltaTime);
         else if (IsGrounded)
-            planar = Vector3.MoveTowards(planar, Vector3.zero, friction * targetSpeed * Time.deltaTime);
+            planar = Vector3.MoveTowards(planar, Vector3.zero, friction * Time.deltaTime);
 
         _velocity.x = planar.x;
         _velocity.z = planar.z;
@@ -376,9 +477,14 @@ public class PlayerMotor : MonoBehaviour
         if (IsGrounded && _velocity.y < 0f) _velocity.y = -2f;
 
         bool withinCoyote = Time.time - _lastGroundedTime <= coyoteTime;
-        bool jumpQueued = Time.time - _lastJumpPressedTime <= jumpBuffer;
 
-        // First jump needs ground (or coyote time); later ones are air jumps.
+        // Walking off a ledge has to spend the ground jump. Without this the first
+        // jump is gone (no ground, coyote expired) and the air jump is not available
+        // either (it needs _jumpsUsed > 0) -- you fall off a crate with maxJumps = 2
+        // and cannot jump at all.
+        if (!IsGrounded && !withinCoyote && _jumpsUsed == 0) _jumpsUsed = 1;
+
+        bool jumpQueued = Time.time - _lastJumpPressedTime <= jumpBuffer;
         bool canGroundJump = _jumpsUsed == 0 && withinCoyote;
         bool canAirJump = _jumpsUsed > 0 && _jumpsUsed < maxJumps;
 
@@ -393,9 +499,37 @@ public class PlayerMotor : MonoBehaviour
         }
 
         _velocity.y += gravity * Time.deltaTime;
-        _cc.Move(_velocity * Time.deltaTime);
+
+        float impactSpeed = -_velocity.y;
+        CollisionFlags flags = _cc.Move(_velocity * Time.deltaTime);
+
+        // Clipping the head on an overhang has to kill the upward velocity, or you
+        // hang under the ceiling for the rest of the arc still travelling up.
+        if ((flags & CollisionFlags.Above) != 0 && _velocity.y > 0f) _velocity.y = 0f;
+
+        IsGrounded = _cc.isGrounded;
+        if (IsGrounded && !_wasGrounded) OnLanded(impactSpeed);
+        _wasGrounded = IsGrounded;
 
         PlanarSpeed01 = Mathf.Clamp01(new Vector2(_velocity.x, _velocity.z).magnitude / sprintSpeed);
+    }
+
+    void OnLanded(float impactSpeed)
+    {
+        if (impactSpeed < landImpactThreshold) return;
+
+        _landDip = Mathf.Min(landDipAmount, landDipAmount * impactSpeed / 12f);
+        _stepAccumulator = 0f;
+
+        if (landClip != null && footstepSource != null)
+            footstepSource.PlayOneShot(landClip, footstepVolume);
+        else
+            PlayFootstep();
+
+        if (fallDamage && _health != null && impactSpeed > safeFallSpeed)
+            _health.ApplyDamage((impactSpeed - safeFallSpeed) * fallDamagePerSpeed, gameObject);
+
+        Landed?.Invoke(impactSpeed);
     }
 
     // ======================================================================
@@ -407,6 +541,7 @@ public class PlayerMotor : MonoBehaviour
         float moveAmount = IsGrounded ? PlanarSpeed01 : 0f;
 
         _bobTimer += Time.deltaTime * bobFrequency * (0.6f + moveAmount);
+        _landDip = Mathf.MoveTowards(_landDip, 0f, landDipRecovery * landDipAmount * Time.deltaTime);
 
         Vector3 target = moveAmount > 0.05f
             ? new Vector3(Mathf.Cos(_bobTimer * 0.5f) * bobAmplitude * moveAmount,
@@ -414,7 +549,8 @@ public class PlayerMotor : MonoBehaviour
             : Vector3.zero;
 
         _bobOffset = Vector3.Lerp(_bobOffset, target, bobLerpSpeed * Time.deltaTime);
-        cameraHolder.localPosition = new Vector3(_bobOffset.x, eyeHeight + _bobOffset.y, 0f);
+        cameraHolder.localPosition = new Vector3(_bobOffset.x,
+                                                 eyeHeight + _bobOffset.y - _landDip, 0f);
 
         if (!IsGrounded) return;
 
@@ -429,10 +565,10 @@ public class PlayerMotor : MonoBehaviour
     {
         if (footstepSource == null || footstepClips == null || footstepClips.Length == 0) return;
 
-        var clip = footstepClips[Random.Range(0, footstepClips.Length)];
+        var clip = footstepClips[UnityEngine.Random.Range(0, footstepClips.Length)];
         if (clip == null) return;
 
-        footstepSource.pitch = Random.Range(0.92f, 1.08f);
+        footstepSource.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
         footstepSource.PlayOneShot(clip, footstepVolume * (IsCrouching ? 0.4f : 1f));
     }
 

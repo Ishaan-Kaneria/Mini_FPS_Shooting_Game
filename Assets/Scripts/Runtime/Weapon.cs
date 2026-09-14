@@ -21,6 +21,15 @@ public class Weapon : MonoBehaviour
     [Tooltip("Layers the bullet can hit. Exclude the Player layer.")]
     public LayerMask hitMask = ~0;
 
+    [Header("Feedback")]
+    [Tooltip("Pop the damage dealt over whatever you hit. Reading the numbers is how a " +
+             "player works out that headshots are worth aiming for.")]
+    public bool showDamageNumbers = true;
+
+    public Color damageNumberColor = new Color(1f, 0.92f, 0.75f);
+    public Color headshotNumberColor = new Color(1f, 0.82f, 0.2f);
+    public Color killNumberColor = new Color(1f, 0.45f, 0.35f);
+
     // ---- state read by the HUD and sway ----------------------------------
     public WeaponData Data => data;
     public int CurrentAmmo { get; private set; }
@@ -49,6 +58,7 @@ public class Weapon : MonoBehaviour
     float _kickback;
     float _muzzleLightOffTime;
     bool _burstInProgress;
+    bool _mobileFireWasDown;
 
     // ======================================================================
     void Awake()
@@ -106,20 +116,27 @@ public class Weapon : MonoBehaviour
     // ======================================================================
     void HandleFireInput(ControlSettings controls)
     {
+        // MobileInput.Fire is a held flag. Feeding it straight into the semi-auto and
+        // burst cases made a touch screen fire every one of them like a full-auto, so
+        // the press edge is derived here instead.
+        bool touchHeld = MobileInput.Fire;
+        bool touchPressed = touchHeld && !_mobileFireWasDown;
+        _mobileFireWasDown = touchHeld;
+
         if (Time.time < _nextFireTime || IsReloading || _burstInProgress) return;
 
         switch (data.fireMode)
         {
             case FireMode.Auto:
-                if (ControlSettings.Held(controls.fire) || MobileInput.Fire) FireOnce();
+                if (ControlSettings.Held(controls.fire) || touchHeld) FireOnce();
                 break;
 
             case FireMode.Single:
-                if (ControlSettings.Pressed(controls.fire) || MobileInput.Fire) FireOnce();
+                if (ControlSettings.Pressed(controls.fire) || touchPressed) FireOnce();
                 break;
 
             case FireMode.Burst:
-                if (ControlSettings.Pressed(controls.fire) || MobileInput.Fire)
+                if (ControlSettings.Pressed(controls.fire) || touchPressed)
                     StartCoroutine(BurstRoutine());
                 break;
         }
@@ -162,9 +179,13 @@ public class Weapon : MonoBehaviour
         // Recoil, spread growth and the visual punch.
         float recoilScale = Mathf.Lerp(1f, data.adsRecoilMultiplier, AimProgress);
         if (_motor != null)
+        {
             _motor.AddRecoil(data.recoilVertical * recoilScale,
                              data.recoilHorizontal * recoilScale,
                              data.recoilRecovery);
+
+            _motor.AddShake(data.cameraShake * recoilScale);
+        }
 
         float maxBonus = Mathf.Max(0f, data.maxSpread - data.baseSpread);
         _spreadBonus = Mathf.Min(maxBonus, _spreadBonus + data.spreadPerShot);
@@ -193,15 +214,24 @@ public class Weapon : MonoBehaviour
             var hitbox = hit.collider.GetComponent<Hitbox>();
             if (hitbox != null)
             {
-                DealtDamage?.Invoke(this, hitbox.Receive(info));
+                var resolved = hitbox.Receive(info);
+                if (resolved.amount > 0f)
+                {
+                    DealtDamage?.Invoke(this, resolved);
+                    ShowDamage(resolved, hitbox.owner);
+                }
             }
             else
             {
                 var health = hit.collider.GetComponentInParent<Health>();
-                if (health != null && !health.IsDead)
+                if (health != null)
                 {
-                    health.ApplyDamage(info);
-                    DealtDamage?.Invoke(this, info);
+                    info.amount = health.ApplyDamage(info);
+                    if (info.amount > 0f)
+                    {
+                        DealtDamage?.Invoke(this, info);
+                        ShowDamage(info, health);
+                    }
                 }
             }
 
@@ -267,10 +297,48 @@ public class Weapon : MonoBehaviour
         ReloadFinished?.Invoke(this);
     }
 
-    public void AddReserveAmmo(int amount)
+    /// <summary>
+    /// Tops up the reserve and returns how much actually fitted. A pickup checks that
+    /// return value so it refuses to be consumed when the reserve is already full.
+    /// </summary>
+    public int AddReserveAmmo(int amount)
     {
-        ReserveAmmo = Mathf.Max(0, ReserveAmmo + amount);
-        AmmoChanged?.Invoke(this);
+        if (amount <= 0) return 0;
+
+        // Infinite reserve means ammo pickups have nothing to give.
+        if (data != null && (data.infiniteReserve || data.infiniteAmmo)) return 0;
+
+        int cap = data != null && data.maxReserveAmmo > 0 ? data.maxReserveAmmo : int.MaxValue;
+        int before = ReserveAmmo;
+
+        ReserveAmmo = Mathf.Clamp(ReserveAmmo + amount, 0, cap);
+
+        int taken = ReserveAmmo - before;
+        if (taken > 0) AmmoChanged?.Invoke(this);
+
+        return taken;
+    }
+
+    /// <summary>Floats the damage dealt over the target, brighter for a headshot or a kill.</summary>
+    void ShowDamage(DamageInfo info, Health target)
+    {
+        if (!showDamageNumbers || info.amount <= 0f) return;
+
+        bool killed = target != null && target.IsDead;
+
+        Color color = killed ? killNumberColor
+                    : info.isHeadshot ? headshotNumberColor
+                    : damageNumberColor;
+
+        DamageNumber.Show(info.point, info.amount, color,
+                          killed ? 1.35f : info.isHeadshot ? 1.15f : 1f);
+    }
+
+    void OnDisable()
+    {
+        // Aiming halves look sensitivity. Leaving that behind on a disabled weapon
+        // would quietly stick the player with slow mouse look and no way back.
+        if (_motor != null) _motor.LookSensitivityMultiplier = 1f;
     }
 
     // ======================================================================

@@ -3,18 +3,28 @@ using UnityEngine;
 using UnityEngine.AI;
 
 /// <summary>
-/// NavMesh chaser with line-of-sight checks, a wind-up before it commits to an
-/// attack, and optional ranged fire. Drop an Animator in and the float/trigger
-/// parameters below get driven automatically.
+/// NavMesh hunter with line-of-sight checks, a telegraphed wind-up before it
+/// commits, ranged fire, crowd separation, strafing and a stagger reaction.
+///
+/// The behaviour is deliberately layered rather than scripted per enemy type: an
+/// <see cref="EnemyArchetype"/> stamps numbers onto these knobs at spawn, and
+/// <see cref="ApplyWaveTuning"/> sharpens them as the waves climb. One brain,
+/// many enemies, no per-variant code.
+///
+/// Drop an Animator in and the float/trigger parameters below get driven automatically.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyAI : MonoBehaviour
 {
-    public enum State { Idle, Chase, Attack, Dead }
+    public enum State { Idle, Chase, Attack, Stagger, Dead }
 
     [Header("Wiring")]
     public Transform eyes;
     public Transform target;
+
+    [Tooltip("Assigned by the WaveManager at spawn. Read for score value and drops; " +
+             "leave empty on a hand-placed enemy and it simply uses the fields below.")]
+    public EnemyArchetype archetype;
 
     [Header("Behaviour")]
     public bool ranged;
@@ -22,8 +32,15 @@ public class EnemyAI : MonoBehaviour
     public float attackDamage = 12f;
     public float attackCooldown = 1.3f;
 
-    [Tooltip("Telegraph time before damage lands. Gives the player a chance to back off.")]
+    [Tooltip("Telegraph time before damage lands. This is the player's reaction window, " +
+             "so it is the one number wave scaling is not allowed to grind away.")]
     public float attackWindup = 0.35f;
+
+    [Tooltip("Shots fired per ranged attack.")]
+    [Min(1)] public int shotsPerAttack = 1;
+
+    [Tooltip("Seconds between the shots of one burst.")]
+    public float burstInterval = 0.12f;
 
     [Header("Senses")]
     public float detectionRadius = 35f;
@@ -37,10 +54,43 @@ public class EnemyAI : MonoBehaviour
              "They still need sight or range to actually attack.")]
     public bool relentless = true;
 
+    [Header("Movement")]
+    [Tooltip("How hard it sidesteps while closing. A crowd that all walks the direct line " +
+             "arrives as a single-file queue you can hold with one magazine; a crowd that " +
+             "circles forces you to keep moving.")]
+    [Range(0f, 1f)] public float strafeAmount = 0.35f;
+
+    [Tooltip("Seconds before it reverses its circling direction, so the weave is not a treadmill.")]
+    public float strafeFlipInterval = 2.6f;
+
+    [Tooltip("Enemies inside this radius push each other apart. Without it they converge " +
+             "into one stack of overlapping bodies and the fight stops reading.")]
+    public float separationRadius = 2.4f;
+
+    [Range(0f, 4f)] public float separationStrength = 1.8f;
+
+    [Tooltip("Speed multiplier for a short sprint once it reaches charge range. 1 disables it.")]
+    [Min(1f)] public float chargeSpeedMultiplier = 1f;
+
+    public float chargeRange = 10f;
+    public float chargeDuration = 1.1f;
+    public float chargeCooldown = 4f;
+
     [Header("Ranged Only")]
     public float rangedSpread = 2.5f;
     public float preferredRangedDistance = 12f;
     public LayerMask rangedHitMask = ~0;
+
+    [Header("Reactions")]
+    [Tooltip("Damage in one hit needed to interrupt it. This is what makes a strong weapon " +
+             "feel strong: the enemy visibly flinches and loses its wind-up. 0 never staggers.")]
+    [Min(0f)] public float staggerThreshold = 18f;
+
+    public float staggerDuration = 0.45f;
+
+    [Tooltip("Colour the body flashes while winding up an attack. The flash is the tell -- " +
+             "without it a melee hit out of a crowd is unreadable.")]
+    [ColorUsage(false, true)] public Color telegraphColor = new Color(2.6f, 0.5f, 0.15f);
 
     [Header("Audio (optional)")]
     public AudioClip alertClip;
@@ -55,17 +105,51 @@ public class EnemyAI : MonoBehaviour
 
     public State CurrentState { get; private set; } = State.Idle;
 
+    /// <summary>0 on wave 1, 1 once the difficulty curve has topped out. Read by the HUD/debug.</summary>
+    public float Aggression { get; private set; }
+
     NavMeshAgent _agent;
     Health _health;
     Health _targetHealth;
     AudioSource _audio;
     Collider[] _colliders;
+    RagdollController _ragdoll;
 
+    Renderer[] _renderers;
+    MaterialPropertyBlock _block;
+    Color[] _restBodyColor;
+    Color[] _restGlowColor;
+
+    Coroutine _attackRoutine;
+
+    float _baseSpeed = 4f;
     float _nextAttackTime;
     float _nextRepathTime;
     float _lastSeenTime = -9999f;
+    float _strafeFlipTime;
+    float _strafeSign = 1f;
+    float _jitterAngle;
+    float _staggerUntil;
+    float _chargeUntil;
+    float _nextChargeTime;
+    float _windupStart, _windupEnd;
     bool _attacking;
     bool _hasAlerted;
+    bool _flashing;
+
+    static readonly Collider[] NeighbourBuffer = new Collider[16];
+
+    /// <summary>Every renderer that is part of the body, excluding the floating health bar.</summary>
+    Renderer[] BodyRenderers()
+    {
+        var all = GetComponentsInChildren<Renderer>();
+        var body = new System.Collections.Generic.List<Renderer>(all.Length);
+
+        foreach (var renderer in all)
+            if (renderer != null && !EnemyHealthBar.IsBarRenderer(renderer)) body.Add(renderer);
+
+        return body.ToArray();
+    }
 
     // ======================================================================
     void Awake()
@@ -74,19 +158,29 @@ public class EnemyAI : MonoBehaviour
         _health = GetComponent<Health>();
         _audio = GetComponent<AudioSource>();
         _colliders = GetComponentsInChildren<Collider>();
+        _ragdoll = GetComponent<RagdollController>();
 
         if (eyes == null) eyes = transform;
         if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        _renderers = BodyRenderers();
+        _block = new MaterialPropertyBlock();
     }
 
     void OnEnable()
     {
-        if (_health != null) _health.Died += OnDied;
+        if (_health == null) return;
+
+        _health.Died += OnDied;
+        _health.Damaged += OnDamaged;
     }
 
     void OnDisable()
     {
-        if (_health != null) _health.Died -= OnDied;
+        if (_health == null) return;
+
+        _health.Died -= OnDied;
+        _health.Damaged -= OnDamaged;
     }
 
     void Start()
@@ -98,6 +192,17 @@ public class EnemyAI : MonoBehaviour
         }
 
         if (target != null) _targetHealth = target.GetComponentInParent<Health>();
+
+        // Captured here rather than in Awake: the archetype and the wave's speed
+        // growth are both applied after Instantiate returns, so Awake would bank
+        // the unscaled prefab value and every charge would slow the enemy down.
+        _baseSpeed = _agent.speed;
+
+        _strafeSign = Random.value < 0.5f ? -1f : 1f;
+        _strafeFlipTime = Time.time + Random.Range(0.5f, strafeFlipInterval);
+        _jitterAngle = Random.Range(0f, Mathf.PI * 2f);
+
+        CacheRestColors();
 
         if (!_agent.isOnNavMesh)
             Debug.LogWarning($"[EnemyAI] {name} spawned off the NavMesh and cannot move.", this);
@@ -112,6 +217,16 @@ public class EnemyAI : MonoBehaviour
         {
             Stop();
             CurrentState = State.Idle;
+            UpdateAnimator();
+            return;
+        }
+
+        UpdateTelegraph();
+
+        if (Time.time < _staggerUntil)
+        {
+            Stop();
+            CurrentState = State.Stagger;
             UpdateAnimator();
             return;
         }
@@ -144,11 +259,12 @@ public class EnemyAI : MonoBehaviour
             if (inAttackPosition && Time.time >= _nextAttackTime)
             {
                 CurrentState = State.Attack;
-                StartCoroutine(AttackRoutine());
+                _attackRoutine = StartCoroutine(AttackRoutine());
             }
             else
             {
                 CurrentState = State.Chase;
+                UpdateCharge(distance);
                 MoveTowardTarget(distance);
             }
         }
@@ -160,28 +276,104 @@ public class EnemyAI : MonoBehaviour
     }
 
     // ======================================================================
+    // Movement
+    // ======================================================================
+
+    /// <summary>
+    /// Picks a destination that is not simply "where the player is standing". The
+    /// direct line is the worst possible approach in a crowd: everyone shares it,
+    /// so they trail into a queue and die one at a time. Offsetting sideways and
+    /// pushing off neighbours turns the same enemies into something that surrounds you.
+    /// </summary>
     void MoveTowardTarget(float distance)
     {
         if (!_agent.isOnNavMesh) return;
+
+        _agent.isStopped = false;
         if (Time.time < _nextRepathTime) return;
 
         _nextRepathTime = Time.time + repathInterval;
-        _agent.isStopped = false;
 
-        // Ranged units hold a firing line instead of walking into melee.
-        if (ranged && distance < preferredRangedDistance * 0.6f)
+        if (Time.time >= _strafeFlipTime)
         {
-            Vector3 away = (transform.position - target.position).normalized;
-            Vector3 retreat = transform.position + away * 3f;
-
-            if (NavMesh.SamplePosition(retreat, out NavMeshHit hit, 4f, NavMesh.AllAreas))
-            {
-                _agent.SetDestination(hit.position);
-                return;
-            }
+            _strafeSign = -_strafeSign;
+            _strafeFlipTime = Time.time + strafeFlipInterval * Random.Range(0.7f, 1.3f);
         }
 
-        _agent.SetDestination(target.position);
+        Vector3 toTarget = target.position - transform.position;
+        toTarget.y = 0f;
+
+        Vector3 forward = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : transform.forward;
+        Vector3 right = Vector3.Cross(Vector3.up, forward);
+
+        // How far out it wants to sit: its firing line, or just inside melee reach.
+        float standOff = ranged ? preferredRangedDistance : attackRange * 0.7f;
+        Vector3 goal = target.position - forward * standOff;
+
+        // Circle while there is still ground to cover; stop circling on arrival so
+        // it actually closes instead of orbiting forever just out of reach.
+        float closing = Mathf.Clamp01((distance - standOff) / 8f);
+        goal += right * (_strafeSign * strafeAmount * 6f * closing);
+
+        goal += Separation();
+
+        if (NavMesh.SamplePosition(goal, out NavMeshHit hit, 4f, NavMesh.AllAreas))
+            _agent.SetDestination(hit.position);
+        else
+            _agent.SetDestination(target.position);
+    }
+
+    /// <summary>Sum of pushes away from nearby enemies, strongest when almost overlapping.</summary>
+    Vector3 Separation()
+    {
+        if (separationStrength <= 0f || separationRadius <= 0f) return Vector3.zero;
+
+        int count = Physics.OverlapSphereNonAlloc(transform.position, separationRadius,
+                                                  NeighbourBuffer, 1 << gameObject.layer,
+                                                  QueryTriggerInteraction.Ignore);
+        Vector3 push = Vector3.zero;
+
+        for (int i = 0; i < count; i++)
+        {
+            var other = NeighbourBuffer[i];
+            if (other == null || other.transform.root == transform.root) continue;
+
+            Vector3 away = transform.position - other.transform.position;
+            away.y = 0f;
+
+            float distance = away.magnitude;
+            if (distance < 0.01f)
+            {
+                // Perfectly stacked: shove along this enemy's own fixed bearing so the
+                // pair separates, instead of both reading a zero vector and staying put.
+                push += new Vector3(Mathf.Cos(_jitterAngle), 0f, Mathf.Sin(_jitterAngle));
+                continue;
+            }
+
+            push += away / distance * (1f - distance / separationRadius);
+        }
+
+        return push * separationStrength;
+    }
+
+    /// <summary>A short sprint in mid-range, so closing the last stretch has some threat to it.</summary>
+    void UpdateCharge(float distance)
+    {
+        if (chargeSpeedMultiplier <= 1f) return;
+
+        if (Time.time < _chargeUntil)
+        {
+            _agent.speed = _baseSpeed * chargeSpeedMultiplier;
+            return;
+        }
+
+        _agent.speed = _baseSpeed;
+
+        bool inWindow = distance <= chargeRange && distance > attackRange;
+        if (!inWindow || Time.time < _nextChargeTime) return;
+
+        _chargeUntil = Time.time + chargeDuration;
+        _nextChargeTime = Time.time + chargeCooldown;
     }
 
     void Stop()
@@ -216,6 +408,8 @@ public class EnemyAI : MonoBehaviour
     }
 
     // ======================================================================
+    // Attacking
+    // ======================================================================
     IEnumerator AttackRoutine()
     {
         _attacking = true;
@@ -226,16 +420,32 @@ public class EnemyAI : MonoBehaviour
 
         PlayClip(attackClip);
 
+        _windupStart = Time.time;
+        _windupEnd = Time.time + attackWindup;
+
         yield return new WaitForSeconds(attackWindup);
+
+        ClearTelegraph();
 
         if (CurrentState != State.Dead && target != null && _targetHealth != null && !_targetHealth.IsDead)
         {
-            if (ranged) FireRangedShot();
-            else TryMeleeHit();
+            if (ranged)
+            {
+                for (int i = 0; i < Mathf.Max(1, shotsPerAttack); i++)
+                {
+                    FireRangedShot();
+                    if (i < shotsPerAttack - 1) yield return new WaitForSeconds(burstInterval);
+                }
+            }
+            else
+            {
+                TryMeleeHit();
+            }
         }
 
         _nextAttackTime = Time.time + attackCooldown;
         _attacking = false;
+        _attackRoutine = null;
     }
 
     void TryMeleeHit()
@@ -251,6 +461,8 @@ public class EnemyAI : MonoBehaviour
 
     void FireRangedShot()
     {
+        if (target == null) return;
+
         Vector3 origin = eyes.position;
         Vector3 direction = ((target.position + Vector3.up * 1.2f) - origin).normalized;
 
@@ -273,11 +485,41 @@ public class EnemyAI : MonoBehaviour
     }
 
     // ======================================================================
+    // Reactions
+    // ======================================================================
+    void OnDamaged(Health health, DamageInfo info)
+    {
+        if (CurrentState == State.Dead) return;
+
+        // Getting shot is an introduction. Even out of its field of view, an enemy
+        // that takes a hit should turn and commit rather than stand there.
+        _hasAlerted = true;
+        _lastSeenTime = Time.time;
+
+        if (staggerThreshold <= 0f || info.amount < staggerThreshold) return;
+
+        _staggerUntil = Time.time + staggerDuration;
+
+        if (_attackRoutine != null)
+        {
+            StopCoroutine(_attackRoutine);
+            _attackRoutine = null;
+            _attacking = false;
+        }
+
+        ClearTelegraph();
+
+        // A stagger that did not also cost it the attack would be decoration.
+        _nextAttackTime = Mathf.Max(_nextAttackTime, Time.time + staggerDuration);
+        _chargeUntil = 0f;
+    }
+
     void OnDied(Health health)
     {
         CurrentState = State.Dead;
         _attacking = false;
         StopAllCoroutines();
+        ClearTelegraph();
 
         if (_agent != null && _agent.isOnNavMesh)
         {
@@ -285,8 +527,14 @@ public class EnemyAI : MonoBehaviour
             _agent.enabled = false;
         }
 
-        foreach (var col in _colliders)
-            if (col != null) col.enabled = false;
+        // With a ragdoll present the bone colliders ARE the corpse's physics, so
+        // switching them off here would drop it straight through the floor. Let the
+        // RagdollController own collider state in that case.
+        if (_ragdoll == null)
+        {
+            foreach (var col in _colliders)
+                if (col != null) col.enabled = false;
+        }
 
         if (animator != null && !string.IsNullOrEmpty(deathTrigger))
             animator.SetTrigger(deathTrigger);
@@ -295,11 +543,128 @@ public class EnemyAI : MonoBehaviour
         enabled = false;
     }
 
+    // ======================================================================
+    // Difficulty
+    // ======================================================================
+
+    /// <summary>
+    /// Sharpens this enemy for a later wave. Cooldowns tighten, it circles harder
+    /// and it shoots straighter -- but the wind-up only compresses part way and
+    /// never past a floor, because that telegraph is the whole reason a crowd is
+    /// survivable. Take the reaction window away and difficulty becomes unfairness.
+    /// </summary>
+    public void ApplyWaveTuning(float aggression01)
+    {
+        Aggression = Mathf.Clamp01(aggression01);
+
+        attackCooldown = Mathf.Max(0.35f, attackCooldown * Mathf.Lerp(1f, 0.6f, Aggression));
+        attackWindup = Mathf.Max(0.18f, attackWindup * Mathf.Lerp(1f, 0.75f, Aggression));
+
+        strafeAmount = Mathf.Clamp01(strafeAmount + 0.35f * Aggression);
+        rangedSpread = Mathf.Max(0.5f, rangedSpread * Mathf.Lerp(1f, 0.55f, Aggression));
+        detectionRadius *= Mathf.Lerp(1f, 1.25f, Aggression);
+        loseTargetTime *= Mathf.Lerp(1f, 1.6f, Aggression);
+    }
+
+    // ======================================================================
+    // Presentation
+    // ======================================================================
+
+    /// <summary>
+    /// Records the colours the archetype left on each renderer, so the wind-up flash
+    /// has something to return to. Runs after the archetype has been stamped on.
+    /// </summary>
+    void CacheRestColors()
+    {
+        if (_renderers == null) return;
+
+        _restBodyColor = new Color[_renderers.Length];
+        _restGlowColor = new Color[_renderers.Length];
+
+        for (int i = 0; i < _renderers.Length; i++)
+        {
+            var renderer = _renderers[i];
+            if (renderer == null) continue;
+
+            // Cleared first: a renderer with no block of its own leaves whatever was
+            // read last still sitting in this one, and every body part after the first
+            // would inherit the first part's colour as its "rest" state.
+            _block.Clear();
+            renderer.GetPropertyBlock(_block);
+
+            _restBodyColor[i] = _block.HasColor("_BaseColor")
+                ? _block.GetColor("_BaseColor")
+                : ReadSharedColor(renderer, "_BaseColor");
+
+            _restGlowColor[i] = _block.HasColor("_EmissionColor")
+                ? _block.GetColor("_EmissionColor")
+                : Color.black;
+        }
+    }
+
+    static Color ReadSharedColor(Renderer renderer, string property)
+    {
+        var material = renderer.sharedMaterial;
+        if (material == null) return Color.white;
+
+        if (material.HasProperty(property)) return material.GetColor(property);
+        return material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white;
+    }
+
+    /// <summary>Ramps the body toward the warning colour across the wind-up.</summary>
+    void UpdateTelegraph()
+    {
+        if (!_attacking || _windupEnd <= _windupStart) return;
+
+        float t = Mathf.InverseLerp(_windupStart, _windupEnd, Time.time);
+
+        // Ease in so the flash peaks right before the hit, not the moment it starts.
+        SetFlash(t * t);
+    }
+
+    void SetFlash(float amount)
+    {
+        if (_renderers == null || _restBodyColor == null) return;
+
+        amount = Mathf.Clamp01(amount);
+        _flashing = amount > 0.001f;
+
+        for (int i = 0; i < _renderers.Length; i++)
+        {
+            var renderer = _renderers[i];
+            if (renderer == null) continue;
+
+            renderer.GetPropertyBlock(_block);
+
+            Color body = Color.Lerp(_restBodyColor[i], telegraphColor, amount * 0.6f);
+            Color glow = Color.Lerp(_restGlowColor[i], telegraphColor, amount);
+
+            _block.SetColor("_BaseColor", body);
+            _block.SetColor("_Color", body);
+            _block.SetColor("_EmissionColor", glow);
+            renderer.SetPropertyBlock(_block);
+        }
+    }
+
+    void ClearTelegraph()
+    {
+        if (!_flashing) return;
+
+        SetFlash(0f);
+        _flashing = false;
+        _windupEnd = _windupStart;
+    }
+
     void UpdateAnimator()
     {
         if (animator == null || string.IsNullOrEmpty(speedParameter)) return;
 
-        float speed = _agent != null && _agent.isOnNavMesh ? _agent.velocity.magnitude : 0f;
+        // enabled is checked before isOnNavMesh: OnDied disables the agent, and several
+        // NavMeshAgent properties complain when read on a disabled component.
+        float speed = _agent != null && _agent.enabled && _agent.isOnNavMesh
+            ? _agent.velocity.magnitude
+            : 0f;
+
         animator.SetFloat(speedParameter, speed);
     }
 
@@ -318,5 +683,8 @@ public class EnemyAI : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+
+        Gizmos.color = new Color(0.3f, 0.7f, 1f, 0.6f);
+        Gizmos.DrawWireSphere(transform.position, separationRadius);
     }
 }

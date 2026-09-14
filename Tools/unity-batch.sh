@@ -24,17 +24,38 @@ esac
 
 [ -x "$UNITY" ] || { echo "Unity not found at $UNITY (set UNITY_BIN)" >&2; exit 127; }
 
-if pgrep -f "$UNITY" >/dev/null 2>&1; then
+# Match on the project path, not on the editor binary. A Hub-launched editor runs as
+# "unityhub-unity-editor-<version>", so checking for "$UNITY" misses it entirely and
+# the guard silently passes -- Unity then aborts on its own with a lock error instead.
+# Import workers carry the same -projectPath and are not a conflict, so they are excluded.
+editor_holds_lock() {
+  pgrep -af unity 2>/dev/null \
+    | grep -iF -- "-projectpath $PROJECT" \
+    | grep -viE 'AssetImportWorker|unity-batch' \
+    | grep -q .
+}
+
+if editor_holds_lock; then
   echo "The Unity editor is already running and holds the project lock." >&2
   echo "Close it before running a batch job." >&2
   exit 1
 fi
 
 mkdir -p "$(dirname "$LOG")"
+
+# -nographics gives a null graphics device, which is right for building scenes but
+# blind to anything that only goes wrong while actually rendering. UNITY_GRAPHICS=1
+# keeps a real device so the play-mode tests exercise shaders, canvases and meshes.
+GFX=(-nographics)
+if [ "${UNITY_GRAPHICS:-0}" = "1" ]; then
+  GFX=()
+  echo "unity-batch: real graphics device (UNITY_GRAPHICS=1)"
+fi
+
 echo "unity-batch: $METHOD  (log: $LOG)"
 
 set +e
-"$UNITY" -batchmode -nographics -projectPath "$PROJECT" \
+"$UNITY" -batchmode "${GFX[@]}" -projectPath "$PROJECT" \
          -executeMethod "$METHOD" -logFile "$LOG" "$@"
 CODE=$?
 set -e

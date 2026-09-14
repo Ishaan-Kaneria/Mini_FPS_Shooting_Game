@@ -13,14 +13,16 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 
 | Concern  | Files |
 |---|---|
-| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil), `WeaponSway.cs` |
+| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs` |
 | Weapons  | `Weapon.cs`, `WeaponData.cs` (ScriptableObject, `FireMode` Single/Burst/Auto), `ImpactLibrary.cs` |
-| Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Dead), `Health.cs`, `Hitbox.cs`, `RagdollController.cs` |
-| Waves    | `WaveManager.cs` — endless spawner, per-wave growth, dynamic NavMesh ring spawns that avoid the player's view |
-| UI       | `HUDController.cs`, plus the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
+| Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs` |
+| Waves    | `WaveManager.cs` — endless spawner, per-wave growth, boss waves, `WaveModifier`, dynamic NavMesh ring spawns that avoid the player's view |
+| Run state | `GameDirector.cs` — score, combo, pause, game over, restart, PlayerPrefs records |
+| Feedback | `HUDController.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs` |
+| UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
-`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
+`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Enemies/` (EnemyArchetype assets), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
 
 ## Input: legacy only
 
@@ -36,9 +38,10 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 ## The scene builder regenerates everything
 
-`FPSKitSceneBuilder.cs` (~1350 lines) drives the **FPSKit** menu:
+`FPSKitSceneBuilder.cs` (~1830 lines) drives the **FPSKit** menu:
 
 - **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Subway | Mars Colony]** — each calls `BuildScene(themeName)`.
+- **FPSKit > Build Scene > From Selected Theme Asset** — builds from whatever `LevelTheme` is selected in the Project window, built-in or not. This is how a new arena gets made without touching code.
 - **FPSKit > Build Scene > Build ALL Themes** — builds and saves one scene per theme, registering them in Build Settings so the in-game restart works.
 - **FPSKit > Add Gameplay To Current Scene** — the non-destructive path: injects player, enemies, wave manager, HUD, post-FX and a baked NavMesh into an existing level, leaving geometry and baked lighting alone. Refuses to run twice (bails if a `Player`-tagged object exists).
 
@@ -46,7 +49,26 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 So: **fix scene content by editing the builder, not the `.unity` file.** Hand-editing a generated scene is only appropriate for a throwaway experiment. The same applies to the generated assets it writes (`Controls.asset`, `Enemy.prefab`, themes, materials) — the builder and `FPSKitThemes` recreate or re-dirty them.
 
-Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets).
+Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets).
+
+## Content is data, not code
+
+Two ScriptableObject types are the extension points, and both exist so that adding content never means editing the builder:
+
+- **A new arena is a `LevelTheme` asset.** Duplicate one in `FPSKit_Generated/Themes/`, retune it, select it, then **FPSKit > Build Scene > From Selected Theme Asset**. The six named menu entries are just shortcuts to the built-in assets.
+- **A new enemy is an `EnemyArchetype` asset.** Duplicate one in `FPSKit_Generated/Enemies/`, change the numbers, add it to the WaveManager's roster. There is one base `Enemy.prefab`; an archetype is *stamped onto* an instance at spawn (stats, scale, colour via `MaterialPropertyBlock`, behaviour, score, drops). `EnemyArchetype.Role` decides whether it joins the normal mix, counts as an elite, or is drawn only for boss waves.
+
+When adding either, prefer a new asset over a new branch in the builder. If a knob genuinely does not exist yet, add it to the ScriptableObject — not to `FPSKitSceneBuilder`.
+
+## Domain reload is OFF — every static needs a reset hook
+
+`ProjectSettings/EditorSettings.asset` has `m_EnterPlayModeOptionsEnabled: 1` and `m_EnterPlayModeOptions: 3`, which is `DisableDomainReload | DisableSceneReload`. Entering play mode is fast, and **no C# static is ever reset between play sessions.**
+
+That makes a specific bug class very easy to write and very hard to spot: the game works the first time you press Play and is dead the second, while every compile and build check still passes. A gate left false, a cached singleton pointing at a destroyed object, a shutdown flag set by the `OnApplicationQuit` that fires when play mode exits.
+
+So: **any static field that carries state must be cleared in a `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` hook on its own class.** That hook runs before the first scene loads on every play session, with or without a domain reload. The classes that currently own one are `PlayerMotor`, `GameDirector`, `DamageNumber`, `EnemyHealthBar` and `MobileInput`. `Time.timeScale` is not a static but persists the same way, and `GameDirector` resets it in the same hook.
+
+`Tools/unity-batch.sh FPSKitBatch.VerifyReplay` is the regression test: it plays two real sessions back to back, ends the first on the game over screen (the messiest state a player can leave), and fails if the second does not start clean.
 
 ## Project conventions
 

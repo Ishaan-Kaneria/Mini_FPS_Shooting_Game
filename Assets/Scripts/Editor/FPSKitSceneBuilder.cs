@@ -52,6 +52,14 @@ namespace FPSKit.EditorTools
         [MenuItem("FPSKit/Build Scene/Mars Colony", false, 5)]
         private static void BuildMars() => BuildScene("Mars Colony");
 
+        [MenuItem("FPSKit/Build Scene/From Selected Theme Asset", false, 19)]
+        private static void BuildFromSelectedTheme()
+            => BuildSceneFromTheme(Selection.activeObject as LevelTheme);
+
+        [MenuItem("FPSKit/Build Scene/From Selected Theme Asset", true)]
+        private static bool BuildFromSelectedThemeValidate()
+            => Selection.activeObject is LevelTheme;
+
         [MenuItem("FPSKit/Build Scene/Build ALL Themes", false, 20)]
         private static void BuildAll()
         {
@@ -118,6 +126,7 @@ namespace FPSKit.EditorTools
             var spawnPoints = BuildSpawnPointsAround(spawn);
             var wave = BuildWaveManager(enemyPrefab, spawnPoints, player.transform);
 
+            BuildGameDirector();
             BuildHUD(player, wave);
             BuildPostProcessing(player);
 
@@ -226,8 +235,34 @@ namespace FPSKit.EditorTools
         /// <summary>Reuses an existing Enemy prefab so a character built in Enemy Setup survives.</summary>
         private static GameObject LoadOrBuildEnemyPrefab()
         {
-            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(AssetFolder + "/Enemy.prefab");
-            return existing != null ? existing : BuildEnemyPrefab();
+            string path = AssetFolder + "/Enemy.prefab";
+
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            return existing != null ? UpgradeEnemyPrefab(path) : BuildEnemyPrefab();
+        }
+
+        /// <summary>
+        /// Adds whatever newer systems expect to a prefab that predates them, without
+        /// touching anything already on it. A rigged character set up in Enemy Setup is
+        /// exactly the thing we must not rebuild from scratch, so it gets patched instead.
+        /// </summary>
+        private static GameObject UpgradeEnemyPrefab(string path)
+        {
+            var contents = PrefabUtility.LoadPrefabContents(path);
+            bool changed = false;
+
+            if (contents.GetComponent<EnemyHealthBar>() == null)
+            {
+                var bar = contents.AddComponent<EnemyHealthBar>();
+                bar.barMaterial = CreateBarMaterial();
+                bar.heightOffset = 2.6f;
+                changed = true;
+            }
+
+            if (changed) PrefabUtility.SaveAsPrefabAsset(contents, path);
+            PrefabUtility.UnloadPrefabContents(contents);
+
+            return AssetDatabase.LoadAssetAtPath<GameObject>(path);
         }
 
         // ==================================================================
@@ -241,7 +276,39 @@ namespace FPSKit.EditorTools
             EnsureProjectTagsAndLayers();
             EnsureFolders();
 
-            _theme = FPSKitThemes.GetOrCreate(themeName);
+            BuildFromTheme(FPSKitThemes.GetOrCreate(themeName), themeName);
+        }
+
+        /// <summary>
+        /// Builds from any LevelTheme asset, whether or not it is one of the built-in
+        /// six. This is the seam that makes a new arena a no-code job: duplicate a theme
+        /// asset, retune sky, palette and layout counts, select it, build.
+        /// </summary>
+        public static void BuildSceneFromTheme(LevelTheme theme, bool askFirst = true)
+        {
+            if (theme == null)
+            {
+                Debug.LogError("[FPSKit] No LevelTheme given to build from.");
+                return;
+            }
+
+            string sceneName = string.IsNullOrWhiteSpace(theme.themeName) ? theme.name : theme.themeName;
+
+            if (askFirst && !EditorUtility.DisplayDialog($"Build \"{sceneName}\"",
+                "This creates a new scene from the selected theme asset.\n\n" +
+                "Any unsaved changes in the current scene will be lost.",
+                "Build it", "Cancel")) return;
+
+            EnsureProjectTagsAndLayers();
+            EnsureFolders();
+
+            BuildFromTheme(theme, sceneName);
+        }
+
+        /// <summary>Everything after the theme has been resolved. Destructive: replaces the open scene.</summary>
+        private static void BuildFromTheme(LevelTheme theme, string sceneName)
+        {
+            _theme = theme;
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
@@ -257,18 +324,20 @@ namespace FPSKit.EditorTools
             BakeNavMesh();
 
             var wave = BuildWaveManager(enemyPrefab, spawnPoints, player.transform);
+            BuildGameDirector();
             BuildHUD(player, wave);
             BuildPostProcessing(player);
             BuildAtmosphereExtras();
 
             EditorSceneManager.MarkSceneDirty(scene);
-            SaveSceneAndRegister(scene, themeName);
+            SaveSceneAndRegister(scene, sceneName);
 
             Selection.activeGameObject = player;
 
-            Debug.Log($"<color=lime>[FPSKit]</color> \"{themeName}\" built. Press Play. " +
+            Debug.Log($"<color=lime>[FPSKit]</color> \"{sceneName}\" built. Press Play. " +
                       "Arrows move, Space fires, double-tap Space sprints, left click jumps, " +
-                      "right click aims, R reloads. Rebind in FPSKit_Generated/Controls.asset.");
+                      "right click aims, R reloads, Escape pauses. " +
+                      "Rebind in FPSKit_Generated/Controls.asset.");
         }
 
         // ==================================================================
@@ -844,9 +913,22 @@ namespace FPSKit.EditorTools
 
             var hp = player.AddComponent<Health>();
             hp.maxHealth = 100f;
+
+            // A shield on top of health is what makes a crowd survivable: it soaks the
+            // first mistake and comes back on its own, so one bad corner costs a fight
+            // rather than the whole run.
+            hp.maxShield = 50f;
+            hp.shieldRegenDelay = 4f;
+            hp.shieldRegenPerSecond = 22f;
+
             hp.regenerates = true;
-            hp.regenDelay = 5f;
-            hp.regenPerSecond = 15f;
+            hp.regenDelay = 7f;
+            hp.regenPerSecond = 9f;
+
+            // Six melee enemies landing hits on the same frame would otherwise delete
+            // the player with no window to react to any of them.
+            hp.invulnerabilityWindow = 0.25f;
+
             hp.destroyOnDeath = false;
 
             var playerAudio = player.AddComponent<AudioSource>();
@@ -932,7 +1014,7 @@ namespace FPSKit.EditorTools
             body.tag = "Flesh";
             body.layer = enemyLayer;
             body.GetComponent<Renderer>().sharedMaterial =
-                MakeMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
+                MakeTintableMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
 
             var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             head.name = "Head";
@@ -942,7 +1024,7 @@ namespace FPSKit.EditorTools
             head.tag = "Flesh";
             head.layer = enemyLayer;
             head.GetComponent<Renderer>().sharedMaterial =
-                MakeMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);
+                MakeTintableMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);
 
             var hp = enemy.AddComponent<Health>();
             hp.maxHealth = 100f;
@@ -988,6 +1070,12 @@ namespace FPSKit.EditorTools
             src.spatialBlend = 1f;
             src.maxDistance = 30f;
 
+            // Floating health bar. The material is assigned from an asset rather than
+            // found at runtime, so the shader survives shader stripping in a build.
+            var bar = enemy.AddComponent<EnemyHealthBar>();
+            bar.barMaterial = CreateBarMaterial();
+            bar.heightOffset = 2.6f;
+
             string path = AssetFolder + "/Enemy.prefab";
             var prefab = PrefabUtility.SaveAsPrefabAsset(enemy, path);
             Object.DestroyImmediate(enemy);
@@ -1027,18 +1115,37 @@ namespace FPSKit.EditorTools
             var go = new GameObject("WaveManager");
             var wm = go.AddComponent<WaveManager>();
 
-            wm.enemyTypes = new[]
-            {
-                new WaveManager.EnemyType { prefab = enemyPrefab, weight = 1f, unlockWave = 1 }
-            };
+            // One prefab, many variants. Every entry is an archetype asset, so a new
+            // enemy means duplicating an asset and adding it here -- never a new prefab.
+            wm.baseEnemyPrefab = enemyPrefab;
+            wm.enemyTypes = BuildRoster();
+
+            wm.healthPickupPrefab = CreatePickupPrefab("Pickup_Health", Pickup.Kind.Health,
+                new Color(0.25f, 0.95f, 0.45f), PrimitiveType.Sphere);
+            wm.shieldPickupPrefab = CreatePickupPrefab("Pickup_Shield", Pickup.Kind.Shield,
+                new Color(0.3f, 0.7f, 1f), PrimitiveType.Cube);
+
+            // Ammo drops are left unwired on purpose: the generated rifle has an
+            // infinite reserve, so they would be pickups that do nothing. Turn that off
+            // in TestRifle.asset and drop a Pickup here to bring the ammo economy back.
+
             wm.spawnPoints = spawns;
             wm.player = player;
             wm.baseEnemiesPerWave = 5;
-            wm.enemiesPerWaveGrowth = 1.35f;
-            wm.maxAliveAtOnce = 16;
-            wm.spawnInterval = 0.35f;
+            wm.enemiesPerWaveGrowth = 1.3f;
+            wm.maxEnemiesPerWave = 60;
+            wm.maxAliveAtOnce = 18;
+            wm.spawnInterval = 0.3f;
             wm.timeBeforeFirstWave = 4f;
             wm.intermissionDuration = 10f;
+
+            wm.aggressionRampWaves = 18;
+            wm.bossWaveInterval = 5;
+            wm.bossWaveEscortFraction = 0.55f;
+            wm.useModifiers = true;
+            wm.modifierStartWave = 3;
+            wm.modifierChance = 0.55f;
+            wm.waveClearBonus = 250;
 
             wm.minSpawnDistanceFromPlayer = 14f;
             wm.maxSpawnDistanceFromPlayer = Mathf.Max(24f, _theme.arenaSize * 0.55f);
@@ -1048,6 +1155,25 @@ namespace FPSKit.EditorTools
             wm.spawnSightBlockers = 1 << LayerMask.NameToLayer("Environment");
 
             return wm;
+        }
+
+        /// <summary>
+        /// Turns every archetype asset into a roster entry. Ordering does not matter --
+        /// the WaveManager selects by weight and unlock wave, and bosses are drawn from
+        /// their own pool.
+        /// </summary>
+        private static WaveManager.EnemyType[] BuildRoster()
+        {
+            var archetypes = FPSKitEnemyRoster.GetOrCreateAll();
+            var entries = new List<WaveManager.EnemyType>(archetypes.Count);
+
+            foreach (var archetype in archetypes)
+            {
+                if (archetype == null) continue;
+                entries.Add(new WaveManager.EnemyType { archetype = archetype });
+            }
+
+            return entries.ToArray();
         }
 
         // ==================================================================
@@ -1141,20 +1267,120 @@ namespace FPSKit.EditorTools
             hud.playerHealth = player.GetComponent<Health>();
             hud.waveManager = wave;
 
-            hud.ammoText = MakeText(canvasGo.transform, "AmmoText", "30 / 150",
-                new Vector2(1f, 0f), new Vector2(-60f, 60f), 48, TextAlignmentOptions.BottomRight);
-            hud.healthText = MakeText(canvasGo.transform, "HealthText", "100",
-                new Vector2(0f, 0f), new Vector2(60f, 60f), 48, TextAlignmentOptions.BottomLeft);
-            hud.waveText = MakeText(canvasGo.transform, "WaveText", "WAVE 1",
-                new Vector2(0.5f, 1f), new Vector2(0f, -50f), 40, TextAlignmentOptions.Top);
-            hud.enemiesLeftText = MakeText(canvasGo.transform, "EnemiesLeft", "0 LEFT",
-                new Vector2(0.5f, 1f), new Vector2(0f, -100f), 28, TextAlignmentOptions.Top);
-            hud.intermissionText = MakeText(canvasGo.transform, "Intermission", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 180f), 34, TextAlignmentOptions.Center);
+            var root = canvasGo.transform;
 
-            // Crosshair: four arms, order matters -- top, bottom, left, right.
+            // ---- corners -------------------------------------------------
+            hud.ammoText = MakeText(root, "AmmoText", "30 / 150",
+                new Vector2(1f, 0f), new Vector2(-60f, 60f), 48, TextAlignmentOptions.BottomRight);
+
+            hud.healthText = MakeText(root, "HealthText", "100",
+                new Vector2(0f, 0f), new Vector2(60f, 104f), 44, TextAlignmentOptions.BottomLeft);
+
+            hud.scoreText = MakeText(root, "ScoreText", "0",
+                new Vector2(1f, 1f), new Vector2(-60f, -45f), 44, TextAlignmentOptions.TopRight);
+
+            hud.comboText = MakeText(root, "ComboText", "",
+                new Vector2(1f, 1f), new Vector2(-60f, -105f), 30, TextAlignmentOptions.TopRight);
+            hud.comboText.color = new Color(1f, 0.78f, 0.3f);
+
+            BuildPlayerHealthBar(root, hud);
+
+            // ---- top centre ----------------------------------------------
+            hud.waveText = MakeText(root, "WaveText", "WAVE 1",
+                new Vector2(0.5f, 1f), new Vector2(0f, -50f), 40, TextAlignmentOptions.Top);
+            hud.enemiesLeftText = MakeText(root, "EnemiesLeft", "0 LEFT",
+                new Vector2(0.5f, 1f), new Vector2(0f, -100f), 28, TextAlignmentOptions.Top);
+
+            BuildBossBar(root, hud);
+
+            hud.intermissionText = MakeText(root, "Intermission", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 250f), 34, TextAlignmentOptions.Center);
+
+            // ---- centre --------------------------------------------------
+            BuildCrosshair(root, hud);
+            BuildWaveBanner(root, hud);
+            BuildDamageIndicators(root, hud);
+
+            // ---- full-screen overlays ------------------------------------
+            var vig = new GameObject("DamageVignette", typeof(RectTransform), typeof(Image));
+            vig.transform.SetParent(root, false);
+            Stretch(vig.GetComponent<RectTransform>());
+
+            var vigImg = vig.GetComponent<Image>();
+            vigImg.color = new Color(0.7f, 0f, 0f, 0f);
+            vigImg.raycastTarget = false;
+            hud.damageVignette = vigImg;
+
+            hud.pausePanel = BuildPausePanel(root, hud);
+            hud.gameOverPanel = BuildGameOverPanel(root, hud);
+        }
+
+        /// <summary>
+        /// Health and shield as bars rather than a bare number. A number tells you what
+        /// you have; a bar tells you how close you are to dead without reading anything.
+        /// </summary>
+        private static void BuildPlayerHealthBar(Transform parent, HUDController hud)
+        {
+            var group = new GameObject("HealthBar", typeof(RectTransform));
+            group.transform.SetParent(parent, false);
+
+            var groupRect = group.GetComponent<RectTransform>();
+            groupRect.anchorMin = groupRect.anchorMax = groupRect.pivot = new Vector2(0f, 0f);
+            groupRect.anchoredPosition = new Vector2(60f, 62f);
+            groupRect.sizeDelta = new Vector2(380f, 40f);
+
+            var zero = Vector2.zero;
+            var size = new Vector2(360f, 16f);
+
+            MakeImage(group.transform, "Background", zero, zero, zero, size,
+                      new Color(0.04f, 0.04f, 0.05f, 0.8f));
+
+            // Pale bar behind the real one, so the size of a hit stays visible for a beat.
+            hud.healthTrailFill = MakeImage(group.transform, "Trail", zero, zero, zero, size,
+                                            new Color(1f, 1f, 1f, 0.35f), filled: true);
+
+            hud.healthFill = MakeImage(group.transform, "Fill", zero, zero, zero, size,
+                                       new Color(0.85f, 0.25f, 0.25f), filled: true);
+
+            hud.shieldFill = MakeImage(group.transform, "Shield", zero, zero,
+                                       new Vector2(0f, 21f), new Vector2(360f, 8f),
+                                       new Color(0.4f, 0.75f, 1f), filled: true);
+        }
+
+        private static void BuildBossBar(Transform parent, HUDController hud)
+        {
+            var panel = new GameObject("BossBar", typeof(RectTransform));
+            panel.transform.SetParent(parent, false);
+
+            var rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -150f);
+            rect.sizeDelta = new Vector2(900f, 60f);
+
+            hud.bossNameText = MakeText(panel.transform, "BossName", "BOSS",
+                new Vector2(0.5f, 1f), Vector2.zero, 28, TextAlignmentOptions.Top);
+            hud.bossNameText.color = new Color(1f, 0.5f, 0.45f);
+
+            var barAnchor = new Vector2(0.5f, 0f);
+            var barSize = new Vector2(860f, 14f);
+
+            MakeImage(panel.transform, "BossBackground", barAnchor, barAnchor, Vector2.zero, barSize,
+                      new Color(0.05f, 0.02f, 0.02f, 0.85f));
+
+            hud.bossFill = MakeImage(panel.transform, "BossFill", barAnchor, barAnchor,
+                                     Vector2.zero, barSize,
+                                     new Color(0.9f, 0.2f, 0.18f), filled: true);
+
+            hud.bossPanel = panel;
+            panel.SetActive(false);
+        }
+
+        private static void BuildCrosshair(Transform parent, HUDController hud)
+        {
+            // Four arms, order matters -- top, bottom, left, right.
             var chRoot = new GameObject("Crosshair", typeof(RectTransform), typeof(CanvasGroup));
-            chRoot.transform.SetParent(canvasGo.transform, false);
+            chRoot.transform.SetParent(parent, false);
+
             var chRect = chRoot.GetComponent<RectTransform>();
             chRect.anchorMin = chRect.anchorMax = new Vector2(0.5f, 0.5f);
             chRect.anchoredPosition = Vector2.zero;
@@ -1167,35 +1393,285 @@ namespace FPSKit.EditorTools
                 MakeArm(chRect, "Left",   new Vector2(10f, 2f)),
                 MakeArm(chRect, "Right",  new Vector2(10f, 2f))
             };
+        }
 
-            // Damage vignette
-            var vig = new GameObject("DamageVignette", typeof(RectTransform), typeof(Image));
-            vig.transform.SetParent(canvasGo.transform, false);
-            var vigRect = vig.GetComponent<RectTransform>();
-            vigRect.anchorMin = Vector2.zero;
-            vigRect.anchorMax = Vector2.one;
-            vigRect.offsetMin = vigRect.offsetMax = Vector2.zero;
-            var vigImg = vig.GetComponent<Image>();
-            vigImg.color = new Color(0.7f, 0f, 0f, 0f);
-            vigImg.raycastTarget = false;
-            hud.damageVignette = vigImg;
+        private static void BuildWaveBanner(Transform parent, HUDController hud)
+        {
+            var banner = new GameObject("WaveBanner", typeof(RectTransform), typeof(CanvasGroup));
+            banner.transform.SetParent(parent, false);
 
-            // Game over panel
+            var rect = banner.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+
+            hud.bannerGroup = banner.GetComponent<CanvasGroup>();
+            hud.bannerGroup.alpha = 0f;
+
+            hud.bannerTitle = MakeText(banner.transform, "BannerTitle", "WAVE 1",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 170f), 62, TextAlignmentOptions.Center);
+
+            hud.bannerSubtitle = MakeText(banner.transform, "BannerSubtitle", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), 30, TextAlignmentOptions.Center);
+            hud.bannerSubtitle.color = new Color(0.85f, 0.85f, 0.85f);
+        }
+
+        /// <summary>
+        /// One arrow template, pivoting on the screen centre. The HUD clones it per hit
+        /// and rotates it, which is the only thing telling a surrounded player where the
+        /// damage is coming from.
+        /// </summary>
+        private static void BuildDamageIndicators(Transform parent, HUDController hud)
+        {
+            var root = new GameObject("DamageIndicators", typeof(RectTransform));
+            root.transform.SetParent(parent, false);
+
+            var rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = rootRect.anchorMax = new Vector2(0.5f, 0.5f);
+            rootRect.anchoredPosition = Vector2.zero;
+            rootRect.sizeDelta = Vector2.zero;
+            hud.damageIndicatorRoot = rootRect;
+
+            var template = new GameObject("IndicatorTemplate", typeof(RectTransform), typeof(CanvasGroup));
+            template.transform.SetParent(parent, false);
+
+            var templateRect = template.GetComponent<RectTransform>();
+            templateRect.anchorMin = templateRect.anchorMax = new Vector2(0.5f, 0.5f);
+            templateRect.anchoredPosition = Vector2.zero;
+            templateRect.sizeDelta = Vector2.zero;
+
+            var centre = new Vector2(0.5f, 0.5f);
+            MakeImage(template.transform, "Arc", centre, centre, new Vector2(0f, 190f),
+                      new Vector2(170f, 12f), new Color(1f, 0.2f, 0.18f, 0.9f));
+
+            hud.damageIndicatorPrefab = template.GetComponent<CanvasGroup>();
+            template.SetActive(false);
+        }
+
+        private static GameObject BuildPausePanel(Transform parent, HUDController hud)
+        {
+            var panel = new GameObject("PausePanel", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(parent, false);
+            Stretch(panel.GetComponent<RectTransform>());
+            panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.7f);
+
+            MakeText(panel.transform, "PausedTitle", "PAUSED",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), 64, TextAlignmentOptions.Center);
+
+            hud.pauseHintText = MakeText(panel.transform, "PauseHint", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -20f), 32, TextAlignmentOptions.Center);
+
+            panel.SetActive(false);
+            return panel;
+        }
+
+        private static GameObject BuildGameOverPanel(Transform parent, HUDController hud)
+        {
             var panel = new GameObject("GameOverPanel", typeof(RectTransform), typeof(Image));
-            panel.transform.SetParent(canvasGo.transform, false);
-            var pRect = panel.GetComponent<RectTransform>();
-            pRect.anchorMin = Vector2.zero;
-            pRect.anchorMax = Vector2.one;
-            pRect.offsetMin = pRect.offsetMax = Vector2.zero;
-            panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.75f);
+            panel.transform.SetParent(parent, false);
+            Stretch(panel.GetComponent<RectTransform>());
+            panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.78f);
 
             hud.finalWaveText = MakeText(panel.transform, "FinalWave", "You survived 0 waves",
                 new Vector2(0.5f, 0.5f), Vector2.zero, 44, TextAlignmentOptions.Center);
-            hud.gameOverPanel = panel;
+            hud.finalWaveText.GetComponent<RectTransform>().sizeDelta = new Vector2(1200f, 400f);
+
             panel.SetActive(false);
+            return panel;
         }
 
-        private static RectTransform MakeArm(RectTransform parent, string name, Vector2 size)
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+        }
+
+        // ==================================================================
+        // Shared UI and material helpers
+        // ==================================================================
+
+        /// <summary>
+        /// A sprite for Image components that need one. Filled images -- every bar in
+        /// the HUD -- ignore fillAmount entirely without a sprite, so this is not
+        /// optional decoration. Unity's built-in UI sprite is used where available and
+        /// a flat white one is generated as a fallback.
+        /// </summary>
+        private static Sprite UISprite()
+        {
+            if (_uiSprite != null) return _uiSprite;
+
+            _uiSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            if (_uiSprite != null) return _uiSprite;
+
+            string path = $"{AssetFolder}/UIWhite.png";
+            var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (existing != null)
+            {
+                _uiSprite = existing;
+                return _uiSprite;
+            }
+
+            var texture = new Texture2D(4, 4);
+            var pixels = new Color32[16];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color32(255, 255, 255, 255);
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(path);
+
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.SaveAndReimport();
+            }
+
+            _uiSprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            return _uiSprite;
+        }
+
+        private static Sprite _uiSprite;
+
+        private static Image MakeImage(Transform parent, string name, Vector2 anchor, Vector2 pivot,
+                                       Vector2 offset, Vector2 size, Color color,
+                                       bool filled = false)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = pivot;
+            rt.sizeDelta = size;
+            rt.anchoredPosition = offset;
+
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            image.sprite = UISprite();
+
+            if (filled)
+            {
+                image.type = Image.Type.Filled;
+                image.fillMethod = Image.FillMethod.Horizontal;
+                image.fillOrigin = (int)Image.OriginHorizontal.Left;
+                image.fillAmount = 1f;
+            }
+            else
+            {
+                image.type = Image.Type.Sliced;
+            }
+
+            return image;
+        }
+
+        /// <summary>
+        /// A material whose emission can be driven per instance by a property block.
+        /// The keyword has to be on the shared material -- turning it on per renderer
+        /// would need renderer.material, which instantiates a copy per enemy.
+        /// </summary>
+        private static Material MakeTintableMaterial(string name, Color color, float smoothness,
+                                                     float metallic, bool shared = false)
+        {
+            var mat = shared
+                ? MakeSharedMaterial(name, color, smoothness, metallic)
+                : MakeMaterial(name, color, smoothness, metallic);
+
+            if (mat == null) return null;
+
+            mat.EnableKeyword("_EMISSION");
+
+            // No GI contribution: these glows are a readability cue, not lighting, and
+            // realtime emissive on every enemy would cost far more than it is worth.
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", Color.black);
+
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>Unlit material shared by every floating enemy health bar.</summary>
+        public static Material GetOrCreateBarMaterial()
+        {
+            EnsureFolders();
+            return CreateBarMaterial();
+        }
+
+        private static Material CreateBarMaterial()
+        {
+            string path = $"{MaterialFolder}/HealthBar.mat";
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null) return existing;
+
+            var shader = Shader.Find("Universal Render Pipeline/Unlit") ??
+                         Shader.Find("Unlit/Color") ??
+                         Shader.Find("Sprites/Default");
+            if (shader == null) return null;
+
+            var mat = new Material(shader);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", Color.white);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
+
+            AssetDatabase.CreateAsset(mat, path);
+            return mat;
+        }
+
+        // ==================================================================
+        private static GameObject CreatePickupPrefab(string assetName, Pickup.Kind kind,
+                                                     Color color, PrimitiveType shape)
+        {
+            string path = $"{AssetFolder}/{assetName}.prefab";
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) return existing;
+
+            var root = new GameObject(assetName);
+
+            var pickup = root.AddComponent<Pickup>();
+            pickup.kind = kind;
+            pickup.amount = kind == Pickup.Kind.Shield ? 50f : 35f;
+            pickup.ammoAmount = 90;
+
+            var visual = GameObject.CreatePrimitive(shape);
+            visual.name = "Visual";
+            visual.transform.SetParent(root.transform, false);
+            visual.transform.localScale = Vector3.one * 0.45f;
+            Object.DestroyImmediate(visual.GetComponent<Collider>());
+
+            var material = MakeTintableMaterial(assetName, color, 0.6f, 0.1f, shared: true);
+            if (material != null)
+            {
+                // Pickups glow so they read on a dark floor across the arena.
+                material.SetColor("_EmissionColor", color * 1.8f);
+                EditorUtility.SetDirty(material);
+                visual.GetComponent<Renderer>().sharedMaterial = material;
+            }
+
+            var glow = new GameObject("Glow");
+            glow.transform.SetParent(root.transform, false);
+
+            var light = glow.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = color;
+            light.intensity = 3.5f;
+            light.range = 5f;
+            light.shadows = LightShadows.None;
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            return prefab;
+        }
+
+        private static void BuildGameDirector()
+        {
+            if (Object.FindAnyObjectByType<GameDirector>() != null) return;
+
+            var go = new GameObject("GameDirector");
+            go.AddComponent<GameDirector>();
+        }
+
+                private static RectTransform MakeArm(RectTransform parent, string name, Vector2 size)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image));
             go.transform.SetParent(parent, false);
@@ -1248,8 +1724,21 @@ namespace FPSKit.EditorTools
 
         // ==================================================================
         private static Material MakeMaterial(string name, Color color, float smoothness, float metallic)
+            => MakeMaterialAt($"{MaterialFolder}/{SafeName(_theme.themeName)}_{name}.mat",
+                              color, smoothness, metallic);
+
+        /// <summary>
+        /// A material with no theme in its name, for assets that are built once and
+        /// reused by every scene. Pickup prefabs are shared, so prefixing their material
+        /// with whichever theme happened to be built first is a lie about its scope.
+        /// </summary>
+        private static Material MakeSharedMaterial(string name, Color color, float smoothness,
+                                                   float metallic)
+            => MakeMaterialAt($"{MaterialFolder}/{name}.mat", color, smoothness, metallic);
+
+        private static Material MakeMaterialAt(string path, Color color, float smoothness,
+                                               float metallic)
         {
-            string path = $"{MaterialFolder}/{SafeName(_theme.themeName)}_{name}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null) return existing;
 

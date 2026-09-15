@@ -117,6 +117,28 @@ public class EnemyAI : MonoBehaviour
 
     Renderer[] _renderers;
     MaterialPropertyBlock _block;
+
+    /// <summary>
+    /// Always reach the block through here, never through the field. Recompiling a
+    /// script while play mode is running reloads the domain without re-running Awake,
+    /// and a MaterialPropertyBlock is a plain C# class that Unity's reload backup
+    /// cannot carry across -- so it comes back null while _renderers and
+    /// _restBodyColor, both serializable types, survive.
+    ///
+    /// That specific combination is what made the old code dangerous: the guards here
+    /// test the two fields that survive, so they pass, and the null one goes straight
+    /// into Renderer.GetPropertyBlock as "ArgumentNullException: dest", once per
+    /// renderer per frame for the rest of the session. Recreating on demand costs one
+    /// null check and makes the flash simply keep working after a reload.
+    /// </summary>
+    MaterialPropertyBlock Block
+    {
+        get
+        {
+            if (_block == null) _block = new MaterialPropertyBlock();
+            return _block;
+        }
+    }
     Color[] _restBodyColor;
     Color[] _restGlowColor;
 
@@ -164,7 +186,6 @@ public class EnemyAI : MonoBehaviour
         if (animator == null) animator = GetComponentInChildren<Animator>();
 
         _renderers = BodyRenderers();
-        _block = new MaterialPropertyBlock();
     }
 
     void OnEnable()
@@ -581,6 +602,8 @@ public class EnemyAI : MonoBehaviour
         _restBodyColor = new Color[_renderers.Length];
         _restGlowColor = new Color[_renderers.Length];
 
+        var block = Block;
+
         for (int i = 0; i < _renderers.Length; i++)
         {
             var renderer = _renderers[i];
@@ -589,15 +612,15 @@ public class EnemyAI : MonoBehaviour
             // Cleared first: a renderer with no block of its own leaves whatever was
             // read last still sitting in this one, and every body part after the first
             // would inherit the first part's colour as its "rest" state.
-            _block.Clear();
-            renderer.GetPropertyBlock(_block);
+            block.Clear();
+            renderer.GetPropertyBlock(block);
 
-            _restBodyColor[i] = _block.HasColor("_BaseColor")
-                ? _block.GetColor("_BaseColor")
+            _restBodyColor[i] = block.HasColor("_BaseColor")
+                ? block.GetColor("_BaseColor")
                 : ReadSharedColor(renderer, "_BaseColor");
 
-            _restGlowColor[i] = _block.HasColor("_EmissionColor")
-                ? _block.GetColor("_EmissionColor")
+            _restGlowColor[i] = block.HasColor("_EmissionColor")
+                ? block.GetColor("_EmissionColor")
                 : Color.black;
         }
     }
@@ -629,20 +652,22 @@ public class EnemyAI : MonoBehaviour
         amount = Mathf.Clamp01(amount);
         _flashing = amount > 0.001f;
 
+        var block = Block;
+
         for (int i = 0; i < _renderers.Length; i++)
         {
             var renderer = _renderers[i];
             if (renderer == null) continue;
 
-            renderer.GetPropertyBlock(_block);
+            renderer.GetPropertyBlock(block);
 
             Color body = Color.Lerp(_restBodyColor[i], telegraphColor, amount * 0.6f);
             Color glow = Color.Lerp(_restGlowColor[i], telegraphColor, amount);
 
-            _block.SetColor("_BaseColor", body);
-            _block.SetColor("_Color", body);
-            _block.SetColor("_EmissionColor", glow);
-            renderer.SetPropertyBlock(_block);
+            block.SetColor("_BaseColor", body);
+            block.SetColor("_Color", body);
+            block.SetColor("_EmissionColor", glow);
+            renderer.SetPropertyBlock(block);
         }
     }
 

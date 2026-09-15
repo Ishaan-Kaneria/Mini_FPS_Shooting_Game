@@ -54,10 +54,24 @@ public class EnemyHealthBar : MonoBehaviour
     MaterialPropertyBlock _block;
     Camera _camera;
 
+    /// <summary>
+    /// Created on demand rather than in Awake, for the same reason as EnemyAI.Block:
+    /// recompiling during play mode reloads the domain without re-running Awake, and a
+    /// MaterialPropertyBlock cannot survive that backup, so the field comes back null
+    /// and every SetColor turns into "ArgumentNullException: dest".
+    /// </summary>
+    MaterialPropertyBlock Block
+    {
+        get
+        {
+            if (_block == null) _block = new MaterialPropertyBlock();
+            return _block;
+        }
+    }
+
     void Awake()
     {
         _health = GetComponent<Health>();
-        _block = new MaterialPropertyBlock();
 
         var material = ResolveMaterial();
         if (material == null)
@@ -172,10 +186,12 @@ public class EnemyHealthBar : MonoBehaviour
     {
         if (renderer == null) return;
 
-        renderer.GetPropertyBlock(_block);
-        _block.SetColor("_BaseColor", color);
-        _block.SetColor("_Color", color);
-        renderer.SetPropertyBlock(_block);
+        var block = Block;
+
+        renderer.GetPropertyBlock(block);
+        block.SetColor("_BaseColor", color);
+        block.SetColor("_Color", color);
+        renderer.SetPropertyBlock(block);
     }
 
     Renderer MakeQuad(string name, Material material, Vector2 quadSize, float z, out Transform quad)

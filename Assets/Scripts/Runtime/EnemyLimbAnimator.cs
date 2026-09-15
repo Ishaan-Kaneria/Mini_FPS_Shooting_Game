@@ -52,6 +52,20 @@ public class EnemyLimbAnimator : MonoBehaviour
              "so an enemy easing to a stop settles instead of snapping to rest.")]
     public float fullSpeed = 4f;
 
+    [Header("Weapon")]
+    [Tooltip("The rifle the arms carry. Switched off automatically on an enemy whose " +
+             "archetype is not ranged, so one prefab serves the whole roster.")]
+    public GameObject weapon;
+
+    [Tooltip("Degrees an armed enemy holds its arms at while on its feet, so the gun " +
+             "points where the enemy is looking instead of at the floor.")]
+    public float aimRaise = 76f;
+
+    [Tooltip("How much of the walk swing survives while carrying a weapon. Near zero: " +
+             "a braced rifle does not swing with the stride, and a gun waving through " +
+             "the full arm arc looks broken rather than lively.")]
+    [Range(0f, 1f)] public float armedSwingFactor = 0.12f;
+
     [Header("Attack")]
     [Tooltip("Degrees the arms rise while winding up and striking.")]
     public float attackRaise = 95f;
@@ -120,31 +134,57 @@ public class EnemyLimbAnimator : MonoBehaviour
 
         float swing = Mathf.Sin(_stridePhase) * strideAngle * speed01;
 
+        ApplyWeaponVisibility();
         ApplyLimbs(swing);
         ApplyTorso(speed01);
     }
 
+    /// <summary>
+    /// A melee archetype should not be holding a rifle it never fires.
+    ///
+    /// Checked every frame against the object's own state rather than cached in Awake,
+    /// because EnemyArchetype stamps `ranged` onto the AI *after* the prefab is
+    /// instantiated -- at Awake every enemy still looks unarmed. Comparing against
+    /// activeSelf means this costs a bool test and holds no state of its own.
+    /// </summary>
+    void ApplyWeaponVisibility()
+    {
+        if (weapon == null) return;
+
+        bool armed = _ai != null && _ai.ranged;
+        if (weapon.activeSelf != armed) weapon.SetActive(armed);
+    }
+
+    bool Armed => weapon != null && _ai != null && _ai.ranged;
+
     void ApplyLimbs(float swing)
     {
         // Legs lead, arms counter-swing: the opposite-limb pairing is most of what makes
-        // a walk read as a walk rather than a shuffle.
-        SetLimb(leftLeg, _leftLegRest, swing, 0f);
-        SetLimb(rightLeg, _rightLegRest, -swing, 0f);
+        // a walk read as a walk rather than a shuffle. Legs are unaffected by what the
+        // hands are doing, so they always hold at rest and always swing fully.
+        SetLimb(leftLeg, _leftLegRest, swing, 0f, 1f);
+        SetLimb(rightLeg, _rightLegRest, -swing, 0f, 1f);
+
+        // An armed enemy already holds its arms up, and the attack pose pulls them the
+        // rest of the way -- so the two poses blend instead of fighting.
+        float hold = Mathf.Lerp(Armed ? -aimRaise : 0f, -attackRaise, _attack01);
+
+        // Swing fades out as the attack takes over, so a lunging enemy is not also
+        // pumping its arms, and a carried rifle barely moves at all.
+        float weight = (1f - _attack01) * (Armed ? armedSwingFactor : 1f);
 
         float armSwing = -swing * armSwingFactor;
-        float raise = -attackRaise * _attack01;
 
-        SetLimb(leftArm, _leftArmRest, armSwing, raise);
-        SetLimb(rightArm, _rightArmRest, -armSwing, raise);
+        SetLimb(leftArm, _leftArmRest, armSwing, hold, weight);
+        SetLimb(rightArm, _rightArmRest, -armSwing, hold, weight);
     }
 
-    void SetLimb(Transform limb, Quaternion rest, float swingDegrees, float raiseDegrees)
+    void SetLimb(Transform limb, Quaternion rest, float swingDegrees, float holdDegrees,
+                 float swingWeight)
     {
         if (limb == null) return;
 
-        // Swing fades out as the attack pose takes over, so a lunging enemy is not also
-        // pumping its arms.
-        float pitch = Mathf.Lerp(swingDegrees, raiseDegrees, _attack01);
+        float pitch = holdDegrees + swingDegrees * swingWeight;
         limb.localRotation = rest * Quaternion.Euler(pitch, 0f, 0f);
     }
 

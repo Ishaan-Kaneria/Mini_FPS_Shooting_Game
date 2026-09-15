@@ -95,6 +95,11 @@ namespace FPSKit.EditorTools
         public static void AddGameplayToCurrentScene(string themeName)
         {
             EnsureProjectTagsAndLayers();
+
+            // The pipeline assets are provisioned for the same reason the tags are: a
+            // generated arena assumes shadows reach across it and that its hard-edged
+            // primitives are antialiased. Idempotent, and silent when nothing changed.
+            FPSKitGraphics.Apply();
             EnsureFolders();
 
             _theme = FPSKitThemes.GetOrCreate(themeName);
@@ -274,6 +279,11 @@ namespace FPSKit.EditorTools
                 "Build it", "Cancel")) return;
 
             EnsureProjectTagsAndLayers();
+
+            // The pipeline assets are provisioned for the same reason the tags are: a
+            // generated arena assumes shadows reach across it and that its hard-edged
+            // primitives are antialiased. Idempotent, and silent when nothing changed.
+            FPSKitGraphics.Apply();
             EnsureFolders();
 
             BuildFromTheme(FPSKitThemes.GetOrCreate(themeName), themeName);
@@ -300,6 +310,11 @@ namespace FPSKit.EditorTools
                 "Build it", "Cancel")) return;
 
             EnsureProjectTagsAndLayers();
+
+            // The pipeline assets are provisioned for the same reason the tags are: a
+            // generated arena assumes shadows reach across it and that its hard-edged
+            // primitives are antialiased. Idempotent, and silent when nothing changed.
+            FPSKitGraphics.Apply();
             EnsureFolders();
 
             BuildFromTheme(theme, sceneName);
@@ -915,6 +930,10 @@ namespace FPSKit.EditorTools
 
             // The streak behind it. A tracer at 240 m/s crosses the arena in a handful of
             // frames, so without a trail it is a few stills rather than a line.
+            // Flies itself rather than being walked by a coroutine on whoever fired it,
+            // which is what lets an enemy's tracer outlive the enemy that fired it.
+            root.AddComponent<TracerProjectile>();
+
             var trail = root.AddComponent<TrailRenderer>();
             trail.time = 0.055f;
             trail.startWidth = 0.05f;
@@ -1436,6 +1455,20 @@ namespace FPSKit.EditorTools
             ai.attackClip = Clip("SFX/enemy_attack.wav");
             ai.deathClip = Clip("SFX/enemy_death.wav");
 
+            // The rifle a ranged archetype carries. Hung off the right arm so the limb
+            // animator swings and raises it with the hands rather than needing to know
+            // it exists.
+            var enemyMuzzle = BuildEnemyWeapon(rightArm, out GameObject enemyWeapon);
+
+            ai.muzzlePoint = enemyMuzzle;
+            ai.muzzleFlashPrefab = CreateMuzzleFlashPrefab();
+            ai.tracerPrefab = CreateTracerPrefab();
+
+            // Slower than the player's 240, so incoming fire is legible as something
+            // arriving at you rather than an instant hit you can only infer from damage.
+            ai.tracerSpeed = 170f;
+            ai.fireClip = Clip("SFX/weapon_fire.wav");
+
             // No AnimationClips and no AnimatorController anywhere in the kit -- the walk
             // comes off the agent's own velocity. See EnemyLimbAnimator.
             var limbs = enemy.AddComponent<EnemyLimbAnimator>();
@@ -1444,6 +1477,7 @@ namespace FPSKit.EditorTools
             limbs.rightArm = rightArm;
             limbs.leftLeg = leftLeg;
             limbs.rightLeg = rightLeg;
+            limbs.weapon = enemyWeapon;
 
             // Floating health bar. The material is assigned from an asset rather than
             // found at runtime, so the shader survives shader stripping in a build.
@@ -1455,6 +1489,98 @@ namespace FPSKit.EditorTools
             var prefab = PrefabUtility.SaveAsPrefabAsset(enemy, path);
             Object.DestroyImmediate(enemy);
             return prefab;
+        }
+
+        /// <summary>
+        /// The rifle a ranged enemy carries, parented to the arm that holds it.
+        ///
+        /// The arm is a joint that hangs straight down at rest and is pitched up to
+        /// EnemyLimbAnimator.aimRaise while armed. Cancelling exactly that angle here
+        /// means the weapon points along the enemy's forward once the arms come up, with
+        /// no aiming code: arm pitch and weapon pitch sum to zero.
+        ///
+        /// Tagged Metal, which does two jobs -- it keeps the archetype's body colour off
+        /// the gun (see EnemyAI.IsBodyRenderer) and, if it ever gains colliders, would
+        /// spark metal rather than flesh. It has none: this is decoration, and a rifle
+        /// that absorbed shots meant for the chest behind it would be a stealth nerf on
+        /// every ranged enemy.
+        /// </summary>
+        private static Transform BuildEnemyWeapon(Transform arm, out GameObject weapon)
+        {
+            var metal = MakeSharedMaterial("Gun_Metal", new Color(0.11f, 0.115f, 0.125f), 0.55f, 0.85f);
+            var polymer = MakeSharedMaterial("Gun_Polymer", new Color(0.16f, 0.17f, 0.18f), 0.25f, 0f);
+
+            var root = new GameObject("Weapon");
+            root.transform.SetParent(arm, false);
+
+            // Down at the hand, and pulled back toward the chest: hung straight off the
+            // right arm the rifle reads as held out at the hip by one hand, where both
+            // arms raise together and this sits between them as a two-handed grip.
+            root.transform.localPosition = new Vector3(-0.22f, -0.44f, 0.05f);
+            root.transform.localRotation = Quaternion.Euler(EnemyAimRaise, 0f, 0f);
+
+            EnemyGunPart(root.transform, "Receiver", PrimitiveType.Cube, metal,
+                         new Vector3(0f, 0f, 0.08f), new Vector3(0.07f, 0.1f, 0.34f));
+
+            EnemyGunPart(root.transform, "Barrel", PrimitiveType.Cylinder, metal,
+                         new Vector3(0f, 0.01f, 0.36f), new Vector3(0.028f, 0.12f, 0.028f),
+                         new Vector3(90f, 0f, 0f));
+
+            EnemyGunPart(root.transform, "Magazine", PrimitiveType.Cube, polymer,
+                         new Vector3(0f, -0.11f, 0.1f), new Vector3(0.05f, 0.16f, 0.09f),
+                         new Vector3(8f, 0f, 0f));
+
+            EnemyGunPart(root.transform, "Stock", PrimitiveType.Cube, polymer,
+                         new Vector3(0f, -0.02f, -0.15f), new Vector3(0.055f, 0.09f, 0.16f));
+
+            var muzzle = new GameObject("MuzzlePoint");
+            muzzle.transform.SetParent(root.transform, false);
+            muzzle.transform.localPosition = new Vector3(0f, 0.01f, 0.5f) * EnemyGunScale;
+
+            weapon = root;
+
+            // Off until an archetype says otherwise. EnemyLimbAnimator turns it on for a
+            // ranged enemy, because `ranged` is stamped after the prefab is instantiated
+            // and so cannot be known here.
+            root.SetActive(false);
+
+            return muzzle.transform;
+        }
+
+        /// <summary>
+        /// Must match EnemyLimbAnimator.aimRaise. The weapon cancels this angle so it
+        /// points forward once the arms are up, so the two have to agree -- if you
+        /// retune one, retune the other.
+        /// </summary>
+        private const float EnemyAimRaise = 76f;
+
+        /// <summary>
+        /// The enemy's rifle is authored at the player's proportions and then enlarged,
+        /// because it is read at fifteen metres rather than at arm's length. A weapon
+        /// that is correctly scaled and unreadable tells the player nothing about which
+        /// enemies shoot back.
+        /// </summary>
+        private const float EnemyGunScale = 1.18f;
+
+        private static void EnemyGunPart(Transform parent, string name, PrimitiveType shape,
+                                         Material material, Vector3 position, Vector3 scale)
+            => EnemyGunPart(parent, name, shape, material, position, scale, Vector3.zero);
+
+        private static void EnemyGunPart(Transform parent, string name, PrimitiveType shape,
+                                         Material material, Vector3 position, Vector3 scale,
+                                         Vector3 euler)
+        {
+            var part = GameObject.CreatePrimitive(shape);
+            part.name = name;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = position * EnemyGunScale;
+            part.transform.localRotation = Quaternion.Euler(euler);
+            part.transform.localScale = scale * EnemyGunScale;
+            part.tag = "Metal";
+
+            Object.DestroyImmediate(part.GetComponent<Collider>());
+
+            if (material != null) part.GetComponent<Renderer>().sharedMaterial = material;
         }
 
         /// <summary>A bare pivot: the joint a limb rotates about.</summary>
@@ -1626,14 +1752,34 @@ namespace FPSKit.EditorTools
             data.dithering = true;
         }
 
+        /// <summary>
+        /// The theme's grade, as a Volume profile.
+        ///
+        /// Re-stamped rather than created once. Every value below comes from the theme,
+        /// so an early return on an existing asset meant retuning bloomIntensity or
+        /// saturation and rebuilding did precisely nothing -- the same trap that left the
+        /// pickups silent and the rifle without a tracer.
+        /// </summary>
         private static VolumeProfile CreateVolumeProfile()
         {
             string path = $"{AssetFolder}/PostFX_{SafeName(_theme.themeName)}.asset";
-            var existing = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);
-            if (existing != null) return existing;
 
-            var profile = ScriptableObject.CreateInstance<VolumeProfile>();
-            AssetDatabase.CreateAsset(profile, path);
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, path);
+            }
+
+            // Cleared first: Add on a profile that already holds an override of that type
+            // returns the existing one in some versions and appends a second in others,
+            // and a profile with two Blooms is a profile nobody can tune.
+            for (int i = profile.components.Count - 1; i >= 0; i--)
+            {
+                var component = profile.components[i];
+                profile.components.RemoveAt(i);
+                Object.DestroyImmediate(component, true);
+            }
 
             var tonemapping = profile.Add<Tonemapping>(true);
             tonemapping.mode.overrideState = true;

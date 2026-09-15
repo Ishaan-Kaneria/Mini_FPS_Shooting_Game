@@ -201,7 +201,9 @@ public class EnemyArchetype : ScriptableObject
 
         foreach (var renderer in enemy.GetComponentsInChildren<Renderer>())
         {
-            if (renderer == null || EnemyHealthBar.IsBarRenderer(renderer)) continue;
+            // Body only: a carried weapon is not flesh and must not be painted the
+            // archetype's colour. See EnemyAI.IsBodyRenderer for the rule.
+            if (!EnemyAI.IsBodyRenderer(renderer)) continue;
 
             // The head is the headshot box, so it keeps its own lighter shade.
             bool isHead = renderer.name.IndexOf("Head", System.StringComparison.OrdinalIgnoreCase) >= 0;

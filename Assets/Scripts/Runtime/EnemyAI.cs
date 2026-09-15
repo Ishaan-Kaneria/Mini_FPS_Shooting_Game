@@ -97,6 +97,24 @@ public class EnemyAI : MonoBehaviour
     public AudioClip attackClip;
     public AudioClip deathClip;
 
+    [Header("Ranged Feedback")]
+    [Tooltip("Where the shot appears to come from. Only cosmetic -- the shot itself is " +
+             "still traced from the eyes, so cover and accuracy do not change with the " +
+             "weapon model. Falls back to the eyes when empty.")]
+    public Transform muzzlePoint;
+
+    [Tooltip("Spawned at the muzzle on each shot, and destroyed by its own TransientFlash.")]
+    public GameObject muzzleFlashPrefab;
+
+    [Tooltip("The streak from muzzle to impact. Without one, a ranged enemy shoots you " +
+             "from across the arena with nothing on screen to say where it came from.")]
+    public GameObject tracerPrefab;
+
+    public float tracerSpeed = 200f;
+
+    [Tooltip("The shot itself. Separate from attackClip, which is the enemy's own voice.")]
+    public AudioClip fireClip;
+
     [Header("Animation (optional)")]
     public Animator animator;
     public string speedParameter = "Speed";
@@ -162,13 +180,35 @@ public class EnemyAI : MonoBehaviour
     static readonly Collider[] NeighbourBuffer = new Collider[16];
 
     /// <summary>Every renderer that is part of the body, excluding the floating health bar.</summary>
+    /// <summary>
+    /// Whether a renderer is part of the enemy's body, as opposed to something it is
+    /// carrying or wearing.
+    ///
+    /// Two things use this and both would be wrong without it: the damage flash here,
+    /// and EnemyArchetype.Tint, which paints every renderer it finds the archetype's
+    /// colour. An enemy holding a rifle would otherwise hold a flesh-coloured rifle
+    /// that flashes red when the enemy is hit.
+    ///
+    /// The rule is the surface tag the kit already uses for impact effects: anything
+    /// tagged as a hard surface is gear, not flesh. Untagged parts still count as body,
+    /// so a custom enemy prefab that never set tags keeps tinting exactly as before.
+    /// </summary>
+    public static bool IsBodyRenderer(Renderer renderer)
+    {
+        if (renderer == null || EnemyHealthBar.IsBarRenderer(renderer)) return false;
+
+        return !renderer.CompareTag("Metal")
+            && !renderer.CompareTag("Wood")
+            && !renderer.CompareTag("Concrete");
+    }
+
     Renderer[] BodyRenderers()
     {
         var all = GetComponentsInChildren<Renderer>();
         var body = new System.Collections.Generic.List<Renderer>(all.Length);
 
         foreach (var renderer in all)
-            if (renderer != null && !EnemyHealthBar.IsBarRenderer(renderer)) body.Add(renderer);
+            if (IsBodyRenderer(renderer)) body.Add(renderer);
 
         return body.ToArray();
     }
@@ -491,8 +531,18 @@ public class EnemyAI : MonoBehaviour
         direction = Quaternion.AngleAxis(offset.x, Vector3.up) *
                     Quaternion.AngleAxis(offset.y, transform.right) * direction;
 
-        if (!Physics.Raycast(origin, direction, out RaycastHit hit, detectionRadius,
-                             rangedHitMask, QueryTriggerInteraction.Ignore)) return;
+        PlayMuzzleEffects();
+
+        // The shot is resolved before the visuals are sent anywhere, so the tracer can be
+        // drawn to the real impact point. Note the early return is gone: a shot that hits
+        // nothing still gets a tracer, because "where did that come from" is the question
+        // a miss most needs to answer.
+        bool struck = Physics.Raycast(origin, direction, out RaycastHit hit, detectionRadius,
+                                      rangedHitMask, QueryTriggerInteraction.Ignore);
+
+        SpawnTracer(struck ? hit.point : origin + direction * detectionRadius);
+
+        if (!struck) return;
 
         var info = new DamageInfo(attackDamage, hit.point, hit.normal, direction, gameObject);
 
@@ -503,6 +553,44 @@ public class EnemyAI : MonoBehaviour
             var health = hit.collider.GetComponentInParent<Health>();
             if (health != null && health != _health) health.ApplyDamage(info);
         }
+    }
+
+    /// <summary>Flash and report, at the weapon rather than at the eyes.</summary>
+    void PlayMuzzleEffects()
+    {
+        Transform from = muzzlePoint != null ? muzzlePoint : eyes;
+
+        if (muzzleFlashPrefab != null && from != null)
+        {
+            // Parented to the muzzle so it tracks a moving enemy for its two frames, and
+            // destroyed on a timer the way Weapon does it -- TransientFlash controls how
+            // long it is actually visible.
+            var flash = Instantiate(muzzleFlashPrefab, from.position, from.rotation, from);
+            Destroy(flash, 1f);
+        }
+
+        if (fireClip != null && _audio != null) _audio.PlayOneShot(fireClip);
+    }
+
+    /// <summary>
+    /// Drawn from the weapon, not from the eyes the shot was traced from. Starting the
+    /// streak at the barrel is what makes the gun look like the thing that fired.
+    /// </summary>
+    void SpawnTracer(Vector3 endPoint)
+    {
+        if (tracerPrefab == null) return;
+
+        Transform from = muzzlePoint != null ? muzzlePoint : eyes;
+        if (from == null) return;
+
+        Vector3 travel = endPoint - from.position;
+        if (travel.sqrMagnitude < 0.0001f) return;
+
+        var tracer = Instantiate(tracerPrefab, from.position, Quaternion.LookRotation(travel));
+
+        var projectile = tracer.GetComponent<TracerProjectile>();
+        if (projectile != null) projectile.Launch(endPoint, tracerSpeed);
+        else Destroy(tracer, 1f);
     }
 
     // ======================================================================

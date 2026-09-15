@@ -412,7 +412,14 @@ public class Weapon : MonoBehaviour
 
         var tracer = Instantiate(data.tracerPrefab, muzzlePoint.position,
                                  Quaternion.LookRotation(endPoint - muzzlePoint.position));
-        StartCoroutine(MoveTracer(tracer.transform, endPoint));
+
+        // The generated prefab flies itself, which keeps the tracer alive even if this
+        // weapon is disabled mid-flight -- a coroutine here would not. The fallback is
+        // for a hand-made tracerPrefab that predates TracerProjectile, so swapping in
+        // your own prefab still works.
+        var projectile = tracer.GetComponent<TracerProjectile>();
+        if (projectile != null) projectile.Launch(endPoint, data.tracerSpeed);
+        else StartCoroutine(MoveTracer(tracer.transform, endPoint));
     }
 
     IEnumerator MoveTracer(Transform tracer, Vector3 endPoint)

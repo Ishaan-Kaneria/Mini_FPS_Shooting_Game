@@ -1595,9 +1595,25 @@ namespace FPSKit.EditorTools
 
             mat.EnableKeyword("_EMISSION");
 
-            // No GI contribution: these glows are a readability cue, not lighting, and
-            // realtime emissive on every enemy would cost far more than it is worth.
-            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            // That keyword is what makes the per-instance glow possible at all: a
+            // MaterialPropertyBlock can set _EmissionColor but cannot enable a shader
+            // keyword, so without it EnemyAI's glow and the pickup tint render black.
+            //
+            // Keeping it enabled is also why these flags are not None. URP derives the
+            // keyword from the GI flags alone -- BaseShaderGUI.SetMaterialKeywords does
+            // shouldEmissionBeEnabled = (globalIlluminationFlags & AnyEmissive) != 0 --
+            // so None strips _EMISSION the first time anyone so much as clicks the
+            // material in the Inspector, silently killing every glow in the scene. It
+            // survives a rebuild, because the strip happens after the builder runs.
+            //
+            // BakedEmissive keeps the material readable as emissive; EmissiveIsBlack is
+            // the half that says "contribute nothing to GI", which was the original
+            // intent -- these glows are a readability cue, not lighting. Unity's own
+            // FixupEmissiveFlag maintains the pair, dropping EmissiveIsBlack once a real
+            // colour is set, and nothing the builder makes is Contribute GI static, so
+            // no bake sees them either way.
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive |
+                                          MaterialGlobalIlluminationFlags.EmissiveIsBlack;
             if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", Color.black);
 
             EditorUtility.SetDirty(mat);
@@ -1635,6 +1651,21 @@ namespace FPSKit.EditorTools
                                                      Color color, PrimitiveType shape)
         {
             string path = $"{AssetFolder}/{assetName}.prefab";
+
+            // Stamped before the existing-prefab check rather than inside the creation
+            // path below. The prefab is deliberately kept across rebuilds, so anything
+            // done only while creating it can never be corrected by building again --
+            // which is how these materials kept a stale emission setup through a full
+            // rebuild. Re-stamping is idempotent and the material is shared, so the
+            // prefab keeps pointing at one the current builder still agrees with.
+            var material = MakeTintableMaterial(assetName, color, 0.6f, 0.1f, shared: true);
+            if (material != null)
+            {
+                // Pickups glow so they read on a dark floor across the arena.
+                material.SetColor("_EmissionColor", color * 1.8f);
+                EditorUtility.SetDirty(material);
+            }
+
             var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (existing != null) return existing;
 
@@ -1651,14 +1682,7 @@ namespace FPSKit.EditorTools
             visual.transform.localScale = Vector3.one * 0.45f;
             Object.DestroyImmediate(visual.GetComponent<Collider>());
 
-            var material = MakeTintableMaterial(assetName, color, 0.6f, 0.1f, shared: true);
-            if (material != null)
-            {
-                // Pickups glow so they read on a dark floor across the arena.
-                material.SetColor("_EmissionColor", color * 1.8f);
-                EditorUtility.SetDirty(material);
-                visual.GetComponent<Renderer>().sharedMaterial = material;
-            }
+            if (material != null) visual.GetComponent<Renderer>().sharedMaterial = material;
 
             var glow = new GameObject("Glow");
             glow.transform.SetParent(root.transform, false);

@@ -25,8 +25,11 @@ MonoBehaviour:
   minDamageFactor: 0.55
   magazineSize: 30
   reserveAmmo: 150
+  maxReserveAmmo: 360
   reloadTime: 2.1
   autoReloadWhenEmpty: 1
+  infiniteReserve: 1
+  infiniteAmmo: 0
   baseSpread: 0.6
   spreadPerShot: 0.45
   maxSpread: 5
@@ -44,11 +47,12 @@ MonoBehaviour:
   adsSpeed: 12
   muzzleFlashDuration: 0.045
   impactForce: 35
-  fireClip: {fileID: 0}
-  reloadClip: {fileID: 0}
-  emptyClip: {fileID: 0}
+  cameraShake: 0.18
+  fireClip: {fileID: 8300000, guid: 63da0a84f4945c9aab87d69e6dedcc8d, type: 3}
+  reloadClip: {fileID: 8300000, guid: 4e11845933db44619adbc649c9bf8ea2, type: 3}
+  emptyClip: {fileID: 8300000, guid: 75ab90f74094cc38184cac61a2b794a7, type: 3}
   pitchVariance: 0.06
-  muzzleFlashPrefab: {fileID: 0}
-  tracerPrefab: {fileID: 0}
+  muzzleFlashPrefab: {fileID: 2134951606029692187, guid: 8a79f2628d8bdbc7e804f0f81f251750, type: 3}
+  tracerPrefab: {fileID: 2247844606418610152, guid: cafbe0e8fd18c73c9b941c758f06c078, type: 3}
   tracerSpeed: 240
   impacts: {fileID: 11400000, guid: 368d78fa5d59c944f81a0100fd9381c3, type: 2}

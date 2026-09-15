@@ -14,28 +14,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ImpactLibrary
   entries:
   - surfaceTag: Concrete
-    effectPrefab: {fileID: 0}
-    clips: []
-    volume: 0.8
-    effectLifetime: 4
+    effectPrefab: {fileID: 1238077029557984431, guid: e17a124f7dd870283b34e43bfa3d165f, type: 3}
+    clips:
+    - {fileID: 8300000, guid: 6340a5107191f5571acef76d92c52937, type: 3}
+    volume: 0.7
+    effectLifetime: 1
   - surfaceTag: Metal
-    effectPrefab: {fileID: 0}
-    clips: []
-    volume: 0.8
-    effectLifetime: 4
+    effectPrefab: {fileID: 6667298210803856546, guid: 9c2bb8f4bc3689aa1ab27ce6473112a7, type: 3}
+    clips:
+    - {fileID: 8300000, guid: a88b7318b7c86dbb0868f671c8ba909c, type: 3}
+    volume: 0.75
+    effectLifetime: 1
   - surfaceTag: Wood
-    effectPrefab: {fileID: 0}
-    clips: []
-    volume: 0.8
-    effectLifetime: 4
+    effectPrefab: {fileID: 4911889247184717814, guid: 26f21559fb04fd094907707d405206f0, type: 3}
+    clips:
+    - {fileID: 8300000, guid: fc9a6c5f8565c7af19098419ffc19951, type: 3}
+    volume: 0.7
+    effectLifetime: 1
   - surfaceTag: Flesh
-    effectPrefab: {fileID: 0}
-    clips: []
-    volume: 0.8
-    effectLifetime: 4
+    effectPrefab: {fileID: 6279959965576244524, guid: 6d09e6702e07dbc5e8f6cbd57a8cb0e4, type: 3}
+    clips:
+    - {fileID: 8300000, guid: 9dd9832a82fb22f2980451606f72787e, type: 3}
+    volume: 0.85
+    effectLifetime: 1
   fallback:
     surfaceTag: Default
-    effectPrefab: {fileID: 0}
-    clips: []
-    volume: 0.8
-    effectLifetime: 4
+    effectPrefab: {fileID: 1238077029557984431, guid: e17a124f7dd870283b34e43bfa3d165f, type: 3}
+    clips:
+    - {fileID: 8300000, guid: 6340a5107191f5571acef76d92c52937, type: 3}
+    volume: 0.55
+    effectLifetime: 1

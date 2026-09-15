@@ -818,37 +818,241 @@ namespace FPSKit.EditorTools
                 weather.transform.position = new Vector3(0f, _theme.wallHeight + 8f, 0f);
             }
 
-            if (_theme.ambienceLoop == null) return;
+            // The theme's own loop wins; the generated bed is the floor, so an arena is
+            // never silent just because its theme predates the audio set.
+            var ambience = _theme.ambienceLoop != null ? _theme.ambienceLoop : Clip("Ambience/arena_bed.wav");
+            if (ambience == null) return;
 
             var go = new GameObject("Ambience");
             var source = go.AddComponent<AudioSource>();
-            source.clip = _theme.ambienceLoop;
+            source.clip = ambience;
             source.loop = true;
             source.playOnAwake = true;
-            source.volume = _theme.ambienceVolume;
+            source.volume = _theme.ambienceVolume > 0f ? _theme.ambienceVolume : 0.35f;
+
+            // 2D on purpose: the bed has no position in the world, and this is why the
+            // import policy keeps ambience in stereo while forcing every SFX to mono.
             source.spatialBlend = 0f;
         }
 
         // ==================================================================
+        // Audio and VFX
+        // ==================================================================
+
+        private const string AudioFolder = "Assets/Audio";
+
+        /// <summary>
+        /// Loads one of the kit's clips by its path under Assets/Audio, or null when it
+        /// is not there. Every audio field in the kit is optional, so a project that
+        /// deleted the placeholder set still builds and still plays -- just quietly.
+        /// </summary>
+        private static AudioClip Clip(string relativePath)
+            => AssetDatabase.LoadAssetAtPath<AudioClip>($"{AudioFolder}/{relativePath}");
+
+        /// <summary>Loads several clips, silently dropping any that are missing.</summary>
+        private static AudioClip[] Clips(params string[] relativePaths)
+        {
+            var found = new List<AudioClip>(relativePaths.Length);
+
+            foreach (string relativePath in relativePaths)
+            {
+                var clip = Clip(relativePath);
+                if (clip != null) found.Add(clip);
+            }
+
+            return found.ToArray();
+        }
+
+        /// <summary>Saves a freshly built object over its prefab and drops the scene copy.</summary>
+        private static GameObject SaveGeneratedPrefab(GameObject root, string path)
+        {
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            return prefab;
+        }
+
+        /// <summary>
+        /// A material that reads as hot -- tracers, muzzle flash, impact sparks. Shares
+        /// MakeTintableMaterial's emission setup (see the note there on why the GI flags
+        /// are not None) but keeps a real colour, since nothing drives these through a
+        /// MaterialPropertyBlock the way the enemies do.
+        /// </summary>
+        private static Material MakeGlowMaterial(string name, Color color, float intensity)
+        {
+            var mat = MakeTintableMaterial(name, color, 0.3f, 0f, shared: true);
+            if (mat == null) return null;
+
+            mat.SetColor("_EmissionColor", color * intensity);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>
+        /// The round in flight, and the reason you can now see your shots. Weapon.
+        /// SpawnTracer has always known how to fire one, but WeaponData.tracerPrefab was
+        /// never filled in, so every shot was an invisible raycast.
+        ///
+        /// Weapon orients the tracer with LookRotation and walks it to the impact point,
+        /// so the root has to stay unrotated and the mesh has to run along +Z. A
+        /// primitive cylinder's axis is Y, which is what the pitch on the child is for.
+        /// </summary>
+        private static GameObject CreateTracerPrefab()
+        {
+            var glow = MakeGlowMaterial("Tracer", new Color(1f, 0.83f, 0.45f), 8f);
+
+            var root = new GameObject("Tracer");
+
+            var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shaft.name = "Shaft";
+            shaft.transform.SetParent(root.transform, false);
+            shaft.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+            // A primitive cylinder is two units tall, so 0.2 gives a 0.4m streak: long
+            // enough to read as a line at speed, short enough not to look like a laser.
+            shaft.transform.localScale = new Vector3(0.03f, 0.2f, 0.03f);
+            Object.DestroyImmediate(shaft.GetComponent<Collider>());
+            shaft.GetComponent<Renderer>().sharedMaterial = glow;
+
+            // The streak behind it. A tracer at 240 m/s crosses the arena in a handful of
+            // frames, so without a trail it is a few stills rather than a line.
+            var trail = root.AddComponent<TrailRenderer>();
+            trail.time = 0.055f;
+            trail.startWidth = 0.05f;
+            trail.endWidth = 0f;
+            trail.minVertexDistance = 0.08f;
+            trail.sharedMaterial = glow;
+            trail.alignment = LineAlignment.View;
+            trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            trail.receiveShadows = false;
+
+            return SaveGeneratedPrefab(root, AssetFolder + "/Tracer.prefab");
+        }
+
+        /// <summary>
+        /// The flash at the barrel. Weapon parents this to the muzzle and destroys it a
+        /// second later, which is a cleanup timer rather than a duration -- TransientFlash
+        /// is what makes it last the two frames a muzzle flash should.
+        /// </summary>
+        private static GameObject CreateMuzzleFlashPrefab()
+        {
+            var glow = MakeGlowMaterial("MuzzleFlash", new Color(1f, 0.78f, 0.38f), 12f);
+
+            var root = new GameObject("MuzzleFlash");
+
+            // A core plus two crossed blades. Three cheap primitives beat one sphere,
+            // because the blades give the flash a shape rather than a blob -- and they
+            // face the player, who is looking straight down the barrel.
+            var core = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            core.name = "Core";
+            core.transform.SetParent(root.transform, false);
+            core.transform.localScale = Vector3.one * 0.07f;
+            Object.DestroyImmediate(core.GetComponent<Collider>());
+            core.GetComponent<Renderer>().sharedMaterial = glow;
+
+            for (int i = 0; i < 2; i++)
+            {
+                var blade = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                blade.name = "Blade_" + i;
+                blade.transform.SetParent(root.transform, false);
+                blade.transform.localRotation = Quaternion.Euler(0f, 0f, i * 90f);
+                blade.transform.localScale = new Vector3(0.26f, 0.045f, 1f);
+                Object.DestroyImmediate(blade.GetComponent<Collider>());
+                blade.GetComponent<Renderer>().sharedMaterial = glow;
+            }
+
+            var flash = root.AddComponent<TransientFlash>();
+            flash.lifetime = 0.045f;
+            flash.startScale = 1f;
+            flash.endScale = 0.2f;
+
+            return SaveGeneratedPrefab(root, AssetFolder + "/MuzzleFlash.prefab");
+        }
+
+        /// <summary>
+        /// The spark where a round lands. ImpactLibrary spawns it facing along the surface
+        /// normal, so it needs no orientation of its own.
+        /// </summary>
+        private static GameObject CreateImpactPrefab(string name, Color color, float scale)
+        {
+            var glow = MakeGlowMaterial("Impact" + name, color, 6f);
+
+            var root = new GameObject("Impact_" + name);
+
+            var burst = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            burst.name = "Burst";
+            burst.transform.SetParent(root.transform, false);
+            burst.transform.localScale = Vector3.one * scale;
+            Object.DestroyImmediate(burst.GetComponent<Collider>());
+            burst.GetComponent<Renderer>().sharedMaterial = glow;
+
+            // Brief enough that even an automatic only ever has one or two of these lit
+            // at a time, and TransientFlash switches the object off, taking the light
+            // with it rather than leaving it burning until the library's cleanup.
+            var light = root.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = color;
+            light.intensity = 2.5f;
+            light.range = 3f;
+            light.shadows = LightShadows.None;
+
+            var flash = root.AddComponent<TransientFlash>();
+            flash.lifetime = 0.09f;
+            flash.startScale = 1f;
+            flash.endScale = 0.1f;
+
+            return SaveGeneratedPrefab(root, $"{AssetFolder}/Impact_{name}.prefab");
+        }
+
+        // ==================================================================
+        /// <summary>
+        /// Surface tag to impact effect and sound. Created once, then re-stamped on every
+        /// build: the asset is deliberately kept across rebuilds, so wiring done only on
+        /// the run that created it could never be corrected by building again.
+        /// </summary>
         private static ImpactLibrary CreateImpactLibrary()
         {
             string path = $"{AssetFolder}/ImpactLibrary.asset";
-            var existing = AssetDatabase.LoadAssetAtPath<ImpactLibrary>(path);
-            if (existing != null) return existing;
 
-            var library = ScriptableObject.CreateInstance<ImpactLibrary>();
+            var library = AssetDatabase.LoadAssetAtPath<ImpactLibrary>(path);
+            if (library == null)
+            {
+                library = ScriptableObject.CreateInstance<ImpactLibrary>();
+                AssetDatabase.CreateAsset(library, path);
+            }
+
             library.entries = new[]
             {
-                new ImpactLibrary.Entry { surfaceTag = "Concrete" },
-                new ImpactLibrary.Entry { surfaceTag = "Metal" },
-                new ImpactLibrary.Entry { surfaceTag = "Wood" },
-                new ImpactLibrary.Entry { surfaceTag = "Flesh" }
+                Impact("Concrete", new Color(1f, 0.92f, 0.75f), 0.09f, "SFX/impact_concrete.wav", 0.7f),
+                Impact("Metal", new Color(1f, 0.85f, 0.5f), 0.1f, "SFX/impact_metal.wav", 0.75f),
+                Impact("Wood", new Color(0.9f, 0.65f, 0.35f), 0.09f, "SFX/impact_wood.wav", 0.7f),
+                Impact("Flesh", new Color(0.85f, 0.12f, 0.12f), 0.11f, "SFX/impact_flesh.wav", 0.85f)
             };
-            library.fallback = new ImpactLibrary.Entry { surfaceTag = "Default" };
 
-            AssetDatabase.CreateAsset(library, path);
+            // Anything untagged still sparks and still ticks, so a shot into imported
+            // geometry that nobody remembered to tag does not read as a miss.
+            library.fallback = Impact("Concrete", new Color(1f, 0.92f, 0.75f), 0.08f,
+                                     "SFX/impact_concrete.wav", 0.55f);
+            library.fallback.surfaceTag = "Default";
+
+            EditorUtility.SetDirty(library);
             AssetDatabase.SaveAssets();
             return AssetDatabase.LoadAssetAtPath<ImpactLibrary>(path);
+        }
+
+        private static ImpactLibrary.Entry Impact(string surfaceTag, Color color, float scale,
+                                                  string clipPath, float volume)
+        {
+            return new ImpactLibrary.Entry
+            {
+                surfaceTag = surfaceTag,
+                effectPrefab = CreateImpactPrefab(surfaceTag, color, scale),
+                clips = Clips(clipPath),
+                volume = volume,
+
+                // Comfortably longer than TransientFlash takes to switch itself off, so
+                // the cleanup never cuts the effect short.
+                effectLifetime = 1f
+            };
         }
 
         /// <summary>Key bindings live in their own asset so they can be rebound without code.</summary>
@@ -866,11 +1070,17 @@ namespace FPSKit.EditorTools
             return AssetDatabase.LoadAssetAtPath<ControlSettings>(path);
         }
 
+        /// <summary>
+        /// The rifle's tuning. The stats are only written when the asset is first
+        /// created, so a retuned rifle survives a rebuild -- but the audio and VFX hookup
+        /// below is re-stamped every time, because those point at generated assets this
+        /// builder owns and a stale reference there is a silent loss of effect.
+        /// </summary>
         private static WeaponData CreateWeaponData(ImpactLibrary impacts)
         {
             string path = AssetFolder + "/TestRifle.asset";
             var existing = AssetDatabase.LoadAssetAtPath<WeaponData>(path);
-            if (existing != null) return existing;
+            if (existing != null) return StampWeaponFeedback(existing, impacts);
 
             var data = ScriptableObject.CreateInstance<WeaponData>();
             data.weaponName = "Test Rifle";
@@ -889,11 +1099,40 @@ namespace FPSKit.EditorTools
             data.adsFieldOfView = 40f;
             data.adsPosition = new Vector3(0f, -0.02f, 0.12f);
             data.infiniteReserve = true;
-            data.impacts = impacts;
 
             AssetDatabase.CreateAsset(data, path);
+            StampWeaponFeedback(data, impacts);
             AssetDatabase.SaveAssets();
             return AssetDatabase.LoadAssetAtPath<WeaponData>(path);
+        }
+
+        /// <summary>
+        /// Everything the rifle needs to be seen and heard. Kept apart from the stats
+        /// above so it can run against an existing asset too.
+        ///
+        /// tracerPrefab is the one that matters most: Weapon.SpawnTracer bails when it is
+        /// null, which is why the rifle fired invisible bullets for as long as it has
+        /// existed. The raycast, the damage and the impact were all working -- there was
+        /// simply nothing to watch.
+        /// </summary>
+        private static WeaponData StampWeaponFeedback(WeaponData data, ImpactLibrary impacts)
+        {
+            data.impacts = impacts;
+
+            data.fireClip = Clip("SFX/weapon_fire.wav");
+            data.reloadClip = Clip("SFX/weapon_reload.wav");
+            data.emptyClip = Clip("SFX/weapon_empty.wav");
+            data.pitchVariance = 0.06f;
+
+            data.muzzleFlashPrefab = CreateMuzzleFlashPrefab();
+            data.tracerPrefab = CreateTracerPrefab();
+
+            // Fast enough to feel like a bullet, slow enough to actually see cross the
+            // arena. Real rounds are ten times this and would simply teleport.
+            data.tracerSpeed = 240f;
+
+            EditorUtility.SetDirty(data);
+            return data;
         }
 
         // ==================================================================
@@ -957,6 +1196,12 @@ namespace FPSKit.EditorTools
             var motor = player.AddComponent<PlayerMotor>();
             motor.cameraHolder = holder.transform;
             motor.footstepSource = playerAudio;
+
+            // Four variants rather than one: a single footstep clip retriggered at walking
+            // cadence is the most obviously synthetic sound a game can make.
+            motor.footstepClips = Clips("SFX/footstep_01.wav", "SFX/footstep_02.wav",
+                                        "SFX/footstep_03.wav", "SFX/footstep_04.wav");
+            motor.landClip = Clip("SFX/land.wav");
             motor.controls = CreateControlSettings();
 
             // ---- weapon rig ----
@@ -965,18 +1210,15 @@ namespace FPSKit.EditorTools
             weaponHolder.transform.localPosition = Vector3.zero;
             weaponHolder.AddComponent<WeaponSway>();
 
-            var model = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            model.name = "WeaponModel";
-            model.transform.SetParent(weaponHolder.transform);
-            model.transform.localPosition = new Vector3(0.22f, -0.18f, 0.45f);
-            model.transform.localScale = new Vector3(0.08f, 0.12f, 0.55f);
-            Object.DestroyImmediate(model.GetComponent<Collider>());
-            model.GetComponent<Renderer>().sharedMaterial =
-                MakeMaterial("Gun", new Color(0.12f, 0.12f, 0.13f), 0.55f, 0.8f);
+            var model = BuildWeaponModel(weaponHolder.transform);
 
             var muzzle = new GameObject("MuzzlePoint");
             muzzle.transform.SetParent(model.transform);
-            muzzle.transform.localPosition = new Vector3(0f, 0f, 0.55f);
+
+            // Real metres now, not the old cube's scaled local space: the model root is
+            // an empty at unit scale, so this is simply the end of the barrel -- carried
+            // through the same authoring scale the parts use.
+            muzzle.transform.localPosition = new Vector3(0f, 0.005f, 0.47f) * GunScale;
 
             var muzzleLight = muzzle.AddComponent<Light>();
             muzzleLight.type = LightType.Point;
@@ -998,6 +1240,108 @@ namespace FPSKit.EditorTools
             return player;
         }
 
+        /// <summary>
+        /// The first-person rifle, built from primitives into something with a barrel, a
+        /// grip and sights rather than the single stretched cube it used to be.
+        ///
+        /// The root is an empty at unit scale and everything hangs off it, which matters
+        /// for more than tidiness: Weapon caches transform.localPosition as its hip pose
+        /// and punches the model back along Z for recoil, so the thing carrying the
+        /// Weapon component has to be an unscaled parent. Scaling lived on the old cube,
+        /// which is why the muzzle point had to be expressed in scaled units.
+        /// </summary>
+        private static GameObject BuildWeaponModel(Transform holder)
+        {
+            var metal = MakeSharedMaterial("Gun_Metal", new Color(0.11f, 0.115f, 0.125f), 0.55f, 0.85f);
+            var polymer = MakeSharedMaterial("Gun_Polymer", new Color(0.16f, 0.17f, 0.18f), 0.25f, 0f);
+            var accent = MakeSharedMaterial("Gun_Accent", new Color(0.32f, 0.33f, 0.35f), 0.7f, 0.9f);
+
+            var root = new GameObject("WeaponModel");
+            root.transform.SetParent(holder, false);
+
+            // Far enough forward that the stock is not sitting on the near clip plane,
+            // which is what the old single cube got away with by having no stock.
+            root.transform.localPosition = new Vector3(0.20f, -0.16f, 0.62f);
+
+            // Slight inward yaw so the weapon reads as held across the body rather than
+            // bolted to the camera facing dead ahead.
+            root.transform.localRotation = Quaternion.Euler(0f, -3f, 0f);
+
+            Transform parent = root.transform;
+
+            GunPart(parent, "Receiver", PrimitiveType.Cube, metal,
+                    new Vector3(0f, 0f, 0f), new Vector3(0.072f, 0.095f, 0.30f), Vector3.zero);
+
+            GunPart(parent, "Handguard", PrimitiveType.Cube, polymer,
+                    new Vector3(0f, -0.004f, 0.21f), new Vector3(0.06f, 0.065f, 0.16f), Vector3.zero);
+
+            // A primitive cylinder is two units tall on Y, so the pitch turns it into a
+            // barrel and the Y scale is half the length.
+            GunPart(parent, "Barrel", PrimitiveType.Cylinder, accent,
+                    new Vector3(0f, 0.004f, 0.36f), new Vector3(0.019f, 0.09f, 0.019f),
+                    new Vector3(90f, 0f, 0f));
+
+            GunPart(parent, "Grip", PrimitiveType.Cube, polymer,
+                    new Vector3(0f, -0.10f, -0.055f), new Vector3(0.048f, 0.135f, 0.062f),
+                    new Vector3(-16f, 0f, 0f));
+
+            GunPart(parent, "Magazine", PrimitiveType.Cube, polymer,
+                    new Vector3(0f, -0.105f, 0.055f), new Vector3(0.042f, 0.15f, 0.085f),
+                    new Vector3(7f, 0f, 0f));
+
+            GunPart(parent, "Stock", PrimitiveType.Cube, polymer,
+                    new Vector3(0f, -0.018f, -0.235f), new Vector3(0.05f, 0.085f, 0.18f),
+                    new Vector3(-2f, 0f, 0f));
+
+            GunPart(parent, "Rail", PrimitiveType.Cube, accent,
+                    new Vector3(0f, 0.055f, 0.02f), new Vector3(0.028f, 0.016f, 0.26f), Vector3.zero);
+
+            // Sights sit on the rail rather than on the receiver, so the notch and post
+            // line up with each other at any ADS offset.
+            GunPart(parent, "SightRear", PrimitiveType.Cube, accent,
+                    new Vector3(0f, 0.077f, -0.06f), new Vector3(0.030f, 0.030f, 0.014f), Vector3.zero);
+
+            GunPart(parent, "SightFront", PrimitiveType.Cube, accent,
+                    new Vector3(0f, 0.077f, 0.27f), new Vector3(0.012f, 0.030f, 0.012f), Vector3.zero);
+
+            GunPart(parent, "Trigger", PrimitiveType.Cube, accent,
+                    new Vector3(0f, -0.055f, -0.025f), new Vector3(0.012f, 0.032f, 0.012f), Vector3.zero);
+
+            return root;
+        }
+
+        /// <summary>
+        /// Every authored dimension of the weapon is multiplied by this on its way to the
+        /// transform.
+        ///
+        /// The parts above are written at sizes that are easy to reason about -- a 30cm
+        /// receiver, a 15cm magazine -- and then the whole gun is shrunk to sit in frame.
+        /// Doing it here rather than by scaling the root keeps the root at unit scale,
+        /// which is what lets the muzzle point stay in real metres and keeps Weapon's
+        /// recoil kickback in the same units as everything else.
+        /// </summary>
+        private const float GunScale = 0.78f;
+
+        /// <summary>One primitive of the weapon, stripped of the collider it ships with.</summary>
+        private static GameObject GunPart(Transform parent, string name, PrimitiveType shape,
+                                          Material material, Vector3 position, Vector3 scale,
+                                          Vector3 euler)
+        {
+            var part = GameObject.CreatePrimitive(shape);
+            part.name = name;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = position * GunScale;
+            part.transform.localRotation = Quaternion.Euler(euler);
+            part.transform.localScale = scale * GunScale;
+
+            // Nothing on the weapon is ever collided with -- it lives inside the camera's
+            // near plane -- and a collider there would trip the player's own capsule.
+            Object.DestroyImmediate(part.GetComponent<Collider>());
+
+            if (material != null) part.GetComponent<Renderer>().sharedMaterial = material;
+            return part;
+        }
+
         // ==================================================================
         private static GameObject BuildEnemyPrefab()
         {
@@ -1007,39 +1351,55 @@ namespace FPSKit.EditorTools
             enemy.tag = "Enemy";
             enemy.layer = enemyLayer;
 
-            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            body.name = "Body";
-            body.transform.SetParent(enemy.transform);
-            body.transform.localPosition = new Vector3(0f, 1f, 0f);
-            body.tag = "Flesh";
-            body.layer = enemyLayer;
-            body.GetComponent<Renderer>().sharedMaterial =
-                MakeTintableMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
+            var flesh = MakeTintableMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
+            var headFlesh = MakeTintableMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);
 
-            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            head.name = "Head";
-            head.transform.SetParent(enemy.transform);
-            head.transform.localPosition = new Vector3(0f, 2.05f, 0f);
-            head.transform.localScale = Vector3.one * 0.45f;
-            head.tag = "Flesh";
-            head.layer = enemyLayer;
-            head.GetComponent<Renderer>().sharedMaterial =
-                MakeTintableMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);
+            // The torso is an empty pivot at the hips, so EnemyLimbAnimator can lean and
+            // bob the upper body without dragging the feet off the floor. Legs hang off
+            // the root for the same reason.
+            var torso = new GameObject("Torso");
+            torso.transform.SetParent(enemy.transform, false);
+            torso.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+
+            var body = EnemyPart(torso.transform, "Chest", PrimitiveType.Capsule, flesh, enemyLayer,
+                                 new Vector3(0f, 0.30f, 0f), new Vector3(0.5f, 0.33f, 0.42f));
+
+            var head = EnemyPart(torso.transform, "Head", PrimitiveType.Sphere, headFlesh, enemyLayer,
+                                 new Vector3(0f, 0.80f, 0f), Vector3.one * 0.40f);
+
+            // Shoulder and hip pivots carry the limb, so a swing rotates the whole limb
+            // about its joint instead of spinning the mesh around its own middle.
+            var leftArm = EnemyJoint(torso.transform, "ArmLeft", new Vector3(-0.31f, 0.55f, 0f));
+            var rightArm = EnemyJoint(torso.transform, "ArmRight", new Vector3(0.31f, 0.55f, 0f));
+
+            var leftArmMesh = EnemyPart(leftArm, "ArmLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                        new Vector3(0f, -0.31f, 0f), new Vector3(0.15f, 0.31f, 0.15f));
+            var rightArmMesh = EnemyPart(rightArm, "ArmRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                         new Vector3(0f, -0.31f, 0f), new Vector3(0.15f, 0.31f, 0.15f));
+
+            var leftLeg = EnemyJoint(enemy.transform, "LegLeft", new Vector3(-0.14f, 1.05f, 0f));
+            var rightLeg = EnemyJoint(enemy.transform, "LegRight", new Vector3(0.14f, 1.05f, 0f));
+
+            var leftLegMesh = EnemyPart(leftLeg, "LegLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                        new Vector3(0f, -0.52f, 0f), new Vector3(0.19f, 0.52f, 0.19f));
+            var rightLegMesh = EnemyPart(rightLeg, "LegRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                         new Vector3(0f, -0.52f, 0f), new Vector3(0.19f, 0.52f, 0.19f));
 
             var hp = enemy.AddComponent<Health>();
             hp.maxHealth = 100f;
             hp.destroyOnDeath = true;
             hp.destroyDelay = 2f;
 
-            // Hitboxes -- this is what gives you headshots.
-            var torsoBox = body.AddComponent<Hitbox>();
-            torsoBox.owner = hp;
-            torsoBox.damageMultiplier = 1f;
+            // Hitboxes -- this is what gives you headshots, and now what makes a limb
+            // shot worth less than a chest shot. Every visible part carries one, so no
+            // part of the silhouette is a hole that swallows rounds.
+            AddHitbox(body, hp, 1f, false);
+            AddHitbox(head, hp, 3f, true);
 
-            var headBox = head.AddComponent<Hitbox>();
-            headBox.owner = hp;
-            headBox.damageMultiplier = 3f;
-            headBox.isHeadshot = true;
+            AddHitbox(leftArmMesh, hp, 0.65f, false);
+            AddHitbox(rightArmMesh, hp, 0.65f, false);
+            AddHitbox(leftLegMesh, hp, 0.75f, false);
+            AddHitbox(rightLegMesh, hp, 0.75f, false);
 
             var agent = enemy.AddComponent<UnityEngine.AI.NavMeshAgent>();
             agent.speed = 4f;
@@ -1050,8 +1410,8 @@ namespace FPSKit.EditorTools
             agent.height = 2f;
 
             var eyes = new GameObject("Eyes");
-            eyes.transform.SetParent(enemy.transform);
-            eyes.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+            eyes.transform.SetParent(torso.transform, false);
+            eyes.transform.localPosition = new Vector3(0f, 0.80f, 0.18f);
 
             var ai = enemy.AddComponent<EnemyAI>();
             ai.eyes = eyes.transform;
@@ -1070,6 +1430,21 @@ namespace FPSKit.EditorTools
             src.spatialBlend = 1f;
             src.maxDistance = 30f;
 
+            // Force To Mono on these is not tidiness: spatialBlend 1 above means a stereo
+            // clip would play its left channel only. The import policy handles it.
+            ai.alertClip = Clip("SFX/enemy_alert.wav");
+            ai.attackClip = Clip("SFX/enemy_attack.wav");
+            ai.deathClip = Clip("SFX/enemy_death.wav");
+
+            // No AnimationClips and no AnimatorController anywhere in the kit -- the walk
+            // comes off the agent's own velocity. See EnemyLimbAnimator.
+            var limbs = enemy.AddComponent<EnemyLimbAnimator>();
+            limbs.torso = torso.transform;
+            limbs.leftArm = leftArm;
+            limbs.rightArm = rightArm;
+            limbs.leftLeg = leftLeg;
+            limbs.rightLeg = rightLeg;
+
             // Floating health bar. The material is assigned from an asset rather than
             // found at runtime, so the shader survives shader stripping in a build.
             var bar = enemy.AddComponent<EnemyHealthBar>();
@@ -1080,6 +1455,43 @@ namespace FPSKit.EditorTools
             var prefab = PrefabUtility.SaveAsPrefabAsset(enemy, path);
             Object.DestroyImmediate(enemy);
             return prefab;
+        }
+
+        /// <summary>A bare pivot: the joint a limb rotates about.</summary>
+        private static Transform EnemyJoint(Transform parent, string name, Vector3 localPosition)
+        {
+            var joint = new GameObject(name);
+            joint.transform.SetParent(parent, false);
+            joint.transform.localPosition = localPosition;
+            return joint.transform;
+        }
+
+        /// <summary>
+        /// One visible piece of an enemy. Tagged Flesh so the impact library plays the
+        /// wet hit, and put on the Enemy layer so the player's own shots can find it.
+        /// </summary>
+        private static GameObject EnemyPart(Transform parent, string name, PrimitiveType shape,
+                                            Material material, int layer,
+                                            Vector3 localPosition, Vector3 localScale)
+        {
+            var part = GameObject.CreatePrimitive(shape);
+            part.name = name;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+            part.tag = "Flesh";
+            part.layer = layer;
+
+            if (material != null) part.GetComponent<Renderer>().sharedMaterial = material;
+            return part;
+        }
+
+        private static void AddHitbox(GameObject part, Health owner, float multiplier, bool headshot)
+        {
+            var box = part.AddComponent<Hitbox>();
+            box.owner = owner;
+            box.damageMultiplier = multiplier;
+            box.isHeadshot = headshot;
         }
 
         // ==================================================================
@@ -1666,12 +2078,32 @@ namespace FPSKit.EditorTools
                 EditorUtility.SetDirty(material);
             }
 
+            // Stamped out here with the material, above the existing-prefab check, so a
+            // kept prefab picks the sound up on the next build.
+            var pickupClip = Clip("SFX/pickup.wav");
+
             var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                // The material above could be re-stamped from out here because it is a
+                // separate asset. A component on the kept prefab cannot, so it is caught
+                // here instead -- otherwise a pickup created before the audio existed
+                // would stay silent through every future rebuild.
+                var kept = existing.GetComponent<Pickup>();
+                if (kept != null && kept.collectClip != pickupClip)
+                {
+                    kept.collectClip = pickupClip;
+                    EditorUtility.SetDirty(existing);
+                    AssetDatabase.SaveAssets();
+                }
+
+                return existing;
+            }
 
             var root = new GameObject(assetName);
 
             var pickup = root.AddComponent<Pickup>();
+            pickup.collectClip = pickupClip;
             pickup.kind = kind;
             pickup.amount = kind == Pickup.Kind.Shield ? 50f : 35f;
             pickup.ammoAmount = 90;

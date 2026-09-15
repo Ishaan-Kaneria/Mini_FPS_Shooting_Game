@@ -314,10 +314,17 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// SetOverrideSampleSettings reports an unrecognised platform name by
-        /// returning false rather than throwing, which would leave the override
-        /// quietly unapplied and the clip shipping at its desktop settings. Surface
-        /// it instead -- a typo here is otherwise invisible until a device profile.
+        /// SetOverrideSampleSettings returns false rather than throwing, which would
+        /// leave the override quietly unapplied and the clip shipping at its desktop
+        /// settings. Surface it instead -- it is otherwise invisible until a device
+        /// profile.
+        ///
+        /// In practice it means the platform module is not installed in this editor,
+        /// not that the name is wrong: an editor without the iOS Build Support module
+        /// rejects every "iOS" override. Install the module and re-stamp with
+        /// FPSKit &gt; Audio &gt; Apply Import Policy to All Clips. A genuinely
+        /// misspelled name (it must match a UnityEditor.BuildTargetGroup member)
+        /// fails identically, so both are named here.
         /// </summary>
         private static void SetOverride(AudioImporter importer, string platform, AudioImporterSampleSettings settings)
         {
@@ -325,8 +332,9 @@ namespace FPSKit.EditorTools
 
             Debug.LogWarning(
                 $"[FPSKit Audio] Unity rejected the '{platform}' sample-setting override for " +
-                $"{importer.assetPath}. That platform name must match a UnityEditor.BuildTargetGroup " +
-                "member; the clip keeps its default settings on that platform.");
+                $"{importer.assetPath} -- usually because {platform} Build Support is not installed " +
+                "in this editor. The clip keeps its default settings on that platform; install the " +
+                "module and re-run FPSKit > Audio > Apply Import Policy to All Clips.");
         }
 
         private static void ApplyMobileRate(ref AudioImporterSampleSettings settings, uint rate)

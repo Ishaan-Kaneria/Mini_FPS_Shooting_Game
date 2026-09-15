@@ -250,6 +250,9 @@ namespace FPSKit.EditorTools
         /// Adds whatever newer systems expect to a prefab that predates them, without
         /// touching anything already on it. A rigged character set up in Enemy Setup is
         /// exactly the thing we must not rebuild from scratch, so it gets patched instead.
+        ///
+        /// Everything here is gated on the field being empty, so a prefab that has been
+        /// given its own clips or effects keeps them.
         /// </summary>
         private static GameObject UpgradeEnemyPrefab(string path)
         {
@@ -264,10 +267,62 @@ namespace FPSKit.EditorTools
                 changed = true;
             }
 
+            // Anything it needs to be heard. A prefab built before the kit had audio has
+            // an AI wired for clips it was never given, so a ranged one shoots silently.
+            var ai = contents.GetComponent<EnemyAI>();
+            if (ai != null)
+            {
+                if (contents.GetComponent<AudioSource>() == null)
+                {
+                    var src = contents.AddComponent<AudioSource>();
+                    src.playOnAwake = false;
+                    src.spatialBlend = 1f;
+                    src.maxDistance = 30f;
+                    changed = true;
+                }
+
+                changed |= FillClip(ref ai.alertClip, "SFX/enemy_alert.wav");
+                changed |= FillClip(ref ai.attackClip, "SFX/enemy_attack.wav");
+                changed |= FillClip(ref ai.deathClip, "SFX/enemy_death.wav");
+                changed |= FillClip(ref ai.fireClip, "SFX/weapon_fire.wav");
+
+                // And anything it needs to be seen. muzzlePoint is deliberately left
+                // alone: on a hand-rigged character there is no way to guess where the
+                // barrel is, and EnemyAI already falls back to firing from the eyes.
+                if (ai.tracerPrefab == null)
+                {
+                    ai.tracerPrefab = CreateTracerPrefab();
+                    ai.tracerSpeed = 170f;
+                    changed = true;
+                }
+
+                if (ai.muzzleFlashPrefab == null)
+                {
+                    ai.muzzleFlashPrefab = CreateMuzzleFlashPrefab();
+                    changed = true;
+                }
+            }
+
             if (changed) PrefabUtility.SaveAsPrefabAsset(contents, path);
             PrefabUtility.UnloadPrefabContents(contents);
 
             return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        }
+
+        /// <summary>
+        /// Fills an empty clip slot, reporting whether it actually filled one. Returns
+        /// false when the slot already held something or the clip is not in the project,
+        /// so neither case marks the prefab dirty.
+        /// </summary>
+        private static bool FillClip(ref AudioClip slot, string relativePath)
+        {
+            if (slot != null) return false;
+
+            var clip = Clip(relativePath);
+            if (clip == null) return false;
+
+            slot = clip;
+            return true;
         }
 
         // ==================================================================

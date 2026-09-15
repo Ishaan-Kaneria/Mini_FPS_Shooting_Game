@@ -45,7 +45,10 @@ public class ImpactLibrary : ScriptableObject
         if (entry.clips != null && entry.clips.Length > 0)
         {
             var clip = entry.clips[Random.Range(0, entry.clips.Length)];
-            if (clip != null) AudioSource.PlayClipAtPoint(clip, point, entry.volume);
+
+            // Pooled rather than PlayClipAtPoint: this runs on nearly every shot, and
+            // that call builds and destroys a GameObject each time. See OneShotAudio.
+            if (clip != null) OneShotAudio.Play(clip, point, entry.volume);
         }
     }
 }

@@ -236,6 +236,12 @@ public class WaveManager : MonoBehaviour
     GameDirector Director => _director != null ? _director : null;
 
     // ======================================================================
+    /// <summary>
+    /// The wave loop itself. Held so a lost one can be told apart from a finished one --
+    /// see RecoverWaveLoop.
+    /// </summary>
+    Coroutine _waveRoutine;
+
     void Start()
     {
         _director = GameDirector.Ensure();
@@ -274,7 +280,7 @@ public class WaveManager : MonoBehaviour
             despawnDistance = minimumLeash;
         }
 
-        StartCoroutine(RunWaves());
+        _waveRoutine = StartCoroutine(RunWaves());
     }
 
     void OnDestroy()
@@ -285,7 +291,38 @@ public class WaveManager : MonoBehaviour
         _playerHealth.Damaged -= OnPlayerDamaged;
     }
 
-    void Update() => SweepEnemies();
+    void Update()
+    {
+        RecoverWaveLoop();
+        SweepEnemies();
+    }
+
+    /// <summary>
+    /// Restarts the wave loop if it is ever lost.
+    ///
+    /// This is the worst case of the whole class, because RunWaves *is* the game: it
+    /// counts the wave, spawns it, waits for it to end, and starts the next one. It is
+    /// started once from Start, so anything that kills it ends the run silently: nothing
+    /// spawns again, and nothing says so -- the arena just stays empty while the HUD goes
+    /// on showing a wave in progress, which reads as the spawner being broken. In the
+    /// editor the way that happens is recompiling a script during play, which reloads the
+    /// domain and kills every coroutine without re-running Start.
+    ///
+    /// Restarting costs one fresh intermission before the next wave. That seam is worth
+    /// it against an editor session that is otherwise over. GameIsOver is respected, so
+    /// this never revives a finished run, and the handle is assigned by the same
+    /// statement that starts the routine, so a null handle mid-run means exactly one
+    /// thing.
+    /// </summary>
+    void RecoverWaveLoop()
+    {
+        if (_waveRoutine != null || GameIsOver) return;
+
+        Debug.LogWarning("[WaveManager] The wave loop was lost and has been restarted. In the " +
+                         "editor this means a script was recompiled while play mode was running.", this);
+
+        _waveRoutine = StartCoroutine(RunWaves());
+    }
 
     /// <summary>
     /// Drops entries whose GameObject is gone, and removes the ones that are still

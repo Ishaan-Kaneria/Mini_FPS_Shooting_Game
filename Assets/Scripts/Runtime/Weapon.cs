@@ -60,6 +60,11 @@ public class Weapon : MonoBehaviour
     bool _burstInProgress;
     bool _mobileFireWasDown;
 
+    // Held so the flags above can be checked against the routines they describe. See
+    // ClearRoutineState, and the domain reload section of CLAUDE.md.
+    Coroutine _reloadRoutine;
+    Coroutine _burstRoutine;
+
     // ======================================================================
     void Awake()
     {
@@ -80,6 +85,15 @@ public class Weapon : MonoBehaviour
     }
 
     void Start() => AmmoChanged?.Invoke(this);
+
+    /// <summary>Forgets that a reload or a burst was ever in progress.</summary>
+    void ClearRoutineState()
+    {
+        IsReloading = false;
+        _burstInProgress = false;
+        _reloadRoutine = null;
+        _burstRoutine = null;
+    }
 
     /// <summary>Bindings come from the player so both stay in sync automatically.</summary>
     ControlSettings Controls
@@ -111,6 +125,32 @@ public class Weapon : MonoBehaviour
         UpdateSpread();
         UpdateAimAndKick();
         UpdateMuzzleLight();
+
+        RecoverLostRoutines();
+    }
+
+    /// <summary>
+    /// Clears a flag whose coroutine is gone.
+    ///
+    /// IsReloading and _burstInProgress each describe a running routine, and each gates
+    /// the gun: stuck on, the weapon can never fire, aim or reload again for the rest of
+    /// the session. Every ordinary way a routine ends clears its own flag, and OnDisable
+    /// covers the weapon being switched off -- so the one case left is a routine that
+    /// vanished without either happening.
+    ///
+    /// In the editor that means a script was recompiled during play, which reloads the
+    /// domain and kills every coroutine without running OnDisable or re-running Awake.
+    /// The flags survive it, because a bool is serializable; the Coroutine handles cannot
+    /// be, and come back null. That mismatch is unreachable in normal play, since each
+    /// handle is assigned by the same statement that starts its routine -- so no frame
+    /// can observe the gap between the two.
+    /// </summary>
+    void RecoverLostRoutines()
+    {
+        bool stranded = (IsReloading && _reloadRoutine == null)
+                     || (_burstInProgress && _burstRoutine == null);
+
+        if (stranded) ClearRoutineState();
     }
 
     // ======================================================================
@@ -137,7 +177,7 @@ public class Weapon : MonoBehaviour
 
             case FireMode.Burst:
                 if (ControlSettings.Pressed(controls.fire) || touchPressed)
-                    StartCoroutine(BurstRoutine());
+                    _burstRoutine = StartCoroutine(BurstRoutine());
                 break;
         }
     }
@@ -154,6 +194,7 @@ public class Weapon : MonoBehaviour
         }
 
         _burstInProgress = false;
+        _burstRoutine = null;
         _nextFireTime = Time.time + data.SecondsBetweenShots;
     }
 
@@ -265,7 +306,7 @@ public class Weapon : MonoBehaviour
         if (CurrentAmmo >= data.magazineSize) return;
         if (ReserveAmmo <= 0 && !data.infiniteReserve) return;
 
-        StartCoroutine(ReloadRoutine());
+        _reloadRoutine = StartCoroutine(ReloadRoutine());
     }
 
     IEnumerator ReloadRoutine()
@@ -293,6 +334,7 @@ public class Weapon : MonoBehaviour
         _spreadBonus = 0f;
 
         IsReloading = false;
+        _reloadRoutine = null;
         AmmoChanged?.Invoke(this);
         ReloadFinished?.Invoke(this);
     }
@@ -339,6 +381,13 @@ public class Weapon : MonoBehaviour
         // Aiming halves look sensitivity. Leaving that behind on a disabled weapon
         // would quietly stick the player with slow mouse look and no way back.
         if (_motor != null) _motor.LookSensitivityMultiplier = 1f;
+
+        // Same idea, one level down: Unity stops a behaviour's coroutines the moment it
+        // is disabled, so the flags describing one must not outlive it. A weapon hidden
+        // mid-reload otherwise comes back stuck on IsReloading, which gates firing,
+        // aiming and reloading alike -- a dead gun, in a player build, with nothing
+        // logged to say why.
+        ClearRoutineState();
     }
 
     // ======================================================================
@@ -418,8 +467,18 @@ public class Weapon : MonoBehaviour
         // for a hand-made tracerPrefab that predates TracerProjectile, so swapping in
         // your own prefab still works.
         var projectile = tracer.GetComponent<TracerProjectile>();
-        if (projectile != null) projectile.Launch(endPoint, data.tracerSpeed);
-        else StartCoroutine(MoveTracer(tracer.transform, endPoint));
+        if (projectile != null)
+        {
+            projectile.Launch(endPoint, data.tracerSpeed);
+            return;
+        }
+
+        // The fallback walks the tracer from a coroutine on this weapon, and a coroutine
+        // that dies -- the weapon disabled, the domain reloaded -- leaves the tracer
+        // hanging in the air forever. The backstop is the only thing that would ever
+        // clean it up, so it is not optional.
+        StartCoroutine(MoveTracer(tracer.transform, endPoint));
+        Destroy(tracer, 5f);
     }
 
     IEnumerator MoveTracer(Transform tracer, Vector3 endPoint)

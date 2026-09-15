@@ -238,6 +238,12 @@ public class EnemyAI : MonoBehaviour
 
     void OnDisable()
     {
+        // Disabling a behaviour stops its coroutines, so the flag describing one stops
+        // with it. Left set, _attacking locks this enemy out of the whole state machine
+        // below -- it would stand still and face the player forever.
+        _attacking = false;
+        _attackRoutine = null;
+
         if (_health == null) return;
 
         _health.Died -= OnDied;
@@ -302,6 +308,8 @@ public class EnemyAI : MonoBehaviour
                 PlayClip(alertClip);
             }
         }
+
+        RecoverLostAttack();
 
         bool aware = relentless || (_hasAlerted && Time.time - _lastSeenTime <= loseTargetTime);
 
@@ -507,6 +515,30 @@ public class EnemyAI : MonoBehaviour
         _nextAttackTime = Time.time + attackCooldown;
         _attacking = false;
         _attackRoutine = null;
+    }
+
+    /// <summary>
+    /// Clears the attack flag when its routine is gone.
+    ///
+    /// _attacking describes a running coroutine and survives one being killed, because a
+    /// bool is serializable and a Coroutine handle is not. In the editor that happens
+    /// whenever a script is recompiled during play.
+    ///
+    /// The result is an enemy stranded mid-attack: the state machine in Update only runs
+    /// while it is not attacking, so it stops moving and stops attacking, and
+    /// UpdateTelegraph
+    /// keeps reading a wind-up window that ended long ago -- which pins the flash at
+    /// full, leaving it standing there glowing and facing the player. Shooting it does
+    /// not help either: the stagger path clears the flag only when it finds a routine
+    /// to stop. See Weapon.RecoverLostRoutines and the domain reload section of CLAUDE.md.
+    /// </summary>
+    void RecoverLostAttack()
+    {
+        if (!_attacking || _attackRoutine != null) return;
+
+        _attacking = false;
+        _nextAttackTime = Time.time + attackCooldown;
+        ClearTelegraph();
     }
 
     void TryMeleeHit()

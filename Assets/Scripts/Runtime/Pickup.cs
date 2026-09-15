@@ -129,7 +129,7 @@ public class Pickup : MonoBehaviour
         if (!Apply() && requireEffect) return;
 
         if (collectClip != null)
-            AudioSource.PlayClipAtPoint(collectClip, transform.position, collectVolume);
+            OneShotAudio.Play(collectClip, transform.position, collectVolume);
 
         if (collectEffect != null)
             Destroy(Instantiate(collectEffect, transform.position, Quaternion.identity), 3f);

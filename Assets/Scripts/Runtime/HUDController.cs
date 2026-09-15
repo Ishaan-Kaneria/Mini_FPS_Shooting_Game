@@ -212,46 +212,137 @@ public class HUDController : MonoBehaviour
         UpdateIndicators();
     }
 
+    // ==================================================================
+    // Text
+    //
+    // UpdateTexts runs every frame, and every label below used to rebuild an
+    // interpolated string on each one -- up to seven allocations a frame, nearly all
+    // identical to the frame before, since ammo only moves when you fire and the wave
+    // number only once a wave. At 60fps that is several hundred short-lived strings a
+    // second to display a HUD that changes a handful of times a minute.
+    //
+    // So each label is keyed on the values its string is built from. Every one of them
+    // is an integer, or a float that is rounded to an integer before it is shown, so the
+    // key is exact: if the key has not moved, the string would have been identical.
+    // Comparing finished strings instead would not help, because building them is the
+    // cost being avoided.
+    //
+    // Hidden marks a label that should be showing nothing, and is distinct from Unset,
+    // which no real key can equal -- so every label writes once on the first frame
+    // rather than trusting whatever text it was created with.
+    // ==================================================================
+
+    const int Unset = int.MinValue;
+    const int Hidden = -1;
+
+    enum AmmoDisplay { Unset, Counted, Reloading, InfiniteMagazine, InfiniteReserve }
+
+    AmmoDisplay _shownAmmoMode = AmmoDisplay.Unset;
+    int _shownAmmo = Unset, _shownReserve = Unset;
+    int _shownHealth = Unset, _shownShield = Unset;
+    int _shownScore = Unset;
+    int _shownCombo = Unset, _shownMultiplier = Unset;
+    int _shownWave = Unset;
+    int _shownLeft = Unset, _shownWaveClock = Unset;
+    int _shownIntermission = Unset;
+
     void UpdateTexts()
     {
-        if (ammoText != null && weapon != null)
-        {
-            var data = weapon.Data;
-
-            if (weapon.IsReloading) ammoText.text = "RELOADING";
-            else if (data != null && data.infiniteAmmo) ammoText.text = "∞";
-            else if (data != null && data.infiniteReserve) ammoText.text = $"{weapon.CurrentAmmo} / ∞";
-            else ammoText.text = $"{weapon.CurrentAmmo} / {weapon.ReserveAmmo}";
-        }
-
-        if (healthText != null && playerHealth != null)
-        {
-            healthText.text = playerHealth.Shield > 0.5f
-                ? $"{Mathf.CeilToInt(playerHealth.Current)} <size=60%><color=#66BFFF>+{Mathf.CeilToInt(playerHealth.Shield)}</color></size>"
-                : Mathf.CeilToInt(playerHealth.Current).ToString();
-        }
+        if (ammoText != null && weapon != null) UpdateAmmoText();
+        if (healthText != null && playerHealth != null) UpdateHealthText();
 
         if (_director != null)
         {
-            if (scoreText != null) scoreText.text = _director.Score.ToString("N0");
-
-            if (comboText != null)
-                comboText.text = _director.Combo > 1
-                    ? $"<size=70%>x</size>{_director.ComboMultiplier:0.##}  <size=55%>{_director.Combo} CHAIN</size>"
-                    : string.Empty;
+            UpdateScoreText();
+            UpdateComboText();
         }
 
         if (waveManager == null) return;
 
-        if (waveText != null)
-            waveText.text = $"WAVE {waveManager.CurrentWave}";
+        UpdateWaveText();
+        UpdateEnemiesLeftText();
+        UpdateIntermissionText();
+    }
 
-        if (enemiesLeftText != null) enemiesLeftText.text = EnemiesLeftLabel();
+    void UpdateAmmoText()
+    {
+        var data = weapon.Data;
 
-        if (intermissionText != null)
-            intermissionText.text = waveManager.IsIntermission && !waveManager.GameIsOver
-                ? $"NEXT WAVE IN {Mathf.CeilToInt(waveManager.IntermissionRemaining)}"
-                : string.Empty;
+        AmmoDisplay mode = weapon.IsReloading ? AmmoDisplay.Reloading
+                         : data != null && data.infiniteAmmo ? AmmoDisplay.InfiniteMagazine
+                         : data != null && data.infiniteReserve ? AmmoDisplay.InfiniteReserve
+                         : AmmoDisplay.Counted;
+
+        int ammo = weapon.CurrentAmmo;
+        int reserve = weapon.ReserveAmmo;
+
+        if (mode == _shownAmmoMode && ammo == _shownAmmo && reserve == _shownReserve) return;
+
+        _shownAmmoMode = mode;
+        _shownAmmo = ammo;
+        _shownReserve = reserve;
+
+        switch (mode)
+        {
+            case AmmoDisplay.Reloading: ammoText.text = "RELOADING"; break;
+            case AmmoDisplay.InfiniteMagazine: ammoText.text = "∞"; break;
+            case AmmoDisplay.InfiniteReserve: ammoText.text = $"{ammo} / ∞"; break;
+            default: ammoText.text = $"{ammo} / {reserve}"; break;
+        }
+    }
+
+    void UpdateHealthText()
+    {
+        int health = Mathf.CeilToInt(playerHealth.Current);
+
+        // Shield folds into the key as zero when there is none, so gaining or losing it
+        // is a key change like any other.
+        int shield = playerHealth.Shield > 0.5f ? Mathf.CeilToInt(playerHealth.Shield) : 0;
+
+        if (health == _shownHealth && shield == _shownShield) return;
+
+        _shownHealth = health;
+        _shownShield = shield;
+
+        healthText.text = shield > 0
+            ? $"{health} <size=60%><color=#66BFFF>+{shield}</color></size>"
+            : health.ToString();
+    }
+
+    void UpdateScoreText()
+    {
+        if (scoreText == null || _director.Score == _shownScore) return;
+
+        _shownScore = _director.Score;
+        scoreText.text = _shownScore.ToString("N0");
+    }
+
+    void UpdateComboText()
+    {
+        if (comboText == null) return;
+
+        int combo = _director.Combo;
+
+        // Keyed at the resolution it is displayed at. Keying on the raw float would
+        // rebuild the label for changes too small to see.
+        int multiplier = Mathf.RoundToInt(_director.ComboMultiplier * 100f);
+
+        if (combo == _shownCombo && multiplier == _shownMultiplier) return;
+
+        _shownCombo = combo;
+        _shownMultiplier = multiplier;
+
+        comboText.text = combo > 1
+            ? $"<size=70%>x</size>{_director.ComboMultiplier:0.##}  <size=55%>{combo} CHAIN</size>"
+            : string.Empty;
+    }
+
+    void UpdateWaveText()
+    {
+        if (waveText == null || waveManager.CurrentWave == _shownWave) return;
+
+        _shownWave = waveManager.CurrentWave;
+        waveText.text = $"WAVE {_shownWave}";
     }
 
     /// <summary>
@@ -259,17 +350,37 @@ public class HUDController : MonoBehaviour
     /// the wave no longer requires a total wipe: without it, a player hunting the last
     /// enemy has no way to know the round will move on by itself.
     /// </summary>
-    string EnemiesLeftLabel()
+    void UpdateEnemiesLeftText()
     {
-        if (waveManager.IsIntermission) return string.Empty;
+        if (enemiesLeftText == null) return;
 
-        string left = $"{waveManager.EnemiesRemaining} LEFT";
-
+        bool intermission = waveManager.IsIntermission;
         float remaining = waveManager.WaveTimeRemaining;
-        if (remaining <= 0f) return left;
 
-        int seconds = Mathf.CeilToInt(remaining);
-        return $"{left}   <size=75%>{seconds / 60}:{seconds % 60:00}</size>";
+        int left = intermission ? Hidden : waveManager.EnemiesRemaining;
+        int clock = intermission || remaining <= 0f ? Hidden : Mathf.CeilToInt(remaining);
+
+        if (left == _shownLeft && clock == _shownWaveClock) return;
+
+        _shownLeft = left;
+        _shownWaveClock = clock;
+
+        if (intermission) enemiesLeftText.text = string.Empty;
+        else if (clock == Hidden) enemiesLeftText.text = $"{left} LEFT";
+        else enemiesLeftText.text = $"{left} LEFT   <size=75%>{clock / 60}:{clock % 60:00}</size>";
+    }
+
+    void UpdateIntermissionText()
+    {
+        if (intermissionText == null) return;
+
+        bool counting = waveManager.IsIntermission && !waveManager.GameIsOver;
+        int seconds = counting ? Mathf.CeilToInt(waveManager.IntermissionRemaining) : Hidden;
+
+        if (seconds == _shownIntermission) return;
+
+        _shownIntermission = seconds;
+        intermissionText.text = counting ? $"NEXT WAVE IN {seconds}" : string.Empty;
     }
 
     // ======================================================================

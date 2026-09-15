@@ -87,6 +87,30 @@ namespace FPSKit.EditorTools
         public static void VerifyReplay() => FPSKitPlayTest.VerifyReplay();
 
         /// <summary>
+        /// Asserts every state-carrying static has a SubsystemRegistration reset hook.
+        ///
+        /// VerifyReplay catches a leaked static by watching the second run break, which
+        /// means playing two full sessions. This catches the same mistake structurally
+        /// in seconds and without entering play mode, so it is the cheap gate to run
+        /// first: a new static with no hook fails here before it ever reaches a session.
+        /// </summary>
+        public static void VerifyStatics()
+        {
+            Run(() =>
+            {
+                var problems = FPSKitStaticProbe.Audit(out string report);
+                Debug.Log(report);
+
+                if (problems.Count > 0)
+                    throw new Exception(
+                        $"{problems.Count} static(s) without a reset hook: " +
+                        string.Join("; ", problems));
+
+                Debug.Log("[FPSKitBatch] static reset audit passed");
+            });
+        }
+
+        /// <summary>
         /// Proves a wave that cannot be cleared still ends. Delegates to
         /// <see cref="FPSKitWaveTest"/>, which drives play mode asynchronously and
         /// pushes its own exit code, so it must not go through Run.

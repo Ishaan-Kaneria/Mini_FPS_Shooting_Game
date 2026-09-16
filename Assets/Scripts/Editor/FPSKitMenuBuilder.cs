@@ -1,0 +1,1218 @@
+#if UNITY_EDITOR
+using System.Collections.Generic;
+using System.IO;
+using TMPro;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+namespace FPSKit.EditorTools
+{
+    /// <summary>
+    /// Builds the dashboard: the scene the game boots into and every run returns to.
+    ///
+    /// Destructive in the same way FPSKitSceneBuilder is -- it replaces Menu.unity from
+    /// scratch -- and for the same reason: the screen is generated, so it is fixed by
+    /// editing this file rather than by hand-editing the scene. What it does *not*
+    /// hard-code is the list of arenas. That is written into an ArenaCatalog asset and
+    /// read at runtime, so adding an arena never means rebuilding this scene.
+    ///
+    /// The look is deliberately pixel-flat: hard borders, no gradients, a small palette
+    /// and point-filtered preview images. That is partly taste and partly a constraint
+    /// worth being honest about -- the project has one font (LiberationSans) and no UI
+    /// art at all, so anything that leans on soft shading would look unfinished. Flat
+    /// blocks of colour with crisp edges do not.
+    /// </summary>
+    public static class FPSKitMenuBuilder
+    {
+        public const string MenuScenePath = "Assets/FPSKit_Generated/Scenes/Menu.unity";
+        public const string CatalogPath = "Assets/FPSKit_Generated/Arenas.asset";
+        public const string PreviewFolder = "Assets/FPSKit_Generated/Previews";
+
+        const int PreviewWidth = 512;
+        const int PreviewHeight = 288;
+
+        // ------------------------------------------------------------------
+        // Palette. Small on purpose: six colours is what keeps a generated screen
+        // looking designed rather than assembled.
+        // ------------------------------------------------------------------
+        static readonly Color Backdrop = new Color32(0x0B, 0x0D, 0x10, 0xFF);
+        static readonly Color Panel = new Color32(0x15, 0x19, 0x1F, 0xFF);
+        static readonly Color PanelLift = new Color32(0x1E, 0x24, 0x2C, 0xFF);
+        static readonly Color Border = new Color32(0x2C, 0x34, 0x3F, 0xFF);
+        static readonly Color Accent = new Color32(0xF0, 0xA8, 0x30, 0xFF);
+        static readonly Color Ink = new Color32(0xE8, 0xE6, 0xE3, 0xFF);
+        static readonly Color InkDim = new Color32(0x8B, 0x94, 0x9E, 0xFF);
+
+        /// <summary>Leaving is the one destructive thing on this screen, so it is the one red.</summary>
+        static readonly Color Danger = new Color32(0xC0, 0x39, 0x2B, 0xFF);
+        static readonly Color DangerLift = new Color32(0xE0, 0x4B, 0x3A, 0xFF);
+
+        static Sprite _flat;
+
+        // ==================================================================
+        [MenuItem("FPSKit/Build Dashboard", false, 20)]
+        public static void BuildMenuMenuItem()
+        {
+            if (!EditorUtility.DisplayDialog("Build the dashboard",
+                "This rebuilds Menu.unity from scratch and refreshes the arena catalog " +
+                "and preview images.\n\nAny unsaved changes in the current scene are lost.",
+                "Build it", "Cancel")) return;
+
+            Build();
+        }
+
+        /// <summary>Headless entry point. See FPSKitBatch.BuildDashboard.</summary>
+        public static void Build()
+        {
+            EnsureFolders();
+
+            // Previews first: capturing one means opening its arena scene, and that has
+            // to happen before the menu scene is the open one.
+            var rows = CapturePreviews();
+
+            int count = WriteCatalog(rows);
+            BuildScene();
+
+            // Refreshed before the start scene is set. Saving a scene over a path the
+            // database already knows leaves the SceneAsset briefly unresolvable, and
+            // loading it in that window returns null -- so the setting silently did
+            // nothing on exactly the run that had just rebuilt the scene.
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            // Build Settings order decides what a *player* boots into; it has no bearing
+            // on the editor, which plays whatever is in the hierarchy. FPSKitPlayMode is
+            // what makes Play start here instead of in whichever arena is open.
+            FPSKitPlayMode.ApplyNow();
+
+            var startScene = UnityEditor.SceneManagement.EditorSceneManager.playModeStartScene;
+
+            Debug.Log($"<color=lime>[FPSKit]</color> Dashboard built with {count} arena(s). " +
+                      "It is scene 0 in Build Settings, so a player boots into it, and Play " +
+                      $"in the editor starts at \"{(startScene != null ? startScene.name : "<the open scene>")}\". " +
+                      "Toggle that with FPSKit > Play Starts At Dashboard.");
+        }
+
+        /// <summary>
+        /// One arena, described only by asset paths and plain strings.
+        ///
+        /// Paths rather than object references, deliberately. Importing a texture can
+        /// reload the asset database, and a reload destroys the managed wrapper around
+        /// every asset already loaded -- so a LevelTheme or the catalog itself, picked up
+        /// before the loop and used after it, comes back as
+        /// "MissingReferenceException: the object ... has been destroyed". Carrying paths
+        /// through the loop and resolving them once at the end cannot hit that.
+        /// </summary>
+        struct Row
+        {
+            public string DisplayName;
+            public string SceneName;
+            public string Description;
+            public string ThemePath;
+            public string PreviewPath;
+        }
+
+        // ==================================================================
+        // Catalog + previews
+        // ==================================================================
+        static List<Row> CapturePreviews()
+        {
+            var rows = new List<Row>();
+
+            bool canRender = SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null;
+            if (!canRender)
+                Debug.LogWarning("[FPSKit] No graphics device, so arena previews are being drawn " +
+                                 "from theme colours instead of rendered. Re-run with " +
+                                 "UNITY_GRAPHICS=1 for real screenshots.");
+
+            foreach (string themeName in FPSKitThemes.Names)
+            {
+                var theme = FPSKitThemes.GetOrCreate(themeName);
+                if (theme == null) continue;
+
+                string sceneName = SafeName(themeName);
+                string scenePath = $"Assets/FPSKit_Generated/Scenes/{sceneName}.unity";
+
+                if (!File.Exists(scenePath))
+                    Debug.LogWarning($"[FPSKit] {scenePath} does not exist yet, so \"{themeName}\" " +
+                                     "is being listed without a preview. Build the scenes first.");
+
+                // Everything read off the theme is read now, while the reference is
+                // known good, and kept as a string from here on.
+                var row = new Row
+                {
+                    DisplayName = themeName,
+                    SceneName = sceneName,
+                    Description = Summarise(theme),
+                    ThemePath = AssetDatabase.GetAssetPath(theme),
+                    PreviewPath = $"{PreviewFolder}/{sceneName}.png"
+                };
+
+                WritePreview(theme, scenePath, row.PreviewPath, canRender);
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        /// <summary>Fills in the catalog asset from rows, and returns how many it holds.</summary>
+        static int WriteCatalog(List<Row> rows)
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<ArenaCatalog>(CatalogPath);
+            if (catalog == null)
+            {
+                catalog = ScriptableObject.CreateInstance<ArenaCatalog>();
+                AssetDatabase.CreateAsset(catalog, CatalogPath);
+            }
+
+            catalog.arenas.Clear();
+
+            foreach (var row in rows)
+            {
+                catalog.arenas.Add(new ArenaCatalog.Entry
+                {
+                    displayName = row.DisplayName,
+                    sceneName = row.SceneName,
+                    description = row.Description,
+                    theme = AssetDatabase.LoadAssetAtPath<LevelTheme>(row.ThemePath),
+                    preview = AssetDatabase.LoadAssetAtPath<Texture2D>(row.PreviewPath)
+                });
+            }
+
+            EditorUtility.SetDirty(catalog);
+            AssetDatabase.SaveAssets();
+
+            return catalog.arenas.Count;
+        }
+
+        /// <summary>One line for the card, from the theme's own description where it has one.</summary>
+        static string Summarise(LevelTheme theme)
+        {
+            if (theme == null) return "";
+            if (!string.IsNullOrWhiteSpace(theme.description))
+            {
+                string text = theme.description.Replace("\n", " ").Trim();
+                return text.Length <= 84 ? text : text.Substring(0, 81) + "...";
+            }
+
+            return $"{theme.arenaSize:0}m arena";
+        }
+
+        /// <summary>
+        /// A screenshot of the arena, or a drawn stand-in when one cannot be taken.
+        ///
+        /// The render is verified before it is kept. A camera that renders into a null
+        /// device, or before the pipeline is ready, returns a uniformly black frame
+        /// rather than failing -- and a dashboard full of black rectangles looks exactly
+        /// like a dashboard whose images failed to load. Measuring the variance is the
+        /// cheap way to tell a picture from a void.
+        /// </summary>
+        static void WritePreview(LevelTheme theme, string scenePath, string previewPath, bool canRender)
+        {
+            if (canRender && File.Exists(scenePath))
+            {
+                var shot = Capture(scenePath, theme);
+                if (shot != null)
+                {
+                    Save(shot, previewPath);
+                    return;
+                }
+            }
+
+            Save(Drawn(theme), previewPath);
+        }
+
+        static Texture2D Capture(string scenePath, LevelTheme theme)
+        {
+            Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            if (!scene.IsValid()) return null;
+
+            // Ambient light is derived from the skybox, and a scene that has only just
+            // been opened has not had that derivation run yet -- so the first arena
+            // captured came back lit by nothing at all, a black floor under a sunset,
+            // while every arena after it looked right. Asking for the update explicitly
+            // is what makes the first one behave like the rest.
+            DynamicGI.UpdateEnvironment();
+
+            var rig = new GameObject("FPSKitPreviewCamera");
+            var camera = rig.AddComponent<Camera>();
+
+            RenderTexture target = null;
+            Texture2D shot = null;
+
+            try
+            {
+                float size = theme != null ? theme.arenaSize : 110f;
+
+                // Shot from where the player stands, looking out across the arena.
+                //
+                // The first attempt was an aerial from a third of the arena's width up,
+                // and every theme came back as the same grey plain seen through fog:
+                // technically a render of the level, and useless as a picture of it. A
+                // card has to answer "what is it like to be in here", and the only
+                // viewpoint that answers that is the one the game is played from.
+                var player = GameObject.FindGameObjectWithTag("Player");
+
+                Vector3 eye = player != null
+                    ? player.transform.position + Vector3.up * 1.65f
+                    : Vector3.up * 1.75f;
+
+                // Backed off the spawn a little so the player's own arena furniture is
+                // in frame rather than in the lens, and pitched down just enough to keep
+                // the floor in shot.
+                Vector3 bearing = Quaternion.Euler(0f, 34f, 0f) * Vector3.forward;
+
+                rig.transform.position = eye - bearing * Mathf.Min(6f, size * 0.06f)
+                                             + Vector3.up * 1.2f;
+
+                rig.transform.rotation = Quaternion.LookRotation(
+                    Quaternion.Euler(7f, 34f, 0f) * Vector3.forward, Vector3.up);
+
+                camera.fieldOfView = 68f;
+                camera.nearClipPlane = 0.1f;
+                camera.farClipPlane = Mathf.Max(400f, size * 4f);
+                camera.clearFlags = CameraClearFlags.Skybox;
+
+                target = new RenderTexture(PreviewWidth, PreviewHeight, 24, RenderTextureFormat.ARGB32)
+                {
+                    antiAliasing = 2
+                };
+
+                // Rendered through the pipeline, not with Camera.Render().
+                //
+                // Camera.Render() predates scriptable pipelines: under URP it produces a
+                // frame with the skybox drawn and essentially no lighting applied, so
+                // every arena came back as black silhouettes against a nice sunset. The
+                // render request is what asks URP to render the camera properly, and it
+                // is the supported route in Unity 6. Camera.Render stays as a fallback
+                // for a project that is not on a scriptable pipeline at all.
+                var request = new RenderPipeline.StandardRequest { destination = target };
+
+                if (RenderPipeline.SupportsRenderRequest(camera, request))
+                {
+                    // Twice, keeping the second. The first frame after a scene opens is
+                    // drawn with whatever the pipeline had already warmed -- shadow maps
+                    // and the environment probe land a frame late.
+                    RenderPipeline.SubmitRenderRequest(camera, request);
+                    RenderPipeline.SubmitRenderRequest(camera, request);
+                }
+                else
+                {
+                    camera.targetTexture = target;
+                    camera.Render();
+                }
+
+                var previous = RenderTexture.active;
+                RenderTexture.active = target;
+
+                shot = new Texture2D(PreviewWidth, PreviewHeight, TextureFormat.RGB24, false);
+                shot.ReadPixels(new Rect(0f, 0f, PreviewWidth, PreviewHeight), 0, 0);
+                shot.Apply();
+
+                RenderTexture.active = previous;
+
+                Brighten(shot);
+
+                if (!HasDetail(shot))
+                {
+                    Object.DestroyImmediate(shot);
+                    shot = null;
+
+                    Debug.LogWarning($"[FPSKit] The preview render of {scenePath} came back flat, " +
+                                     "so a drawn stand-in is being used instead.");
+                }
+            }
+            finally
+            {
+                camera.targetTexture = null;
+                Object.DestroyImmediate(rig);
+
+                if (target != null)
+                {
+                    target.Release();
+                    Object.DestroyImmediate(target);
+                }
+            }
+
+            return shot;
+        }
+
+        /// <summary>
+        /// Lifts a preview that is too dark to read as a thumbnail.
+        ///
+        /// Some themes really are night scenes -- the subway sits at a mean luminance of
+        /// about 30 out of 255 -- and a card that is a black rectangle tells the player
+        /// nothing except that something failed to load. This is the same adjustment a
+        /// store page makes to a screenshot of a dark game, and it is deliberately
+        /// bounded: it only engages below the target, it only ever raises shadows, and
+        /// the gamma is clamped so a dark arena still reads as a dark arena rather than
+        /// being flattened into a grey one.
+        ///
+        /// A preview that is already bright enough is left exactly as rendered.
+        /// </summary>
+        static void Brighten(Texture2D texture)
+        {
+            const float Target = 0.27f;     // mean luminance a card wants, 0-1
+            const float FloorGamma = 0.55f; // how far it is allowed to go
+
+            var pixels = texture.GetPixels();
+            if (pixels.Length == 0) return;
+
+            float sum = 0f;
+            foreach (var pixel in pixels) sum += pixel.grayscale;
+
+            float mean = sum / pixels.Length;
+            if (mean >= Target || mean <= 0.001f) return;
+
+            float gamma = Mathf.Max(FloorGamma, Mathf.Log(Target) / Mathf.Log(mean));
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = new Color(
+                    Mathf.Pow(pixels[i].r, gamma),
+                    Mathf.Pow(pixels[i].g, gamma),
+                    Mathf.Pow(pixels[i].b, gamma),
+                    1f);
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+        }
+
+        /// <summary>True if the image is more than one flat colour.</summary>
+        static bool HasDetail(Texture2D texture)
+        {
+            var pixels = texture.GetPixels32();
+            if (pixels.Length == 0) return false;
+
+            var first = pixels[0];
+
+            foreach (var pixel in pixels)
+            {
+                if (Mathf.Abs(pixel.r - first.r) > 6 ||
+                    Mathf.Abs(pixel.g - first.g) > 6 ||
+                    Mathf.Abs(pixel.b - first.b) > 6) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// A stand-in drawn from the theme: sky, horizon, ground and a skyline of
+        /// blocks in the theme's own colours.
+        ///
+        /// Not a placeholder in the apologetic sense. It is deterministic, needs no
+        /// graphics device, and carries the one piece of information a preview is
+        /// actually for -- whether this arena is the grey one, the red one or the white
+        /// one -- so a headless build still produces a dashboard worth looking at.
+        /// </summary>
+        static Texture2D Drawn(LevelTheme theme)
+        {
+            var texture = new Texture2D(PreviewWidth, PreviewHeight, TextureFormat.RGB24, false);
+
+            Color sky = theme != null ? theme.skyTint : new Color(0.4f, 0.45f, 0.55f);
+            Color ground = theme != null ? theme.floorColor : new Color(0.3f, 0.3f, 0.32f);
+            Color wall = theme != null ? theme.wallColor : new Color(0.45f, 0.45f, 0.48f);
+            Color accent = theme != null ? theme.accentLightColor : Accent;
+
+            int horizon = Mathf.RoundToInt(PreviewHeight * 0.58f);
+
+            // Deterministic per theme, so rebuilding does not reshuffle the skyline and
+            // produce a diff on every run.
+            var random = new System.Random(theme != null ? theme.themeName.GetHashCode() : 0);
+
+            var pixels = new Color[PreviewWidth * PreviewHeight];
+
+            for (int y = 0; y < PreviewHeight; y++)
+            {
+                for (int x = 0; x < PreviewWidth; x++)
+                {
+                    Color colour;
+
+                    if (y < horizon)
+                    {
+                        // Ground, darkening toward the viewer.
+                        float depth = 1f - y / (float)horizon;
+                        colour = Color.Lerp(ground, ground * 0.45f, depth * 0.8f);
+
+                        // Banded rather than smooth: the steps are the pixel look.
+                        if (((y / 6) & 1) == 0) colour *= 1.06f;
+                    }
+                    else
+                    {
+                        float up = (y - horizon) / (float)(PreviewHeight - horizon);
+                        colour = Color.Lerp(sky * 1.05f, sky * 0.62f, up);
+                    }
+
+                    pixels[y * PreviewWidth + x] = colour;
+                }
+            }
+
+            // A skyline of slabs sitting on the horizon.
+            int cursor = 8;
+            while (cursor < PreviewWidth - 8)
+            {
+                int width = 18 + random.Next(46);
+                int height = 14 + random.Next(58);
+                Color slab = Color.Lerp(wall, sky * 0.5f, 0.35f) * (0.8f + (float)random.NextDouble() * 0.4f);
+
+                for (int x = cursor; x < Mathf.Min(cursor + width, PreviewWidth); x++)
+                {
+                    for (int y = horizon - 1; y < Mathf.Min(horizon + height, PreviewHeight); y++)
+                        pixels[y * PreviewWidth + x] = slab;
+
+                    // A lit window strip, so the block reads as built rather than as a bar.
+                    int lit = horizon + height / 2;
+                    if (lit < PreviewHeight && ((x / 5) & 1) == 0 && random.NextDouble() > 0.55f)
+                        pixels[lit * PreviewWidth + x] = accent;
+                }
+
+                cursor += width + 4 + random.Next(12);
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+            return texture;
+        }
+
+        static void Save(Texture2D texture, string path)
+        {
+            if (texture == null) return;
+
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                // Point filtering and no compression: the card is meant to look like
+                // pixels, and a block-compressed 512px screenshot scaled into a card is
+                // mush exactly where the detail matters.
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.filterMode = FilterMode.Point;
+                importer.mipmapEnabled = false;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.SaveAndReimport();
+            }
+        }
+
+        // ==================================================================
+        // Scene
+        // ==================================================================
+        static void BuildScene()
+        {
+            // Loaded here rather than passed in: building the previews reimported a
+            // texture per arena, and any one of those can reload the asset database out
+            // from under a reference taken earlier.
+            var catalog = AssetDatabase.LoadAssetAtPath<ArenaCatalog>(CatalogPath);
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var cameraGo = new GameObject("Main Camera");
+            cameraGo.tag = "MainCamera";
+
+            var camera = cameraGo.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = Backdrop;
+            camera.orthographic = true;
+            cameraGo.AddComponent<AudioListener>();
+
+            EnsureEventSystem();
+
+            var canvasGo = new GameObject("Dashboard Canvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            canvasGo.AddComponent<GraphicRaycaster>();
+
+            var menu = canvasGo.AddComponent<MainMenuController>();
+            menu.catalog = catalog;
+
+            menu.sounds = BuildSound(canvasGo);
+
+            var root = (RectTransform)canvasGo.transform;
+
+            Backdrop2D(root);
+            BuildHeader(root, menu);
+            BuildLastRun(root, menu);
+            BuildArenaArea(root, menu);
+            BuildProfile(root, menu);
+            BuildFooter(root, menu);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, MenuScenePath);
+
+            RegisterAsFirstScene(MenuScenePath);
+        }
+
+
+
+        /// <summary>
+        /// The dashboard's music bed and interface sounds.
+        ///
+        /// Two sources rather than one: a one-shot played on the music source would cut
+        /// the bed off mid-bar, and the two want very different levels.
+        /// </summary>
+        static UISounds BuildSound(GameObject canvasGo)
+        {
+            var sounds = canvasGo.AddComponent<UISounds>();
+
+            var effects = canvasGo.AddComponent<AudioSource>();
+            effects.playOnAwake = false;
+            effects.spatialBlend = 0f;
+
+            var musicGo = new GameObject("Music", typeof(AudioSource));
+            musicGo.transform.SetParent(canvasGo.transform, false);
+
+            var music = musicGo.GetComponent<AudioSource>();
+            music.playOnAwake = true;
+            music.loop = true;
+            music.spatialBlend = 0f;
+            music.clip = Clip("Music/menu_loop.wav");
+
+            sounds.effects = effects;
+            sounds.music = music;
+            sounds.click = Clip("UI/ui_click.wav");
+            sounds.hover = Clip("UI/ui_hover.wav");
+            sounds.back = Clip("UI/ui_back.wav");
+            sounds.launch = Clip("UI/ui_launch.wav");
+
+            return sounds;
+        }
+
+        /// <summary>
+        /// Loads a clip, saying so when it cannot.
+        ///
+        /// Same reasoning as FPSKitSceneBuilder.Clip: every audio field here is optional,
+        /// so a clip that fails to load writes a silent null into a slot that a previous
+        /// build filled, and the only symptom is a menu that went quiet.
+        /// </summary>
+        static AudioClip Clip(string relativePath)
+        {
+            string path = $"Assets/Audio/{relativePath}";
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+
+            if (clip == null)
+                Debug.LogWarning($"[FPSKit] No AudioClip at {path}; the dashboard is being " +
+                                 "built without it.");
+
+            return clip;
+        }
+
+        static void Backdrop2D(RectTransform parent)
+        {
+            var image = Block(parent, "Backdrop", Backdrop);
+            Stretch(image.rectTransform);
+
+            // A faint grid, which is most of what makes a flat screen look intentional.
+            for (int i = 1; i < 12; i++)
+            {
+                var line = Block(parent, $"GridLine_{i}", new Color(1f, 1f, 1f, 0.018f));
+                var rect = line.rectTransform;
+                rect.anchorMin = new Vector2(i / 12f, 0f);
+                rect.anchorMax = new Vector2(i / 12f, 1f);
+                rect.sizeDelta = new Vector2(2f, 0f);
+                rect.anchoredPosition = Vector2.zero;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        static void BuildHeader(RectTransform parent, MainMenuController menu)
+        {
+            var bar = Panelled(parent, "Header", PanelLift, out RectTransform inner);
+            // Stretched across the top and sized from the edges. Setting offsetMin and
+            // offsetMax here instead would be fighting the same field: with the vertical
+            // anchors collapsed to a line, sizeDelta *is* the offsets, and writing both
+            // leaves whichever ran last -- which is how the header ended up inset by a
+            // quarter of the screen.
+            bar.anchorMin = new Vector2(0f, 1f);
+            bar.anchorMax = new Vector2(1f, 1f);
+            bar.pivot = new Vector2(0.5f, 1f);
+            bar.sizeDelta = new Vector2(-80f, 104f);
+            bar.anchoredPosition = new Vector2(0f, -36f);
+
+            var title = Label(inner, "Title", "MINI  FPS", 44, TextAlignmentOptions.MidlineLeft, Ink);
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 0f);
+            titleRect.anchorMax = new Vector2(0.6f, 1f);
+            titleRect.offsetMin = new Vector2(28f, 0f);
+            titleRect.offsetMax = Vector2.zero;
+            titleRect.pivot = new Vector2(0.5f, 0.5f);
+            title.characterSpacing = 12f;
+
+            var accent = Block(inner, "TitleAccent", Accent);
+            var accentRect = accent.rectTransform;
+            accentRect.anchorMin = new Vector2(0f, 0f);
+            accentRect.anchorMax = new Vector2(0f, 1f);
+            accentRect.pivot = new Vector2(0f, 0.5f);
+            accentRect.sizeDelta = new Vector2(8f, -28f);
+            accentRect.anchoredPosition = new Vector2(10f, 0f);
+
+            var who = Label(inner, "PlayerName", "OPERATIVE", 26,
+                            TextAlignmentOptions.MidlineRight, InkDim);
+            var whoRect = who.rectTransform;
+            whoRect.anchorMin = new Vector2(0.55f, 0f);
+            whoRect.anchorMax = new Vector2(1f, 1f);
+            whoRect.pivot = new Vector2(0.5f, 0.5f);
+            whoRect.offsetMin = Vector2.zero;
+            whoRect.offsetMax = new Vector2(-28f, 0f);
+            who.characterSpacing = 6f;
+
+            menu.playerNameText = who;
+        }
+
+        // ------------------------------------------------------------------
+        static void BuildLastRun(RectTransform parent, MainMenuController menu)
+        {
+            var strip = Panelled(parent, "LastRun", Panel, out RectTransform inner);
+            strip.anchorMin = new Vector2(0f, 1f);
+            strip.anchorMax = new Vector2(1f, 1f);
+            strip.pivot = new Vector2(0.5f, 1f);
+            strip.sizeDelta = new Vector2(-80f, 96f);
+            strip.anchoredPosition = new Vector2(0f, -156f);
+
+            var flash = Block(inner, "OutcomeAccent", new Color32(0xD9, 0x3B, 0x3B, 0xFF));
+            var flashRect = flash.rectTransform;
+            flashRect.anchorMin = new Vector2(0f, 0f);
+            flashRect.anchorMax = new Vector2(0f, 1f);
+            flashRect.pivot = new Vector2(0f, 0.5f);
+            flashRect.sizeDelta = new Vector2(8f, 0f);
+            flashRect.anchoredPosition = Vector2.zero;
+
+            var title = Label(inner, "OutcomeTitle", "YOU WERE KILLED", 26,
+                              TextAlignmentOptions.BottomLeft, Ink);
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 0.45f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 0.5f);
+            titleRect.offsetMin = new Vector2(28f, 0f);
+            titleRect.offsetMax = new Vector2(-24f, -8f);
+            title.characterSpacing = 8f;
+
+            var detail = Label(inner, "OutcomeDetail", "", 20,
+                               TextAlignmentOptions.TopLeft, InkDim);
+            var detailRect = detail.rectTransform;
+            detailRect.anchorMin = new Vector2(0f, 0f);
+            detailRect.anchorMax = new Vector2(1f, 0.45f);
+            detailRect.pivot = new Vector2(0.5f, 0.5f);
+            detailRect.offsetMin = new Vector2(28f, 8f);
+            detailRect.offsetMax = new Vector2(-24f, 0f);
+
+            menu.lastRunPanel = strip.gameObject;
+            menu.lastRunTitle = title;
+            menu.lastRunDetail = detail;
+
+            strip.gameObject.SetActive(false);
+        }
+
+        // ------------------------------------------------------------------
+        static void BuildArenaArea(RectTransform parent, MainMenuController menu)
+        {
+            var heading = Label(parent, "ArenaHeading", "SELECT  ARENA", 22,
+                                TextAlignmentOptions.MidlineLeft, InkDim);
+            var headingRect = heading.rectTransform;
+            headingRect.anchorMin = new Vector2(0f, 1f);
+            headingRect.anchorMax = new Vector2(0.72f, 1f);
+            headingRect.pivot = new Vector2(0.5f, 1f);
+            headingRect.sizeDelta = new Vector2(-88f, 40f);
+            headingRect.anchoredPosition = new Vector2(2f, -272f);
+            heading.characterSpacing = 10f;
+
+            var grid = new GameObject("ArenaGrid", typeof(RectTransform)).GetComponent<RectTransform>();
+            grid.SetParent(parent, false);
+            grid.anchorMin = new Vector2(0f, 0f);
+            grid.anchorMax = new Vector2(0.72f, 1f);
+            grid.offsetMin = new Vector2(40f, 120f);
+            grid.offsetMax = new Vector2(0f, -320f);
+
+            var layout = grid.gameObject.AddComponent<GridLayoutGroup>();
+
+            // A starting size only. MainMenuController recomputes the cell from the real
+            // width of this rect every time it changes, because a fixed cell is only
+            // correct at one aspect ratio -- at 4:3 three 404-wide cards overflow the
+            // column and slide under the record panel, and a browser window is whatever
+            // shape the player left it.
+            layout.cellSize = new Vector2(404f, 286f);
+            layout.spacing = new Vector2(20f, 20f);
+            layout.padding = new RectOffset(4, 4, 4, 4);
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            layout.constraintCount = 3;
+
+            menu.cardParent = grid;
+            menu.arenaHeading = headingRect;
+            menu.cardTemplate = BuildCardTemplate(parent);
+        }
+
+        /// <summary>
+        /// The card, built once and left switched off.
+        ///
+        /// Parented to the canvas rather than to the grid so the layout group never sees
+        /// it: a template inside the grid would be counted as a cell, and the first real
+        /// arena would sit in the second slot behind an invisible hole.
+        /// </summary>
+        static ArenaCard BuildCardTemplate(RectTransform parent)
+        {
+            var root = Panelled(parent, "ArenaCardTemplate", Panel, out RectTransform inner);
+            root.sizeDelta = new Vector2(404f, 286f);
+            root.anchorMin = root.anchorMax = new Vector2(0f, 1f);
+            root.pivot = new Vector2(0.5f, 0.5f);
+
+            var card = root.gameObject.AddComponent<ArenaCard>();
+
+            var button = root.gameObject.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            card.button = button;
+
+            // A card starts a run, so it gets the two-note launch rather than a click.
+            root.gameObject.AddComponent<UIButtonSound>().voice = UIButtonSound.Voice.Launch;
+
+            // The frame is the outer block of the panel, which is what the hover recolours.
+            card.frame = root.GetComponent<Image>();
+            card.frame.raycastTarget = true;
+
+            // Everything inside the card is anchored as a fraction of it rather than in
+            // pixels from the top, so the card survives being resized by the grid. Laid
+            // out in pixels, a card that shrank kept a 166px preview and pushed its own
+            // text out through the bottom edge.
+            var preview = Block(inner, "Preview", new Color(0.1f, 0.11f, 0.13f));
+            Span(preview.rectTransform, 0.465f, 1f, 0f, 0f);
+            preview.type = Image.Type.Simple;
+            preview.preserveAspect = false;
+            card.preview = preview;
+
+            var accent = Block(inner, "AccentBar", Accent);
+            Span(accent.rectTransform, 0.448f, 0.465f, 0f, 0f);
+            card.accentBar = accent;
+
+            // Auto-sized, both of them. The cell width now depends on the window, and a
+            // fixed point size only fits at one of them -- "INDUSTRIAL WAREHOUSE" came
+            // out as "INDUSTRIAL WAREHOUS" the moment the grid narrowed. Shrinking to
+            // fit is better than truncating the one word that says where you are going.
+            var name = Label(inner, "Name", "ARENA", 25, TextAlignmentOptions.MidlineLeft, Ink);
+            Span(name.rectTransform, 0.335f, 0.448f, 14f, 14f);
+            name.characterSpacing = 4f;
+            Autosize(name, 13f, 25f);
+            card.nameText = name;
+
+            var description = Label(inner, "Description", "", 17,
+                                    TextAlignmentOptions.TopLeft, InkDim);
+            Span(description.rectTransform, 0.115f, 0.335f, 14f, 14f);
+            description.textWrappingMode = TextWrappingModes.Normal;
+
+            // Ellipsis rather than Truncate: at the smallest card a long description
+            // still will not fit, and trailing off reads as a summary while a glyph
+            // sliced in half reads as a rendering fault.
+            description.overflowMode = TextOverflowModes.Ellipsis;
+            Autosize(description, 9f, 16f);
+            card.descriptionText = description;
+
+            var best = Label(inner, "Best", "NOT PLAYED", 16,
+                             TextAlignmentOptions.BottomLeft, Accent);
+            Span(best.rectTransform, 0.015f, 0.115f, 14f, 14f);
+            best.characterSpacing = 6f;
+            card.bestText = best;
+
+            root.gameObject.SetActive(false);
+            return card;
+        }
+
+        // ------------------------------------------------------------------
+        static void BuildProfile(RectTransform parent, MainMenuController menu)
+        {
+            var panel = Panelled(parent, "Profile", Panel, out RectTransform inner);
+            panel.anchorMin = new Vector2(0.72f, 0f);
+            panel.anchorMax = new Vector2(1f, 1f);
+            panel.offsetMin = new Vector2(20f, 120f);
+            panel.offsetMax = new Vector2(-40f, -272f);
+
+            var heading = Label(inner, "Heading", "RECORD", 22,
+                                TextAlignmentOptions.MidlineLeft, InkDim);
+            var headingRect = heading.rectTransform;
+            headingRect.anchorMin = new Vector2(0f, 1f);
+            headingRect.anchorMax = new Vector2(1f, 1f);
+            headingRect.pivot = new Vector2(0.5f, 1f);
+            headingRect.sizeDelta = new Vector2(-48f, 54f);
+            headingRect.anchoredPosition = new Vector2(0f, -10f);
+            heading.characterSpacing = 10f;
+
+            // The stats live in their own container and divide it evenly, rather than
+            // sitting at fixed pixel offsets from the top of the panel.
+            //
+            // The old layout placed each row a fixed distance down and pinned a block of
+            // key hints to the bottom, which is fine at one window height and collides at
+            // any shorter one -- "TOTAL KILLS" ran straight into the hints. Splitting a
+            // measured box four ways cannot collide, whatever shape the window is.
+            var rows = new GameObject("Stats", typeof(RectTransform)).GetComponent<RectTransform>();
+            rows.SetParent(inner, false);
+            rows.anchorMin = Vector2.zero;
+            rows.anchorMax = Vector2.one;
+            rows.offsetMin = new Vector2(0f, 24f);
+            rows.offsetMax = new Vector2(0f, -64f);
+
+            menu.bestWaveText = Stat(rows, "BestWave", "BEST WAVE", 0, 4);
+            menu.bestScoreText = Stat(rows, "BestScore", "BEST SCORE", 1, 4);
+            menu.runsText = Stat(rows, "Runs", "RUNS PLAYED", 2, 4);
+            menu.killsText = Stat(rows, "Kills", "TOTAL KILLS", 3, 4);
+
+            // The key hints that used to sit under these are gone. They were duplicated
+            // from the strip that is on screen during the whole run, and this is the
+            // dashboard -- nothing here is happening in a run.
+        }
+
+        /// <summary>One label-over-number row, occupying its share of the stats box.</summary>
+        static TMP_Text Stat(RectTransform parent, string name, string caption, int index, int count)
+        {
+            float height = 1f / Mathf.Max(1, count);
+            float top = 1f - index * height;
+            float bottom = top - height;
+
+            var row = new GameObject($"{name}Row", typeof(RectTransform)).GetComponent<RectTransform>();
+            row.SetParent(parent, false);
+            row.anchorMin = new Vector2(0f, bottom);
+            row.anchorMax = new Vector2(1f, top);
+            row.pivot = new Vector2(0.5f, 0.5f);
+            row.offsetMin = new Vector2(24f, 0f);
+            row.offsetMax = new Vector2(-24f, 0f);
+
+            // A hairline above each row turns four stacked numbers into a list.
+            var rule = Block(row, $"{name}Rule", new Color(1f, 1f, 1f, 0.07f));
+            rule.rectTransform.anchorMin = new Vector2(0f, 1f);
+            rule.rectTransform.anchorMax = new Vector2(1f, 1f);
+            rule.rectTransform.pivot = new Vector2(0.5f, 1f);
+            rule.rectTransform.sizeDelta = new Vector2(0f, 2f);
+            rule.rectTransform.anchoredPosition = Vector2.zero;
+
+            var label = Label(row, $"{name}Caption", caption, 16,
+                              TextAlignmentOptions.TopLeft, InkDim);
+            Span(label.rectTransform, 0.52f, 0.94f, 0f, 0f);
+            label.characterSpacing = 8f;
+            Autosize(label, 10f, 16f);
+
+            var value = Label(row, $"{name}Value", "0", 38,
+                              TextAlignmentOptions.TopLeft, Ink);
+            Span(value.rectTransform, 0.06f, 0.54f, 0f, 0f);
+            Autosize(value, 16f, 38f);
+
+            return value;
+        }
+
+        // ------------------------------------------------------------------
+        static void BuildFooter(RectTransform parent, MainMenuController menu)
+        {
+            var status = Label(parent, "Status", "", 18, TextAlignmentOptions.MidlineLeft,
+                               new Color32(0xE0, 0x7A, 0x5F, 0xFF));
+            var statusRect = status.rectTransform;
+            statusRect.anchorMin = new Vector2(0f, 0f);
+            statusRect.anchorMax = new Vector2(0.7f, 0f);
+            statusRect.pivot = new Vector2(0.5f, 0f);
+            statusRect.sizeDelta = new Vector2(-88f, 72f);
+            statusRect.anchoredPosition = new Vector2(2f, 34f);
+            status.textWrappingMode = TextWrappingModes.Normal;
+            menu.statusText = status;
+
+            var exit = MakeButton(parent, "ExitButton", "EXIT  GAME", PanelLift, Danger);
+            var exitRect = (RectTransform)exit.transform;
+            exitRect.anchorMin = new Vector2(1f, 0f);
+            exitRect.anchorMax = new Vector2(1f, 0f);
+            exitRect.pivot = new Vector2(1f, 0f);
+            exitRect.sizeDelta = new Vector2(260f, 68f);
+            exitRect.anchoredPosition = new Vector2(-40f, 34f);
+
+            menu.exitButton = exit;
+            menu.exitRow = exit.gameObject;
+
+            BuildExitConfirm(parent, menu);
+        }
+
+        /// <summary>
+        /// The "are you sure" over the Exit button.
+        ///
+        /// Exiting is the only irreversible thing on this screen -- in a browser it
+        /// replaces the page, and there is no undo for a mis-click on the way past. The
+        /// overlay is a full-screen raycast target on purpose: it swallows clicks meant
+        /// for the dashboard underneath, so the dialog is genuinely modal rather than
+        /// merely drawn on top.
+        /// </summary>
+        static void BuildExitConfirm(RectTransform parent, MainMenuController menu)
+        {
+            var shade = Block(parent, "ExitConfirm", new Color(0.02f, 0.03f, 0.04f, 0.82f));
+            Stretch(shade.rectTransform);
+            shade.raycastTarget = true;
+
+            var box = Panelled(shade.rectTransform, "Dialog", Panel, out RectTransform inner);
+            box.anchorMin = box.anchorMax = box.pivot = new Vector2(0.5f, 0.5f);
+            box.sizeDelta = new Vector2(760f, 300f);
+            box.anchoredPosition = Vector2.zero;
+
+            var stripe = Block(inner, "Stripe", Danger);
+            stripe.rectTransform.anchorMin = new Vector2(0f, 1f);
+            stripe.rectTransform.anchorMax = new Vector2(1f, 1f);
+            stripe.rectTransform.pivot = new Vector2(0.5f, 1f);
+            stripe.rectTransform.sizeDelta = new Vector2(0f, 6f);
+            stripe.rectTransform.anchoredPosition = Vector2.zero;
+
+            var question = Label(inner, "Question", "ARE YOU REALLY EXITING THE GAME?", 30,
+                                 TextAlignmentOptions.Center, Ink);
+            Span(question.rectTransform, 0.52f, 0.9f, 32f, 32f);
+            question.textWrappingMode = TextWrappingModes.Normal;
+            question.characterSpacing = 4f;
+            Autosize(question, 16f, 30f);
+
+            var note = Label(inner, "Note", "Your record is saved. Runs are not.", 18,
+                             TextAlignmentOptions.Center, InkDim);
+            Span(note.rectTransform, 0.36f, 0.52f, 32f, 32f);
+            Autosize(note, 12f, 18f);
+
+            var cancel = MakeButton(inner, "Cancel", "STAY", PanelLift, Border);
+            cancel.GetComponent<UIButtonSound>().voice = UIButtonSound.Voice.Back;
+            var cancelRect = (RectTransform)cancel.transform;
+            cancelRect.anchorMin = cancelRect.anchorMax = new Vector2(0.5f, 0f);
+            cancelRect.pivot = new Vector2(1f, 0f);
+            cancelRect.sizeDelta = new Vector2(240f, 64f);
+            cancelRect.anchoredPosition = new Vector2(-12f, 34f);
+
+            var confirm = MakeButton(inner, "Confirm", "EXIT", Danger, DangerLift);
+            var confirmRect = (RectTransform)confirm.transform;
+            confirmRect.anchorMin = confirmRect.anchorMax = new Vector2(0.5f, 0f);
+            confirmRect.pivot = new Vector2(0f, 0f);
+            confirmRect.sizeDelta = new Vector2(240f, 64f);
+            confirmRect.anchoredPosition = new Vector2(12f, 34f);
+
+            menu.exitConfirmPanel = shade.gameObject;
+            menu.confirmExitButton = confirm;
+            menu.cancelExitButton = cancel;
+
+            shade.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// A button that can actually be clicked.
+        ///
+        /// The raycastTarget line is the whole reason this helper exists. Every block
+        /// this file draws has it switched off, because most of them are decoration; miss
+        /// the exception on a Button's own graphic and it is inert and silent -- it
+        /// highlights nothing and receives nothing, and looks exactly like a button whose
+        /// handler is broken. That is what Exit Game did. Routing every button through
+        /// one place is what stops it happening again.
+        ///
+        /// The face is left white so Button's colour tint, which multiplies, produces the
+        /// state colours exactly rather than a darkened version of them.
+        /// </summary>
+        static Button MakeButton(RectTransform parent, string name, string caption,
+                                 Color normal, Color hover)
+        {
+            var outer = Block(parent, name, Border);
+
+            var face = Block(outer.rectTransform, "Face", Color.white);
+            face.rectTransform.anchorMin = Vector2.zero;
+            face.rectTransform.anchorMax = Vector2.one;
+            face.rectTransform.offsetMin = new Vector2(3f, 3f);
+            face.rectTransform.offsetMax = new Vector2(-3f, -3f);
+            face.raycastTarget = true;
+
+            var button = outer.gameObject.AddComponent<Button>();
+            button.targetGraphic = face;
+
+            var colors = button.colors;
+            colors.normalColor = normal;
+            colors.highlightedColor = hover;
+            colors.selectedColor = normal;
+            colors.pressedColor = hover * 0.8f;
+            colors.disabledColor = normal * 0.6f;
+            colors.fadeDuration = 0.08f;
+            button.colors = colors;
+
+            var label = Label(face.rectTransform, "Label", caption, 24,
+                              TextAlignmentOptions.Center, Ink);
+            Stretch(label.rectTransform);
+            label.characterSpacing = 6f;
+            Autosize(label, 12f, 24f);
+
+            // Added here rather than at each call site, for the same reason raycastTarget
+            // is: a button that exists should sound like one without anybody remembering.
+            button.gameObject.AddComponent<UIButtonSound>();
+
+            return button;
+        }
+
+        // ==================================================================
+        // Small UI helpers, pixel-flat by design
+        // ==================================================================
+
+        /// <summary>A bordered panel: an outer block and an inset inner one.</summary>
+        static RectTransform Panelled(RectTransform parent, string name, Color fill,
+                                      out RectTransform inner)
+        {
+            var outer = Block(parent, name, Border);
+
+            var innerImage = Block((RectTransform)outer.transform, "Inner", fill);
+            inner = innerImage.rectTransform;
+            inner.anchorMin = Vector2.zero;
+            inner.anchorMax = Vector2.one;
+            inner.offsetMin = new Vector2(3f, 3f);
+            inner.offsetMax = new Vector2(-3f, -3f);
+
+            return outer.rectTransform;
+        }
+
+        static Image Block(RectTransform parent, string name, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            image.sprite = Flat();
+            image.type = Image.Type.Simple;
+
+            return image;
+        }
+
+        static TMP_Text Label(RectTransform parent, string name, string content, float size,
+                              TextAlignmentOptions align, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var text = go.AddComponent<TextMeshProUGUI>();
+            text.text = content;
+            text.fontSize = size;
+            text.alignment = align;
+            text.color = color;
+            text.raycastTarget = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Truncate;
+
+            return text;
+        }
+
+        /// <summary>
+        /// A one-pixel white sprite with no border and point filtering.
+        ///
+        /// Deliberately not Unity's built-in UISprite, which the HUD uses: that one is
+        /// nine-sliced with rounded corners, and every panel on this screen is supposed
+        /// to have hard ones.
+        /// </summary>
+        static Sprite Flat()
+        {
+            if (_flat != null) return _flat;
+
+            string path = "Assets/FPSKit_Generated/UIFlat.png";
+            _flat = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (_flat != null) return _flat;
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            var pixels = new Color32[4];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color32(255, 255, 255, 255);
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.filterMode = FilterMode.Point;
+                importer.mipmapEnabled = false;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.SaveAndReimport();
+            }
+
+            _flat = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            return _flat;
+        }
+
+        /// <summary>
+        /// Lets a label shrink to fit its box rather than losing the end of the line.
+        /// Truncate stays on as the last resort, for a string no size would fit.
+        /// </summary>
+        static void Autosize(TMP_Text text, float min, float max)
+        {
+            text.enableAutoSizing = true;
+            text.fontSizeMin = min;
+            text.fontSizeMax = max;
+        }
+
+        /// <summary>
+        /// Anchors a rect to a horizontal band of its parent, from one fraction of the
+        /// height to another, inset left and right by a margin in pixels.
+        /// </summary>
+        static void Span(RectTransform rect, float bottom, float top, float leftInset, float rightInset)
+        {
+            rect.anchorMin = new Vector2(0f, bottom);
+            rect.anchorMax = new Vector2(1f, top);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = new Vector2(leftInset, 0f);
+            rect.offsetMax = new Vector2(-rightInset, 0f);
+        }
+
+        static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+        }
+
+        static void EnsureEventSystem()
+        {
+            if (Object.FindAnyObjectByType<EventSystem>() != null) return;
+
+            var go = new GameObject("EventSystem", typeof(EventSystem));
+
+#if ENABLE_INPUT_SYSTEM
+            go.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
+            go.AddComponent<StandaloneInputModule>();
+#endif
+        }
+
+        // ==================================================================
+
+        /// <summary>
+        /// Puts the dashboard at index 0 so the game boots into it, keeping every arena
+        /// registered behind it.
+        /// </summary>
+        static void RegisterAsFirstScene(string path)
+        {
+            var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+            scenes.RemoveAll(s => s.path == path);
+            scenes.Insert(0, new EditorBuildSettingsScene(path, true));
+
+            EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        static void EnsureFolders()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/FPSKit_Generated"))
+                AssetDatabase.CreateFolder("Assets", "FPSKit_Generated");
+
+            if (!AssetDatabase.IsValidFolder("Assets/FPSKit_Generated/Scenes"))
+                AssetDatabase.CreateFolder("Assets/FPSKit_Generated", "Scenes");
+
+            if (!AssetDatabase.IsValidFolder(PreviewFolder))
+                AssetDatabase.CreateFolder("Assets/FPSKit_Generated", "Previews");
+        }
+
+        static string SafeName(string name) => name.Replace(" ", "");
+    }
+}
+#endif

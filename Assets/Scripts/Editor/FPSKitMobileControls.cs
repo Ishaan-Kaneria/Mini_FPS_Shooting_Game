@@ -117,8 +117,12 @@ namespace FPSKit.EditorTools
             var go = new GameObject("LookArea", typeof(RectTransform), typeof(Image), typeof(TouchLookArea));
             go.transform.SetParent(parent, false);
 
+            // The right of the screen only. It used to cover all of it, which put the
+            // look surface underneath the thumbstick as well: a drag on the left either
+            // moved *and* turned, or turned instead of moving, depending on which of the
+            // two the touch happened to land on.
             var rect = (RectTransform)go.transform;
-            rect.anchorMin = Vector2.zero;
+            rect.anchorMin = new Vector2(LeftRegion, 0f);
             rect.anchorMax = Vector2.one;
             rect.offsetMin = rect.offsetMax = Vector2.zero;
 
@@ -126,67 +130,123 @@ namespace FPSKit.EditorTools
             // on some setups, so a hair above zero is safer.
             var image = go.GetComponent<Image>();
             image.color = new Color(0f, 0f, 0f, 0.004f);
+
+            // Tap-to-fire stays off. With a FIRE button on screen it is redundant, and
+            // because this surface is most of the screen it meant every tap that missed
+            // a button by a few pixels fired the weapon.
+            go.GetComponent<TouchLookArea>().tapToFire = false;
         }
 
+        /// <summary>
+        /// The move stick: the whole left region is the stick, and the ring appears
+        /// wherever the thumb lands.
+        ///
+        /// A fixed ring in the corner is the wrong shape for a phone -- there is nothing
+        /// under the thumb to feel for, so the player misses it, and the miss used to
+        /// fall through to the look surface behind. A region that accepts a thumb
+        /// anywhere cannot be missed.
+        /// </summary>
         private static void BuildJoystick(Transform parent)
         {
-            var pad = new GameObject("Joystick", typeof(RectTransform), typeof(Image), typeof(VirtualJoystick));
-            pad.transform.SetParent(parent, false);
+            var region = new GameObject("MoveRegion", typeof(RectTransform), typeof(Image),
+                                        typeof(VirtualJoystick));
+            region.transform.SetParent(parent, false);
+
+            var regionRect = (RectTransform)region.transform;
+            regionRect.anchorMin = Vector2.zero;
+            regionRect.anchorMax = new Vector2(LeftRegion, 1f);
+            regionRect.offsetMin = regionRect.offsetMax = Vector2.zero;
+            regionRect.pivot = new Vector2(0.5f, 0.5f);
+
+            // Invisible, and the same near-zero alpha the look area uses so it keeps
+            // receiving touches.
+            var regionImage = region.GetComponent<Image>();
+            regionImage.color = new Color(0f, 0f, 0f, 0.004f);
+
+            var pad = new GameObject("Pad", typeof(RectTransform), typeof(Image),
+                                     typeof(CanvasGroup));
+            pad.transform.SetParent(region.transform, false);
 
             var padRect = (RectTransform)pad.transform;
-            padRect.anchorMin = padRect.anchorMax = new Vector2(0f, 0f);
+            padRect.anchorMin = padRect.anchorMax = new Vector2(0.5f, 0.5f);
             padRect.pivot = new Vector2(0.5f, 0.5f);
-            padRect.sizeDelta = new Vector2(300f, 300f);
-            padRect.anchoredPosition = new Vector2(260f, 260f);
+            padRect.sizeDelta = new Vector2(340f, 340f);
+            padRect.anchoredPosition = Vector2.zero;
 
             var padImage = pad.GetComponent<Image>();
             padImage.sprite = Knob();
-            padImage.color = new Color(1f, 1f, 1f, 0.16f);
+            padImage.color = new Color(1f, 1f, 1f, 0.14f);
+            padImage.raycastTarget = false;
 
             var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
             handle.transform.SetParent(pad.transform, false);
 
             var handleRect = (RectTransform)handle.transform;
             handleRect.anchorMin = handleRect.anchorMax = new Vector2(0.5f, 0.5f);
-            handleRect.sizeDelta = new Vector2(130f, 130f);
+            handleRect.sizeDelta = new Vector2(150f, 150f);
             handleRect.anchoredPosition = Vector2.zero;
 
             var handleImage = handle.GetComponent<Image>();
             handleImage.sprite = Knob();
-            handleImage.color = new Color(1f, 1f, 1f, 0.45f);
+            handleImage.color = new Color(1f, 1f, 1f, 0.42f);
             handleImage.raycastTarget = false;
 
-            var joystick = pad.GetComponent<VirtualJoystick>();
+            var joystick = region.GetComponent<VirtualJoystick>();
+            joystick.pad = padRect;
             joystick.handle = handleRect;
-            joystick.radius = 110f;
+            joystick.radius = 150f;
+            joystick.hideWhenIdle = true;
         }
+
+        /// <summary>
+        /// Where the move half of the screen ends and the look half begins.
+        ///
+        /// Left of this is the stick, right of it is look plus the button cluster. The
+        /// split is what stops one thumb's job being done by the other.
+        /// </summary>
+        private const float LeftRegion = 0.38f;
 
         // ==================================================================
         private static void BuildButtons(Transform parent)
         {
-            // Right thumb cluster, laid out so the two you press most sit lowest.
+            // A right-thumb cluster, laid out so nothing overlaps and the two pressed
+            // most sit lowest and largest. Positions are bottom-right anchored at the
+            // canvas's 1920x1080 reference, and the gaps between them are deliberate:
+            // a thumb is about 120 reference-pixels wide, so buttons that touch each
+            // other are buttons that get pressed together.
             MakeButton(parent, "FireButton", "FIRE", TouchButton.ActionKind.Fire, false,
-                       new Vector2(-230f, 240f), 200f, new Color(1f, 0.42f, 0.35f, 0.30f));
+                       new Vector2(-230f, 230f), 240f, new Color(1f, 0.42f, 0.35f, 0.32f));
 
             MakeButton(parent, "AimButton", "ADS", TouchButton.ActionKind.Aim, true,
-                       new Vector2(-440f, 200f), 150f, new Color(1f, 1f, 1f, 0.18f));
+                       new Vector2(-470f, 330f), 160f, new Color(1f, 1f, 1f, 0.20f));
 
             MakeButton(parent, "JumpButton", "JUMP", TouchButton.ActionKind.Jump, false,
-                       new Vector2(-190f, 450f), 150f, new Color(1f, 1f, 1f, 0.18f));
+                       new Vector2(-230f, 490f), 160f, new Color(1f, 1f, 1f, 0.20f));
 
             MakeButton(parent, "SprintButton", "RUN", TouchButton.ActionKind.Sprint, true,
-                       new Vector2(-400f, 400f), 140f, new Color(0.5f, 0.85f, 1f, 0.20f));
+                       new Vector2(-450f, 560f), 150f, new Color(0.5f, 0.85f, 1f, 0.22f));
 
             MakeButton(parent, "CrouchButton", "CROUCH", TouchButton.ActionKind.Crouch, true,
-                       new Vector2(-600f, 170f), 140f, new Color(1f, 1f, 1f, 0.18f));
+                       new Vector2(-660f, 400f), 150f, new Color(1f, 1f, 1f, 0.20f));
 
             MakeButton(parent, "ReloadButton", "RELOAD", TouchButton.ActionKind.Reload, false,
-                       new Vector2(-600f, 340f), 140f, new Color(1f, 0.85f, 0.4f, 0.20f));
+                       new Vector2(-660f, 200f), 150f, new Color(1f, 0.85f, 0.4f, 0.22f));
+
+            // Top right, away from the thumbs, because it is the one button you never
+            // want to hit by accident and the only way off this screen: a phone has no
+            // Escape key, so without it a touch player cannot pause, cannot quit and
+            // cannot get back to the dashboard.
+            var pause = MakeButton(parent, "PauseButton", "II", TouchButton.ActionKind.Pause,
+                                   false, Vector2.zero, 110f, new Color(1f, 1f, 1f, 0.18f));
+
+            var pauseRect = (RectTransform)pause.transform;
+            pauseRect.anchorMin = pauseRect.anchorMax = new Vector2(1f, 1f);
+            pauseRect.anchoredPosition = new Vector2(-90f, -90f);
         }
 
-        private static void MakeButton(Transform parent, string name, string label,
-                                       TouchButton.ActionKind action, bool toggle,
-                                       Vector2 anchoredPosition, float size, Color color)
+        private static GameObject MakeButton(Transform parent, string name, string label,
+                                            TouchButton.ActionKind action, bool toggle,
+                                            Vector2 anchoredPosition, float size, Color color)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(TouchButton));
             go.transform.SetParent(parent, false);
@@ -222,6 +282,8 @@ namespace FPSKit.EditorTools
             text.alignment = TextAlignmentOptions.Center;
             text.color = new Color(1f, 1f, 1f, 0.85f);
             text.raycastTarget = false;
+
+            return go;
         }
 
         // ==================================================================

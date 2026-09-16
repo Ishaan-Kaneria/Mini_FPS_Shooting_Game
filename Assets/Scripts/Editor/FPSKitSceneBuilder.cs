@@ -1996,6 +1996,8 @@ namespace FPSKit.EditorTools
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             canvasGo.AddComponent<GraphicRaycaster>();
 
+            EnsureEventSystem();
+
             var hud = canvasGo.AddComponent<HUDController>();
             hud.weapon = player.GetComponentInChildren<Weapon>();
             hud.playerHealth = player.GetComponent<Health>();
@@ -2034,6 +2036,7 @@ namespace FPSKit.EditorTools
             // ---- centre --------------------------------------------------
             BuildCrosshair(root, hud);
             BuildWaveBanner(root, hud);
+            BuildInstructionStrip(root, hud);
             BuildDamageIndicators(root, hud);
 
             // ---- full-screen overlays ------------------------------------
@@ -2182,6 +2185,53 @@ namespace FPSKit.EditorTools
             template.SetActive(false);
         }
 
+        /// <summary>
+        /// The thin bar across the top of the screen that states the keys.
+        ///
+        /// It is always on, which is a deliberate cost: it takes a strip of screen for
+        /// the whole run. The alternative is what the kit had before -- the keys stated
+        /// once on a pause menu the player has to already know how to open. A browser
+        /// player who cannot find pause does not look for a manual; they close the tab.
+        ///
+        /// Anchored to the top centre and kept narrow so it sits above the crosshair and
+        /// clear of the wave counter, and dim enough not to compete with the fight.
+        /// HUDController fills in the text from the live key bindings.
+        /// </summary>
+        private static void BuildInstructionStrip(Transform parent, HUDController hud)
+        {
+            var strip = new GameObject("InstructionStrip", typeof(RectTransform), typeof(Image));
+            strip.transform.SetParent(parent, false);
+
+            var rect = strip.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 1f);
+            rect.sizeDelta = new Vector2(560f, 38f);
+            rect.anchoredPosition = new Vector2(0f, -12f);
+
+            var backing = strip.GetComponent<Image>();
+            backing.color = new Color(0.03f, 0.04f, 0.05f, 0.62f);
+            backing.raycastTarget = false;
+            backing.sprite = UISprite();
+
+            // A hairline under the bar, which is what stops it reading as a floating
+            // grey rectangle on a bright skybox.
+            MakeImage(strip.transform, "Underline", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                      Vector2.zero, new Vector2(560f, 2f), new Color(1f, 0.72f, 0.3f, 0.5f));
+
+            var text = MakeText(strip.transform, "Keys", "", new Vector2(0.5f, 0.5f),
+                                Vector2.zero, 19, TextAlignmentOptions.Center);
+
+            var textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = textRect.offsetMax = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+
+            text.color = new Color(1f, 0.93f, 0.82f, 0.95f);
+            text.characterSpacing = 4f;
+
+            hud.instructionText = text;
+        }
+
         private static GameObject BuildPausePanel(Transform parent, HUDController hud)
         {
             var panel = new GameObject("PausePanel", typeof(RectTransform), typeof(Image));
@@ -2190,10 +2240,21 @@ namespace FPSKit.EditorTools
             panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.7f);
 
             MakeText(panel.transform, "PausedTitle", "PAUSED",
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), 64, TextAlignmentOptions.Center);
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 140f), 64, TextAlignmentOptions.Center);
 
             hud.pauseHintText = MakeText(panel.transform, "PauseHint", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -20f), 32, TextAlignmentOptions.Center);
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), 32, TextAlignmentOptions.Center);
+
+            // The keys are stated above; these are the same two actions for anyone
+            // without a keyboard. A phone can open this menu and, without them, has no
+            // way at all to leave it.
+            hud.resumeButton = PanelButton(panel.transform, "ResumeButton", "RESUME",
+                                           new Vector2(-170f, -60f),
+                                           new Color(0.35f, 0.65f, 0.45f, 0.9f));
+
+            hud.quitButton = PanelButton(panel.transform, "QuitButton", "QUIT TO DASHBOARD",
+                                          new Vector2(170f, -60f),
+                                          new Color(0.55f, 0.25f, 0.24f, 0.9f));
 
             panel.SetActive(false);
             return panel;
@@ -2210,8 +2271,62 @@ namespace FPSKit.EditorTools
                 new Vector2(0.5f, 0.5f), Vector2.zero, 44, TextAlignmentOptions.Center);
             hud.finalWaveText.GetComponent<RectTransform>().sizeDelta = new Vector2(1200f, 400f);
 
+            hud.gameOverQuitButton = PanelButton(panel.transform, "DashboardButton",
+                                                  "BACK TO DASHBOARD", new Vector2(0f, -230f),
+                                                  new Color(0.3f, 0.42f, 0.6f, 0.9f));
+
             panel.SetActive(false);
             return panel;
+        }
+
+        /// <summary>
+        /// A clickable button on one of the full-screen panels.
+        ///
+        /// raycastTarget is set explicitly, because MakeImage turns it off for everything
+        /// it draws -- and a Button whose own graphic cannot be raycast is inert and
+        /// completely silent about it.
+        /// </summary>
+        private static Button PanelButton(Transform parent, string name, string label,
+                                          Vector2 offset, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(320f, 84f);
+            rect.anchoredPosition = offset;
+
+            var image = go.GetComponent<Image>();
+            image.sprite = UISprite();
+            image.color = Color.white;
+            image.raycastTarget = true;
+
+            var button = go.GetComponent<Button>();
+            button.targetGraphic = image;
+
+            var colors = button.colors;
+            colors.normalColor = color;
+            colors.highlightedColor = new Color(color.r * 1.3f, color.g * 1.3f, color.b * 1.3f, 1f);
+            colors.pressedColor = color * 0.8f;
+            colors.selectedColor = color;
+            colors.fadeDuration = 0.07f;
+            button.colors = colors;
+
+            var text = MakeText(go.transform, "Label", label, new Vector2(0.5f, 0.5f),
+                                Vector2.zero, 24, TextAlignmentOptions.Center);
+
+            var textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = textRect.offsetMax = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 14f;
+            text.fontSizeMax = 24f;
+
+            return button;
         }
 
         private static void Stretch(RectTransform rect)
@@ -2231,6 +2346,24 @@ namespace FPSKit.EditorTools
         /// optional decoration. Unity's built-in UI sprite is used where available and
         /// a flat white one is generated as a fallback.
         /// </summary>
+        /// <summary>
+        /// Without one of these no UI click or touch is delivered anywhere in the scene.
+        /// The generated HUD never needed it until it grew buttons of its own; the mobile
+        /// control layer has always added its own copy, and this is idempotent.
+        /// </summary>
+        private static void EnsureEventSystem()
+        {
+            if (Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() != null) return;
+
+            var go = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem));
+
+#if ENABLE_INPUT_SYSTEM
+            go.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
+            go.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+#endif
+        }
+
         private static Sprite UISprite()
         {
             if (_uiSprite != null) return _uiSprite;

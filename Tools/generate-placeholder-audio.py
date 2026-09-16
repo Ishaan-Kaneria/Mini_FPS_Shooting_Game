@@ -205,3 +205,77 @@ air    = gain(highpass(lowpass(n(secs(8.0)), 1400), 300), 0.10)
 swell  = [0.55 + 0.45 * math.sin(2 * math.pi * 0.07 * i / RATE) for i in range(secs(8.0))]
 bed    = [rumble[i] * swell[i] + air[i] for i in range(secs(8.0))]
 save(f"{A}/Ambience/arena_bed.wav", bed, loop=True)
+
+# ---- interface --------------------------------------------------------------
+# Appended after everything else on purpose: these draw from the same seeded noise
+# stream, and adding them anywhere earlier would re-roll every sound authored below
+# them into an identical-sounding but byte-different file. See enemy_pain above.
+
+def blip(t, f0, f1, power=3.0, attack=0.004):
+    """A soft two-partial tone. The octave above keeps it from sounding like a test
+    signal without making it a chime."""
+    body = mix(gain(tone(t, f0, f1), 0.85), gain(tone(t, f0 * 2, f1 * 2), 0.16))
+    return env(body, attack=attack, power=power)
+
+save(f"{A}/UI/ui_hover.wav", gain(blip(0.06, 1180, 1420, 4.5), 0.42))
+
+save(f"{A}/UI/ui_click.wav",
+     mix(gain(blip(0.12, 720, 960, 3.0), 0.9),
+         gain(env(highpass(n(secs(0.025)), 3200), power=9), 0.13)))
+
+save(f"{A}/UI/ui_back.wav", gain(blip(0.14, 640, 430, 3.0), 0.8))
+
+# Two notes up: the sound of something starting rather than something being pressed.
+save(f"{A}/UI/ui_launch.wav",
+     cat(gain(blip(0.10, 660, 660, 3.5), 0.7),
+         gain(blip(0.26, 988, 1318, 2.4), 0.85)))
+
+
+# ---- menu music -------------------------------------------------------------
+# Four bars of a slow minor progression, quiet enough to sit under a conversation.
+# Sine partials only: the kit has no instrument samples, and a soft stack of sines is
+# the one synthetic sound that reads as intentional rather than as a placeholder.
+
+def voice(t, freq, level, attack=0.5, fade=0.55):
+    stack = mix(gain(tone(t, freq, freq), 1.0),
+                gain(tone(t, freq * 2, freq * 2), 0.26),
+                gain(tone(t, freq * 3, freq * 3), 0.08))
+    total = len(stack)
+    rise = max(1, secs(attack))
+    out = []
+    for i, v in enumerate(stack):
+        g = min(1.0, i / rise) * (1.0 - (i / total) ** 2 * fade)
+        out.append(v * g)
+    return gain(out, level)
+
+
+def chord(t, notes, level=0.16):
+    return mix(*[voice(t, f, level) for f in notes])
+
+
+def pluck(at, t, freq, level=0.1):
+    return cat(blank(at), gain(env(mix(gain(tone(t, freq, freq), 1.0),
+                                       gain(tone(t, freq * 2, freq * 2), 0.2)),
+                                  attack=0.008, power=4.5), level))
+
+
+BAR = 4.0
+PROGRESSION = [
+    (220.00, [220.00, 261.63, 329.63]),   # Am
+    (174.61, [174.61, 220.00, 261.63]),   # F
+    (130.81, [261.63, 329.63, 392.00]),   # C
+    (196.00, [196.00, 246.94, 293.66]),   # G
+]
+
+bars = []
+for root, notes in PROGRESSION:
+    layers = [chord(BAR, notes), voice(BAR, root / 2.0, 0.13, attack=0.8)]
+
+    # A sparse arpeggio over the top, on the off-beats so it drifts rather than marches.
+    for step, note in enumerate(notes + [notes[1]]):
+        layers.append(pluck(0.5 + step * 0.85, 0.7, note * 2.0, 0.055))
+
+    bar = mix(*layers)
+    bars.append(bar[: secs(BAR)])
+
+save(f"{A}/Music/menu_loop.wav", gain(cat(*bars), 0.75), loop=True)

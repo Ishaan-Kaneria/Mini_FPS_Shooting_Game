@@ -95,7 +95,21 @@ public class HUDController : MonoBehaviour
 
     [Header("Game Over")]
     public GameObject gameOverPanel;
-    public KeyCode restartKey = KeyCode.R;
+
+    [Header("Pause / Results Buttons")]
+    [Tooltip("On-screen equivalents of the resume and quit keys. Not decoration: a phone " +
+             "has no R or Q, so without these a touch player can reach the pause menu " +
+             "and then has no way out of it.")]
+    public Button resumeButton;
+
+    public Button quitButton;
+    public Button gameOverQuitButton;
+
+    [Header("Instruction Strip")]
+    [Tooltip("The thin bar across the top that states the keys. Optional -- the HUD " +
+             "works without one -- but a run that never tells the player how to pause " +
+             "is one they leave by closing the tab.")]
+    public TMP_Text instructionText;
 
     float _currentGap;
     float _kick;
@@ -165,21 +179,87 @@ public class HUDController : MonoBehaviour
 
     void Start()
     {
-        if (_director != null) restartKey = _director.restartKey;
+        WriteKeyHints();
+        WireButtons();
 
-        if (pauseHintText != null)
+        // A phone has no Escape key, and a strip listing three of them is three lines of
+        // nonsense over the top of a small screen. TouchControls makes the same call for
+        // the on-screen sticks; see WebDevice.IsTouchOnly for why it is not
+        // Application.isMobilePlatform.
+        if (instructionText != null && (WebDevice.IsTouchOnly || Application.isMobilePlatform))
         {
-            string hint = $"{Director?.pauseKey ?? KeyCode.Escape} resume    " +
-                          $"{restartKey} restart";
-
-            // A browser build has nowhere to quit to, so the key does nothing there --
-            // and a menu advertising a key that does nothing reads as a broken game.
-            if (GameDirector.CanQuit)
-                hint += $"    {Director?.quitKey ?? KeyCode.Q} quit";
-
-            pauseHintText.text = $"<size=60%>{hint}</size>";
+            var strip = instructionText.transform.parent;
+            if (strip != null) strip.gameObject.SetActive(false);
         }
     }
+
+    /// <summary>
+    /// Writes the key hints, in both places they appear.
+    ///
+    /// Read off the live director rather than hard-coded, so rebinding a key in the
+    /// Inspector cannot leave the strip advertising one that no longer does anything --
+    /// which is how the pause menu ended up promising a quit key that, in a browser,
+    /// did nothing at all.
+    /// </summary>
+    void WriteKeyHints()
+    {
+        var director = Director;
+
+        KeyCode pause = director != null ? director.pauseKey : KeyCode.Escape;
+        KeyCode altPause = director != null ? director.altPauseKey : KeyCode.P;
+        KeyCode resume = director != null ? director.resumeKey : KeyCode.R;
+        KeyCode quit = director != null ? director.quitKey : KeyCode.Q;
+
+        string pauseLabel = altPause == KeyCode.None || altPause == pause
+            ? Key(pause)
+            : $"{Key(pause)}/{Key(altPause)}";
+
+        // <color>, not <alpha>. TMP's alpha tag applies from where it appears and has no
+        // closing form, so "</alpha>" is not a tag -- it renders as those eight
+        // characters, on screen, three times across the strip.
+        const string Dim = "<color=#B8AFA0>";
+
+        if (instructionText != null)
+            instructionText.text =
+                $"{pauseLabel} {Dim}PAUSE</color>     " +
+                $"{Key(resume)} {Dim}RESUME</color>     " +
+                $"{Key(quit)} {Dim}QUIT</color>";
+
+        if (pauseHintText != null)
+            pauseHintText.text =
+                $"<size=60%>{Key(resume)} resume     {pauseLabel} resume     " +
+                $"{Key(quit)} quit to dashboard</size>";
+    }
+
+    /// <summary>
+    /// Points the on-screen pause buttons at the director.
+    ///
+    /// Wired here rather than in the builder because the director is found at runtime --
+    /// a scene can be played without one until something asks for it.
+    /// </summary>
+    void WireButtons()
+    {
+        Bind(resumeButton, () => Director?.SetPaused(false));
+        Bind(quitButton, () => Director?.ReturnToMenu());
+        Bind(gameOverQuitButton, () => Director?.ReturnToMenu());
+    }
+
+    static void Bind(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button == null) return;
+
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(action);
+    }
+
+    /// <summary>Short, uppercase and readable: "ESC", not "Escape".</summary>
+    static string Key(KeyCode key) => key switch
+    {
+        KeyCode.Escape => "ESC",
+        KeyCode.Return => "ENTER",
+        KeyCode.Space => "SPACE",
+        _ => key.ToString().ToUpperInvariant()
+    };
 
     void OnEnable()
     {
@@ -739,7 +819,7 @@ public class HUDController : MonoBehaviour
                 $"{record}You survived {wave} wave{(wave == 1 ? "" : "s")}\n" +
                 $"<size=65%>{director.Score:N0} points   {director.Kills} kills   " +
                 $"{director.Headshots} headshots</size>\n\n" +
-                $"<size=55%>Press {restartKey} to try again</size>";
+                $"<size=55%>Press {Key(director.quitKey)} for the dashboard</size>";
         }
 
         if (gameOverPanel != null) gameOverPanel.SetActive(true);

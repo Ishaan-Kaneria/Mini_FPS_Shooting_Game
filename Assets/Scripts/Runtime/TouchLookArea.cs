@@ -11,8 +11,11 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
     [Tooltip("Multiplier on the raw drag. Final turn rate also uses the player's Touch Sensitivity.")]
     public float sensitivity = 1f;
 
-    [Tooltip("Tapping without dragging fires the weapon, the way most mobile shooters do.")]
-    public bool tapToFire = true;
+    [Tooltip("Tapping without dragging fires the weapon. Off by default, and it should " +
+             "stay off wherever there is a FIRE button: this surface covers most of the " +
+             "screen, so with it on, every tap that is not exactly on a button shoots -- " +
+             "including the ones aimed at ADS, JUMP or RUN and missed by a few pixels.")]
+    public bool tapToFire;
     public float tapMaxDuration = 0.25f;
     public float tapMaxDrag = 20f;
     public float tapFireHoldTime = 0.12f;

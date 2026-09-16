@@ -5,7 +5,7 @@ using UnityEngine.UI;
 /// <summary>One on-screen action button.</summary>
 public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
-    public enum ActionKind { Fire, Aim, Jump, Sprint, Crouch, Reload }
+    public enum ActionKind { Fire, Aim, Jump, Sprint, Crouch, Reload, Pause }
 
     public ActionKind action = ActionKind.Fire;
 
@@ -33,6 +33,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         // Edge-triggered actions fire on press only.
         if (action == ActionKind.Jump) MobileInput.QueueJump();
         else if (action == ActionKind.Reload) MobileInput.QueueReload();
+        else if (action == ActionKind.Pause) MobileInput.QueuePause();
     }
 
     public void OnPointerUp(PointerEventData eventData)

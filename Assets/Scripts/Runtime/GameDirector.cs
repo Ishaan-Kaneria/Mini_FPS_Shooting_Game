@@ -57,20 +57,31 @@ public class GameDirector : MonoBehaviour
              "with a captured mouse is a game you cannot click out of.")]
     public KeyCode pauseKey = KeyCode.Escape;
 
-    [Tooltip("Restarts the level. Offered on both the pause menu and the game over screen.")]
-    public KeyCode restartKey = KeyCode.R;
+    [Tooltip("Second key for the same thing. Escape is the convention, but a browser " +
+             "eats it to leave pointer lock, so a paused web player who presses Escape " +
+             "gets their cursor back and no menu. P is the one that always arrives.")]
+    public KeyCode altPauseKey = KeyCode.P;
 
-    [Tooltip("Quits from the pause menu. Stops play mode in the editor, and is ignored " +
-             "in a browser, where there is nothing to quit to.")]
+    [Tooltip("Unpauses from the pause menu. Pause toggles too, so this is the key the " +
+             "menu can advertise as meaning one thing.")]
+    public KeyCode resumeKey = KeyCode.R;
+
+    [Tooltip("Leaves the run and goes back to the dashboard, from the pause menu or the " +
+             "results screen. This is a scene load, so unlike quitting the application " +
+             "it works everywhere -- including in a browser, which has nowhere to quit to.")]
     public KeyCode quitKey = KeyCode.Q;
 
+    [Tooltip("Scene the dashboard lives in. Loaded when a run ends, however it ended.")]
+    public string menuScene = "Menu";
+
     /// <summary>
-    /// Whether leaving the game is a thing this build can do.
+    /// Whether closing the application outright is a thing this build can do.
     ///
-    /// False in a browser. Application.Quit() there tears the player down and leaves a
-    /// frozen canvas on the page with no way back but a reload -- so a pause menu that
-    /// offers the key is offering to strand whoever presses it. The HUD reads this to
-    /// decide whether to print the hint at all.
+    /// This is no longer what the pause menu's quit key does -- that returns to the
+    /// dashboard, which works everywhere. It is only consulted by the dashboard's own
+    /// Exit button, which really does mean "leave", and which on the web hands over to
+    /// WebDevice.Exit rather than calling Application.Quit and leaving a frozen canvas
+    /// on the page with no way back but a reload.
     /// </summary>
     public static bool CanQuit =>
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -165,30 +176,59 @@ public class GameDirector : MonoBehaviour
 
     void Update()
     {
-        // Restart works from the pause menu as well as the game over screen, because
-        // the pause menu tells the player it does.
-        if ((IsGameOver || IsPaused) && Input.GetKeyDown(restartKey))
+        // Read once at the top, never inside a condition.
+        //
+        // Asking for pause consumes a queued tap from the on-screen button, and the
+        // checks below are short-circuiting: written inline, a frame where the resume
+        // key was also down would skip the consume and leave the tap queued to fire
+        // again on the very next frame, which reads as the game pausing itself.
+        bool pause = PausePressed();
+        bool resume = Pressed(resumeKey);
+        bool leave = Pressed(quitKey);
+
+        // The results screen takes any of the three as "I have read this", because there
+        // is nothing else to do from there and a screen that ignores every key a player
+        // tries reads as frozen.
+        if (IsGameOver)
         {
-            Restart();
+            if (leave || resume || pause) ReturnToMenu();
             return;
         }
-
-        if (IsGameOver) return;
 
         if (IsPaused)
         {
-            if (CanQuit && Input.GetKeyDown(quitKey)) QuitGame();
-            else if (Input.GetKeyDown(pauseKey)) TogglePause();
+            // Quit is checked first: it is the only one of the three that leaves, so a
+            // key that happens to be bound to two things should still get you out.
+            if (leave) ReturnToMenu();
+            else if (resume || pause) SetPaused(false);
             return;
         }
 
-        if (Input.GetKeyDown(pauseKey)) TogglePause();
+        if (pause) SetPaused(true);
 
         // From one, not two. A lone kill leaves Combo at 1, and if that never expired
         // the next kill -- minutes later -- would start the chain at 2 and hand out a
         // multiplier nothing earned.
         if (Combo > 0 && Time.time >= _comboExpiry) ResetCombo();
     }
+
+    /// <summary>
+    /// A key press that still arrives while the game is frozen.
+    ///
+    /// Pausing sets Time.timeScale to 0, which stops FixedUpdate but not Update or
+    /// Input -- so this is an ordinary GetKeyDown. It exists as a named method purely so
+    /// the three call sites above read as intent rather than as plumbing.
+    /// </summary>
+    static bool Pressed(KeyCode key) => key != KeyCode.None && Input.GetKeyDown(key);
+
+    /// <summary>
+    /// Pause asked for by a key or by the on-screen button.
+    ///
+    /// The touch path matters more than it looks: a phone has no Escape key, so without
+    /// it there is no way to pause, and therefore no way to leave a run or reach the
+    /// dashboard at all. Consumed rather than polled, so one tap is one toggle.
+    /// </summary>
+    bool PausePressed() => Pressed(pauseKey) || Pressed(altPauseKey) || MobileInput.ConsumePause();
 
     // ======================================================================
     // Scoring
@@ -287,9 +327,98 @@ public class GameDirector : MonoBehaviour
         SetCursorFree(true);
         Time.timeScale = 0f;
 
+        // Banked before the results screen is shown rather than on the way out of it,
+        // so a player who closes the tab on the results still keeps the run.
+        GameSession.RecordRun(GameSession.Outcome.Died, waveReached, Score, Kills);
+
         GameEnded?.Invoke(this);
     }
 
+    /// <summary>
+    /// Leaves the run and goes back to the dashboard.
+    ///
+    /// This is what the quit key does, and it is a plain scene load -- which is the
+    /// point. Quitting used to mean Application.Quit, so on the web it did nothing at
+    /// all and the pause menu hid the key rather than admit it: there was no screen to
+    /// quit *to*. Now there is one, and the same key works in every build.
+    /// </summary>
+    public void ReturnToMenu()
+    {
+        // A run abandoned mid-fight still counts. Reporting it here rather than in
+        // ReportGameOver covers the quit path without double-counting the death one,
+        // which has already banked its own result by the time this runs.
+        if (!IsGameOver)
+            GameSession.RecordRun(GameSession.Outcome.Quit, FinalWaveForSummary(), Score, Kills);
+
+        Time.timeScale = 1f;
+        IsPaused = false;
+        PlayerMotor.InputEnabled = true;
+        MobileInput.Reset();
+        SetCursorFree(true);
+
+        LoadSceneByNameOrIndex(menuScene);
+    }
+
+    /// <summary>
+    /// The wave to credit a quit with: whatever the spawner has reached, or the wave
+    /// already recorded if the run is over. Asked for separately because FinalWave is
+    /// only set on death.
+    /// </summary>
+    int FinalWaveForSummary()
+    {
+        if (FinalWave > 0) return FinalWave;
+
+        var waves = FindAnyObjectByType<WaveManager>();
+        return waves != null ? waves.CurrentWave : 0;
+    }
+
+    /// <summary>
+    /// Ends the application, for the dashboard's Exit button.
+    ///
+    /// On the web there is no process to end, so this hands over to the page: see
+    /// WebDevice.Exit, which closes the tab where the browser allows it and otherwise
+    /// replaces the canvas with a sign-off rather than leaving a frozen one.
+    /// </summary>
+    public static void ExitApplication()
+    {
+        Time.timeScale = 1f;
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#elif UNITY_WEBGL
+        WebDevice.Exit();
+#else
+        Application.Quit();
+#endif
+    }
+
+    static void LoadSceneByNameOrIndex(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName))
+        {
+            Debug.LogError("[GameDirector] No menu scene set, so there is nowhere to return to.");
+            return;
+        }
+
+        // A scene that is not in Build Settings cannot be loaded, and the failure is a
+        // silent black screen. Saying so is the difference between a five-second fix
+        // and an afternoon.
+        if (Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            SceneManager.LoadScene(sceneName);
+            return;
+        }
+
+        Debug.LogError($"[GameDirector] Scene \"{sceneName}\" is not in Build Settings, so the " +
+                       "dashboard cannot be loaded. Run FPSKit > Build Dashboard.");
+    }
+
+    /// <summary>
+    /// Reloads the arena in place. No longer bound to a key: the dashboard is where a
+    /// run is started, so "again" means picking the same card. Kept because replaying
+    /// the current scene without a trip through the menu is what a retry button wants,
+    /// and because the play-mode test restarts a run this way.
+    /// </summary>
     public void Restart()
     {
         Time.timeScale = 1f;
@@ -301,19 +430,6 @@ public class GameDirector : MonoBehaviour
         // buildIndex is -1 when the scene is not in Build Settings.
         if (scene.buildIndex >= 0) SceneManager.LoadScene(scene.buildIndex);
         else SceneManager.LoadScene(scene.name);
-    }
-
-    public void QuitGame()
-    {
-        if (!CanQuit) return;
-
-        Time.timeScale = 1f;
-
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
     }
 
     static void SetCursorFree(bool free)

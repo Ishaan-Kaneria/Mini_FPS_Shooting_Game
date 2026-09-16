@@ -17,7 +17,8 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | Weapons  | `Weapon.cs`, `WeaponData.cs` (ScriptableObject, `FireMode` Single/Burst/Auto), `ImpactLibrary.cs`, `TracerProjectile.cs` (flies its own tracer, so the shot outlives whoever fired it) |
 | Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Retreat/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs`, `EnemyLimbAnimator.cs` (swings the limbs off agent velocity -- there is no AnimatorController anywhere in the project) |
 | Waves    | `WaveManager.cs` — endless spawner, per-wave growth, boss waves, `WaveModifier`, golden-angle ring spawns that avoid the player's view, an enemy leash and a wave clock so no wave can stall |
-| Run state | `GameDirector.cs` — score, combo, pause, game over, restart, PlayerPrefs records |
+| Run state | `GameDirector.cs` — score, combo, pause, game over, return-to-dashboard, PlayerPrefs records; `GameSession.cs` (what survives a scene change), `PlayerProfile.cs` (PlayerPrefs stats) |
+| Dashboard | `MainMenuController.cs`, `ArenaCard.cs`, `ArenaCatalog.cs` (ScriptableObject) |
 | Feedback | `HUDController.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
@@ -51,7 +52,7 @@ So: **fix scene content by editing the builder, not the `.unity` file.** Hand-ed
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the four checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitWaveTest.cs` (`VerifyWaves`, which also asserts the rifle grew across a cleared wave), `FPSKitCombatTest.cs` (`VerifyCombat`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the five checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitWaveTest.cs` (`VerifyWaves`, which also asserts the rifle grew across a cleared wave), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
 
 `FPSKitBatch.ResetEnemyArchetypes` is the other entry point worth knowing: the roster assets are generated once and then left alone, so retuning a number in `FPSKitEnemyRoster.Configure` does **not** reach the assets the game reads until this is run.
 
@@ -63,11 +64,85 @@ The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests a
 
 The page owns what only the browser can answer: pointer/keyboard focus, suppressing the context menu over the arena, capping `devicePixelRatio` on phones, and the `(any-pointer: coarse)` test behind `Assets/Plugins/WebGL/FPSKitWebDevice.jslib`, which `WebDevice.IsTouchOnly` reads. That test exists because `Application.isMobilePlatform` on WebGL is a user-agent match an iPad fails — it has called itself a Macintosh since iPadOS 13 — so `TouchControls` would hide the on-screen controls on the one device with no other way to play.
 
+## The game boots into a dashboard
+
+`Menu.unity` is scene 0, built by `FPSKitMenuBuilder.cs` (**FPSKit > Build Dashboard**,
+or `FPSKitBatch.BuildDashboard`). It is destructive in the same way the scene builder is
+and fixed the same way — edit the builder, not the scene.
+
+The loop is: dashboard → arena → back to dashboard, however the run ended.
+
+- **Esc or P** pause. Both, because a browser takes Escape to release pointer lock, so a
+  web player pressing it gets their cursor back and no menu.
+- **R** resume. **Q** leaves the run.
+- Q is a *scene load*, not `Application.Quit`. That is the whole fix: quitting used to
+  call `Application.Quit`, which does nothing in a browser, so the HUD hid the key rather
+  than admit there was nowhere to go. `GameDirector.CanQuit` now only governs the
+  dashboard's **Exit Game** button, which on the web hands over to `WebDevice.Exit` and
+  the `FPSKitExit` jslib export — it closes the tab where the browser allows it and
+  otherwise replaces the page with a sign-off, because `Application.Quit` there just
+  leaves a dead canvas.
+- `HUDController.instructionText` is the strip across the top of the arena. It is written
+  from the live bindings, never hard-coded, and hidden on a touch-only device.
+
+**Play in the editor starts at the dashboard**, whatever scene is open. Build Settings
+order only decides what a *player* boots into; the editor plays what is in the hierarchy,
+so pressing Play with an arena open dropped you into that arena. `FPSKitPlayMode` sets
+`playModeStartScene` from `[InitializeOnLoad]` rather than once at build time, because
+Unity keeps that in gitignored per-user settings and a fresh clone would lose it. Toggle
+it with **FPSKit > Play Starts At Dashboard**.
+
+Every play-mode test therefore calls `FPSKitPlayMode.SuspendStartScene()` before entering
+play mode and restores it in `Detach` — each one opens the scene it means to exercise, and
+would otherwise be handed the dashboard and fail on its first assertion.
+
+**The arena list is `ArenaCatalog.asset`, not code.** Adding an arena means a theme, a
+built scene, and an entry in the catalog — the dashboard clones its card template per
+entry at runtime, so the menu scene never needs rebuilding for new content.
+
+Four things about that screen are worth not re-deriving:
+
+- **Build every button with `FPSKitMenuBuilder.MakeButton`.** Everything else this file
+  draws is `raycastTarget = false`, because most of it is decoration and a canvas full of
+  click targets is a canvas where the wrong thing gets clicked. Miss the exception on a
+  `Button`'s own graphic and it is inert *silently*: it highlights nothing, receives
+  nothing, and looks exactly like a button whose handler is broken. That is what Exit Game
+  did. One helper owns that detail now.
+  `VerifyFlow` fires a real raycast at every button and fails if one is unreachable —
+  checking that a listener is attached would not have caught it, because one always was.
+  Two things that test gets wrong if you write it casually: raycast at
+  `rect.TransformPoint(rect.rect.center)` rather than `rect.position`, which is the pivot
+  and sits on the boundary for a corner-anchored button; and give a panel a frame after
+  enabling it before raycasting, because a graphic enabled this frame is not in the canvas
+  yet.
+- **Panels lay out in fractions of a measured box, not pixels from an edge.** The record
+  panel placed its rows a fixed distance down and pinned a hint block to the bottom, which
+  is fine at one window height and collides at any shorter one — "TOTAL KILLS" ran into
+  the text below it. Splitting a measured box `n` ways cannot collide at any size.
+- **The grid must fit vertically as well as horizontally.** A `GridLayoutGroup` neither
+  clips nor scrolls; content that does not fit is simply drawn past the edge, which cut
+  the descriptions off the bottom row. `FitGrid` takes the smaller of what the width
+  allows and what the height allows.
+
+- **Nothing may write `anchoredPosition` on a card.** A `GridLayoutGroup` owns that
+  property on every child it places, so the hover animation doing so dragged all six
+  cards onto one spot — a grid that looked like a single card with five hidden under it,
+  while every structural check still counted six. `ArenaCard` animates `localScale`
+  instead, and `VerifyFlow` fails if two cards share a position.
+- **Cell sizes are computed, not fixed.** A fixed cell is only right at one aspect ratio:
+  three 404px cards fit 16:9 and slide under the record panel at 4:3, and a browser window
+  is whatever shape the player left it. Card internals are anchored as fractions for the
+  same reason, and the text auto-sizes.
+
+TMP has no closing `</alpha>` tag — `<alpha=#99>` applies from where it appears. Writing
+one prints those eight characters on screen, which is what the instruction strip and the
+dashboard hint both did. Use `<color=…></color>`; `VerifyFlow` checks for it.
+
 ## Content is data, not code
 
 Two ScriptableObject types are the extension points, and both exist so that adding content never means editing the builder:
 
-- **A new arena is a `LevelTheme` asset.** Duplicate one in `FPSKit_Generated/Themes/`, retune it, select it, then **FPSKit > Build Scene > From Selected Theme Asset**. The six named menu entries are just shortcuts to the built-in assets.
+- **A new arena is a `LevelTheme` asset.** Duplicate one in `FPSKit_Generated/Themes/`, retune it, select it, then **FPSKit > Build Scene > From Selected Theme Asset**. The six named menu entries are just shortcuts to the built-in assets. Re-run **FPSKit > Build Dashboard** afterwards so it gets a card and a preview.
 - **A new enemy is an `EnemyArchetype` asset.** Duplicate one in `FPSKit_Generated/Enemies/`, change the numbers, add it to the WaveManager's roster. There is one base `Enemy.prefab`; an archetype is *stamped onto* an instance at spawn (stats, scale, colour via `MaterialPropertyBlock`, behaviour, score, drops). `EnemyArchetype.Role` decides whether it joins the normal mix, counts as an elite, or is drawn only for boss waves.
 
 When adding either, prefer a new asset over a new branch in the builder. If a knob genuinely does not exist yet, add it to the ScriptableObject — not to `FPSKitSceneBuilder`.
@@ -175,4 +250,5 @@ Two independent safety nets, both in `WaveManager`:
 - Tunables are `[Header]`-grouped public fields with `[Tooltip]`s written as plain prose. Match that style — the existing XML doc comments explain *why* a knob exists, not just what it is.
 - `Library/`, `Temp/`, `Logs/`, `UserSettings/` are gitignored; `.meta` files are committed and must stay in sync with their assets.
 - Placeholder audio is synthesised by `Tools/generate-placeholder-audio.py` (stdlib only). It draws from one seeded random stream, so a new clip that uses noise must save and restore `random.getstate()` around itself or every sound authored below it is re-rolled into an identical-sounding but byte-different file.
+- Arena previews (`FPSKit_Generated/Previews/`) are rendered from the built scenes by the dashboard builder. Render them through `RenderPipeline.SubmitRenderRequest`, not `Camera.Render()` — the latter predates scriptable pipelines and under URP returns a frame with the skybox and essentially no lighting, so every arena comes back as black silhouettes. Call `DynamicGI.UpdateEnvironment()` after opening a scene and submit twice, or the first arena captured is lit by nothing while the rest look right.
 - **If a build suddenly has no sound, suspect `Library/` before the files.** A corrupted asset database makes Unity import every `.wav` as a `DefaultAsset` rather than an `AudioClip`, with no error logged anywhere; the builder then writes null into every audio slot and saves a mute scene over a working one. Closing Unity and deleting `Library/` fixes it. `FPSKitSceneBuilder.Clip` now warns per clip and `ReportMissingClips` sums it up at the end of a build, so this is loud rather than silent.

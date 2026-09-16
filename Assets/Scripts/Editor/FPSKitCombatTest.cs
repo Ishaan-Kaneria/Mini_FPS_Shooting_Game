@@ -100,6 +100,9 @@ namespace FPSKit.EditorTools
                 _phase = Phase.Enter;
 
                 Application.logMessageReceived += OnGameLog;
+                // The dashboard sets a play-mode start scene; this test needs the
+                // one it just opened. Put back in Detach, including on failure.
+                FPSKitPlayMode.SuspendStartScene();
                 EditorApplication.update += Tick;
 
                 Debug.Log("[FPSKitBatch] combat test: wave one must arrive armed, slower than you, and fight");
@@ -383,6 +386,8 @@ namespace FPSKit.EditorTools
 
         static void Detach()
         {
+            FPSKitPlayMode.RestoreStartScene();
+
             EditorApplication.update -= Tick;
             Application.logMessageReceived -= OnGameLog;
         }

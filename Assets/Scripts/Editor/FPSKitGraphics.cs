@@ -70,6 +70,26 @@ namespace FPSKit.EditorTools
         // ==================================================================
 
         [MenuItem("FPSKit/Graphics/Apply Quality Settings", false, 80)]
+        /// <summary>
+        /// Locks handheld builds to landscape.
+        ///
+        /// This is a first-person shooter with a thumbstick on the left and a fire
+        /// button on the right; in portrait the two thumbs overlap the middle of the
+        /// screen and there is nothing to aim at. It applies to Android and iOS players
+        /// only -- WebGL ignores it entirely, because in a browser the page owns the
+        /// viewport, which is why the template asks the player to turn the device and
+        /// takes an orientation lock when one is on offer.
+        /// </summary>
+        public static void ApplyOrientation()
+        {
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
+
+            PlayerSettings.allowedAutorotateToLandscapeLeft = true;
+            PlayerSettings.allowedAutorotateToLandscapeRight = true;
+            PlayerSettings.allowedAutorotateToPortrait = false;
+            PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+        }
+
         public static void ApplyFromMenu()
         {
             int changed = Apply();

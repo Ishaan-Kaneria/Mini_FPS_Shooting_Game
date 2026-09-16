@@ -88,6 +88,20 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Rebuilds the dashboard scene, the arena catalog and the preview images, and
+        /// registers the dashboard as scene 0 so the game boots into it.
+        ///
+        /// Run this after BuildAllThemes, not before: the previews are rendered from the
+        /// arena scenes, so they can only be as current as the scenes are. Pass a real
+        /// graphics device (UNITY_GRAPHICS=1) for screenshots -- without one it falls
+        /// back to drawing each card from its theme's colours.
+        /// </summary>
+        public static void BuildDashboard()
+        {
+            Run(FPSKitMenuBuilder.Build);
+        }
+
+        /// <summary>
         /// Re-stamps the built-in numbers onto every EnemyArchetype asset.
         ///
         /// The roster assets are generated once and then left alone, so a retune written
@@ -152,6 +166,12 @@ namespace FPSKit.EditorTools
         /// player, and able to land a hit on someone standing in the middle of it.
         /// </summary>
         public static void VerifyCombat() => FPSKitCombatTest.VerifyCombat();
+
+        /// <summary>
+        /// Plays the loop the player sees: dashboard, into an arena, quit, back to the
+        /// dashboard with the run recorded.
+        /// </summary>
+        public static void VerifyFlow() => FPSKitFlowTest.VerifyFlow();
 
         /// <summary>
         /// Builds one scene and then asserts it is actually playable.
@@ -287,43 +307,75 @@ namespace FPSKit.EditorTools
         ///
         ///   Tools/unity-batch.sh FPSKitBatch.BuildWebGL -buildTarget WebGL
         ///
-        /// One scene, not six. Nothing in the game ever switches level -- Restart reloads
-        /// the scene it is already in and there is no level select -- so the other five
-        /// themes would be megabytes a player has no way to reach.
+        /// Ships the dashboard and every arena. It used to ship one arena and nothing
+        /// else, on the reasoning that the game never switched level -- which was true
+        /// when Restart reloaded the scene it was already in and there was no level
+        /// select. There is one now, so the other five are exactly what a player is
+        /// being offered, and the dashboard has to be index 0 or the build opens
+        /// straight into a fight.
         ///
-        /// The scene list is passed explicitly instead of being read from Build Settings,
-        /// which still has Unity's empty SampleScene template at index 0. Index 0 is what
-        /// a player boots into, so shipping that list as it stands opens on a grey void.
+        /// The scene list is passed explicitly rather than read from Build Settings,
+        /// which still carries Unity's empty SampleScene template.
         /// </summary>
         public static void BuildWebGL()
         {
             Run(() =>
             {
-                const string source = "Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity";
                 string output = ReadArg(OutputArg) ?? "Build/WebGL";
 
-                if (!File.Exists(source))
-                    throw new Exception($"{source} is missing. Run BuildAllThemes first.");
+                string menu = FPSKitMenuBuilder.MenuScenePath;
+                if (!File.Exists(menu))
+                    throw new Exception($"{menu} is missing. Run BuildDashboard first.");
 
                 bool fallback = !string.Equals(ReadArg(FallbackArg), "false",
                                                 StringComparison.OrdinalIgnoreCase);
                 ConfigureWebGL(fallback);
 
-                // The touch layer is built into a throwaway copy rather than into the
-                // scene itself. Saving it back would leave a generated scene carrying
-                // something the builder does not put there, which the next BuildScene
-                // would silently wipe -- a half-state that is worse than either end of it.
-                string staged = "Assets/FPSKit_Generated/Scenes/_WebGLStaging.unity";
-
-                var scene = EditorSceneManager.OpenScene(source, OpenSceneMode.Single);
-                FPSKitMobileControls.AddMobileControls(askFirst: false);
-                EditorSceneManager.SaveScene(scene, staged, saveAsCopy: true);
+                // The dashboard first: index 0 is what the player boots into.
+                var scenes = new List<string> { menu };
+                var staged = new List<string>();
 
                 try
                 {
+                    foreach (string themeName in FPSKitThemes.Names)
+                    {
+                        string source = $"Assets/FPSKit_Generated/Scenes/" +
+                                        $"{themeName.Replace(" ", "")}.unity";
+
+                        if (!File.Exists(source))
+                        {
+                            Debug.LogWarning($"[FPSKitBatch] {source} is missing and is being " +
+                                             "left out of the build. Run BuildAllThemes.");
+                            continue;
+                        }
+
+                        // The touch layer goes into a throwaway copy rather than into the
+                        // scene itself. Saving it back would leave a generated scene
+                        // carrying something the builder does not put there, which the
+                        // next BuildScene would silently wipe -- a half-state that is
+                        // worse than either end of it.
+                        string copy = $"Assets/FPSKit_Generated/Scenes/_WebGLStaging_" +
+                                      $"{themeName.Replace(" ", "")}.unity";
+
+                        var scene = EditorSceneManager.OpenScene(source, OpenSceneMode.Single);
+                        FPSKitMobileControls.AddMobileControls(askFirst: false);
+                        EditorSceneManager.SaveScene(scene, copy, saveAsCopy: true);
+
+                        staged.Add(copy);
+                        scenes.Add(copy);
+                    }
+
+                    if (scenes.Count < 2)
+                        throw new Exception("no arenas were available to build.");
+
+                    // The dashboard loads arenas by name, and a staged copy is called
+                    // something else -- so the catalog has to point at the staged names
+                    // for the duration of the build.
+                    RemapCatalogToStaged(staged);
+
                     var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                     {
-                        scenes = new[] { staged },
+                        scenes = scenes.ToArray(),
                         locationPathName = output,
                         target = BuildTarget.WebGL,
                         targetGroup = BuildTargetGroup.WebGL,
@@ -339,14 +391,72 @@ namespace FPSKit.EditorTools
                     WriteNetlifyHeaders(output);
 
                     Debug.Log($"[FPSKitBatch] WebGL build succeeded -> {output} " +
-                              $"({summary.totalSize / 1048576f:0.0} MB payload, " +
+                              $"({scenes.Count} scenes, {summary.totalSize / 1048576f:0.0} MB payload, " +
                               $"{summary.totalTime.TotalMinutes:0.0} min)");
                 }
                 finally
                 {
-                    AssetDatabase.DeleteAsset(staged);
+                    RestoreCatalog();
+
+                    foreach (string copy in staged) AssetDatabase.DeleteAsset(copy);
                 }
             });
+        }
+
+        /// <summary>Scene name each catalog entry had before the build renamed it.</summary>
+        private static readonly Dictionary<string, string> OriginalSceneNames =
+            new Dictionary<string, string>();
+
+        /// <summary>
+        /// Points the arena catalog at the staged scene copies.
+        ///
+        /// The dashboard loads an arena by scene name, and the copies carrying the touch
+        /// layer are named differently -- so without this every card in the shipped build
+        /// would report the arena as missing from Build Settings and refuse to start.
+        /// Undone in RestoreCatalog, which the build's finally block always reaches.
+        /// </summary>
+        private static void RemapCatalogToStaged(List<string> staged)
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<ArenaCatalog>(FPSKitMenuBuilder.CatalogPath);
+            if (catalog == null) return;
+
+            OriginalSceneNames.Clear();
+
+            foreach (string path in staged)
+            {
+                string stagedName = Path.GetFileNameWithoutExtension(path);
+                string realName = stagedName.Replace("_WebGLStaging_", "");
+
+                var entry = catalog.Find(realName);
+                if (entry == null) continue;
+
+                OriginalSceneNames[stagedName] = entry.sceneName;
+                entry.sceneName = stagedName;
+            }
+
+            EditorUtility.SetDirty(catalog);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static void RestoreCatalog()
+        {
+            if (OriginalSceneNames.Count == 0) return;
+
+            var catalog = AssetDatabase.LoadAssetAtPath<ArenaCatalog>(FPSKitMenuBuilder.CatalogPath);
+
+            if (catalog != null)
+            {
+                foreach (var pair in OriginalSceneNames)
+                {
+                    var entry = catalog.Find(pair.Key);
+                    if (entry != null) entry.sceneName = pair.Value;
+                }
+
+                EditorUtility.SetDirty(catalog);
+                AssetDatabase.SaveAssets();
+            }
+
+            OriginalSceneNames.Clear();
         }
 
         /// <summary>
@@ -365,6 +475,11 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void ConfigureWebGL(bool decompressionFallback)
         {
+            // Handheld players only -- WebGL ignores it -- but it costs nothing here and
+            // means an Android build of the same project is landscape without a second
+            // place to remember.
+            FPSKitGraphics.ApplyOrientation();
+
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
             PlayerSettings.WebGL.decompressionFallback = decompressionFallback;
             PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;

@@ -233,7 +233,57 @@
     </style>
   </head>
 
+  <style>
+    /* ---------- rotate prompt ----------
+       A browser cannot be made to rotate a page. screen.orientation.lock() is refused
+       outside fullscreen on every mobile browser, and there is no other API -- so the
+       honest fallback is to ask, and to keep asking for exactly as long as the phone is
+       upright. Shown only to a touch-only device: a desktop window that happens to be
+       taller than it is wide is not a phone held the wrong way. */
+    #rotate {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      background: #0b0d10;
+      color: #e8e6e3;
+      text-align: center;
+      padding: 2rem;
+    }
+    #rotate.show { display: flex; }
+    #rotate .glyph {
+      width: 84px;
+      height: 132px;
+      border: 4px solid currentColor;
+      border-radius: 12px;
+      opacity: 0.85;
+      animation: tip 2.2s ease-in-out infinite;
+    }
+    #rotate .headline {
+      font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+      letter-spacing: 0.18em;
+      font-weight: 700;
+    }
+    #rotate .sub { font-size: clamp(0.8rem, 3vw, 0.95rem); opacity: 0.6; }
+    @keyframes tip {
+      0%, 40%   { transform: rotate(0deg); }
+      60%, 100% { transform: rotate(-90deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #rotate .glyph { animation: none; transform: rotate(-90deg); }
+    }
+  </style>
+
   <body>
+    <div id="rotate" role="alertdialog" aria-live="polite">
+      <div class="glyph" aria-hidden="true"></div>
+      <div class="headline">TURN YOUR DEVICE</div>
+      <div class="sub">This one is meant to be played sideways.</div>
+    </div>
     <div id="game">
       <canvas id="unity-canvas" width="{{{ WIDTH }}}" height="{{{ HEIGHT }}}" tabindex="-1"></canvas>
     </div>
@@ -256,7 +306,9 @@
         <div><span>Sprint</span><span>Shift</span></div>
         <div><span>Crouch</span><span>Ctrl</span></div>
         <div><span>Reload</span><span>R</span></div>
-        <div><span>Pause</span><span>Esc</span></div>
+        <div><span>Pause</span><span>Esc / P</span></div>
+        <div><span>Resume</span><span>R</span></div>
+        <div><span>Quit to menu</span><span>Q</span></div>
       </div>
 
       <div id="hint">Click to play</div>
@@ -288,6 +340,39 @@
       var touchOnly = !!(window.matchMedia &&
                          window.matchMedia("(any-pointer: coarse)").matches &&
                          !window.matchMedia("(any-pointer: fine)").matches);
+
+      // ---------- landscape ----------
+      // Asked for properly first: inside fullscreen, some Android browsers honour an
+      // orientation lock. Everywhere else -- and on iOS always -- it throws or rejects,
+      // and the prompt below is the only thing left. Both paths are wired, because the
+      // lock working is strictly better than asking and is free to attempt.
+      var rotate = document.querySelector("#rotate");
+
+      function lockLandscape() {
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            var result = screen.orientation.lock("landscape");
+            if (result && result.catch) result.catch(function () { /* refused; we ask instead */ });
+          }
+        } catch (e) { /* not supported; we ask instead */ }
+      }
+
+      function checkOrientation() {
+        if (!touchOnly || !rotate) return;
+
+        var portrait = window.matchMedia
+          ? window.matchMedia("(orientation: portrait)").matches
+          : window.innerHeight > window.innerWidth;
+
+        rotate.classList.toggle("show", portrait);
+      }
+
+      window.addEventListener("resize", checkOrientation);
+      window.addEventListener("orientationchange", checkOrientation);
+      if (screen.orientation && screen.orientation.addEventListener) {
+        screen.orientation.addEventListener("change", checkOrientation);
+      }
+      checkOrientation();
 
       if (touchOnly) {
         legend.innerHTML =
@@ -388,6 +473,15 @@
             hint.style.display = "block";
             canvas.focus();
             if (!touchOnly) fsButton.style.display = "block";
+
+            // A touch player has just made the gesture a lock needs, so this is the one
+            // moment a browser might grant it. Fullscreen first, because outside it the
+            // request is refused outright.
+            if (touchOnly) {
+              try { unityInstance.SetFullscreen(1); } catch (e) { /* refused */ }
+              lockLandscape();
+              checkOrientation();
+            }
 
             // A player who reads nothing and clicks straight away clears this on the
             // first click. This is for the one who does not click at all.

@@ -36,6 +36,12 @@ public static class MobileInput
     static bool _jumpQueued;
     static bool _reloadQueued;
 
+    /// <summary>
+    /// A touch player has no Escape key, so without this there is no way to pause --
+    /// and therefore no way to reach the dashboard or leave a run at all.
+    /// </summary>
+    static bool _pauseQueued;
+
     /// <summary>Held state of the on-screen fire button.</summary>
     public static void SetFireButton(bool held) => _fireButton = held;
 
@@ -50,6 +56,16 @@ public static class MobileInput
         var delta = _lookDelta;
         _lookDelta = Vector2.zero;
         return delta;
+    }
+
+    public static void QueuePause() => _pauseQueued = true;
+
+    /// <summary>Reads and clears. Only GameDirector should call this.</summary>
+    public static bool ConsumePause()
+    {
+        bool queued = _pauseQueued;
+        _pauseQueued = false;
+        return queued;
     }
 
     public static void QueueJump() => _jumpQueued = true;
@@ -93,6 +109,6 @@ public static class MobileInput
         _lookDelta = Vector2.zero;
         Aim = Sprint = Crouch = false;
         _fireButton = _fireTap = false;
-        _jumpQueued = _reloadQueued = false;
+        _jumpQueued = _reloadQueued = _pauseQueued = false;
     }
 }

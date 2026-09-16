@@ -28,6 +28,7 @@ public class TouchControls : MonoBehaviour
             ShowMode.Always => true,
             ShowMode.Never => false,
             _ => Application.isMobilePlatform || Application.isEditor ||
+                 WebDevice.IsTouchOnly ||
                  (Input.touchSupported && !Input.mousePresent)
         };
 
@@ -52,7 +53,7 @@ public class TouchControls : MonoBehaviour
         }
 
         // A touch player has no cursor to lock, and locking it would block look input.
-        if (show && Application.isMobilePlatform)
+        if (show && (Application.isMobilePlatform || WebDevice.IsTouchOnly))
         {
             var motor = FindAnyObjectByType<PlayerMotor>();
             if (motor != null) motor.lockCursor = false;

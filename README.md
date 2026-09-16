@@ -236,6 +236,18 @@ Tools/unity-batch.sh FPSKitBatch.BuildWebGL -buildTarget WebGL -fpskitFallback f
 
 Writes `Build/WebGL/`, which is gitignored — a WebGL payload is tens of megabytes and git would keep it forever. Upload the folder to any static host; drag it onto [app.netlify.com/drop](https://app.netlify.com/drop) and you have a link in about a minute.
 
+To rebuild and republish in one step:
+
+```bash
+Tools/deploy-web.sh              # rebuild, then deploy
+Tools/deploy-web.sh --no-build   # deploy what is already built
+Tools/deploy-web.sh --dry-run    # build and check, stop before uploading
+```
+
+It needs `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` in the environment and talks to Netlify's deploy API with `curl`, so there is no Node toolchain to install for one command. It refuses to upload a folder the build did not just write — publishing a stale build is the one failure that looks exactly like success from the outside.
+
+There is no content-only update: Unity bakes every asset into `WebGL.data.br`, so changing a single number means a full rebuild. Rebuilds after the first are faster, because shader compilation dominates and that cache survives.
+
 One scene ships, not six. Nothing in the game switches level — `Restart` reloads the scene it is already in and there is no level select — so the other five themes would be megabytes a player has no way to reach. The scene list is passed explicitly rather than read from Build Settings, which still has Unity's empty `SampleScene` at index 0; index 0 is what a player boots into.
 
 **`-fpskitFallback` decides whether the build depends on its host.** Unity ships the payload already Brotli-compressed and needs the server to answer with `Content-Encoding: br`. Leave the fallback on (the default) and a JavaScript decompressor is bundled, so the build runs on any static host — GitHub Pages included — at the cost of a slower start. Turn it off for a host that sends the header itself, which is what the `_headers` file written beside the build configures for Netlify and Cloudflare Pages. Get this wrong and the loading bar never finishes, with nothing in the console to say why.

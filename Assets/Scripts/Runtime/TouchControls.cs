@@ -11,7 +11,9 @@ public class TouchControls : MonoBehaviour
     public enum ShowMode { OnTouchDevicesOnly, Always, Never }
 
     [Tooltip("OnTouchDevicesOnly hides the controls on desktop builds but keeps them " +
-             "visible in the editor so you can test without deploying.")]
+             "visible in the editor so you can test without deploying. A touchscreen " +
+             "laptop counts as desktop: it reports touch support, but it also has a " +
+             "mouse, and claiming it is a touch device costs it mouse look entirely.")]
     public ShowMode showMode = ShowMode.OnTouchDevicesOnly;
 
     [Tooltip("Hidden automatically while the game over screen is up.")]
@@ -25,9 +27,16 @@ public class TouchControls : MonoBehaviour
         {
             ShowMode.Always => true,
             ShowMode.Never => false,
-            _ => Application.isMobilePlatform || Input.touchSupported || Application.isEditor
+            _ => Application.isMobilePlatform || Application.isEditor ||
+                 (Input.touchSupported && !Input.mousePresent)
         };
 
+        // Touch support alone is not a touch device. A touchscreen laptop reports
+        // Input.touchSupported and still has a mouse -- and MobileInput.Active is what
+        // gates PlayerMotor's click-to-lock recovery, so claiming that machine is
+        // mobile leaves it with on-screen buttons and no mouse look at all. In a
+        // browser that is the only path there is: the initial lock in Start always
+        // fails, because a browser will not capture the pointer without a gesture.
         MobileInput.Reset();
         MobileInput.Active = show;
 

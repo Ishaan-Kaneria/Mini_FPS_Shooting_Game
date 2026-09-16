@@ -71,14 +71,28 @@ jobs:
           lfs: true
           fetch-depth: 1
 
-      - name: Restore Unity's Library
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            Library-WebGL-
-            Library-
+      # There is deliberately no Library cache here.
+      #
+      # Caching it looks like the obvious win and is what every Unity CI guide
+      # suggests, but on a 16 GB runner it does not survive contact. The key hashes
+      # Assets/**, so after any change it misses and falls back to the prefix, which
+      # restores a ~1 GB Library built from a different commit. Unity memory-maps that
+      # artifact database while starting up, and inside a container capped at 15.19 GB
+      # it is killed before it has imported a single asset:
+      #
+      #   Register platform support module: .../UnityEditor.WebGL.Extensions.dll
+      #   Registered in 0.003225 seconds.
+      #   Killed
+      #
+      # Exit code 137, five seconds in, with nothing in the log that names memory as
+      # the cause. Run 35069042925 died exactly there; run 35057937302, identical but
+      # for having no cache to restore, built and published in 36m56s.
+      #
+      # A cold build is well inside this job's timeout, so the cache was buying a few
+      # minutes at the price of every deploy after the first one. If build time ever
+      # does matter, the thing to try is caching Library/Bee and Library/ShaderCache
+      # alone -- the expensive artifacts -- and leaving the artifact databases out. Do
+      # that deliberately, on a branch, not on the path that publishes the game.
 
       - name: Build
         uses: game-ci/unity-builder@v4

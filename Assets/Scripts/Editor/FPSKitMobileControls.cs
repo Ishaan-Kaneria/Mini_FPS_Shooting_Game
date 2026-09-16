@@ -22,14 +22,24 @@ namespace FPSKit.EditorTools
         private const string RootName = "Mobile Controls";
 
         [MenuItem("FPSKit/Add Mobile Touch Controls", false, 22)]
-        public static void AddMobileControls()
+        private static void AddMobileControlsMenu() => AddMobileControls();
+
+        /// <summary>
+        /// Builds the control layer into the open scene.
+        ///
+        /// <paramref name="askFirst"/> exists for the same reason BuildScene has one:
+        /// EditorUtility.DisplayDialog cannot be answered in batch mode, so a headless
+        /// caller that went through the prompts would cancel on an existing layer and
+        /// report success having done nothing. A WebGL build is exactly such a caller.
+        /// </summary>
+        public static void AddMobileControls(bool askFirst = true)
         {
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
 
             var existing = GameObject.Find(RootName);
             if (existing != null)
             {
-                if (!EditorUtility.DisplayDialog("Replace touch controls",
+                if (askFirst && !EditorUtility.DisplayDialog("Replace touch controls",
                     "This scene already has on-screen controls.\n\nRebuild them?",
                     "Rebuild", "Cancel")) return;
 
@@ -50,6 +60,12 @@ namespace FPSKit.EditorTools
 
             EditorSceneManager.MarkSceneDirty(scene);
             Selection.activeGameObject = canvas.gameObject;
+
+            if (!askFirst)
+            {
+                Debug.Log("[FPSKit] on-screen touch controls added to " + scene.name);
+                return;
+            }
 
             EditorUtility.DisplayDialog("FPSKit",
                 "On-screen controls added.\n\n" +

@@ -1,7 +1,10 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
+using UnityEditor.Build.Reporting;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -29,6 +32,15 @@ namespace FPSKit.EditorTools
     {
         /// <summary>Argument that names the theme for <see cref="BuildTheme"/>.</summary>
         private const string ThemeArg = "-fpskitTheme";
+
+        /// <summary>Argument that overrides where <see cref="BuildWebGL"/> writes.</summary>
+        private const string OutputArg = "-fpskitOutput";
+
+        /// <summary>
+        /// "-fpskitFallback false" drops the JavaScript decompressor, for a host that
+        /// serves Content-Encoding itself. Defaults to keeping it.
+        /// </summary>
+        private const string FallbackArg = "-fpskitFallback";
 
         /// <summary>
         /// Rebuilds and saves one scene per theme, registering each in Build
@@ -242,6 +254,138 @@ namespace FPSKit.EditorTools
             // would render as full blocks that never move.
             if (hud.healthFill != null && hud.healthFill.sprite == null)
                 problems.Add("health bar has no sprite: fillAmount would do nothing");
+        }
+
+        // ==================================================================
+        /// <summary>
+        /// Builds a browser-playable WebGL player, so the game can be handed to someone
+        /// as a link rather than as a repository.
+        ///
+        ///   Tools/unity-batch.sh FPSKitBatch.BuildWebGL -buildTarget WebGL
+        ///
+        /// One scene, not six. Nothing in the game ever switches level -- Restart reloads
+        /// the scene it is already in and there is no level select -- so the other five
+        /// themes would be megabytes a player has no way to reach.
+        ///
+        /// The scene list is passed explicitly instead of being read from Build Settings,
+        /// which still has Unity's empty SampleScene template at index 0. Index 0 is what
+        /// a player boots into, so shipping that list as it stands opens on a grey void.
+        /// </summary>
+        public static void BuildWebGL()
+        {
+            Run(() =>
+            {
+                const string source = "Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity";
+                string output = ReadArg(OutputArg) ?? "Build/WebGL";
+
+                if (!File.Exists(source))
+                    throw new Exception($"{source} is missing. Run BuildAllThemes first.");
+
+                bool fallback = !string.Equals(ReadArg(FallbackArg), "false",
+                                                StringComparison.OrdinalIgnoreCase);
+                ConfigureWebGL(fallback);
+
+                // The touch layer is built into a throwaway copy rather than into the
+                // scene itself. Saving it back would leave a generated scene carrying
+                // something the builder does not put there, which the next BuildScene
+                // would silently wipe -- a half-state that is worse than either end of it.
+                string staged = "Assets/FPSKit_Generated/Scenes/_WebGLStaging.unity";
+
+                var scene = EditorSceneManager.OpenScene(source, OpenSceneMode.Single);
+                FPSKitMobileControls.AddMobileControls(askFirst: false);
+                EditorSceneManager.SaveScene(scene, staged, saveAsCopy: true);
+
+                try
+                {
+                    var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                    {
+                        scenes = new[] { staged },
+                        locationPathName = output,
+                        target = BuildTarget.WebGL,
+                        targetGroup = BuildTargetGroup.WebGL,
+                        options = BuildOptions.None,
+                    });
+
+                    var summary = report.summary;
+
+                    if (summary.result != BuildResult.Succeeded)
+                        throw new Exception($"WebGL build {summary.result} with " +
+                                            $"{summary.totalErrors} error(s)");
+
+                    WriteNetlifyHeaders(output);
+
+                    Debug.Log($"[FPSKitBatch] WebGL build succeeded -> {output} " +
+                              $"({summary.totalSize / 1048576f:0.0} MB payload, " +
+                              $"{summary.totalTime.TotalMinutes:0.0} min)");
+                }
+                finally
+                {
+                    AssetDatabase.DeleteAsset(staged);
+                }
+            });
+        }
+
+        /// <summary>
+        /// The WebGL settings a shared link actually depends on.
+        ///
+        /// Decompression Fallback is the one that decides whether the page works at all.
+        /// Unity compresses the build with Brotli and expects the server to answer with
+        /// Content-Encoding: br. A static host that does not -- GitHub Pages never does,
+        /// and itch.io only for uploads it recognises -- hands the browser a blob it
+        /// cannot read, and the loading bar simply never finishes, with nothing in the
+        /// console naming the cause. The fallback ships a decompressor inside the build
+        /// so it stops depending on a header nobody controls.
+        ///
+        /// Exception support goes down to explicitly thrown only: full support costs size
+        /// and speed to produce stack traces for a build nobody is going to debug.
+        /// </summary>
+        private static void ConfigureWebGL(bool decompressionFallback)
+        {
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
+            PlayerSettings.WebGL.decompressionFallback = decompressionFallback;
+            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
+
+            // A returning visitor gets the payload from the browser cache instead of
+            // downloading it again.
+            PlayerSettings.WebGL.dataCaching = true;
+
+            Debug.Log($"[FPSKitBatch] WebGL: Brotli, decompression fallback " +
+                      $"{(decompressionFallback ? "ON (works on any static host)" : "OFF (host must send Content-Encoding: br)")}, " +
+                      "explicit-only exceptions, data caching on");
+        }
+
+        /// <summary>
+        /// Drops a Netlify/Cloudflare "_headers" file beside the build.
+        ///
+        /// Unity writes the payload already Brotli-compressed but cannot make the server
+        /// admit it. Without Content-Encoding the browser saves the compressed bytes
+        /// verbatim and the loading bar never finishes -- and because it is a header
+        /// problem rather than a code one, nothing appears in the console to say so. The
+        /// Content-Type lines matter too: a .wasm.br served as anything but
+        /// application/wasm loses the browser's streaming compiler.
+        ///
+        /// Harmless on a host that ignores it, and on a build that kept the fallback --
+        /// those files are named .unityweb and match none of these rules.
+        /// </summary>
+        private static void WriteNetlifyHeaders(string output)
+        {
+            const string headers =
+                "# Unity WebGL ships pre-compressed; these tell the host to say so.\n" +
+                "/Build/*.wasm.br\n" +
+                "  Content-Encoding: br\n" +
+                "  Content-Type: application/wasm\n" +
+                "/Build/*.js.br\n" +
+                "  Content-Encoding: br\n" +
+                "  Content-Type: application/javascript\n" +
+                "/Build/*.data.br\n" +
+                "  Content-Encoding: br\n" +
+                "  Content-Type: application/octet-stream\n" +
+                "/Build/*.symbols.json.br\n" +
+                "  Content-Encoding: br\n" +
+                "  Content-Type: application/json\n";
+
+            File.WriteAllText(Path.Combine(output, "_headers"), headers);
+            Debug.Log("[FPSKitBatch] wrote _headers for Netlify / Cloudflare Pages");
         }
 
         // ==================================================================

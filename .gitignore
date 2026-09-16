@@ -116,3 +116,22 @@ InitTestScene*.unity*
 # Claude Code personal overrides -- machine-specific paths and private
 # permission rules. The shared .claude/settings.json stays tracked.
 /.claude/settings.local.json
+
+# Local player builds. Shared as a link, never committed -- a WebGL payload is
+# tens of megabytes and git would keep it forever.
+/Build/
+
+# Unity's performance-testing package writes these into Resources on a test run.
+# Generated, never authored -- and anything under Resources is force-included in a
+# player build, so they would ship too. The folder exists only to hold them.
+/Assets/Resources/PerformanceTestRun*.json
+/Assets/Resources/PerformanceTestRun*.json.meta
+/Assets/Resources.meta
+
+# Staging scene written by FPSKitBatch.BuildWebGL and deleted in its finally block.
+# Only ever survives a build that was killed before it could clean up.
+/Assets/FPSKit_Generated/Scenes/_WebGLStaging.unity
+/Assets/FPSKit_Generated/Scenes/_WebGLStaging.unity.meta
+
+# Burst's WebGL output, dropped at the project root by a player build.
+/Data/Plugins/lib_burst_generated.*

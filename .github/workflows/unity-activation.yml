@@ -1,0 +1,33 @@
+# Run this ONCE, by hand, to get a Unity licence into CI. It is separate from the
+# deploy workflow because it is not part of any build -- it exists to produce one
+# file, after which it is never needed again.
+#
+#   1. Actions > "Unity licence (one-time activation)" > Run workflow
+#   2. Download the "Manual Activation File" artifact and unzip it
+#   3. Upload the .alf to https://license.unity3d.com/manual -> download the .ulf
+#   4. Settings > Secrets and variables > Actions > New repository secret
+#        Name:  UNITY_LICENSE
+#        Value: the entire contents of the .ulf file, including the XML header
+#
+# The .ulf is a credential. Paste it into the secret, do not commit it.
+name: Unity licence (one-time activation)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  request-activation-file:
+    name: Request activation file
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request the .alf
+        id: request
+        uses: game-ci/unity-request-activation-file@v2
+        with:
+          unityVersion: 6000.6.0f1
+
+      - name: Upload it as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Manual Activation File
+          path: ${{ steps.request.outputs.filePath }}

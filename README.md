@@ -248,6 +248,16 @@ It needs `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` in the environment and talks
 
 There is no content-only update: Unity bakes every asset into `WebGL.data.br`, so changing a single number means a full rebuild. Rebuilds after the first are faster, because shader compilation dominates and that cache survives.
 
+### Continuous deployment
+
+`.github/workflows/deploy-web.yml` does the same thing on every push to `main` that touches `Assets/`, `Packages/` or `ProjectSettings/`, and can also be run by hand from the Actions tab.
+
+Netlify cannot be pointed at this repository directly. Its build images carry Node, Python and Ruby, not a licensed Unity Editor, so the build has to happen in Actions and Netlify is handed the finished folder.
+
+Three repository secrets are needed. `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` are the same two the script uses. `UNITY_LICENSE` comes from running **Actions → Unity licence (one-time activation)**, which produces an `.alf` file to exchange for a `.ulf` at [license.unity3d.com/manual](https://license.unity3d.com/manual); the contents of that `.ulf` are the secret.
+
+Expect the first run or two to need adjusting — Unity in CI usually does.
+
 One scene ships, not six. Nothing in the game switches level — `Restart` reloads the scene it is already in and there is no level select — so the other five themes would be megabytes a player has no way to reach. The scene list is passed explicitly rather than read from Build Settings, which still has Unity's empty `SampleScene` at index 0; index 0 is what a player boots into.
 
 **`-fpskitFallback` decides whether the build depends on its host.** Unity ships the payload already Brotli-compressed and needs the server to answer with `Content-Encoding: br`. Leave the fallback on (the default) and a JavaScript decompressor is bundled, so the build runs on any static host — GitHub Pages included — at the cost of a slower start. Turn it off for a host that sends the header itself, which is what the `_headers` file written beside the build configures for Netlify and Cloudflare Pages. Get this wrong and the loading bar never finishes, with nothing in the console to say why.

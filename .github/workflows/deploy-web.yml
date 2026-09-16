@@ -1,0 +1,138 @@
+# Builds the WebGL player and publishes it to Netlify.
+#
+# Netlify cannot do this itself: its build images carry Node, Python and Ruby, not
+# a licensed Unity Editor. So the build happens here and Netlify is handed the
+# finished folder, which is why this is a workflow rather than a Netlify git link.
+#
+# Three secrets, under Settings > Secrets and variables > Actions:
+#
+#   UNITY_LICENSE       contents of the .ulf -- see unity-activation.yml
+#   NETLIFY_AUTH_TOKEN  netlify.com > User settings > Applications > personal access token
+#   NETLIFY_SITE_ID     netlify.com > Site configuration > General > Site ID
+#
+# Expect the first run or two to need adjusting. Unity in CI usually does.
+name: Deploy WebGL to Netlify
+
+on:
+  push:
+    branches: [main]
+    # Only what can change the game. Without this a README typo costs an hour of
+    # CI and republishes a byte-identical build.
+    paths:
+      - 'Assets/**'
+      - 'Packages/**'
+      - 'ProjectSettings/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+# A queued build is always more current than a running one.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      # The runner has ~14 GB free and the Unity WebGL image alone eats most of
+      # it before the 284 MB checkout and a 4 GB Library cache arrive. Without
+      # this the build dies deep in IL2CPP with an error that does not mention
+      # disk at all.
+      - name: Reclaim disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      # lfs: true is not optional -- 93 files are stored in LFS, and without it
+      # Unity imports their pointer text as if it were audio. The build succeeds
+      # and the game is silently broken.
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 1
+
+      - name: Restore Unity's Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-WebGL-
+            Library-
+
+      - name: Build
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          unityVersion: 6000.6.0f1
+          targetPlatform: WebGL
+          buildMethod: FPSKit.EditorTools.FPSKitBatch.BuildWebGL
+          # Netlify sends Content-Encoding itself, via the _headers file the build
+          # writes, so the JavaScript decompressor is dead weight here.
+          customParameters: -fpskitFallback false
+          # Activating the WebGL target rewrites ProjectSettings and URP's shader
+          # stripping hints, so the tree is dirty by the time the build finishes.
+          allowDirtyBuild: true
+
+      # game-ci runs Unity as root inside the container, and it only chowns its
+      # own default build path -- not the Build/ this project writes to.
+      - name: Take ownership of the output
+        run: sudo chown -R "$USER:$USER" Build || true
+
+      - name: Verify the build produced something publishable
+        run: |
+          set -euo pipefail
+          for required in index.html _headers Build; do
+            if [ ! -e "Build/WebGL/$required" ]; then
+              echo "::error::Build/WebGL/$required is missing -- refusing to deploy"
+              exit 1
+            fi
+          done
+          if ! ls Build/WebGL/Build/*.br >/dev/null 2>&1; then
+            echo "::error::no .br payload -- refusing to deploy"
+            exit 1
+          fi
+          echo "Build/WebGL is $(du -sh Build/WebGL | cut -f1) in $(find Build/WebGL -type f | wc -l) files"
+
+      - name: Publish to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          set -euo pipefail
+          : "${NETLIFY_AUTH_TOKEN:?missing repository secret}"
+          : "${NETLIFY_SITE_ID:?missing repository secret}"
+
+          # Zipped from inside the folder so index.html is at the root of the
+          # archive. One level out and Netlify serves a directory listing.
+          ( cd Build/WebGL && zip -qr "$RUNNER_TEMP/site.zip" . )
+          echo "uploading $(du -h "$RUNNER_TEMP/site.zip" | cut -f1)"
+
+          status=$(curl -sS -o "$RUNNER_TEMP/response.json" -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@$RUNNER_TEMP/site.zip" \
+            "https://api.netlify.com/api/v1/sites/$NETLIFY_SITE_ID/deploys")
+
+          if [ "$status" != "200" ] && [ "$status" != "201" ]; then
+            echo "::error::Netlify returned HTTP $status"
+            head -c 600 "$RUNNER_TEMP/response.json"
+            exit 1
+          fi
+
+          python3 - "$RUNNER_TEMP/response.json" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          print(f"deploy {d.get('id','?')} is {d.get('state','?')}")
+          print(f"live at {d.get('ssl_url') or d.get('url') or '(url not reported)'}")
+          PY

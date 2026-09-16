@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Play the game
+    url: https://minifpsshootinggame.netlify.app
+    about: The current build, running in the browser. Worth checking a bug against it.
+  - name: Conventions and reasoning
+    url: https://github.com/Ishaan-Kaneria/Mini_FPS_Shooting_Game/blob/main/CLAUDE.md
+    about: Why the project is arranged the way it is, before proposing a change to it.

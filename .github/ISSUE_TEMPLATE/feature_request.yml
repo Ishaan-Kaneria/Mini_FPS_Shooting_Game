@@ -1,0 +1,47 @@
+name: Feature or change
+description: Suggest something the kit should do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A lot of what looks like a code change is a data change here. A new arena
+        is a `LevelTheme` asset, a new enemy is an `EnemyArchetype`, a new weapon
+        is a `WeaponData` — none of those need an issue, just duplicate an asset.
+        Worth checking that first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is awkward today
+      description: The situation you run into, rather than the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like instead
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - Gameplay (waves, enemies, weapons, movement)
+        - Scene builder / editor tooling
+        - HUD and feedback
+        - Touch and mobile
+        - Browser build and deployment
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you already tried
+    validations:
+      required: false

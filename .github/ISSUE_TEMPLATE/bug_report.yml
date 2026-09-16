@@ -1,0 +1,92 @@
+name: Bug report
+description: Something in the game or the tooling does not work.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two questions below narrow most bugs down immediately, so please do not
+        skip them: which theme, and whether it happens on the first press of Play
+        or only the second.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. FPSKit > Build Scene > Industrial Warehouse
+        2. Press Play
+        3. Survive to wave 3
+        4. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - In the Unity editor
+        - In the browser build (minifpsshootinggame.netlify.app)
+        - In a local player build
+        - In the headless tooling (Tools/unity-batch.sh)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: when
+    attributes:
+      label: Does it happen the first time you press Play, or only after that?
+      description: >
+        Domain reload is disabled in this project, so a bug that needs a second
+        run is almost always a static that was not reset. This one answer usually
+        identifies the cause.
+      options:
+        - The first time
+        - Only on the second run or later
+        - Not applicable — it is not a play mode bug
+    validations:
+      required: true
+
+  - type: input
+    id: theme
+    attributes:
+      label: Which theme
+      placeholder: Industrial Warehouse
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Unity version, OS, and browser if relevant
+      placeholder: 6000.6.0f1, Windows 11, Chrome 141
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Any errors from the Unity console or the browser console.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: It still reproduces after a fresh **FPSKit > Build Scene**.
+          required: false
+        - label: I ran `Tools/unity-batch.sh` and the project compiles.
+          required: false

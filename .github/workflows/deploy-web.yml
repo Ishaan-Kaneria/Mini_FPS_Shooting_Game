@@ -4,11 +4,22 @@
 # a licensed Unity Editor. So the build happens here and Netlify is handed the
 # finished folder, which is why this is a workflow rather than a Netlify git link.
 #
-# Three secrets, under Settings > Secrets and variables > Actions:
+# Four secrets, under Settings > Secrets and variables > Actions:
 #
-#   UNITY_LICENSE       contents of the .ulf -- see unity-activation.yml
+#   UNITY_LICENSE       the entire contents of your Unity_lic.ulf
+#   UNITY_EMAIL         the Unity account that .ulf was issued to
+#   UNITY_PASSWORD      that account's password
 #   NETLIFY_AUTH_TOKEN  netlify.com > User settings > Applications > personal access token
 #   NETLIFY_SITE_ID     netlify.com > Site configuration > General > Site ID
+#
+# The .ulf comes from Unity Hub on a machine where you have signed in --
+# Preferences > Licenses. There used to be a workflow here that asked Unity for
+# an activation file to exchange for one; Unity has since stopped supporting
+# manual activation of Personal licences and the action that did it is
+# deprecated, so the file has to come from a real Hub install.
+#
+# A Hub that shows a valid licence has not necessarily written a .ulf. If there
+# is none on disk, re-activate from Preferences > Licenses to make Hub produce it.
 #
 # Expect the first run or two to need adjusting. Unity in CI usually does.
 name: Deploy WebGL to Netlify
@@ -73,6 +84,8 @@ jobs:
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           unityVersion: 6000.6.0f1
           targetPlatform: WebGL

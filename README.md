@@ -254,9 +254,11 @@ There is no content-only update: Unity bakes every asset into `WebGL.data.br`, s
 
 Netlify cannot be pointed at this repository directly. Its build images carry Node, Python and Ruby, not a licensed Unity Editor, so the build has to happen in Actions and Netlify is handed the finished folder.
 
-Three repository secrets are needed. `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` are the same two the script uses. `UNITY_LICENSE` comes from running **Actions → Unity licence (one-time activation)**, which produces an `.alf` file to exchange for a `.ulf` at [license.unity3d.com/manual](https://license.unity3d.com/manual); the contents of that `.ulf` are the secret.
+Five repository secrets are needed. `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` are the same two the script uses. The other three are Unity's: `UNITY_LICENSE` (the whole contents of a `Unity_lic.ulf`), `UNITY_EMAIL` and `UNITY_PASSWORD` for the account it was issued to.
 
-Expect the first run or two to need adjusting — Unity in CI usually does.
+The `.ulf` has to come from Unity Hub on a machine you have signed in on — **Preferences → Licenses**. Unity has stopped supporting manual activation of Personal licences, so the old route of asking Unity for an `.alf` from CI and exchanging it for a `.ulf` no longer exists. Note that a Hub showing a valid licence has not necessarily written a `.ulf` to disk; if there is none, re-activate from that screen to make it produce one.
+
+Expect the first run or two to need adjusting — Unity in CI usually does. If the licence cannot be made to work at all, `Tools/deploy-web.sh` does the same job from a machine that is already activated, which is every machine you can build on anyway.
 
 One scene ships, not six. Nothing in the game switches level — `Restart` reloads the scene it is already in and there is no level select — so the other five themes would be megabytes a player has no way to reach. The scene list is passed explicitly rather than read from Build Settings, which still has Unity's empty `SampleScene` at index 0; index 0 is what a player boots into.
 

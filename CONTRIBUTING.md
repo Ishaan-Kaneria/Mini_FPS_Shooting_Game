@@ -28,6 +28,7 @@ holds the project lock.
 Tools/unity-batch.sh                             # compiles
 Tools/unity-batch.sh FPSKitBatch.VerifyBuild     # the builder wired everything up
 Tools/unity-batch.sh FPSKitBatch.VerifyLevels    # a level is scored on both its endings
+Tools/unity-batch.sh FPSKitBatch.VerifyStore     # coins in, a gun and an upgrade out
 Tools/unity-batch.sh FPSKitBatch.VerifyFlow      # dashboard -> levels -> arena -> back
 Tools/unity-batch.sh FPSKitBatch.VerifyCombat    # the enemies actually fight
 Tools/unity-batch.sh FPSKitBatch.VerifyReplay    # state does not leak between runs
@@ -47,9 +48,19 @@ fixes nothing past the next **FPSKit → Build Scene**, and hand-editing
 
 **2. New content is a new asset, not a new branch in the builder.** A new arena
 is a `LevelTheme`; a new level is an entry in that arena's `LevelSet`; a new
-enemy is an `EnemyArchetype`; a new weapon is a `WeaponData`. Duplicate one,
-retune the numbers, use it. If the knob you need genuinely does not exist, add
-it to the ScriptableObject — not to the builder.
+enemy is an `EnemyArchetype`; a new weapon is a `WeaponData`; a new bomb is a
+`BombData`, and either goes on sale by being added to the `StoreCatalog`.
+Duplicate one, retune the numbers, use it. If the knob you need genuinely does
+not exist, add it to the ScriptableObject — not to the builder.
+
+A store entry's `id` is permanent: ownership, upgrade level and carried stock are
+all filed under it in `PlayerPrefs`, so renaming one forgets every purchase of
+that item.
+
+**2b. Nothing bought is written into a shared asset.** `WeaponData`, `BombData`
+and `ConsumableData` are single instances. A bonus written into one survives
+quitting the game and compounds on every restart. Upgrades are multipliers on
+the component — see `Weapon.ApplyUpgrades` and `BombData.Resolve`.
 
 **3. Statics need a reset hook.** Domain reload is disabled, so no C# static is
 ever cleared between play sessions. Any static field carrying state must be reset

@@ -16,7 +16,20 @@ using UnityEngine.EventSystems;
 [DisallowMultipleComponent]
 public class UIButtonSound : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
 {
-    public enum Voice { Click, Launch, Back }
+    public enum Voice
+    {
+        Click,
+        Launch,
+        Back,
+
+        /// <summary>
+        /// Hovers, but says nothing when activated. For a control whose *outcome* has a
+        /// sound of its own -- a store purchase plays a different note depending on
+        /// whether it went through, and a click underneath it would be two sounds
+        /// saying different things at once.
+        /// </summary>
+        Silent
+    }
 
     [Tooltip("Which sound this element makes when it is activated.")]
     public Voice voice = Voice.Click;
@@ -47,6 +60,7 @@ public class UIButtonSound : MonoBehaviour, IPointerEnterHandler, IPointerClickH
         {
             case Voice.Launch: sounds.PlayLaunch(); break;
             case Voice.Back: sounds.PlayBack(); break;
+            case Voice.Silent: break;
             default: sounds.PlayClick(); break;
         }
     }

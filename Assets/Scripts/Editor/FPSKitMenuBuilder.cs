@@ -561,6 +561,7 @@ namespace FPSKit.EditorTools
             BuildProfile(root, menu);
             BuildFooter(root, menu);
             BuildLevelSelect(root, menu);
+            BuildStore(root, menu);
 
             // Everything that belongs to the arena picker, so the level select can take
             // the screen rather than being drawn on top of it. Collected after the
@@ -577,6 +578,7 @@ namespace FPSKit.EditorTools
                 menu.profilePanel,
                 menu.lastRunPanel,
                 menu.exitRow,
+                menu.storeButton.gameObject,
                 menu.statusText.gameObject
             };
 
@@ -617,6 +619,7 @@ namespace FPSKit.EditorTools
             sounds.hover = Clip("UI/ui_hover.wav");
             sounds.back = Clip("UI/ui_back.wav");
             sounds.launch = Clip("UI/ui_launch.wav");
+            sounds.purchase = Clip("UI/purchase.wav");
 
             return sounds;
         }
@@ -693,13 +696,28 @@ namespace FPSKit.EditorTools
                             TextAlignmentOptions.MidlineRight, InkDim);
             var whoRect = who.rectTransform;
             whoRect.anchorMin = new Vector2(0.55f, 0f);
-            whoRect.anchorMax = new Vector2(1f, 1f);
+            whoRect.anchorMax = new Vector2(1f, 0.52f);
             whoRect.pivot = new Vector2(0.5f, 0.5f);
             whoRect.offsetMin = Vector2.zero;
             whoRect.offsetMax = new Vector2(-28f, 0f);
             who.characterSpacing = 6f;
 
             menu.playerNameText = who;
+
+            // The balance sits in the header rather than only in the store, so a player
+            // coming out of a level can see what it paid without going looking.
+            var coins = Label(inner, "Coins", "0", 30,
+                              TextAlignmentOptions.MidlineRight, Accent);
+            var coinRect = coins.rectTransform;
+            coinRect.anchorMin = new Vector2(0.55f, 0.48f);
+            coinRect.anchorMax = new Vector2(1f, 1f);
+            coinRect.pivot = new Vector2(0.5f, 0.5f);
+            coinRect.offsetMin = Vector2.zero;
+            coinRect.offsetMax = new Vector2(-28f, 0f);
+            coins.characterSpacing = 4f;
+            Autosize(coins, 16f, 30f);
+
+            menu.coinText = coins;
         }
 
         // ------------------------------------------------------------------
@@ -965,6 +983,19 @@ namespace FPSKit.EditorTools
             menu.exitButton = exit;
             menu.exitRow = exit.gameObject;
 
+            // The store sits beside Exit rather than up with the arenas, because it is
+            // the other thing a player does *between* levels -- and putting it in the
+            // grid would make it look like somewhere to play.
+            var store = MakeButton(parent, "StoreButton", "STORE", PanelLift, Accent);
+            var storeRect = (RectTransform)store.transform;
+            storeRect.anchorMin = new Vector2(1f, 0f);
+            storeRect.anchorMax = new Vector2(1f, 0f);
+            storeRect.pivot = new Vector2(1f, 0f);
+            storeRect.sizeDelta = new Vector2(260f, 68f);
+            storeRect.anchoredPosition = new Vector2(-320f, 34f);
+
+            menu.storeButton = store;
+
             BuildExitConfirm(parent, menu);
         }
 
@@ -1171,6 +1202,251 @@ namespace FPSKit.EditorTools
             menu.levelSelect = select;
 
             shade.gameObject.SetActive(false);
+        }
+
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// The store: four shelves of stock over the top of the dashboard.
+        ///
+        /// Built into this scene rather than being one of its own, for the same reason
+        /// the level select is -- a second scene would mean a second load, a second music
+        /// start and a second place for a screen to go wrong. Tabs rather than one long
+        /// list, because a GridLayoutGroup does not scroll: a shelf has to fit the window
+        /// it is drawn in, and four short shelves always do where one long one never would.
+        /// </summary>
+        static void BuildStore(RectTransform parent, MainMenuController menu)
+        {
+            var shade = Block(parent, "Store", Backdrop);
+            Stretch(shade.rectTransform);
+            shade.raycastTarget = true;
+
+            // On the canvas, not on the panel it hides. A component that switches its own
+            // object off in Awake never gets to switch it back on: the builder leaves the
+            // panel off, so Awake has not run, and the first SetActive(true) is what
+            // finally runs it. LevelSelectPanel learned this the hard way.
+            var store = parent.gameObject.AddComponent<StorePanel>();
+            store.panel = shade.gameObject;
+            store.catalog = AssetDatabase.LoadAssetAtPath<StoreCatalog>(FPSKitStore.CatalogPath);
+            store.sounds = menu.sounds;
+
+            for (int i = 1; i < 12; i++)
+            {
+                var line = Block(shade.rectTransform, $"GridLine_{i}", new Color(1f, 1f, 1f, 0.018f));
+                var rect = line.rectTransform;
+                rect.anchorMin = new Vector2(i / 12f, 0f);
+                rect.anchorMax = new Vector2(i / 12f, 1f);
+                rect.sizeDelta = new Vector2(2f, 0f);
+                rect.anchoredPosition = Vector2.zero;
+            }
+
+            var header = Panelled(shade.rectTransform, "Header", PanelLift, out RectTransform inner);
+            header.anchorMin = new Vector2(0f, 1f);
+            header.anchorMax = new Vector2(1f, 1f);
+            header.pivot = new Vector2(0.5f, 1f);
+            header.sizeDelta = new Vector2(-80f, 104f);
+            header.anchoredPosition = new Vector2(0f, -36f);
+
+            var accent = Block(inner, "Accent", Accent);
+            var accentRect = accent.rectTransform;
+            accentRect.anchorMin = new Vector2(0f, 0f);
+            accentRect.anchorMax = new Vector2(0f, 1f);
+            accentRect.pivot = new Vector2(0f, 0.5f);
+            accentRect.sizeDelta = new Vector2(8f, -28f);
+            accentRect.anchoredPosition = new Vector2(10f, 0f);
+
+            var heading = Label(inner, "Heading", "WEAPONS", 38,
+                                TextAlignmentOptions.MidlineLeft, Ink);
+            var headingRect = heading.rectTransform;
+            headingRect.anchorMin = new Vector2(0f, 0f);
+            headingRect.anchorMax = new Vector2(0.55f, 1f);
+            headingRect.pivot = new Vector2(0.5f, 0.5f);
+            headingRect.offsetMin = new Vector2(28f, 0f);
+            headingRect.offsetMax = Vector2.zero;
+            heading.characterSpacing = 8f;
+            Autosize(heading, 18f, 38f);
+
+            var balance = Label(inner, "Balance", "0", 34,
+                                TextAlignmentOptions.MidlineRight, Accent);
+            var balanceRect = balance.rectTransform;
+            balanceRect.anchorMin = new Vector2(0.5f, 0f);
+            balanceRect.anchorMax = new Vector2(1f, 1f);
+            balanceRect.pivot = new Vector2(0.5f, 0.5f);
+            balanceRect.offsetMin = Vector2.zero;
+            balanceRect.offsetMax = new Vector2(-28f, 0f);
+            balance.characterSpacing = 4f;
+            Autosize(balance, 18f, 34f);
+
+            // ---- tabs ----------------------------------------------------
+            // Ordered to match StorePanel.Tab, which is what lets the panel wire them in
+            // a loop rather than by name.
+            string[] tabs = { "WEAPONS", "EXPLOSIVES", "SUPPLIES", "UPGRADES" };
+            var tabButtons = new Button[tabs.Length];
+
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                var tab = MakeButton(shade.rectTransform, $"Tab_{tabs[i]}", tabs[i],
+                                     PanelLift, Accent);
+
+                var rect = (RectTransform)tab.transform;
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.sizeDelta = new Vector2(270f, 58f);
+                rect.anchoredPosition = new Vector2(40f + i * 286f, -158f);
+
+                tabButtons[i] = tab;
+            }
+
+            var grid = new GameObject("StoreGrid", typeof(RectTransform)).GetComponent<RectTransform>();
+            grid.SetParent(shade.rectTransform, false);
+            grid.anchorMin = Vector2.zero;
+            grid.anchorMax = Vector2.one;
+            grid.offsetMin = new Vector2(40f, 120f);
+            grid.offsetMax = new Vector2(-40f, -232f);
+
+            var layout = grid.gameObject.AddComponent<GridLayoutGroup>();
+
+            // A starting size only. StorePanel recomputes the cell from the real size of
+            // this rect, because a fixed cell is only right at one window shape and a
+            // GridLayoutGroup neither clips nor scrolls.
+            layout.cellSize = new Vector2(420f, 344f);
+            layout.spacing = new Vector2(20f, 20f);
+            layout.padding = new RectOffset(4, 4, 4, 4);
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            layout.constraintCount = 3;
+
+            var status = Label(shade.rectTransform, "Status", "", 20,
+                               TextAlignmentOptions.MidlineLeft, Accent);
+            var statusRect = status.rectTransform;
+            statusRect.anchorMin = new Vector2(0f, 0f);
+            statusRect.anchorMax = new Vector2(0.72f, 0f);
+            statusRect.pivot = new Vector2(0.5f, 0f);
+            statusRect.sizeDelta = new Vector2(-88f, 72f);
+            statusRect.anchoredPosition = new Vector2(2f, 34f);
+            status.textWrappingMode = TextWrappingModes.Normal;
+
+            var back = MakeButton(shade.rectTransform, "BackButton", "BACK", PanelLift, Border);
+            back.GetComponent<UIButtonSound>().voice = UIButtonSound.Voice.Back;
+            var backRect = (RectTransform)back.transform;
+            backRect.anchorMin = new Vector2(1f, 0f);
+            backRect.anchorMax = new Vector2(1f, 0f);
+            backRect.pivot = new Vector2(1f, 0f);
+            backRect.sizeDelta = new Vector2(260f, 68f);
+            backRect.anchoredPosition = new Vector2(-40f, 34f);
+
+            store.cardParent = grid;
+            store.cardTemplate = BuildStoreCardTemplate(shade.rectTransform);
+            store.backButton = back;
+            store.tabButtons = tabButtons;
+            store.balanceText = balance;
+            store.headingText = heading;
+            store.statusText = status;
+            store.gridColumns = 3;
+
+            menu.store = store;
+
+            shade.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// One store card, built once and left switched off.
+        ///
+        /// Parented to the panel rather than to the grid, for the same reason the arena
+        /// card and the level tile are: a template inside the grid would be counted as a
+        /// cell, and the first real item would sit in the second slot behind an
+        /// invisible hole.
+        /// </summary>
+        static StoreItemCard BuildStoreCardTemplate(RectTransform parent)
+        {
+            var root = Panelled(parent, "StoreCardTemplate", Panel, out RectTransform inner);
+            root.sizeDelta = new Vector2(420f, 344f);
+            root.anchorMin = root.anchorMax = new Vector2(0f, 1f);
+            root.pivot = new Vector2(0.5f, 0.5f);
+
+            var card = root.gameObject.AddComponent<StoreItemCard>();
+            card.frame = root.GetComponent<Image>();
+            card.face = inner.GetComponent<Image>();
+
+            var accent = Block(inner, "AccentBar", Accent);
+            Span(accent.rectTransform, 0.955f, 0.985f, 16f, 16f);
+            card.accentBar = accent;
+
+            var title = Label(inner, "Title", "ITEM", 26, TextAlignmentOptions.MidlineLeft, Ink);
+            Span(title.rectTransform, 0.83f, 0.95f, 16f, 130f);
+            title.characterSpacing = 3f;
+            Autosize(title, 13f, 26f);
+            card.titleText = title;
+
+            var state = Label(inner, "State", "", 17, TextAlignmentOptions.MidlineRight, Accent);
+            Span(state.rectTransform, 0.83f, 0.95f, 260f, 16f);
+            state.characterSpacing = 3f;
+            Autosize(state, 9f, 17f);
+            card.stateText = state;
+
+            var description = Label(inner, "Description", "", 17,
+                                    TextAlignmentOptions.TopLeft, InkDim);
+            Span(description.rectTransform, 0.58f, 0.82f, 16f, 16f);
+            description.textWrappingMode = TextWrappingModes.Normal;
+            description.overflowMode = TextOverflowModes.Ellipsis;
+            Autosize(description, 9f, 17f);
+            card.descriptionText = description;
+
+            var stats = Label(inner, "Stats", "", 17, TextAlignmentOptions.TopLeft, Ink);
+            Span(stats.rectTransform, 0.34f, 0.57f, 16f, 16f);
+            stats.textWrappingMode = TextWrappingModes.Normal;
+            stats.overflowMode = TextOverflowModes.Ellipsis;
+            Autosize(stats, 9f, 17f);
+            card.statsText = stats;
+
+            // Five pips, because five is the upgrade cap on everything that has one. The
+            // card hides the ones past an item's own maximum, and all of them for the
+            // health upgrade, which has none.
+            var pips = new Image[5];
+
+            for (int i = 0; i < pips.Length; i++)
+            {
+                var pip = Block(inner, $"Pip{i + 1}", new Color(1f, 1f, 1f, 0.12f));
+                var rect = pip.rectTransform;
+                rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
+                rect.pivot = new Vector2(0f, 0.5f);
+                rect.sizeDelta = new Vector2(30f, 8f);
+                rect.anchoredPosition = new Vector2(16f + i * 36f, 106f);
+
+                pips[i] = pip;
+            }
+
+            card.upgradePips = pips;
+
+            var buy = MakeButton(inner, "Primary", "BUY", PanelLift, Accent);
+            var buyRect = (RectTransform)buy.transform;
+            buyRect.anchorMin = buyRect.anchorMax = new Vector2(0f, 0f);
+            buyRect.pivot = new Vector2(0f, 0f);
+            buyRect.sizeDelta = new Vector2(186f, 58f);
+            buyRect.anchoredPosition = new Vector2(16f, 20f);
+
+            // Silent, because StorePanel plays the outcome: a purchase note when coins
+            // change hands and a refusal when they do not. A click underneath would be
+            // two sounds saying different things on the same frame.
+            buy.GetComponent<UIButtonSound>().voice = UIButtonSound.Voice.Silent;
+
+            card.primaryButton = buy;
+            card.primaryLabelText = buy.GetComponentInChildren<TMP_Text>();
+
+            var upgrade = MakeButton(inner, "Upgrade", "UPGRADE", PanelLift, Border);
+            var upgradeRect = (RectTransform)upgrade.transform;
+            upgradeRect.anchorMin = upgradeRect.anchorMax = new Vector2(1f, 0f);
+            upgradeRect.pivot = new Vector2(1f, 0f);
+            upgradeRect.sizeDelta = new Vector2(186f, 58f);
+            upgradeRect.anchoredPosition = new Vector2(-16f, 20f);
+
+            upgrade.GetComponent<UIButtonSound>().voice = UIButtonSound.Voice.Silent;
+
+            card.upgradeButton = upgrade;
+            card.upgradeLabelText = upgrade.GetComponentInChildren<TMP_Text>();
+
+            root.gameObject.SetActive(false);
+            return card;
         }
 
         /// <summary>

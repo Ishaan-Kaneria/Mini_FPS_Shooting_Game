@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 213836277b3cf3c9d90997dd9636d6af, type: 3}
+  m_Name: Bomb_Frag
+  m_EditorClassIdentifier: Assembly-CSharp::BombData
+  bombName: Frag Bomb
+  description: 
+  damage: 120
+  radius: 7
+  edgeDamageFraction: 0.25
+  falloffPower: 1.6
+  selfDamageFraction: 0.35
+  explosionForce: 900
+  fallTime: 1
+  minRange: 6
+  maxRange: 34
+  gravityScale: 5.5
+  chargesPerLevel: 2
+  throwCooldown: 0.8
+  cameraShake: 0.75
+  blastVisualDuration: 0.45
+  blastColor: {r: 1, g: 0.55, b: 0.15, a: 1}
+  bombPrefab: {fileID: 7132256317698093118, guid: 2a736e18107e01cd388fed3d6ae24f8e, type: 3}
+  explosionPrefab: {fileID: 1966626841067709592, guid: 0b7ccf98f29b6d92c8928cd2981b2c68, type: 3}
+  throwClip: {fileID: 8300000, guid: 33f031c31c074de5d881a11f540839b4, type: 3}
+  explodeClip: {fileID: 8300000, guid: 8dfd0b0e4446cd06487d6fc021c80868, type: 3}

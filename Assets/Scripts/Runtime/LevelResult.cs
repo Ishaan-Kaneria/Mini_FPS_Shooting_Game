@@ -57,6 +57,9 @@ public struct LevelResult
     public int score;
     public int headshots;
 
+    /// <summary>Coins this level paid, kills plus stars plus score. Banked by GameSession.</summary>
+    public int coins;
+
     /// <summary>A level with a star is a level passed, and the next one opens.</summary>
     public bool Passed => stars > 0;
 

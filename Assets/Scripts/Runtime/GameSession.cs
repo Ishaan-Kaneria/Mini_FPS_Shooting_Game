@@ -6,8 +6,9 @@ using UnityEngine;
 ///
 /// Static because a scene load destroys every object in the old scene, so there is
 /// nothing left to hang it off. It is deliberately tiny -- an arena, a level index and
-/// a result -- because anything larger belongs in <see cref="PlayerProfile"/> or
-/// <see cref="LevelProgress"/>, which persist properly, or in the scene that owns it.
+/// a result -- because anything larger belongs in <see cref="PlayerProfile"/>,
+/// <see cref="LevelProgress"/> or <see cref="Wallet"/>, which persist properly, or in
+/// the scene that owns it.
 ///
 /// Domain reload is disabled in this project, so the reset hook below is not optional:
 /// without it, the second time Play is pressed the dashboard would open already
@@ -80,6 +81,11 @@ public static class GameSession
 
         PlayerProfile.RecordRun(result.score, result.killed);
         LevelProgress.Record(result.arena, result.levelIndex, result.stars, result.score);
+
+        // The one place coins are ever banked. Every ending routes through here --
+        // cleared, timed out, died, walked out -- so there is a single line that can pay
+        // and no way for an ending to be added later that silently pays nothing.
+        Wallet.Add(result.coins);
     }
 
     /// <summary>Forgets the last result, so re-opening the dashboard is not a replay of it.</summary>

@@ -13,6 +13,7 @@
 - [ ] `Tools/unity-batch.sh` — compiles
 - [ ] `Tools/unity-batch.sh FPSKitBatch.VerifyBuild` — the builder wired everything up
 - [ ] `Tools/unity-batch.sh FPSKitBatch.VerifyLevels` — a level is scored on both its endings
+- [ ] `Tools/unity-batch.sh FPSKitBatch.VerifyStore` — coins in, a gun and an upgrade out
 - [ ] `Tools/unity-batch.sh FPSKitBatch.VerifyFlow` — dashboard → level select → arena → back
 - [ ] `Tools/unity-batch.sh FPSKitBatch.VerifyReplay` — no state leaks between runs
 - [ ] `Tools/unity-batch.sh FPSKitBatch.VerifyStatics` — every static resets

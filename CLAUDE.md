@@ -13,8 +13,10 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 
 | Concern  | Files |
 |---|---|
-| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs`, `PlayerProgression.cs` (per-level rifle upgrades) |
+| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs`, `PlayerProgression.cs` (per-level rifle upgrades), `PlayerLoadout.cs` (turns what was bought into what is carried) |
 | Weapons  | `Weapon.cs`, `WeaponData.cs` (ScriptableObject, `FireMode` Single/Burst/Auto), `ImpactLibrary.cs`, `TracerProjectile.cs` (flies its own tracer, so the shot outlives whoever fired it) |
+| Explosives | `BombThrower.cs` (the aiming ring and the throw), `BombProjectile.cs` (flies its own solved arc), `BombAimIndicator.cs`, `Explosion.cs` (the blast, and the static that works out who it hurt), `BombData.cs` (ScriptableObject, carries `BlastSpec`) |
+| Economy  | `Wallet.cs` (coins in PlayerPrefs), `Loadout.cs` (what is owned, upgraded and equipped), `StoreCatalog.cs` (ScriptableObject: stock and prices), `StorePanel.cs`, `StoreItemCard.cs`, `ConsumableData.cs`, `ConsumableBelt.cs` |
 | Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Retreat/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs`, `EnemyLimbAnimator.cs` (swings the limbs off agent velocity -- there is no AnimatorController anywhere in the project) |
 | Levels   | `LevelManager.cs` — runs one level: a fixed roster, a strict clock, golden-angle ring spawns that avoid the player's view, an enemy leash that replaces what it discards, and a weighted score cut into stars. `LevelSet.cs` (ScriptableObject, one ladder per arena), `LevelResult.cs` (how a level ended), `LevelProgress.cs` (stars and unlocks in PlayerPrefs) |
 | Run state | `GameDirector.cs` — score, combo, pause, end of level, return-to-dashboard, PlayerPrefs records; `GameSession.cs` (what survives a scene change), `PlayerProfile.cs` (PlayerPrefs stats) |
@@ -23,7 +25,7 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
-`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
+`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), `Store/` (the catalog plus its WeaponData, BombData and ConsumableData), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, `Bomb.prefab`, `Explosion.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
 
 ## Input: legacy only
 
@@ -50,11 +52,13 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 So: **fix scene content by editing the builder, not the `.unity` file.** Hand-editing a generated scene is only appropriate for a throwaway experiment. The same applies to the generated assets it writes (`Controls.asset`, `Enemy.prefab`, themes, materials) — the builder and `FPSKitThemes` recreate or re-dirty them.
 
-Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
+Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the five checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the six checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
 
-`FPSKitBatch.ResetEnemyArchetypes` and `FPSKitBatch.ResetLevelSets` are the other entry points worth knowing. Both the roster and the level ladders are generated once and then left alone, so retuning a number in `FPSKitEnemyRoster.Configure` or `FPSKitLevels.Configure` does **not** reach the assets the game reads until the matching reset is run. A level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
+**Three generators, three reset entry points, one trap.** `FPSKitBatch.ResetEnemyArchetypes`, `ResetLevelSets` and `ResetStore` exist because the roster, the level ladders and the store are all generated once and then left alone. Retuning a number in `FPSKitEnemyRoster.Configure`, `FPSKitLevels.Configure` or `FPSKitStore.Configure` does **not** reach the assets the game reads until the matching reset is run. A price or a level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
+
+`FPSKitCombatTest` and `FPSKitLevelTest` both retune the live `LevelSet` while they run -- one lengthening the clock so the fight outlives it, the other shortening it so the test does not sit through a full level -- and both put it back in `Detach`. The set is a shared asset: a test that left level one with a four-minute clock would be a test that broke the game to pass.
 
 ## The web build has its own page
 
@@ -107,6 +111,12 @@ it with **FPSKit > Play Starts At Dashboard**.
 Every play-mode test therefore calls `FPSKitPlayMode.SuspendStartScene()` before entering
 play mode and restores it in `Detach` — each one opens the scene it means to exercise, and
 would otherwise be handed the dashboard and fail on its first assertion.
+
+**The store is `Store.asset`, not code.** The Store button on the dashboard opens
+`StorePanel` over the arenas, exactly the way an arena card opens the level select. Both
+are on the canvas, both hide `MainMenuController.dashboardOnly` while they are up, and
+both put back what was showing rather than switching everything on -- the result strip
+only appears after a level, and Exit Game is hidden in a browser.
 
 **The arena list is `ArenaCatalog.asset`, not code.** Adding an arena means a theme, a
 built scene, a `LevelSet` and an entry in the catalog — the dashboard clones its card
@@ -164,6 +174,7 @@ Three ScriptableObject types are the extension points, and all three exist so th
 
 - **A new arena is a `LevelTheme` asset.** Duplicate one in `FPSKit_Generated/Themes/`, retune it, select it, then **FPSKit > Build Scene > From Selected Theme Asset**. The six named menu entries are just shortcuts to the built-in assets. Re-run **FPSKit > Build Dashboard** afterwards so it gets a card and a preview.
 - **A new enemy is an `EnemyArchetype` asset.** Duplicate one in `FPSKit_Generated/Enemies/`, change the numbers, add it to the LevelManager's roster. There is one base `Enemy.prefab`; an archetype is *stamped onto* an instance at spawn (stats, scale, colour via `MaterialPropertyBlock`, behaviour, score, drops). `EnemyArchetype.Role` decides whether it joins the normal mix, counts as an elite, or is drawn only for boss levels. Its `unlockWave` / `weightGrowthPerWave` / `retireWave` fields are difficulty *steps* now, not wave numbers -- the names are kept because renaming a serialized field silently drops the value out of every asset already written with the old one.
+- **A new gun, bomb or supply is an entry in the `StoreCatalog`.** The stock lives in `FPSKit_Generated/Store/`: a `WeaponData` per gun, a `BombData` per explosive, a `ConsumableData` per supply, and one catalog that prices them. Duplicate an asset, add an entry with a **new, permanent `id`** -- ownership and upgrade level are filed under it, so renaming one forgets every purchase of that item -- and the store clones a card for it at runtime.
 - **A new level is an entry in a `LevelSet`.** The ladders live in `FPSKit_Generated/Levels/`, one asset per arena, each a plain list. Add an entry in the Inspector and re-run **FPSKit > Build Dashboard** so the arena card picks up the new count; the level select clones a tile per entry at runtime, so nothing needs rebuilding for the tiles themselves.
 
 When adding either, prefer a new asset over a new branch in the builder. If a knob genuinely does not exist yet, add it to the ScriptableObject — not to `FPSKitSceneBuilder`.
@@ -232,6 +243,82 @@ and `EnemyLimbAnimator` reads them each frame to throw the body along the bullet
 are plain values rather than an event on purpose -- an imported character with a real
 Animator ignores them, and three floats survive a mid-play domain reload where a
 subscription would not.
+
+## Coins are earned in a level and spent between them
+
+`Wallet` is the only thing that moves coins, and `Wallet.TrySpend` is the only thing
+that can lower the balance -- it refuses rather than going negative. Every purchase in
+`StorePanel` is the same three steps in the same order: refuse if it is not for sale,
+take the money, *then* record it in `Loadout`. Granting first and charging afterwards is
+how a shop hands out an item to somebody who could not pay for it.
+
+Coins accrue on `GameDirector` during a level and are banked once, in
+`GameSession.RecordResult`. That is deliberate on both ends:
+
+- **Not per kill.** Banking as you go would let a player farm a level to the last enemy,
+  quit, and repeat. The clock exists so a level has an ending, and the payout is part of
+  the ending.
+- **Every ending pays.** Cleared, timed out, died and walked out all route through
+  `RecordResult`, so there is one line that can pay and no way for a new ending to be
+  added later that silently pays nothing. An abandoned level pays for the kills only --
+  no star bonus, no score bonus.
+
+A headshot is worth extra coins as well as extra score, and coins are **not** multiplied
+by the combo. The combo is the scoreboard's reward for pushing; making it the wallet's
+as well would mean a good chain is worth several minutes of ordinary play, and every
+price in the store would have to be written for the chain rather than for the game.
+
+The prices in `FPSKitStore.Configure` and the rates on `GameDirector` are one pair. At
+three coins a kill, sixty a star and a point-based bonus, a well-played level pays
+roughly three hundred and the whole catalogue is near fifty of them. Moving either half
+without the other is what turns a shop into a grind or a free lunch.
+
+## Upgrades escalate, and one of them never stops
+
+`StoreCatalog.UpgradeCurve` is `base * growth^level`, held on the entry rather than in
+code, so nothing upgradeable can quietly invent its own escalation. Guns and bombs cap
+at five levels; **health is uncapped on purpose** and is the one thing a stuck player can
+always put coins into, so being stuck on a level is never a wall with nothing to do about
+it. The 1.45 growth is what stops that being a free pass.
+
+Nothing bought is ever written into a `WeaponData` or a `BombData`. Those are single
+shared ScriptableObjects, so a bonus stored there would survive quitting the game and
+compound on every restart -- the same rule `PlayerProgression` has always followed. A
+gun's upgrades become multipliers on the `Weapon` component; a bomb's become a
+`BlastSpec` the thrower resolves on the way out.
+
+`PlayerLoadout` is the seam. It reads `Loadout`, equips the gun, arms the bomb, fills the
+belt, resizes the health pool, and then calls `PlayerProgression.Apply`, which multiplies
+the *bought* upgrades by the *level* curve. Both calls are absolute and idempotent,
+because which of the two `Start` methods Unity runs first is not defined.
+
+## The bomb lands where the ring says, in one second
+
+`BombThrower` puts a ring on the ground at the blast radius and a dotted arc to it, and
+the throw is solved to arrive in exactly `BombData.fallTime`. Four things make that a
+promise rather than a hope:
+
+- **The bomb flies its own parabola.** `v = (target - p0)/t - ½gt²`, integrated by hand
+  and swept against the world between frames. A Rigidbody clipping a crate would land
+  somewhere else and blame the physics engine.
+- **`BombAimIndicator` draws the same equation**, so the dotted line cannot disagree with
+  where the bomb actually goes.
+- **`BombThrower.Throw` clamps into range**, including for a caller that hands in a point
+  of its own. The flight time is fixed, so distance *is* speed: a throw far enough out of
+  range simply meets the first wall between here and there.
+- **Gravity is the bomb's own**, several times the world's -- `BombData.gravityScale`.
+  The horizontal speed is fixed by the distance and the time, so the only thing left to
+  choose is height, and under real gravity a one-second throw peaks about a metre up and
+  flies flat into the first crate in the way. This was not a theory: the store test found
+  it, with a thirty-metre throw that hurt nobody.
+
+`Explosion.Blast` is a static that needs no prefab, so a bomb with nothing wired still
+does its damage. It damages one `Health` at most once however many colliders it has --
+an enemy is a body, a head and a pair of limbs, and damaging per collider would make a
+bomb four times stronger against a target with hitboxes.
+
+Self-damage is a fraction on the bomb, not a layer excluded from the sphere. Excluding
+the player would make the ring a lie about one of the things standing in it.
 
 ## The rifle has a curve too
 

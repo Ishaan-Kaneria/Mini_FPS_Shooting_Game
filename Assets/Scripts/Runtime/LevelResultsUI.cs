@@ -187,10 +187,17 @@ public class LevelResultsUI : MonoBehaviour
 
         if (detailText != null)
         {
+            // The coins are the line the player came for, so they get their own colour
+            // and sit at the end where the eye lands last.
+            string coins = result.coins > 0
+                ? $"     <color=#FFD24A>+{Wallet.Format(result.coins)} COINS</color>"
+                : "";
+
             detailText.text =
                 $"<size=70%>{result.killed} / {result.total} KILLED     " +
                 $"{result.score:N0} POINTS     " +
-                $"{Mathf.CeilToInt(result.timeTaken)}s OF {Mathf.RoundToInt(result.timeLimit)}s</size>";
+                $"{Mathf.CeilToInt(result.timeTaken)}s OF {Mathf.RoundToInt(result.timeLimit)}s" +
+                $"{coins}</size>";
         }
 
         if (stars != null)

@@ -56,6 +56,17 @@ public class PlayerMotor : MonoBehaviour
     public float keyboardPitchSpeed = 180f;
 
     [Header("Speeds")]
+    /// <summary>
+    /// Multiplier on whatever speed the player would otherwise be moving at. Set by
+    /// ConsumableBelt while an energy drink is running and put back to 1 when it ends.
+    ///
+    /// A plain float rather than a stack of modifiers: one thing boosts speed, and a
+    /// modifier system for one caller is a system with nothing to be right about. It is
+    /// also why ConsumableBelt assigns rather than multiplies -- two drinks reset the
+    /// clock instead of compounding into a player nothing can catch.
+    /// </summary>
+    [System.NonSerialized] public float SpeedMultiplier = 1f;
+
     public float walkSpeed = 5.6f;
     public float sprintSpeed = 8.2f;
     public float crouchSpeed = 2.8f;
@@ -457,6 +468,7 @@ public class PlayerMotor : MonoBehaviour
         IsSprinting = EvaluateSprint(input) && IsGrounded && !IsCrouching;
 
         float targetSpeed = IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed);
+        targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier);
         Vector3 wish = (transform.right * input.x + transform.forward * input.y) * targetSpeed;
 
         Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);

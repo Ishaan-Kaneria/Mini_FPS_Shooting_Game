@@ -42,13 +42,30 @@ namespace FPSKit.EditorTools
         /// <summary>How close the player is held during the point-blank phase.</summary>
         const float PointBlank = 1.6f;
 
-        enum Phase { Enter, AwaitLevel, Inspect, Engage, CloseIn, Judge }
+        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Judge }
+
+        /// <summary>
+        /// Seconds the level is given while this test runs.
+        ///
+        /// Level one's own clock is around thirty, and this test needs most of that
+        /// before it has even started measuring -- a briefing, a crowd arriving, fourteen
+        /// seconds at range and nine in an enemy's face. Run against the real clock it
+        /// sits one slow frame away from the level being scored underneath it, and a
+        /// scored level freezes time and disables input: every enemy stops mid-Chase and
+        /// the test reports that nothing ever attacked. What is being measured here is
+        /// the fight, not the clock.
+        /// </summary>
+        const float TestClock = 240f;
 
         static Phase _phase;
         static double _deadline;
         static double _startedAt;
         static readonly List<string> Errors = new List<string>();
         static readonly StringBuilder Notes = new StringBuilder();
+
+        /// <summary>The level's own clock, put back in Detach. See TestClock.</summary>
+        static LevelSet.Level _tunedLevel;
+        static float _clockBackup = -1f;
 
         static int _inspected;
         static int _armed;
@@ -125,8 +142,31 @@ namespace FPSKit.EditorTools
                 {
                     case Phase.Enter:
                         if (!EditorApplication.isPlaying) { EditorApplication.EnterPlaymode(); return; }
+                        _phase = Phase.Tune;
+                        return;
+
+                    case Phase.Tune:
+                    {
+                        var level = Level();
+                        if (level == null || level.Level == null) return;
+
+                        // Written during the briefing, before RunLevel reads the limit, so
+                        // the long clock is the one that applies. The LevelSet is a shared
+                        // asset, so the old value is put back in Detach -- a test that
+                        // permanently gave level one a four-minute clock would be a test
+                        // that broke the game to pass.
+                        _clockBackup = level.Level.timeLimit;
+                        _tunedLevel = level.Level;
+
+                        level.Level.timeLimit = TestClock;
+                        level.ResolveLevel();
+
+                        Notes.Append($"\n  level clock extended from {_clockBackup:0}s to {TestClock:0}s " +
+                                     "so the fight outlives it");
+
                         _phase = Phase.AwaitLevel;
                         return;
+                    }
 
                     case Phase.AwaitLevel:
                     {
@@ -386,6 +426,13 @@ namespace FPSKit.EditorTools
 
         static void Detach()
         {
+            // The LevelSet is a shared asset, so whatever the clock was before this ran
+            // goes back however the test ended.
+            if (_tunedLevel != null && _clockBackup > 0f) _tunedLevel.timeLimit = _clockBackup;
+
+            _tunedLevel = null;
+            _clockBackup = -1f;
+
             FPSKitPlayMode.RestoreStartScene();
 
             EditorApplication.update -= Tick;

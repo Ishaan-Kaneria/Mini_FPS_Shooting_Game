@@ -42,6 +42,16 @@ public class ControlSettings : ScriptableObject
     public KeyCode crouch = KeyCode.LeftControl;
     public KeyCode altCrouch = KeyCode.C;
 
+    [Header("Equipment")]
+    [Tooltip("Held to aim a bomb, released to throw it. Held rather than tapped because " +
+             "the aim is the feature -- see BombThrower. The aim key doubles as the " +
+             "range lock while this is down, so there is no third binding for it.")]
+    public KeyCode bomb = KeyCode.G;
+
+    [Tooltip("Drinks an energy drink off the belt. F is where every shooter puts its " +
+             "one-off item, and it is nowhere near the movement keys.")]
+    public KeyCode useItem = KeyCode.F;
+
     [Header("Sprint")]
     [Tooltip("Sprint by double-tapping the key below rather than holding one down.")]
     public bool sprintByDoubleTap;
@@ -100,6 +110,8 @@ public class ControlSettings : ScriptableObject
         crouch = KeyCode.LeftControl;
         altCrouch = KeyCode.C;
         aim = KeyCode.Mouse1;
+        bomb = KeyCode.G;
+        useItem = KeyCode.F;
         sprintEndsWhenNotAdvancing = true;
         lookLeft = lookRight = lookUp = lookDown = KeyCode.None;
 

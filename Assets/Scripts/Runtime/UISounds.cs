@@ -31,6 +31,10 @@ public class UISounds : MonoBehaviour
     [Tooltip("Played when a run is starting, rather than the ordinary click.")]
     public AudioClip launch;
 
+    [Tooltip("Played when coins actually change hands. A purchase that sounds like every " +
+             "other click is a purchase the player is not sure went through.")]
+    public AudioClip purchase;
+
     [Header("Levels")]
     [Range(0f, 1f)] public float effectVolume = 0.55f;
 
@@ -78,6 +82,7 @@ public class UISounds : MonoBehaviour
     public void PlayClick() => Play(click, effectVolume);
     public void PlayBack() => Play(back, effectVolume);
     public void PlayLaunch() => Play(launch != null ? launch : click, effectVolume);
+    public void PlayPurchase() => Play(purchase != null ? purchase : click, effectVolume);
 
     public void PlayHover()
     {

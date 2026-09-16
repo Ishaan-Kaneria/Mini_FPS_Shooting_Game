@@ -19,6 +19,13 @@ public static class MobileInput
     public static bool Crouch;
 
     /// <summary>
+    /// Held while the on-screen bomb button is down. A held flag rather than a queued
+    /// tap, because aiming a bomb *is* holding the key -- releasing it is the throw, so
+    /// a one-shot tap could not express it at all.
+    /// </summary>
+    public static bool BombAim;
+
+    /// <summary>
     /// True while anything on screen is asking for fire.
     ///
     /// Two independent controls can ask, and they overlap: the fire button while it is
@@ -35,6 +42,7 @@ public static class MobileInput
     static Vector2 _lookDelta;       // screen pixels accumulated since last read
     static bool _jumpQueued;
     static bool _reloadQueued;
+    static bool _useItemQueued;
 
     /// <summary>
     /// A touch player has no Escape key, so without this there is no way to pause --
@@ -86,6 +94,16 @@ public static class MobileInput
         return queued;
     }
 
+    public static void QueueUseItem() => _useItemQueued = true;
+
+    /// <summary>Reads and clears. Only ConsumableBelt should call this.</summary>
+    public static bool ConsumeUseItem()
+    {
+        bool queued = _useItemQueued;
+        _useItemQueued = false;
+        return queued;
+    }
+
     /// <summary>
     /// Static state survives play-mode restarts in the editor, so the touch UI
     /// clears it on enable and disable.
@@ -107,8 +125,8 @@ public static class MobileInput
     {
         Move = Vector2.zero;
         _lookDelta = Vector2.zero;
-        Aim = Sprint = Crouch = false;
+        Aim = Sprint = Crouch = BombAim = false;
         _fireButton = _fireTap = false;
-        _jumpQueued = _reloadQueued = _pauseQueued = false;
+        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = false;
     }
 }

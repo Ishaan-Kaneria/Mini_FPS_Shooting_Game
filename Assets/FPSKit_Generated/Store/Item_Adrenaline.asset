@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2503291995a42a72e812e506e1f7b772, type: 3}
+  m_Name: Item_Adrenaline
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableData
+  displayName: Adrenaline Shot
+  description: Almost all your health at once and a short, violent rush. Nothing for the shield.
+  tint: {r: 1, g: 0.55, b: 0.6, a: 1}
+  healthRestore: 95
+  shieldRestore: 0
+  boostDuration: 7
+  moveSpeedMultiplier: 1.55
+  fireRateMultiplier: 1.6
+  reloadTimeMultiplier: 0.55
+  useClip: {fileID: 8300000, guid: 3947d5fe1c342f212a9eb033e26dd44e, type: 3}

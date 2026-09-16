@@ -130,6 +130,19 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Re-stamps the built-in stock, prices and upgrade curves onto the store.
+        ///
+        /// The third of the same trap, for the same reason: the store assets are created
+        /// once and then left alone, so a price changed in FPSKitStore.Configure does not
+        /// reach the asset the game reads until this is run. Coins the player has earned
+        /// and items they have bought live in PlayerPrefs and are never touched by it.
+        /// </summary>
+        public static void ResetStore()
+        {
+            Run(FPSKitStore.ResetAll);
+        }
+
+        /// <summary>
         /// Does nothing on purpose. Reaching it at all means every script in the
         /// project compiled, which is the cheapest pre-commit check there is.
         /// </summary>
@@ -190,6 +203,13 @@ namespace FPSKit.EditorTools
         public static void VerifyFlow() => FPSKitFlowTest.VerifyFlow();
 
         /// <summary>
+        /// Plays the economy end to end: coins earned by killing, spent in the store, and
+        /// carried into a level as a better gun and a bomb that goes off where it was
+        /// aimed.
+        /// </summary>
+        public static void VerifyStore() => FPSKitStoreTest.VerifyStore();
+
+        /// <summary>
         /// Builds one scene and then asserts it is actually playable.
         ///
         /// A build that throws no exception still proves very little: the builder wires
@@ -215,6 +235,7 @@ namespace FPSKit.EditorTools
                 CheckPlayer(problems);
                 CheckLevels(problems);
                 CheckHud(problems);
+                CheckEquipment(problems);
 
                 if (UnityEngine.Object.FindAnyObjectByType<GameDirector>() == null)
                     problems.Add("no GameDirector: score, combo and pause would not work");
@@ -252,6 +273,78 @@ namespace FPSKit.EditorTools
             var weapon = player.GetComponentInChildren<Weapon>();
             if (weapon == null) problems.Add("player has no Weapon");
             else if (weapon.data == null) problems.Add("weapon has no WeaponData: it could not fire");
+        }
+
+        /// <summary>
+        /// The bomb, the belt and the loadout that decides what the player is carrying.
+        ///
+        /// Every reference here is optional at runtime and fails silently when it is not
+        /// wired -- a bomb key that does nothing, a belt counter that never appears, a
+        /// gun the store sold and the player never receives. Those are exactly the
+        /// failures a build check exists for.
+        /// </summary>
+        private static void CheckEquipment(List<string> problems)
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player == null) return;
+
+            var loadout = player.GetComponent<PlayerLoadout>();
+            if (loadout == null)
+            {
+                problems.Add("player has no PlayerLoadout: nothing bought in the store would " +
+                             "ever reach them");
+                return;
+            }
+
+            if (loadout.catalog == null)
+                problems.Add("PlayerLoadout has no StoreCatalog: the player would keep the " +
+                             "builder's rifle whatever they bought");
+
+            var bombs = player.GetComponent<BombThrower>();
+            if (bombs == null) problems.Add("player has no BombThrower");
+            else
+            {
+                if (bombs.indicator == null)
+                    problems.Add("BombThrower has no aim indicator: bombs would be thrown blind");
+
+                if (bombs.groundMask == 0)
+                    problems.Add("BombThrower has an empty ground mask: the aim ray would " +
+                                 "land on nothing and every throw would be refused");
+            }
+
+            if (player.GetComponent<ConsumableBelt>() == null)
+                problems.Add("player has no ConsumableBelt: energy drinks could not be used");
+
+            var catalog = loadout.catalog;
+            if (catalog == null) return;
+
+            if (catalog.StarterGun == null)
+                problems.Add("the store has no starter gun, so a new player would go in unarmed");
+
+            foreach (var gun in catalog.guns)
+            {
+                if (gun == null) continue;
+
+                if (gun.data == null) problems.Add($"store gun \"{gun.id}\" has no WeaponData");
+                else if (gun.data.impacts == null)
+                    problems.Add($"store gun \"{gun.id}\" has no impact library: it would hit silently");
+            }
+
+            foreach (var bomb in catalog.bombs)
+            {
+                if (bomb == null) continue;
+
+                if (bomb.data == null) problems.Add($"store bomb \"{bomb.id}\" has no BombData");
+                else if (bomb.data.bombPrefab == null)
+                    problems.Add($"store bomb \"{bomb.id}\" has no prefab: it would go off in your hand");
+                else if (bomb.data.explosionPrefab == null)
+                    problems.Add($"store bomb \"{bomb.id}\" has no explosion prefab: it would " +
+                                 "damage invisibly");
+            }
+
+            foreach (var item in catalog.consumables)
+                if (item != null && item.data == null)
+                    problems.Add($"store item \"{item.id}\" has no ConsumableData");
         }
 
         private static void CheckLevels(List<string> problems)
@@ -324,6 +417,11 @@ namespace FPSKit.EditorTools
 
             if (hud.crosshairArms == null || hud.crosshairArms.Length < 4)
                 problems.Add("HUD crosshair needs four arms");
+
+            if (hud.bombPanel == null) problems.Add("HUD has no bomb counter");
+            if (hud.beltPanel == null) problems.Add("HUD has no belt counter");
+            if (hud.bombRangeText == null) problems.Add("HUD has no bomb range readout");
+            if (hud.coinText == null) problems.Add("HUD has no coin counter");
 
             CheckResults(problems);
 

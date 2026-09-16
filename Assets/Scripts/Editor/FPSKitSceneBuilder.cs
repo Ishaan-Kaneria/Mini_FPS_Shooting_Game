@@ -124,6 +124,11 @@ namespace FPSKit.EditorTools
             var impacts = CreateImpactLibrary();
             var weaponData = CreateWeaponData(impacts);
 
+            // The store's guns, bombs and supplies get the same audio, VFX and prefabs
+            // the builder makes for the starter rifle. Done before the player is built,
+            // so the equipment on them is pointing at finished assets.
+            StampStoreContent(FPSKitStore.GetOrCreate(), impacts);
+
             var player = BuildPlayer(weaponData);
             player.transform.position = spawn;
 
@@ -401,6 +406,12 @@ namespace FPSKit.EditorTools
 
             var impacts = CreateImpactLibrary();
             var weaponData = CreateWeaponData(impacts);
+
+            // The store's guns, bombs and supplies get the same audio, VFX and prefabs
+            // the builder makes for the starter rifle. Done before the player is built,
+            // so the equipment on them is pointing at finished assets.
+            StampStoreContent(FPSKitStore.GetOrCreate(), impacts);
+
             var player = BuildPlayer(weaponData);
             var enemyPrefab = BuildEnemyPrefab();
             var spawnPoints = BuildSpawnPoints();
@@ -1074,6 +1085,205 @@ namespace FPSKit.EditorTools
         /// second later, which is a cleanup timer rather than a duration -- TransientFlash
         /// is what makes it last the two frames a muzzle flash should.
         /// </summary>
+        /// <summary>
+        /// The bomb in flight: a dark ball with a fuse light that blinks faster as it
+        /// comes down.
+        ///
+        /// One prefab for every bomb in the catalogue rather than one each. The thing
+        /// that differs between a frag and a thermite is the blast, and BombProjectile
+        /// already tints the fuse light from the BombData -- so three near-identical
+        /// prefabs would be three places to forget to change something.
+        ///
+        /// No collider on it: it sweeps its own path against the world, because a
+        /// Rigidbody clipping a crate would land somewhere other than the ring the
+        /// player was shown.
+        /// </summary>
+        private static GameObject CreateBombPrefab()
+        {
+            string path = AssetFolder + "/Bomb.prefab";
+
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) return existing;
+
+            var root = new GameObject("Bomb");
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            body.name = "Body";
+            body.transform.SetParent(root.transform, false);
+            body.transform.localScale = Vector3.one * 0.3f;
+            Object.DestroyImmediate(body.GetComponent<Collider>());
+            body.GetComponent<Renderer>().sharedMaterial =
+                MakeTintableMaterial("BombBody", new Color(0.12f, 0.13f, 0.14f), 0.4f, 0.6f, shared: true);
+
+            // A band around it, so the tumble is visible. A featureless sphere spinning
+            // is a sphere standing still.
+            var band = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            band.name = "Band";
+            band.transform.SetParent(root.transform, false);
+            band.transform.localScale = new Vector3(0.33f, 0.035f, 0.33f);
+            Object.DestroyImmediate(band.GetComponent<Collider>());
+            band.GetComponent<Renderer>().sharedMaterial =
+                MakeGlowMaterial("BombBand", new Color(1f, 0.4f, 0.2f), 3f);
+
+            var fuse = new GameObject("Fuse");
+            fuse.transform.SetParent(root.transform, false);
+
+            var light = fuse.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.45f, 0.2f);
+            light.range = 5f;
+            light.intensity = 4f;
+            light.shadows = LightShadows.None;
+
+            var projectile = root.AddComponent<BombProjectile>();
+            projectile.fuseLight = light;
+            projectile.fuseLightIntensity = 6f;
+            projectile.sweepRadius = 0.18f;
+
+            return SaveGeneratedPrefab(root, path);
+        }
+
+        /// <summary>
+        /// The blast: a bright ball that snaps out to the damage radius, a dark one that
+        /// keeps going as smoke, and a light that is gone almost immediately.
+        ///
+        /// Both spheres are scaled at runtime from the *resolved* radius, so an upgraded
+        /// bomb visibly covers more ground. That is the point of drawing it at the damage
+        /// radius at all -- the picture and the aiming ring and the OverlapSphere are all
+        /// the same number, so a player can learn what a bomb does by watching one.
+        /// </summary>
+        private static GameObject CreateExplosionPrefab()
+        {
+            string path = AssetFolder + "/Explosion.prefab";
+
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) return existing;
+
+            var root = new GameObject("Explosion");
+
+            var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            ball.name = "Ball";
+            ball.transform.SetParent(root.transform, false);
+            Object.DestroyImmediate(ball.GetComponent<Collider>());
+
+            // Unlit: a blast is its own light source, and a lit sphere in a dark arena
+            // comes out as a grey ball at the moment it is supposed to be blinding.
+            ball.GetComponent<Renderer>().sharedMaterial = GetOrCreateBarMaterial();
+
+            var smoke = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            smoke.name = "Smoke";
+            smoke.transform.SetParent(root.transform, false);
+            Object.DestroyImmediate(smoke.GetComponent<Collider>());
+            smoke.GetComponent<Renderer>().sharedMaterial = GetOrCreateBarMaterial();
+
+            var flashGo = new GameObject("Flash");
+            flashGo.transform.SetParent(root.transform, false);
+
+            var flash = flashGo.AddComponent<Light>();
+            flash.type = LightType.Point;
+            flash.shadows = LightShadows.None;
+            flash.range = 18f;
+
+            var blast = root.AddComponent<Explosion>();
+            blast.ball = ball.transform;
+            blast.smoke = smoke.transform;
+            blast.flash = flash;
+            blast.lightIntensity = 60f;
+
+            return SaveGeneratedPrefab(root, path);
+        }
+
+        /// <summary>
+        /// The ring, the pip and the dotted arc the player aims a bomb with.
+        ///
+        /// A scene object rather than a prefab instantiated on demand: it is shown and
+        /// hidden dozens of times a level, and building one per aim would be a dozen
+        /// allocations for a thing that is always the same seventeen transforms.
+        /// </summary>
+        private static BombAimIndicator BuildBombAimIndicator()
+        {
+            var root = new GameObject("BombAim");
+            var indicator = root.AddComponent<BombAimIndicator>();
+
+            // A very flat cylinder is a ring you can lay on a floor. The primitive is two
+            // units across and two tall, so the Y scale here is what makes it a disc --
+            // and BombAimIndicator writes X and Z each frame from the blast radius while
+            // leaving Y exactly as it is.
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = "Ring";
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localScale = new Vector3(1f, 0.012f, 1f);
+            Object.DestroyImmediate(ring.GetComponent<Collider>());
+            ring.GetComponent<Renderer>().sharedMaterial = GetOrCreateBarMaterial();
+
+            var pip = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pip.name = "Pip";
+            pip.transform.SetParent(root.transform, false);
+            pip.transform.localScale = new Vector3(0.35f, 0.02f, 0.35f);
+            Object.DestroyImmediate(pip.GetComponent<Collider>());
+            pip.GetComponent<Renderer>().sharedMaterial = GetOrCreateBarMaterial();
+
+            var dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            dot.name = "ArcDotTemplate";
+            dot.transform.SetParent(root.transform, false);
+            Object.DestroyImmediate(dot.GetComponent<Collider>());
+            dot.GetComponent<Renderer>().sharedMaterial = GetOrCreateBarMaterial();
+            dot.SetActive(false);
+
+            indicator.ring = ring.transform;
+            indicator.pip = pip.transform;
+            indicator.dotTemplate = dot.transform;
+
+            return indicator;
+        }
+
+        /// <summary>
+        /// Points every bomb in the catalogue at the generated prefabs and clips.
+        ///
+        /// The same split as the guns: FPSKitStore owns the numbers, and the things that
+        /// only exist once a scene has been built -- the prefab, the explosion, the audio
+        /// -- are stamped on here. Re-stamped every build rather than only on creation,
+        /// because a bomb asset created before the prefabs existed would otherwise stay
+        /// unable to spawn anything forever.
+        /// </summary>
+        private static void StampStoreContent(StoreCatalog catalog, ImpactLibrary impacts)
+        {
+            if (catalog == null) return;
+
+            foreach (var gun in catalog.guns)
+                if (gun != null && gun.data != null) StampWeaponFeedback(gun.data, impacts);
+
+            var bombPrefab = CreateBombPrefab();
+            var explosionPrefab = CreateExplosionPrefab();
+
+            var throwClip = Clip("SFX/bomb_throw.wav");
+            var explodeClip = Clip("SFX/explosion.wav");
+
+            foreach (var bomb in catalog.bombs)
+            {
+                if (bomb == null || bomb.data == null) continue;
+
+                bomb.data.bombPrefab = bombPrefab;
+                bomb.data.explosionPrefab = explosionPrefab;
+                bomb.data.throwClip = throwClip;
+                bomb.data.explodeClip = explodeClip;
+
+                EditorUtility.SetDirty(bomb.data);
+            }
+
+            var drinkClip = Clip("SFX/drink.wav");
+
+            foreach (var item in catalog.consumables)
+            {
+                if (item == null || item.data == null) continue;
+
+                item.data.useClip = drinkClip;
+                EditorUtility.SetDirty(item.data);
+            }
+
+            EditorUtility.SetDirty(catalog);
+        }
+
         private static GameObject CreateMuzzleFlashPrefab()
         {
             var glow = MakeGlowMaterial("MuzzleFlash", new Color(1f, 0.78f, 0.38f), 12f);
@@ -1386,6 +1596,8 @@ namespace FPSKit.EditorTools
             progression.weapon = weapon;
             progression.audioSource = playerAudio;
             progression.upgradeClip = Clip("SFX/pickup.wav");
+
+            BuildEquipment(player, cam, weapon, hp, playerAudio, progression);
 
             return player;
         }
@@ -1882,6 +2094,75 @@ namespace FPSKit.EditorTools
             return entries.ToArray();
         }
 
+        /// <summary>
+        /// The bomb and the belt, plus the component that decides what the player is
+        /// actually carrying.
+        ///
+        /// All three are optional to everything below them: a scene with no StoreCatalog
+        /// keeps the rifle the builder put in its hands and throws the bomb the builder
+        /// wired, because PlayerLoadout only overrides what the store actually says.
+        /// </summary>
+        private static void BuildEquipment(GameObject player, Camera cam, Weapon weapon,
+                                           Health health, AudioSource audio,
+                                           PlayerProgression progression)
+        {
+            var catalog = FPSKitStore.GetOrCreate();
+
+            int environment = LayerMask.NameToLayer("Environment");
+            int playerLayer = LayerMask.NameToLayer("Player");
+
+            var bombs = player.AddComponent<BombThrower>();
+            bombs.fpsCamera = cam;
+            bombs.audioSource = audio;
+            bombs.controls = CreateControlSettings();
+            bombs.indicator = BuildBombAimIndicator();
+
+            // The throw leaves from the muzzle, so the arc comes out of the gun rather
+            // than out of the middle of the screen.
+            bombs.throwPoint = weapon.muzzlePoint != null ? weapon.muzzlePoint : cam.transform;
+
+            // The ring is placed on the world, so only Environment counts as ground --
+            // an aim ray that stuck to an enemy would slide the ring around with them.
+            bombs.groundMask = 1 << environment;
+
+            // In flight it only goes off against the world. A bomb that detonated on the
+            // first body it clipped would never reach the crowd behind them, which is
+            // exactly the throw the ring promised.
+            bombs.collisionMask = 1 << environment;
+
+            // The blast hurts everything, the player included. Excluding the player layer
+            // here would be the wrong way to make self-damage survivable -- that is what
+            // BombData.selfDamageFraction is for, and it keeps the ring honest.
+            bombs.damageMask = ~0;
+
+            var belt = player.AddComponent<ConsumableBelt>();
+            belt.health = health;
+            belt.motor = player.GetComponent<PlayerMotor>();
+            belt.weapon = weapon;
+            belt.audioSource = audio;
+            belt.controls = bombs.controls;
+
+            var loadout = player.AddComponent<PlayerLoadout>();
+            loadout.catalog = catalog;
+            loadout.weapon = weapon;
+            loadout.health = health;
+            loadout.bombs = bombs;
+            loadout.belt = belt;
+            loadout.progression = progression;
+
+            // The pool before any bought upgrade, held here because Health has already
+            // filled itself from maxHealth by the time the loadout runs -- reading it
+            // back would compound the upgrade every time a level reloaded.
+            loadout.baseHealth = health.maxHealth;
+            loadout.baseShield = health.maxShield;
+
+            // Unused by the masks above, but provisioned for the same reason the tags
+            // are: a project that adds a bomb rule per layer should find the layer there.
+            if (playerLayer < 0)
+                Debug.LogWarning("[FPSKit] No Player layer, so bomb self-damage cannot be " +
+                                 "tuned by layer. Run EnsureProjectTagsAndLayers.");
+        }
+
         // ==================================================================
         private static void BuildPostProcessing(GameObject player)
         {
@@ -2012,7 +2293,12 @@ namespace FPSKit.EditorTools
                 new Vector2(1f, 1f), new Vector2(-60f, -105f), 30, TextAlignmentOptions.TopRight);
             hud.comboText.color = new Color(1f, 0.78f, 0.3f);
 
+            hud.coinText = MakeText(root, "CoinText", "",
+                new Vector2(1f, 1f), new Vector2(-60f, -150f), 26, TextAlignmentOptions.TopRight);
+            hud.coinText.color = new Color(1f, 0.82f, 0.25f);
+
             BuildPlayerHealthBar(root, hud);
+            BuildEquipmentPanels(root, hud);
 
             // ---- top centre ----------------------------------------------
             hud.levelText = MakeText(root, "LevelText", "LEVEL 1",
@@ -2096,6 +2382,65 @@ namespace FPSKit.EditorTools
             rect.anchorMax = new Vector2(0.5f, 0.5f);
 
             return rect;
+        }
+
+        /// <summary>
+        /// The two equipment counters above the health bar, and the range readout that
+        /// appears while a bomb is being aimed.
+        ///
+        /// Each counter is a panel rather than a label, because the HUD hides the whole
+        /// thing when the player owns none of that kind of equipment -- a counter reading
+        /// zero says "you have run out", and somebody who never bought a bomb has not run
+        /// out of anything.
+        /// </summary>
+        private static void BuildEquipmentPanels(Transform parent, HUDController hud)
+        {
+            hud.bombPanel = EquipmentPanel(parent, "BombPanel", new Vector2(60f, 190f),
+                                           out TMP_Text bombText);
+            hud.bombText = bombText;
+
+            hud.beltPanel = EquipmentPanel(parent, "BeltPanel", new Vector2(60f, 140f),
+                                           out TMP_Text beltText);
+            hud.beltText = beltText;
+
+            // The rush timer, drawn under the belt counter so the two read as one block.
+            var boostAnchor = new Vector2(0f, 0f);
+
+            MakeImage(hud.beltPanel.transform, "BoostTrack", boostAnchor, boostAnchor,
+                      new Vector2(0f, -6f), new Vector2(180f, 5f),
+                      new Color(0.04f, 0.04f, 0.05f, 0.7f));
+
+            hud.boostFill = MakeImage(hud.beltPanel.transform, "BoostFill", boostAnchor, boostAnchor,
+                                      new Vector2(0f, -6f), new Vector2(180f, 5f),
+                                      new Color(0.4f, 0.9f, 1f), filled: true);
+            hud.boostFill.gameObject.SetActive(false);
+
+            // Sat just under the crosshair: while a bomb is up, the range is the number
+            // the player is actually reading, and it belongs where they are already
+            // looking rather than in a corner.
+            hud.bombRangeText = MakeText(parent, "BombRange", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), 26, TextAlignmentOptions.Center);
+            hud.bombRangeText.color = new Color(1f, 0.85f, 0.45f);
+        }
+
+        private static GameObject EquipmentPanel(Transform parent, string name, Vector2 offset,
+                                                 out TMP_Text label)
+        {
+            var panel = new GameObject(name, typeof(RectTransform));
+            panel.transform.SetParent(parent, false);
+
+            var rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 0f);
+            rect.anchoredPosition = offset;
+            rect.sizeDelta = new Vector2(220f, 34f);
+
+            label = MakeText(panel.transform, "Label", "", new Vector2(0f, 0f),
+                             Vector2.zero, 24, TextAlignmentOptions.BottomLeft);
+
+            var labelRect = label.GetComponent<RectTransform>();
+            labelRect.sizeDelta = new Vector2(220f, 34f);
+
+            return panel;
         }
 
         /// <summary>

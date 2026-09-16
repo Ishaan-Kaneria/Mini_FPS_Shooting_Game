@@ -51,6 +51,24 @@ public class GameDirector : MonoBehaviour
 
     public float maxComboMultiplier = 4f;
 
+    [Header("Coins")]
+    [Tooltip("Coins for one kill. The store's prices are set against this, so raising it " +
+             "is the same thing as making everything cheaper.")]
+    [Min(0)] public int coinsPerKill = 3;
+
+    [Tooltip("Extra coins for a headshot, on top of the kill. This is what makes aiming " +
+             "worth the time it costs against a crowd -- a headshot is already worth more " +
+             "score, and the score is not what buys the next gun.")]
+    [Min(0)] public int coinsPerHeadshot = 4;
+
+    [Tooltip("Coins per point of score at the end of a level, as a divisor. At 120 a " +
+             "twelve thousand point level pays a hundred coins on top of the kills.")]
+    [Min(1)] public int scorePerCoin = 120;
+
+    [Tooltip("Coins per star. The largest single payment in the game, because clearing a " +
+             "level outright is what the store is meant to reward.")]
+    [Min(0)] public int coinsPerStar = 60;
+
     [Header("Input")]
     [Tooltip("Pauses and unpauses. Also frees the cursor, because a paused game " +
              "with a captured mouse is a game you cannot click out of.")]
@@ -93,6 +111,17 @@ public class GameDirector : MonoBehaviour
     public int Kills { get; private set; }
     public int Headshots { get; private set; }
 
+    /// <summary>
+    /// Coins earned so far this level, from kills alone -- the level-end bonuses land in
+    /// <see cref="ReportLevelFinished"/>. Shown live on the HUD, because a currency the
+    /// player only sees on a results screen is one they never connect to what they did.
+    ///
+    /// Not banked until the level is scored. Banking per kill would mean a player could
+    /// farm a level to the last enemy, quit, and repeat -- and the whole point of the
+    /// clock is that a level has an ending.
+    /// </summary>
+    public int CoinsEarned { get; private set; }
+
     /// <summary>Kills chained inside the combo window. 0 or 1 means no chain yet.</summary>
     public int Combo { get; private set; }
 
@@ -125,6 +154,9 @@ public class GameDirector : MonoBehaviour
 
     /// <summary>Raised per kill with the points awarded, for floating score popups.</summary>
     public event Action<EnemyArchetype, int, Vector3> Killed;
+
+    /// <summary>Raised whenever the coin tally moves, so the HUD can pop its counter.</summary>
+    public event Action<GameDirector, int> CoinsChanged;
 
     float _comboExpiry;
 
@@ -265,6 +297,13 @@ public class GameDirector : MonoBehaviour
         Kills++;
         Score += awarded;
 
+        // Coins are flat per kill and not multiplied by the combo. The combo is the
+        // scoreboard's reward for pushing; making it the wallet's as well would mean a
+        // good chain is worth several minutes of ordinary play, and the store's prices
+        // would have to be written for the chain rather than for the game.
+        int coins = coinsPerKill + (headshot ? coinsPerHeadshot : 0);
+        AddCoins(coins);
+
         ScoreChanged?.Invoke(this);
         ComboChanged?.Invoke(this);
         Killed?.Invoke(archetype, awarded, position);
@@ -279,6 +318,19 @@ public class GameDirector : MonoBehaviour
 
         Score += points;
         ScoreChanged?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Adds to the level's coin tally. Nothing reaches the <see cref="Wallet"/> from
+    /// here -- that happens once, when the level is scored, so a level abandoned halfway
+    /// pays for what was actually killed and a level replayed pays again from zero.
+    /// </summary>
+    public void AddCoins(int amount)
+    {
+        if (amount <= 0 || IsGameOver) return;
+
+        CoinsEarned += amount;
+        CoinsChanged?.Invoke(this, CoinsEarned);
     }
 
     /// <summary>Called when the player takes a hit. Dropping the chain is the cost of being hit.</summary>
@@ -327,6 +379,13 @@ public class GameDirector : MonoBehaviour
     public void ReportLevelFinished(LevelResult result)
     {
         if (IsGameOver) return;
+
+        // The level-end bonuses, added before the result is banked so the number on the
+        // results screen is the number that reached the wallet.
+        CoinsEarned += result.stars * coinsPerStar + result.score / Mathf.Max(1, scorePerCoin);
+        CoinsChanged?.Invoke(this, CoinsEarned);
+
+        result.coins = CoinsEarned;
 
         IsGameOver = true;
         IsPaused = false;
@@ -398,7 +457,11 @@ public class GameDirector : MonoBehaviour
             timeTaken = level != null ? level.TimeLimit - level.TimeRemaining : 0f,
             timeLimit = level != null ? level.TimeLimit : 0f,
             score = Score,
-            headshots = Headshots
+            headshots = Headshots,
+
+            // What was earned by killing, with no star or score bonus on top: walking
+            // out is not a way to be paid for finishing.
+            coins = CoinsEarned
         };
     }
 

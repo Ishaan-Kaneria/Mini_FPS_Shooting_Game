@@ -40,6 +40,17 @@ public class MainMenuController : MonoBehaviour
              "over each other. The grid, the heading and the record panel.")]
     public GameObject[] dashboardOnly;
 
+    [Header("Store")]
+    [Tooltip("The shop. Opened by the Store button, and hidden with the arenas while it " +
+             "is up, exactly like the level select.")]
+    public StorePanel store;
+
+    public Button storeButton;
+
+    [Tooltip("Coins in hand, shown on the dashboard so the player can see what a level " +
+             "just paid without opening the store to find out.")]
+    public TMP_Text coinText;
+
     [Header("Arena Grid")]
     [Tooltip("Parent the cards are cloned into. A layout group on it does the placing.")]
     public RectTransform cardParent;
@@ -139,6 +150,9 @@ public class MainMenuController : MonoBehaviour
             levelSelect.Closed += OnLevelSelectClosed;
         }
 
+        if (store != null) store.Closed += OnStoreClosed;
+
+        Wire(storeButton, OpenStore);
         Wire(exitButton, AskToExit);
         Wire(confirmExitButton, Exit);
         Wire(cancelExitButton, CancelExit);
@@ -148,10 +162,13 @@ public class MainMenuController : MonoBehaviour
 
     void OnDestroy()
     {
-        if (levelSelect == null) return;
+        if (levelSelect != null)
+        {
+            levelSelect.LevelChosen -= Launch;
+            levelSelect.Closed -= OnLevelSelectClosed;
+        }
 
-        levelSelect.LevelChosen -= Launch;
-        levelSelect.Closed -= OnLevelSelectClosed;
+        if (store != null) store.Closed -= OnStoreClosed;
     }
 
     static void Wire(Button button, UnityEngine.Events.UnityAction action)
@@ -164,9 +181,10 @@ public class MainMenuController : MonoBehaviour
 
     void Update()
     {
-        // Nothing behind the level select needs laying out while it is covering the
+        // Nothing behind a full-screen panel needs laying out while it is covering the
         // screen, and the grid it would be measuring is switched off anyway.
         if (levelSelect != null && levelSelect.IsOpen) return;
+        if (store != null && store.IsOpen) return;
 
         FitGrid();
 
@@ -301,6 +319,7 @@ public class MainMenuController : MonoBehaviour
     void ShowProfile()
     {
         if (playerNameText != null) playerNameText.text = PlayerProfile.Name;
+        if (coinText != null) coinText.text = $"{Wallet.Format(Wallet.Balance)} <size=62%>COINS</size>";
         if (starsText != null) starsText.text = $"{TotalStars()} / {PossibleStars()}";
         if (bestScoreText != null) bestScoreText.text = PlayerProfile.BestScore.ToString("N0");
         if (runsText != null) runsText.text = PlayerProfile.Runs.ToString();
@@ -405,6 +424,30 @@ public class MainMenuController : MonoBehaviour
 
         ShowDashboard(false);
         levelSelect.Open(entry);
+    }
+
+    /// <summary>Opens the shop. What the Store button does.</summary>
+    public void OpenStore()
+    {
+        if (store == null)
+        {
+            Report("This dashboard has no store. Run FPSKit > Build Dashboard.");
+            return;
+        }
+
+        ShowDashboard(false);
+        store.Open();
+    }
+
+    void OnStoreClosed()
+    {
+        ShowDashboard(true);
+
+        // Coins and the record panel can both have moved while the shop was open, so
+        // the dashboard is re-read rather than left showing the balance from before.
+        ShowProfile();
+
+        _fittedWidth = _fittedHeight = -1f;
     }
 
     void OnLevelSelectClosed()

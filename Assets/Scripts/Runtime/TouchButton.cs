@@ -5,7 +5,20 @@ using UnityEngine.UI;
 /// <summary>One on-screen action button.</summary>
 public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
-    public enum ActionKind { Fire, Aim, Jump, Sprint, Crouch, Reload, Pause }
+    public enum ActionKind
+    {
+        Fire, Aim, Jump, Sprint, Crouch, Reload, Pause,
+
+        /// <summary>
+        /// Held to aim a bomb and released to throw it, exactly like the key. Held
+        /// rather than queued on purpose: releasing *is* the throw, so a one-shot tap
+        /// could not express it at all.
+        /// </summary>
+        Bomb,
+
+        /// <summary>Drinks one off the belt. Edge-triggered, like reload.</summary>
+        UseItem
+    }
 
     public ActionKind action = ActionKind.Fire;
 
@@ -34,6 +47,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         if (action == ActionKind.Jump) MobileInput.QueueJump();
         else if (action == ActionKind.Reload) MobileInput.QueueReload();
         else if (action == ActionKind.Pause) MobileInput.QueuePause();
+        else if (action == ActionKind.UseItem) MobileInput.QueueUseItem();
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -51,6 +65,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             case ActionKind.Aim: MobileInput.Aim = on; break;
             case ActionKind.Sprint: MobileInput.Sprint = on; break;
             case ActionKind.Crouch: MobileInput.Crouch = on; break;
+            case ActionKind.Bomb: MobileInput.BombAim = on; break;
         }
 
         if (target != null) target.color = on ? activeColor : _idleColor;

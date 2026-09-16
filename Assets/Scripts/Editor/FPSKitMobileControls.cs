@@ -232,6 +232,16 @@ namespace FPSKit.EditorTools
             MakeButton(parent, "ReloadButton", "RELOAD", TouchButton.ActionKind.Reload, false,
                        new Vector2(-660f, 200f), 150f, new Color(1f, 0.85f, 0.4f, 0.22f));
 
+            // The bomb is a hold: press to bring the ring up, slide the look around to
+            // place it, release to throw. It sits above the fire button because those
+            // two are the only controls a thumb uses in the middle of a fight, and it is
+            // the larger of the pair the thumb has to find without looking.
+            MakeButton(parent, "BombButton", "BOMB", TouchButton.ActionKind.Bomb, false,
+                       new Vector2(-450f, 760f), 170f, new Color(1f, 0.6f, 0.2f, 0.26f));
+
+            MakeButton(parent, "ItemButton", "DRINK", TouchButton.ActionKind.UseItem, false,
+                       new Vector2(-660f, 600f), 150f, new Color(0.4f, 0.9f, 1f, 0.24f));
+
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no
             // Escape key, so without it a touch player cannot pause, cannot quit and

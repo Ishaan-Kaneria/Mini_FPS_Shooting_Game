@@ -18,6 +18,13 @@ using UnityEngine;
 /// the same rifle, and a player who beat level six is never sent back into it with the
 /// level-one gun because they quit to the dashboard in between.
 ///
+/// It composes with the store rather than competing with it. What the player bought is
+/// permanent and lives on <see cref="PlayerLoadout"/>; what the level hands over is this
+/// curve; and the two multiply, because a maxed rifle on level eight should be a maxed
+/// rifle *and* a level-eight one. Both go through the same
+/// <see cref="Weapon.ApplyUpgrades"/> call, which is absolute, so whichever of the two
+/// components runs first cannot leave the other's half behind.
+///
 /// Nothing here is written to the WeaponData asset. That is the important part: the
 /// asset is one shared ScriptableObject, so a bonus written into it would survive
 /// quitting the game and start the next attempt already upgraded -- and would compound
@@ -34,6 +41,11 @@ public class PlayerProgression : MonoBehaviour
 
     [Tooltip("Found in the scene when empty.")]
     public LevelManager levelManager;
+
+    [Tooltip("Where the bought upgrades come from. Found on this object when empty. " +
+             "Without one the level curve is the only curve, which is what a scene that " +
+             "never went through the store should get.")]
+    public PlayerLoadout loadout;
 
     [Header("Magazine")]
     [Tooltip("Rounds added to the magazine for each level below this one. The stock " +
@@ -83,6 +95,7 @@ public class PlayerProgression : MonoBehaviour
     void Start()
     {
         if (weapon == null) weapon = GetComponentInChildren<Weapon>();
+        if (loadout == null) loadout = GetComponent<PlayerLoadout>();
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
         if (levelManager == null) levelManager = FindAnyObjectByType<LevelManager>();
@@ -145,7 +158,16 @@ public class PlayerProgression : MonoBehaviour
         _announced = true;
     }
 
-    void Apply()
+    /// <summary>
+    /// Hands the composed rifle to the weapon: what was bought, times what the level
+    /// gives. Public and absolute, because PlayerLoadout calls it too -- the two run in
+    /// an order neither of them controls, and an absolute call cannot double-apply.
+    ///
+    /// The caps are on the level's half only. A store upgrade the player paid coins for
+    /// must not be silently swallowed by a ceiling that exists to stop the *level* curve
+    /// running away with itself.
+    /// </summary>
+    public void Apply()
     {
         if (weapon == null) return;
 
@@ -155,7 +177,17 @@ public class PlayerProgression : MonoBehaviour
 
         float reload = Mathf.Max(minReloadMultiplier, 1f - reloadSpeedBonusPerLevel * Steps);
 
-        weapon.ApplyUpgrades(magazine, damage, reload, Steps > 0);
+        float fireRate = 1f;
+
+        if (loadout != null)
+        {
+            magazine += loadout.StoreMagazineBonus;
+            damage *= loadout.StoreDamageMultiplier;
+            reload *= loadout.StoreReloadMultiplier;
+            fireRate = loadout.StoreFireRateMultiplier;
+        }
+
+        weapon.ApplyUpgrades(magazine, damage, reload, fireRate, topUpMagazine: true);
 
         Summary = Steps <= 0
             ? ""

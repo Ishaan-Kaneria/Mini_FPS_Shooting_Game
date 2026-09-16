@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6077009092455da449d8fceb0c88662d, type: 3}
+  m_Name: Gun_DMR
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponData
+  weaponName: Marksman DMR
+  fireMode: 0
+  roundsPerMinute: 200
+  damage: 62
+  maxRange: 260
+  pelletsPerShot: 1
+  burstCount: 3
+  burstInterval: 0.07
+  falloffStart: 90
+  falloffEnd: 220
+  minDamageFactor: 0.8
+  magazineSize: 12
+  reserveAmmo: 150
+  maxReserveAmmo: 360
+  reloadTime: 2.4
+  autoReloadWhenEmpty: 1
+  infiniteReserve: 1
+  infiniteAmmo: 0
+  baseSpread: 0.12
+  spreadPerShot: 0.8
+  maxSpread: 4.5
+  spreadRecovery: 7
+  adsSpreadMultiplier: 0.15
+  movementSpreadPenalty: 1.6
+  airborneSpreadPenalty: 2.5
+  recoilVertical: 2.2
+  recoilHorizontal: 0.3
+  recoilRecovery: 9
+  adsRecoilMultiplier: 0.7
+  visualKickback: 0.045
+  adsFieldOfView: 26
+  adsPosition: {x: 0, y: -0.02, z: 0.12}
+  adsSpeed: 12
+  muzzleFlashDuration: 0.045
+  impactForce: 35
+  cameraShake: 0.3
+  fireClip: {fileID: 8300000, guid: 63da0a84f4945c9aab87d69e6dedcc8d, type: 3}
+  reloadClip: {fileID: 8300000, guid: 4e11845933db44619adbc649c9bf8ea2, type: 3}
+  emptyClip: {fileID: 8300000, guid: 75ab90f74094cc38184cac61a2b794a7, type: 3}
+  pitchVariance: 0.06
+  muzzleFlashPrefab: {fileID: 2134951606029692187, guid: 8a79f2628d8bdbc7e804f0f81f251750, type: 3}
+  tracerPrefab: {fileID: 2247844606418610152, guid: cafbe0e8fd18c73c9b941c758f06c078, type: 3}
+  tracerSpeed: 240
+  impacts: {fileID: 11400000, guid: 368d78fa5d59c944f81a0100fd9381c3, type: 2}

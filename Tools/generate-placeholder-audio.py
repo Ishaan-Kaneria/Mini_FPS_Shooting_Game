@@ -323,3 +323,47 @@ save(f"{A}/UI/level_failed.wav",
          note(0.14, 0.70, 277.18, 0.60, 1.9),    # C#4
          note(0.14, 0.70, 233.08, 0.32, 1.9),    # A#3
          gain(env(lowpass(n(secs(0.35)), 220), power=4), 0.30)))
+
+
+# ---- explosives and supplies -------------------------------------------------
+# Appended last, like everything else that draws from the seeded noise stream.
+
+# The throw: cloth and a grunt of effort, over in a tenth of a second.
+save(f"{A}/SFX/bomb_throw.wav",
+     mix(gain(env(highpass(lowpass(n(secs(0.16)), 2600), 600), power=5), 0.55),
+         gain(env(tone(0.10, 320, 180), power=6), 0.25)))
+
+# The blast. Three layers, because an explosion that is only noise is a hiss and one
+# that is only a thump is a door closing: a crack off the front, a body of filtered
+# noise with a long tail, and a sub-bass drop underneath that is most of what makes it
+# feel large on a speaker that cannot reproduce it.
+_crack = env(highpass(n(secs(0.35)), 1400), power=6)
+_body  = env(lowpass(n(secs(1.10)), 420), power=2.2)
+_rumble = env(lowpass(n(secs(1.40)), 120), power=1.4)
+_drop  = env(tone(0.70, 90, 28), power=2.0)
+
+save(f"{A}/SFX/explosion.wav",
+     mix(gain(_crack, 0.75), gain(_body, 0.95), gain(_rumble, 0.85), gain(_drop, 0.7)))
+
+# The drink: a can cracking open, three swallows, and a rising tone as the rush lands.
+def swallow(at, t):
+    return cat(blank(at), gain(env(lowpass(n(secs(t)), 380), attack=0.01, power=4), 0.5))
+
+save(f"{A}/SFX/drink.wav",
+     mix(gain(env(highpass(n(secs(0.05)), 3000), power=9), 0.6),        # the tab
+         swallow(0.10, 0.10), swallow(0.26, 0.10), swallow(0.42, 0.12),
+         gain(cat(blank(0.30), blip(0.55, 440, 880, 1.6, attack=0.08)), 0.45)))
+
+# ---- store -------------------------------------------------------------------
+# A coin is a short pair of high partials a fifth apart -- the interval is what makes
+# two notes read as money rather than as a beep.
+save(f"{A}/UI/coin.wav",
+     mix(gain(blip(0.09, 1568, 1568, 4.0), 0.7),
+         gain(cat(blank(0.045), blip(0.22, 2349, 2349, 3.2)), 0.55)))
+
+# A purchase: the coin, then a low confirming thud, so spending feels like a weight
+# changing hands rather than like another click.
+save(f"{A}/UI/purchase.wav",
+     mix(gain(blip(0.10, 784, 1046, 3.0), 0.75),
+         gain(cat(blank(0.08), blip(0.34, 1318, 1568, 2.0)), 0.7),
+         gain(env(lowpass(n(secs(0.18)), 300), power=5), 0.3)))

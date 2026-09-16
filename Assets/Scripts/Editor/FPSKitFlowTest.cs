@@ -421,7 +421,8 @@ namespace FPSKit.EditorTools
         /// saw it and no click was ever delivered. The only honest test is to fire a
         /// raycast at where the button is and see whether it comes back.
         /// </summary>
-        static string UnclickableButtonIn(MainMenuController menu)
+        /// <summary>Internal so FPSKitStoreTest can raycast the store the same way.</summary>
+        internal static string UnclickableButtonIn(MainMenuController menu)
         {
             var raycaster = menu.GetComponent<UnityEngine.UI.GraphicRaycaster>();
             if (raycaster == null) return "the dashboard canvas has no GraphicRaycaster";

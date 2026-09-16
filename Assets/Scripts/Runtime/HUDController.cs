@@ -22,6 +22,13 @@ public class HUDController : MonoBehaviour
     public Health playerHealth;
     public LevelManager levelManager;
 
+    [Tooltip("Found on the player when empty. Drives the bomb counter and the range " +
+             "readout; the whole block hides when the player owns no bomb.")]
+    public BombThrower bombs;
+
+    [Tooltip("Found on the player when empty. Drives the belt counter and the rush bar.")]
+    public ConsumableBelt belt;
+
     [Header("Text")]
     public TMP_Text ammoText;
     public TMP_Text healthText;
@@ -39,6 +46,11 @@ public class HUDController : MonoBehaviour
 
     public TMP_Text scoreText;
     public TMP_Text comboText;
+
+    [Tooltip("Coins earned this level. Live rather than only on the results screen -- a " +
+             "currency the player never sees themselves earning is one they never " +
+             "connect to what they did.")]
+    public TMP_Text coinText;
 
     [Header("Health Bars")]
     public Image healthFill;
@@ -65,6 +77,30 @@ public class HUDController : MonoBehaviour
     public Color objectiveClearColor = new Color(0.55f, 0.95f, 0.65f);
 
     public Color objectiveColor = new Color(0.95f, 0.78f, 0.3f);
+
+    [Header("Equipment")]
+    [Tooltip("The bomb counter and its key hint. Hidden entirely when there is no bomb.")]
+    public GameObject bombPanel;
+
+    public TMP_Text bombText;
+
+    [Tooltip("The range readout shown while a bomb is being aimed -- how far away the " +
+             "ring is, and whether the distance has been locked.")]
+    public TMP_Text bombRangeText;
+
+    [Tooltip("The belt counter. Hidden when the store sells no consumable.")]
+    public GameObject beltPanel;
+
+    public TMP_Text beltText;
+
+    [Tooltip("Drains across an energy drink's rush, so the player can see it running out.")]
+    public Image boostFill;
+
+    public Color equipmentReadyColor = new Color(0.92f, 0.91f, 0.89f);
+
+    [Tooltip("Flashed when a key is pressed with nothing to spend. An equipment key " +
+             "that silently does nothing reads as a broken key.")]
+    public Color equipmentEmptyColor = new Color(1f, 0.4f, 0.35f);
 
     [Header("Crosshair")]
     public CanvasGroup crosshairGroup;
@@ -190,6 +226,20 @@ public class HUDController : MonoBehaviour
         // scene the builder never touched. Done in Awake so OnEnable can subscribe.
         _director = GameDirector.Ensure();
 
+        // Found here for the same reason, and not in Start: OnEnable runs between the
+        // two and is where these are subscribed to, so a Start-time lookup would find
+        // them a frame after the only chance to hook their events.
+        if (bombs == null || belt == null)
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+
+            if (player != null)
+            {
+                if (bombs == null) bombs = player.GetComponentInChildren<BombThrower>();
+                if (belt == null) belt = player.GetComponentInChildren<ConsumableBelt>();
+            }
+        }
+
         _currentGap = crosshairBaseGap;
         _hitmarkerTint = crosshairColor;
 
@@ -244,8 +294,20 @@ public class HUDController : MonoBehaviour
         // characters, on screen, three times across the strip.
         const string Dim = "<color=#B8AFA0>";
 
+        // The equipment keys are only advertised when the player actually has that
+        // equipment. A strip that lists a bomb key for somebody who owns no bomb is
+        // three words of screen spent telling them about a control that does nothing.
+        string equipment = "";
+
+        if (bombs != null && bombs.data != null)
+            equipment += $"{Key(BombKey())} {Dim}BOMB</color>     ";
+
+        if (belt != null && belt.data != null)
+            equipment += $"{Key(ItemKey())} {Dim}DRINK</color>     ";
+
         if (instructionText != null)
             instructionText.text =
+                equipment +
                 $"{pauseLabel} {Dim}PAUSE</color>     " +
                 $"{Key(resume)} {Dim}RESUME</color>     " +
                 $"{Key(quit)} {Dim}QUIT</color>";
@@ -297,6 +359,9 @@ public class HUDController : MonoBehaviour
 
         if (levelManager != null) levelManager.LevelStarted += OnLevelStarted;
 
+        if (bombs != null) bombs.Denied += OnBombDenied;
+        if (belt != null) belt.Denied += OnBeltDenied;
+
         if (progression != null) progression.Upgraded += OnUpgraded;
 
         // Subscribed here rather than in Start, alongside every other source. Started in
@@ -321,6 +386,9 @@ public class HUDController : MonoBehaviour
 
         if (levelManager != null) levelManager.LevelStarted -= OnLevelStarted;
 
+        if (bombs != null) bombs.Denied -= OnBombDenied;
+        if (belt != null) belt.Denied -= OnBeltDenied;
+
         if (progression != null) progression.Upgraded -= OnUpgraded;
 
         if (_director != null)
@@ -340,6 +408,7 @@ public class HUDController : MonoBehaviour
         UpdateBanner();
         UpdateBossBar();
         UpdateObjectiveBar();
+        UpdateEquipment();
         UpdateIndicators();
     }
 
@@ -376,6 +445,12 @@ public class HUDController : MonoBehaviour
     int _shownLevel = Unset;
     int _shownKilled = Unset, _shownClock = Unset;
     int _shownBriefing = Unset;
+    int _shownCoins = Unset;
+    int _shownBombs = Unset, _shownBeltCount = Unset;
+    int _shownRange = Unset;
+
+    /// <summary>When the equipment counters stop being flashed red. Unscaled.</summary>
+    float _bombDeniedUntil, _beltDeniedUntil;
 
     void UpdateTexts()
     {
@@ -386,6 +461,7 @@ public class HUDController : MonoBehaviour
         {
             UpdateScoreText();
             UpdateComboText();
+            UpdateCoinText();
         }
 
         if (levelManager == null) return;
@@ -446,6 +522,14 @@ public class HUDController : MonoBehaviour
 
         _shownScore = _director.Score;
         scoreText.text = _shownScore.ToString("N0");
+    }
+
+    void UpdateCoinText()
+    {
+        if (coinText == null || _director.CoinsEarned == _shownCoins) return;
+
+        _shownCoins = _director.CoinsEarned;
+        coinText.text = _shownCoins > 0 ? $"+{Wallet.Format(_shownCoins)} <size=62%>COINS</size>" : "";
     }
 
     void UpdateComboText()
@@ -579,6 +663,126 @@ public class HUDController : MonoBehaviour
         marker.anchorMax = new Vector2(x, marker.anchorMax.y);
         marker.anchoredPosition = new Vector2(0f, marker.anchoredPosition.y);
     }
+
+    /// <summary>
+    /// The two counters down the side: bombs in hand and drinks on the belt.
+    ///
+    /// Both hide their whole panel rather than showing a zero when the player has none
+    /// of that kind of thing at all. A counter reading "0" says "you have run out"; a
+    /// player who never bought a bomb has not run out of anything, and offering them a
+    /// key hint for one is offering a control that does nothing.
+    /// </summary>
+    void UpdateEquipment()
+    {
+        UpdateBombs();
+        UpdateBelt();
+    }
+
+    void UpdateBombs()
+    {
+        bool has = bombs != null && bombs.data != null;
+
+        if (bombPanel != null && bombPanel.activeSelf != has) bombPanel.SetActive(has);
+        if (!has) return;
+
+        if (bombText != null && bombs.charges != _shownBombs)
+        {
+            _shownBombs = bombs.charges;
+            bombText.text = $"{Key(BombKey())} <size=130%>x{_shownBombs}</size>";
+        }
+
+        if (bombText != null)
+            bombText.color = Time.unscaledTime < _bombDeniedUntil
+                ? equipmentEmptyColor
+                : equipmentReadyColor;
+
+        if (bombRangeText == null) return;
+
+        // Keyed at the resolution it is drawn at, like every other label here.
+        int range = bombs.IsAiming ? Mathf.RoundToInt(bombs.AimRange) : Hidden;
+        int keyed = bombs.IsAiming ? range * 2 + (bombs.RangeLocked ? 1 : 0) : Hidden;
+
+        if (keyed == _shownRange) return;
+        _shownRange = keyed;
+
+        if (!bombs.IsAiming)
+        {
+            bombRangeText.text = string.Empty;
+            return;
+        }
+
+        bombRangeText.text = bombs.RangeLocked
+            ? $"<color=#66F0FF>{range} m  LOCKED</color>"
+            : $"{range} m   <size=70%>{Key(AimKey())} TO LOCK</size>";
+    }
+
+    void UpdateBelt()
+    {
+        bool has = belt != null && belt.data != null;
+
+        if (beltPanel != null && beltPanel.activeSelf != has) beltPanel.SetActive(has);
+        if (!has) return;
+
+        if (beltText != null && belt.Count != _shownBeltCount)
+        {
+            _shownBeltCount = belt.Count;
+            beltText.text = $"{Key(ItemKey())} <size=130%>x{_shownBeltCount}</size>";
+        }
+
+        if (beltText != null)
+            beltText.color = Time.unscaledTime < _beltDeniedUntil
+                ? equipmentEmptyColor
+                : belt.BoostActive ? belt.data.tint : equipmentReadyColor;
+
+        if (boostFill == null) return;
+
+        bool boosting = belt.BoostActive;
+        if (boostFill.gameObject.activeSelf != boosting) boostFill.gameObject.SetActive(boosting);
+
+        if (boosting)
+        {
+            boostFill.fillAmount = belt.BoostNormalized;
+            boostFill.color = belt.data.tint;
+        }
+    }
+
+    KeyCode BombKey()
+    {
+        var controls = PlayerControls();
+        return controls != null ? controls.bomb : KeyCode.G;
+    }
+
+    KeyCode ItemKey()
+    {
+        var controls = PlayerControls();
+        return controls != null ? controls.useItem : KeyCode.F;
+    }
+
+    KeyCode AimKey()
+    {
+        var controls = PlayerControls();
+        return controls != null ? controls.aim : KeyCode.Mouse1;
+    }
+
+    /// <summary>
+    /// The live bindings, read off whatever the player is actually using rather than
+    /// off a copy. Same reason the key hints are written from the director: a hint that
+    /// names a key which has been rebound is worse than no hint at all.
+    /// </summary>
+    ControlSettings PlayerControls()
+    {
+        if (_controls != null) return _controls;
+
+        var motor = FindAnyObjectByType<PlayerMotor>();
+        _controls = motor != null ? motor.controls : null;
+
+        return _controls;
+    }
+
+    ControlSettings _controls;
+
+    void OnBombDenied(BombThrower source) => _bombDeniedUntil = Time.unscaledTime + 0.6f;
+    void OnBeltDenied(ConsumableBelt source) => _beltDeniedUntil = Time.unscaledTime + 0.6f;
 
     // ======================================================================
     void UpdateHealthBars()

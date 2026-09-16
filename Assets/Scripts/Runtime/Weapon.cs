@@ -43,47 +43,98 @@ public class Weapon : MonoBehaviour
     /// <summary>Current cone half-angle in degrees, including movement penalties.</summary>
     public float CurrentSpread { get; private set; }
 
-    // ---- per-run upgrades -------------------------------------------------
+    // ---- upgrades ---------------------------------------------------------
     //
     // These live on the component and never on the WeaponData asset. That is not a
     // style preference: WeaponData is a ScriptableObject, and a ScriptableObject is a
-    // single shared instance. Writing a wave's damage bonus into it would edit the
-    // asset on disk in the editor -- so wave 12's rifle would still be wave 12's rifle
-    // after quitting, restarting, and starting a fresh run -- and in a build it would
-    // compound across every restart for the life of the process. Every upgrade is
-    // therefore a multiplier applied on the way out, and the asset stays the baseline
-    // the run starts from. See PlayerProgression, which is what sets them.
+    // single shared instance. Writing a bought upgrade into it would edit the asset on
+    // disk in the editor -- so a maxed rifle would still be maxed after quitting,
+    // restarting and clearing the profile -- and in a build it would compound across
+    // every restart for the life of the process. Every upgrade is therefore a
+    // multiplier applied on the way out, and the asset stays the baseline.
+    //
+    // Two things set them, and PlayerProgression composes both: the permanent upgrades
+    // bought in the store, and the per-level curve. A third, the energy drink, is
+    // deliberately kept separate below -- it is temporary, and folding a rush into the
+    // same numbers would mean the thing that puts them back has to know what they were.
 
-    /// <summary>Rounds added to the magazine by wave upgrades.</summary>
+    /// <summary>Rounds added to the magazine by upgrades.</summary>
     public int MagazineBonus { get; private set; }
 
-    /// <summary>Multiplier on the asset's damage. 1 is the unupgraded rifle.</summary>
+    /// <summary>Multiplier on the asset's damage. 1 is the unupgraded gun.</summary>
     public float DamageMultiplier { get; private set; } = 1f;
 
     /// <summary>Multiplier on the asset's reload time. Below 1 is a faster reload.</summary>
     public float ReloadTimeMultiplier { get; private set; } = 1f;
 
+    /// <summary>
+    /// Multiplier on rounds per minute -- the bullets per second an upgrade actually
+    /// buys. Above 1 is faster, and it shortens the gap between shots rather than
+    /// lengthening it, which is why SecondsBetweenShots divides by it.
+    /// </summary>
+    public float FireRateMultiplier { get; private set; } = 1f;
+
+    // ---- the rush ---------------------------------------------------------
+    //
+    // Set by ConsumableBelt while an energy drink is running and put straight back to 1
+    // when it ends. Separate fields rather than folded into the upgrades above, because
+    // whatever puts them back must not have to remember what the upgrades were.
+
+    /// <summary>Temporary fire rate multiplier from a consumable. 1 when none is running.</summary>
+    [System.NonSerialized] public float BoostFireRateMultiplier = 1f;
+
+    /// <summary>Temporary reload multiplier from a consumable. Below 1 is faster.</summary>
+    [System.NonSerialized] public float BoostReloadTimeMultiplier = 1f;
+
     /// <summary>The magazine the gun actually holds right now.</summary>
     public int MagazineSize => data == null ? 0 : Mathf.Max(1, data.magazineSize + MagazineBonus);
 
     /// <summary>The reload the gun actually takes right now, in seconds.</summary>
-    public float ReloadTime => data == null ? 0f : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier);
+    public float ReloadTime => data == null
+        ? 0f
+        : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier * Mathf.Max(0.05f, BoostReloadTimeMultiplier));
 
-    /// <summary>Damage at a given range, with the run's upgrades folded in.</summary>
+    /// <summary>
+    /// Seconds between shots, with both fire rate multipliers folded in. This is the
+    /// single place the gun's cadence is decided -- the data asset's own
+    /// SecondsBetweenShots is the baseline and is never read directly by the firing code.
+    /// </summary>
+    public float SecondsBetweenShots
+    {
+        get
+        {
+            if (data == null) return 0.1f;
+
+            float rate = Mathf.Max(0.05f, FireRateMultiplier) * Mathf.Max(0.05f, BoostFireRateMultiplier);
+
+            // Floored, not just clamped by the multipliers: a gun that can be upgraded
+            // and then boosted into firing every other frame is a gun that empties its
+            // magazine before the sound of the first round has finished.
+            return Mathf.Max(0.02f, data.SecondsBetweenShots / rate);
+        }
+    }
+
+    /// <summary>Rounds per minute as the player would read it. For the store card.</summary>
+    public float RoundsPerMinute => SecondsBetweenShots <= 0f ? 0f : 60f / SecondsBetweenShots;
+
+    /// <summary>Damage at a given range, with the upgrades folded in.</summary>
     public float DamageAtDistance(float distance)
         => data == null ? 0f : data.DamageAtDistance(distance) * DamageMultiplier;
 
     /// <summary>
-    /// Applies a set of run upgrades. Absolute rather than incremental on purpose --
-    /// the caller owns the curve, and re-applying the same wave's values twice has to
-    /// be harmless, because the wave loop can be restarted mid-run.
+    /// Applies a set of upgrades. Absolute rather than incremental on purpose -- the
+    /// caller owns the curve, and re-applying the same values twice has to be harmless,
+    /// because PlayerLoadout and PlayerProgression both call it and neither knows which
+    /// of them ran first.
     /// </summary>
     public void ApplyUpgrades(int magazineBonus, float damageMultiplier,
-                              float reloadTimeMultiplier, bool topUpMagazine = true)
+                              float reloadTimeMultiplier, float fireRateMultiplier = 1f,
+                              bool topUpMagazine = true)
     {
         MagazineBonus = Mathf.Max(0, magazineBonus);
         DamageMultiplier = Mathf.Max(0.01f, damageMultiplier);
         ReloadTimeMultiplier = Mathf.Clamp(reloadTimeMultiplier, 0.05f, 4f);
+        FireRateMultiplier = Mathf.Clamp(fireRateMultiplier, 0.05f, 6f);
 
         // A bigger magazine that arrives empty is not a reward. Topping up here also
         // covers the case the bonus shrank -- CurrentAmmo has to come back inside it.
@@ -96,7 +147,36 @@ public class Weapon : MonoBehaviour
     }
 
     /// <summary>Back to the asset's own numbers. Used when a run restarts.</summary>
-    public void ResetUpgrades() => ApplyUpgrades(0, 1f, 1f);
+    public void ResetUpgrades() => ApplyUpgrades(0, 1f, 1f, 1f);
+
+    /// <summary>
+    /// Puts a different gun in the player's hands.
+    ///
+    /// Called by PlayerLoadout once the store selection is known, which is after Awake
+    /// has already initialised the ammo from whatever the builder wired -- so the
+    /// magazine and reserve have to be re-read here rather than left at the old gun's.
+    /// Upgrades are cleared rather than carried across: they are the *other* gun's, and
+    /// PlayerProgression re-applies this one's immediately afterwards.
+    /// </summary>
+    public void Equip(WeaponData weapon)
+    {
+        if (weapon == null || weapon == data) return;
+
+        data = weapon;
+
+        MagazineBonus = 0;
+        DamageMultiplier = 1f;
+        ReloadTimeMultiplier = 1f;
+        FireRateMultiplier = 1f;
+
+        ClearRoutineState();
+
+        CurrentAmmo = MagazineSize;
+        ReserveAmmo = weapon.reserveAmmo;
+        _spreadBonus = 0f;
+
+        AmmoChanged?.Invoke(this);
+    }
 
     public event Action<Weapon> Fired;
     public event Action<Weapon> AmmoChanged;
@@ -105,6 +185,7 @@ public class Weapon : MonoBehaviour
     public event Action<Weapon> ReloadFinished;
 
     PlayerMotor _motor;
+    BombThrower _bombs;
     ControlSettings _fallbackControls;
     Vector3 _hipPosition;
     float _baseFieldOfView;
@@ -130,6 +211,7 @@ public class Weapon : MonoBehaviour
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
         _motor = GetComponentInParent<PlayerMotor>();
+        _bombs = GetComponentInParent<BombThrower>();
         _hipPosition = transform.localPosition;
         _baseFieldOfView = fpsCamera != null ? fpsCamera.fieldOfView : 75f;
 
@@ -168,7 +250,12 @@ public class Weapon : MonoBehaviour
     {
         if (data == null || fpsCamera == null) return;
 
-        bool inputAllowed = PlayerMotor.InputEnabled;
+        // A bomb being aimed takes the hands. Without this the aim key would pull the
+        // sights up at the same time as it locked the throw range, and the fire button
+        // would empty a magazine into the floor the player is placing a ring on.
+        bool aimingBomb = _bombs != null && _bombs.IsAiming;
+
+        bool inputAllowed = PlayerMotor.InputEnabled && !aimingBomb;
 
         var controls = Controls;
 
@@ -253,7 +340,7 @@ public class Weapon : MonoBehaviour
 
         _burstInProgress = false;
         _burstRoutine = null;
-        _nextFireTime = Time.time + data.SecondsBetweenShots;
+        _nextFireTime = Time.time + SecondsBetweenShots;
     }
 
     // ======================================================================
@@ -270,7 +357,7 @@ public class Weapon : MonoBehaviour
         }
 
         if (!data.infiniteAmmo) CurrentAmmo--;
-        _nextFireTime = Time.time + data.SecondsBetweenShots;
+        _nextFireTime = Time.time + SecondsBetweenShots;
 
         for (int i = 0; i < Mathf.Max(1, data.pelletsPerShot); i++)
             FireRay();

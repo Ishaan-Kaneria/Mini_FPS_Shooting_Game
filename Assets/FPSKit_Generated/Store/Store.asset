@@ -1,0 +1,156 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca9b1e2b48f3864399b9a3c9ef544c2c, type: 3}
+  m_Name: Store
+  m_EditorClassIdentifier: Assembly-CSharp::StoreCatalog
+  guns:
+  - id: rifle
+    displayName: Service Rifle
+    description: The one you start with. Nothing it does is remarkable and nothing it does is wrong.
+    data: {fileID: 11400000, guid: dad05708dad824e469b33cb3091b4469, type: 2}
+    price: 0
+    ownedFromStart: 1
+    upgrades:
+      basePrice: 300
+      growth: 1.6
+      maxLevel: 5
+    damagePerLevel: 0.12
+    fireRatePerLevel: 0.09
+    magazinePerLevel: 3
+    reloadPerLevel: 0.05
+  - id: smg
+    displayName: Vector SMG
+    description: Empties a wide magazine very fast and asks you to be close. The crowd gun.
+    data: {fileID: 11400000, guid: 56d7b27287cb2184db90df43b1cfd93f, type: 2}
+    price: 1400
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 320
+      growth: 1.6
+      maxLevel: 5
+    damagePerLevel: 0.13
+    fireRatePerLevel: 0.06
+    magazinePerLevel: 5
+    reloadPerLevel: 0.06
+  - id: shotgun
+    displayName: Breacher
+    description: Nine pellets at once, and nothing at all past twenty metres. Bosses hate it up close.
+    data: {fileID: 11400000, guid: 4d05e73affca01755be6a5e78bb7b488, type: 2}
+    price: 2600
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 360
+      growth: 1.62
+      maxLevel: 5
+    damagePerLevel: 0.14
+    fireRatePerLevel: 0.1
+    magazinePerLevel: 1
+    reloadPerLevel: 0.07
+  - id: burst
+    displayName: Tactical Burst
+    description: Three rounds a pull, tight and controllable. Rewards a player who picks their shots.
+    data: {fileID: 11400000, guid: 5c264f4e49779b133ad094164873ca05, type: 2}
+    price: 3400
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 380
+      growth: 1.62
+      maxLevel: 5
+    damagePerLevel: 0.13
+    fireRatePerLevel: 0.08
+    magazinePerLevel: 3
+    reloadPerLevel: 0.05
+  - id: dmr
+    displayName: Marksman DMR
+    description: One heavy round at a time, across the whole arena. Headshots are worth real coins with this.
+    data: {fileID: 11400000, guid: 7fd98e1061f9d9f5095fc673c5216bd2, type: 2}
+    price: 4200
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 420
+      growth: 1.65
+      maxLevel: 5
+    damagePerLevel: 0.12
+    fireRatePerLevel: 0.11
+    magazinePerLevel: 2
+    reloadPerLevel: 0.05
+  - id: lmg
+    displayName: Suppressor LMG
+    description: A hundred rounds that never stop, and a reload you will regret starting. The boss-level gun.
+    data: {fileID: 11400000, guid: b007f3c786d8d7e199b859de63f333f6, type: 2}
+    price: 5600
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 460
+      growth: 1.65
+      maxLevel: 5
+    damagePerLevel: 0.12
+    fireRatePerLevel: 0.07
+    magazinePerLevel: 10
+    reloadPerLevel: 0.08
+  bombs:
+  - id: frag
+    displayName: Frag Bomb
+    description: Two a level, thrown on a one-second arc. The ring on the ground is exactly what it will hurt.
+    data: {fileID: 11400000, guid: 31a5b2fbf01bba49d9b39731690b10c7, type: 2}
+    price: 0
+    ownedFromStart: 1
+    upgrades:
+      basePrice: 350
+      growth: 1.6
+      maxLevel: 5
+    damagePerLevel: 0.15
+    radiusPerLevel: 0.7
+    upgradesPerExtraCharge: 2
+  - id: cluster
+    displayName: Cluster Charge
+    description: Half the punch over twice the ground, and three of them a level. For a crowd that will not stand still.
+    data: {fileID: 11400000, guid: eca3caae23d32d0a6b839283fe1c2c2e, type: 2}
+    price: 1800
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 380
+      growth: 1.6
+      maxLevel: 5
+    damagePerLevel: 0.14
+    radiusPerLevel: 0.9
+    upgradesPerExtraCharge: 3
+  - id: thermite
+    displayName: Thermite Shell
+    description: Everything it has, in four metres. Land it on the boss or waste it.
+    data: {fileID: 11400000, guid: c396e04ce06f845888cd8f9a487bd065, type: 2}
+    price: 3200
+    ownedFromStart: 0
+    upgrades:
+      basePrice: 500
+      growth: 1.7
+      maxLevel: 5
+    damagePerLevel: 0.16
+    radiusPerLevel: 0.4
+    upgradesPerExtraCharge: 3
+  consumables:
+  - id: energy
+    data: {fileID: 11400000, guid: 173955aa581f8264494ca77bb9019d9c, type: 2}
+    price: 220
+    packSize: 3
+    maxCarried: 9
+  - id: adrenaline
+    data: {fileID: 11400000, guid: 39492b601c281b868a974b4ade76b0a1, type: 2}
+    price: 420
+    packSize: 2
+    maxCarried: 6
+  healthUpgrades:
+    basePrice: 250
+    growth: 1.45
+    maxLevel: 0
+  healthPerLevel: 12
+  shieldPerLevel: 5

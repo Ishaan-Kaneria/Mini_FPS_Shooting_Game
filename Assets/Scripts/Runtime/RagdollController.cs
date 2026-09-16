@@ -72,6 +72,11 @@ public class RagdollController : MonoBehaviour
 
         foreach (var bone in _bones)
         {
+            // Guarded the same way SetRagdollActive guards it. The array is captured
+            // once in Awake, so anything that removes a bone afterwards leaves a hole
+            // here -- and reading worldCenterOfMass through one throws.
+            if (bone == null) continue;
+
             float distance = (bone.worldCenterOfMass - _lastHit.point).sqrMagnitude;
             if (distance >= best) continue;
 

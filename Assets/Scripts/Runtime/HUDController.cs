@@ -115,6 +115,9 @@ public class HUDController : MonoBehaviour
 
     readonly List<Indicator> _indicators = new List<Indicator>();
 
+    /// <summary>Cached crosshair arm Images. See CrosshairImages.</summary>
+    Image[] _crosshairImages;
+
     struct Indicator
     {
         public CanvasGroup group;
@@ -437,12 +440,8 @@ public class HUDController : MonoBehaviour
         SetArm(3, new Vector2(_currentGap, 0f));    // Right
 
         Color tint = Time.unscaledTime < _hitmarkerUntil ? _hitmarkerTint : crosshairColor;
-        foreach (var arm in crosshairArms)
-        {
-            if (arm == null) continue;
-            var image = arm.GetComponent<Image>();
+        foreach (var image in CrosshairImages())
             if (image != null) image.color = tint;
-        }
 
         if (crosshairGroup != null)
         {
@@ -450,6 +449,33 @@ public class HUDController : MonoBehaviour
             crosshairGroup.alpha = Mathf.Lerp(crosshairGroup.alpha, target,
                                               Mathf.Clamp01(16f * Time.unscaledDeltaTime));
         }
+    }
+
+    /// <summary>
+    /// The arms' Image components, resolved once instead of per frame.
+    ///
+    /// The tint loop called GetComponent on all four arms every frame -- 240 lookups a
+    /// second to write a colour that only moves when a hitmarker lands. It sits in a
+    /// method Update calls rather than in Update itself, which is the same place the
+    /// HUD's per-frame string building hid.
+    ///
+    /// Rebuilt whenever the arm count changes, which covers both a rig rewired at
+    /// runtime and the first call after a scene reload. An Image[] is a plain array of
+    /// UnityEngine.Object references, so unlike a property block it does survive a
+    /// mid-play domain reload -- but the arms it points at do not survive a scene load.
+    /// </summary>
+    Image[] CrosshairImages()
+    {
+        if (crosshairArms == null) return System.Array.Empty<Image>();
+
+        if (_crosshairImages == null || _crosshairImages.Length != crosshairArms.Length)
+            _crosshairImages = new Image[crosshairArms.Length];
+
+        for (int i = 0; i < crosshairArms.Length; i++)
+            if (_crosshairImages[i] == null && crosshairArms[i] != null)
+                _crosshairImages[i] = crosshairArms[i].GetComponent<Image>();
+
+        return _crosshairImages;
     }
 
     void SetArm(int index, Vector2 position)

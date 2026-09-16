@@ -53,8 +53,29 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 
     void Update()
     {
-        // Hold the fire flag briefly so a single frame tap still registers a shot.
-        if (_fireUntil > 0f && Time.unscaledTime < _fireUntil) MobileInput.Fire = true;
-        else if (_fireUntil > 0f) { MobileInput.Fire = false; _fireUntil = 0f; }
+        if (_fireUntil <= 0f) return;
+
+        // Held briefly so a tap that lasted a single frame still registers as a shot.
+        if (Time.unscaledTime < _fireUntil)
+        {
+            MobileInput.SetFireTap(true);
+            return;
+        }
+
+        MobileInput.SetFireTap(false);
+        _fireUntil = 0f;
+    }
+
+    /// <summary>
+    /// Switched off with the control layer, the way the buttons do it. A tap left
+    /// pending when this is disabled has nothing to clear it afterwards, and the
+    /// weapon would go on reading a trigger pull that no longer has a finger behind it.
+    /// </summary>
+    void OnDisable()
+    {
+        if (_fireUntil <= 0f) return;
+
+        MobileInput.SetFireTap(false);
+        _fireUntil = 0f;
     }
 }

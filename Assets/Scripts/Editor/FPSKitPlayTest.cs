@@ -267,7 +267,7 @@ namespace FPSKit.EditorTools
         /// Holds the trigger through MobileInput, which Weapon reads directly. That is
         /// the only seam a test has into firing without synthesising keyboard events.
         /// </summary>
-        static void SetFiring(bool on) => MobileInput.Fire = on;
+        static void SetFiring(bool on) => MobileInput.SetFireButton(on);
 
         /// <summary>Populates the damage number pool, so the teardown has something to get wrong.</summary>
         static void SeedDamageNumbers()

@@ -60,6 +60,9 @@ public class Weapon : MonoBehaviour
     bool _burstInProgress;
     bool _mobileFireWasDown;
 
+    /// <summary>The one muzzle flash, replayed per shot. See PlayMuzzleFlash.</summary>
+    GameObject _muzzleFlash;
+
     // Held so the flags above can be checked against the routines they describe. See
     // ClearRoutineState, and the domain reload section of CLAUDE.md.
     Coroutine _reloadRoutine;
@@ -441,12 +444,50 @@ public class Weapon : MonoBehaviour
             _muzzleLightOffTime = Time.time + data.muzzleFlashDuration;
         }
 
-        if (data.muzzleFlashPrefab != null && muzzlePoint != null)
+        PlayMuzzleFlash();
+    }
+
+    /// <summary>
+    /// Shows the muzzle flash, reusing the one instance rather than building another.
+    ///
+    /// A flash was instantiated per shot and destroyed a second later. At 600 rounds a
+    /// minute that is ten objects created and destroyed every second the trigger is
+    /// held, with up to ten of them hanging off the muzzle at once -- for an effect
+    /// TransientFlash switches off after a twentieth of a second. Only one was ever
+    /// visible anyway: they all sit at the same point, so each new one appeared inside
+    /// the last. One instance, switched off and on again, is the same picture.
+    ///
+    /// Created on demand rather than in Awake because a scene reload destroys what this
+    /// points at while the reference itself survives -- and because TransientFlash resets
+    /// its age, scale and roll in OnEnable precisely so it can be replayed this way.
+    /// </summary>
+    void PlayMuzzleFlash()
+    {
+        if (data.muzzleFlashPrefab == null || muzzlePoint == null) return;
+
+        // Only a prefab that switches itself off can be replayed. Anything else has to
+        // be built and destroyed per shot, because nothing would ever hide it again --
+        // reusing one would leave it lit from the first round onward. Same fallback
+        // SpawnTracer keeps for a prefab that predates TracerProjectile.
+        if (data.muzzleFlashPrefab.GetComponent<TransientFlash>() == null)
         {
-            var flash = Instantiate(data.muzzleFlashPrefab, muzzlePoint.position,
-                                    muzzlePoint.rotation, muzzlePoint);
-            Destroy(flash, 1f);
+            Destroy(Instantiate(data.muzzleFlashPrefab, muzzlePoint.position,
+                                muzzlePoint.rotation, muzzlePoint), 1f);
+            return;
         }
+
+        if (_muzzleFlash == null)
+        {
+            // Instantiated active, so OnEnable has already run it from the start.
+            _muzzleFlash = Instantiate(data.muzzleFlashPrefab, muzzlePoint.position,
+                                       muzzlePoint.rotation, muzzlePoint);
+            return;
+        }
+
+        // Off first: a flash still playing from the previous round has to be cycled,
+        // because OnEnable is the only thing that rewinds it.
+        _muzzleFlash.SetActive(false);
+        _muzzleFlash.SetActive(true);
     }
 
     void UpdateMuzzleLight()

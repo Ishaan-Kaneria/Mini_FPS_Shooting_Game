@@ -46,7 +46,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
         switch (action)
         {
-            case ActionKind.Fire: MobileInput.Fire = on; break;
+            case ActionKind.Fire: MobileInput.SetFireButton(on); break;
             case ActionKind.Aim: MobileInput.Aim = on; break;
             case ActionKind.Sprint: MobileInput.Sprint = on; break;
             case ActionKind.Crouch: MobileInput.Crouch = on; break;

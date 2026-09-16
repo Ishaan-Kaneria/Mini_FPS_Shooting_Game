@@ -14,14 +14,33 @@ public static class MobileInput
     public static bool Active;
 
     public static Vector2 Move;      // -1..1 per axis, from the joystick
-    public static bool Fire;
     public static bool Aim;
     public static bool Sprint;
     public static bool Crouch;
 
+    /// <summary>
+    /// True while anything on screen is asking for fire.
+    ///
+    /// Two independent controls can ask, and they overlap: the fire button while it is
+    /// held, and the look area for a moment after a tap lands on it. They shared one
+    /// bool, so whichever finished last won -- a tap expiring switched off a fire button
+    /// that was still held down, and letting go of the button cut a tap short. Each owns
+    /// its own flag now and this reports either, so neither can answer for the other.
+    /// </summary>
+    public static bool Fire => _fireButton || _fireTap;
+
+    static bool _fireButton;
+    static bool _fireTap;
+
     static Vector2 _lookDelta;       // screen pixels accumulated since last read
     static bool _jumpQueued;
     static bool _reloadQueued;
+
+    /// <summary>Held state of the on-screen fire button.</summary>
+    public static void SetFireButton(bool held) => _fireButton = held;
+
+    /// <summary>Set while a tap on the look area still counts as a trigger pull.</summary>
+    public static void SetFireTap(bool active) => _fireTap = active;
 
     public static void AddLook(Vector2 pixels) => _lookDelta += pixels;
 
@@ -72,7 +91,8 @@ public static class MobileInput
     {
         Move = Vector2.zero;
         _lookDelta = Vector2.zero;
-        Fire = Aim = Sprint = Crouch = false;
+        Aim = Sprint = Crouch = false;
+        _fireButton = _fireTap = false;
         _jumpQueued = _reloadQueued = false;
     }
 }

@@ -4,7 +4,14 @@ using UnityEngine;
 /// <summary>
 /// Everything a damage event carries. Passed by value so callers can safely
 /// mutate a copy (hitboxes multiply the amount before forwarding it on).
+///
+/// Serializable so that a field holding one survives a mid-play domain reload.
+/// Without the attribute Unity's reload backup drops it while the plain bool
+/// beside it survives, which is the asymmetry CLAUDE.md warns about:
+/// RagdollController kept _hasLastHit and lost _lastHit, then shoved the bone
+/// nearest the world origin with a force of nothing.
 /// </summary>
+[Serializable]
 public struct DamageInfo
 {
     public float amount;

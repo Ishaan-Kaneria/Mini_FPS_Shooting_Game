@@ -149,9 +149,17 @@ public class HUDController : MonoBehaviour
         if (_director != null) restartKey = _director.restartKey;
 
         if (pauseHintText != null)
-            pauseHintText.text =
-                $"<size=60%>{Director?.pauseKey ?? KeyCode.Escape} resume    " +
-                $"{restartKey} restart    {Director?.quitKey ?? KeyCode.Q} quit</size>";
+        {
+            string hint = $"{Director?.pauseKey ?? KeyCode.Escape} resume    " +
+                          $"{restartKey} restart";
+
+            // A browser build has nowhere to quit to, so the key does nothing there --
+            // and a menu advertising a key that does nothing reads as a broken game.
+            if (GameDirector.CanQuit)
+                hint += $"    {Director?.quitKey ?? KeyCode.Q} quit";
+
+            pauseHintText.text = $"<size=60%>{hint}</size>";
+        }
     }
 
     void OnEnable()

@@ -60,8 +60,24 @@ public class GameDirector : MonoBehaviour
     [Tooltip("Restarts the level. Offered on both the pause menu and the game over screen.")]
     public KeyCode restartKey = KeyCode.R;
 
-    [Tooltip("Quits from the pause menu. Stops play mode in the editor.")]
+    [Tooltip("Quits from the pause menu. Stops play mode in the editor, and is ignored " +
+             "in a browser, where there is nothing to quit to.")]
     public KeyCode quitKey = KeyCode.Q;
+
+    /// <summary>
+    /// Whether leaving the game is a thing this build can do.
+    ///
+    /// False in a browser. Application.Quit() there tears the player down and leaves a
+    /// frozen canvas on the page with no way back but a reload -- so a pause menu that
+    /// offers the key is offering to strand whoever presses it. The HUD reads this to
+    /// decide whether to print the hint at all.
+    /// </summary>
+    public static bool CanQuit =>
+#if UNITY_WEBGL && !UNITY_EDITOR
+        false;
+#else
+        true;
+#endif
 
     public int Score { get; private set; }
     public int Kills { get; private set; }
@@ -161,7 +177,7 @@ public class GameDirector : MonoBehaviour
 
         if (IsPaused)
         {
-            if (Input.GetKeyDown(quitKey)) QuitGame();
+            if (CanQuit && Input.GetKeyDown(quitKey)) QuitGame();
             else if (Input.GetKeyDown(pauseKey)) TogglePause();
             return;
         }
@@ -289,6 +305,8 @@ public class GameDirector : MonoBehaviour
 
     public void QuitGame()
     {
+        if (!CanQuit) return;
+
         Time.timeScale = 1f;
 
 #if UNITY_EDITOR

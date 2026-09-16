@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{{ PRODUCT_NAME.replace(/_/g, ' ') }}}</title>
+
+    <!-- viewport-fit=cover keeps the canvas under the notch instead of beside it, and
+         user-scalable=no stops a two-finger look drag from pinch-zooming the page. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0d10">
+    <meta name="description" content="Hold the arena against endless waves. Runs in the browser -- no install.">
+    <meta property="og:title" content="{{{ PRODUCT_NAME.replace(/_/g, ' ') }}}">
+    <meta property="og:description" content="Hold the arena against endless waves. Runs in the browser -- no install.">
+    <meta property="og:type" content="website">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23ff8a3d' stroke-width='2.5'/%3E%3Cpath d='M16 1v8M16 23v8M1 16h8M23 16h8' stroke='%23ff8a3d' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+
+    <style>
+      :root {
+        --bg: #0b0d10;
+        --panel: rgba(18, 22, 28, 0.92);
+        --ink: #e8ecf2;
+        --muted: #8c97a6;
+        --accent: #ff8a3d;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        /* The game binds arrows, Space and Ctrl. Every one of those scrolls a page, so
+           there must be nothing here that can scroll. */
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      #game {
+        position: fixed;
+        inset: 0;
+        /* dvh tracks the collapsing browser bars on mobile; without it Safari's toolbar
+           sits on top of the bottom row of touch buttons. */
+        height: 100vh;
+        height: 100dvh;
+      }
+
+      #unity-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        /* Stops a look-drag being read as a page scroll or a double-tap zoom. */
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+        outline: none;
+      }
+
+      /* ---------- loading / failure overlay ---------- */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        padding: 24px;
+        box-sizing: border-box;
+        background: radial-gradient(circle at 50% 35%, #161b22 0%, var(--bg) 70%);
+        text-align: center;
+        /* A short landscape phone cannot fit title, bar, legend and note at once, and
+           the body cannot scroll by design, so this panel has to do it itself. */
+        overflow-y: auto;
+        transition: opacity 0.4s ease-out;
+      }
+
+      #overlay.fading { opacity: 0; pointer-events: none; }
+      #overlay.gone { display: none; }
+
+      #title {
+        margin: 0;
+        font-size: clamp(22px, 5vw, 38px);
+        font-weight: 650;
+        letter-spacing: 0.02em;
+      }
+
+      #title em { color: var(--accent); font-style: normal; }
+
+      #track {
+        width: min(340px, 78vw);
+        height: 6px;
+        border-radius: 3px;
+        background: #232a33;
+        overflow: hidden;
+      }
+
+      #fill {
+        width: 0%;
+        height: 100%;
+        background: var(--accent);
+        transition: width 0.2s ease-out;
+      }
+
+      #progress {
+        min-height: 1.4em;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      #note { font-size: 12px; color: #5f6873; }
+
+      #failure {
+        display: none;
+        width: min(520px, 90vw);
+        padding: 18px 20px;
+        box-sizing: border-box;
+        border: 1px solid #5a2b2b;
+        border-radius: 10px;
+        background: #1c1315;
+        color: #ffb4a8;
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: left;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* ---------- controls legend ---------- */
+      /* Nothing in this layer may swallow a click: the first click on the canvas is what
+         captures the mouse, and an overlay that ate it would look like a dead game. */
+      #legend, #hint {
+        pointer-events: none;
+        transition: opacity 0.5s ease-out;
+      }
+
+      #legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+        gap: 10px 22px;
+        width: min(520px, 90vw);
+        padding: 18px 20px;
+        box-sizing: border-box;
+        border: 1px solid #222932;
+        border-radius: 10px;
+        background: var(--panel);
+        font-size: 13px;
+      }
+
+      #legend div {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      #legend span:first-child { color: var(--muted); }
+
+      #legend span:last-child {
+        color: var(--ink);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      #hint {
+        display: none;
+        padding: 12px 26px;
+        border-radius: 8px;
+        background: var(--panel);
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      /* Once the game is up, the panel keeps only the legend and the prompt and floats
+         them over the live arena. Parking them in a corner instead would mean picking a
+         corner that the HUD does not already use -- and on a phone the bottom left, the
+         obvious choice, is exactly where the movement stick sits. */
+      #overlay.handoff {
+        background: none;
+        pointer-events: none;
+        gap: 18px;
+      }
+
+      #overlay.handoff #title,
+      #overlay.handoff #track,
+      #overlay.handoff #progress,
+      #overlay.handoff #note { display: none; }
+
+      /* ---------- in-game warnings (Unity's showBanner) ---------- */
+      #banner {
+        position: fixed;
+        left: 50%;
+        top: 12px;
+        z-index: 20;
+        transform: translateX(-50%);
+        display: none;
+        max-width: 90vw;
+        font-size: 13px;
+      }
+
+      #banner div {
+        margin-bottom: 6px;
+        padding: 8px 14px;
+        border-radius: 6px;
+        background: #2a2118;
+        color: #ffd9a8;
+      }
+
+      /* ---------- fullscreen ---------- */
+      #fullscreen {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 15;
+        display: none;
+        padding: 7px 14px;
+        border: 1px solid #2b333d;
+        border-radius: 6px;
+        background: rgba(20, 24, 30, 0.8);
+        color: var(--muted);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        opacity: 0.35;
+        transition: opacity 0.15s;
+      }
+
+      #fullscreen:hover { opacity: 1; color: var(--ink); }
+    </style>
+  </head>
+
+  <body>
+    <div id="game">
+      <canvas id="unity-canvas" width="{{{ WIDTH }}}" height="{{{ HEIGHT }}}" tabindex="-1"></canvas>
+    </div>
+
+    <button id="fullscreen" type="button">Fullscreen</button>
+    <div id="banner"></div>
+
+    <div id="overlay">
+      <h1 id="title">{{{ PRODUCT_NAME.replace(/_/g, ' ').replace(/(\S+)$/, '<em>$1</em>') }}}</h1>
+
+      <div id="track"><div id="fill"></div></div>
+      <div id="progress">Loading&hellip;</div>
+
+      <div id="legend">
+        <div><span>Move</span><span>WASD / Arrows</span></div>
+        <div><span>Look</span><span>Mouse</span></div>
+        <div><span>Fire</span><span>Left click</span></div>
+        <div><span>Aim</span><span>Right click</span></div>
+        <div><span>Jump</span><span>Space</span></div>
+        <div><span>Sprint</span><span>Shift</span></div>
+        <div><span>Crouch</span><span>Ctrl</span></div>
+        <div><span>Reload</span><span>R</span></div>
+        <div><span>Pause</span><span>Esc</span></div>
+      </div>
+
+      <div id="hint">Click to play</div>
+      <div id="failure"></div>
+      <div id="note">First load downloads about 26&nbsp;MB. It is cached after that.</div>
+    </div>
+
+    <script>
+      // Deliberately not named "status", "name" or "length": those are legacy window
+      // properties, and a global var of that name is silently coerced to a string.
+      var canvas     = document.querySelector("#unity-canvas");
+      var overlay    = document.querySelector("#overlay");
+      var track      = document.querySelector("#track");
+      var fill       = document.querySelector("#fill");
+      var progress   = document.querySelector("#progress");
+      var legend     = document.querySelector("#legend");
+      var hint       = document.querySelector("#hint");
+      var failure    = document.querySelector("#failure");
+      var note       = document.querySelector("#note");
+      var banner     = document.querySelector("#banner");
+      var fsButton   = document.querySelector("#fullscreen");
+
+      var started = false;
+
+      // A touchscreen laptop answers yes to "any-pointer: coarse" and yes to "fine" as
+      // well. Only a device with no fine pointer at all is genuinely touch-only, and
+      // that is the test a user-agent string cannot do: an iPad has reported itself as a
+      // Macintosh since iPadOS 13, so every /iPad/ check in the wild misses it.
+      var touchOnly = !!(window.matchMedia &&
+                         window.matchMedia("(any-pointer: coarse)").matches &&
+                         !window.matchMedia("(any-pointer: fine)").matches);
+
+      if (touchOnly) {
+        legend.innerHTML =
+          "<div><span>Move</span><span>Left stick</span></div>" +
+          "<div><span>Look</span><span>Drag the right half</span></div>" +
+          "<div><span>Fire / aim / jump</span><span>On-screen buttons</span></div>";
+        hint.textContent = "Tap to play";
+      }
+
+      function fail(message) {
+        track.style.display = "none";
+        progress.style.display = "none";
+        note.style.display = "none";
+        legend.style.display = "none";
+        failure.style.display = "block";
+        failure.textContent = message;
+        overlay.classList.remove("fading", "gone", "handoff");
+      }
+
+      // Unity routes non-fatal warnings here. The stock template answers with alert(),
+      // which drops the pointer lock and stops the game dead for something survivable.
+      function showBanner(message, type) {
+        var line = document.createElement("div");
+        line.textContent = message;
+        if (type === "error") {
+          line.style.background = "#3a1d1d";
+          line.style.color = "#ffb4a8";
+        }
+        banner.appendChild(line);
+        banner.style.display = "block";
+        if (type === "error") return;
+        setTimeout(function () {
+          if (line.parentNode) banner.removeChild(line);
+          if (!banner.children.length) banner.style.display = "none";
+        }, 5000);
+      }
+
+      // Called once the player has touched the game. The legend has done its job by
+      // then -- it was on screen for the whole download -- so it gets out of the way.
+      function dismissHints() {
+        if (!started || overlay.classList.contains("fading")) return;
+        overlay.classList.add("fading");
+        setTimeout(function () { overlay.classList.add("gone"); }, 500);
+      }
+
+      var config = {
+        arguments: [],
+        dataUrl: "Build/{{{ DATA_FILENAME }}}",
+        frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_WASM
+        codeUrl: "Build/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+        symbolsUrl: "Build/{{{ SYMBOLS_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        showBanner: showBanner,
+        // A phone renders every pixel of a 3x display for no visible gain and a large
+        // frame-time one. Desktops keep their sharpness, capped so that a 4x panel does
+        // not quietly ask for sixteen times the fill rate.
+        devicePixelRatio: touchOnly ? 1 : Math.min(window.devicePixelRatio || 1, 2)
+      };
+
+      if (!("WebAssembly" in window)) {
+        fail("This browser cannot run WebAssembly, which the game needs.\n\n" +
+             "Try a current version of Chrome, Edge, Firefox or Safari.");
+      } else {
+        var loaderScript = document.createElement("script");
+        loaderScript.src = "Build/{{{ LOADER_FILENAME }}}";
+
+        loaderScript.onerror = function () {
+          fail("Could not download the game loader.\n\nCheck your connection and reload.");
+        };
+
+        loaderScript.onload = function () {
+          if (typeof createUnityInstance !== "function") {
+            fail("The game loader did not load correctly.\n\nReload the page to try again.");
+            return;
+          }
+
+          createUnityInstance(canvas, config, function (p) {
+            // Brotli arrives decompressed by the browser, so bytes-received can run
+            // past the Content-Length the ratio is measured from and report 137%.
+            var pct = Math.round(Math.max(0, Math.min(1, p)) * 100);
+            fill.style.width = pct + "%";
+            progress.textContent = "Loading " + pct + "%";
+          }).then(function (unityInstance) {
+            started = true;
+
+            // The panel goes see-through rather than putting a "play" button in the
+            // way: the click that dismisses a button never reaches the canvas, so the
+            // player would have to click twice -- once for the page, once to capture
+            // the mouse. Now the first click does the only thing it needs to.
+            overlay.classList.add("handoff");
+            hint.style.display = "block";
+            canvas.focus();
+            if (!touchOnly) fsButton.style.display = "block";
+
+            // A player who reads nothing and clicks straight away clears this on the
+            // first click. This is for the one who does not click at all.
+            setTimeout(dismissHints, 8000);
+
+            fsButton.addEventListener("click", function () {
+              unityInstance.SetFullscreen(1);
+              canvas.focus();
+            });
+          }).catch(function (message) {
+            fail("The game failed to start.\n\n" + message);
+          });
+        };
+
+        document.body.appendChild(loaderScript);
+      }
+
+      // Right click is the aim binding. While the pointer is locked the browser
+      // suppresses its own menu, but the first right click of a session lands before
+      // that and would otherwise open it over the arena.
+      canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+      // Clicking the canvas has to put keyboard focus back on it, or the movement keys
+      // go to the document and the player walks nowhere.
+      canvas.addEventListener("pointerdown", function () {
+        canvas.focus();
+        dismissHints();
+      });
+
+      window.addEventListener("keydown", dismissHints);
+
+      // Esc drops the pointer lock and opens the game's own pause menu, so the
+      // fullscreen button is only reachable in that state. It hides itself during play
+      // rather than sitting over the arena collecting stray clicks.
+      document.addEventListener("pointerlockchange", function () {
+        if (touchOnly || !started) return;
+        fsButton.style.display = document.pointerLockElement ? "none" : "block";
+      });
+    </script>
+  </body>
+</html>

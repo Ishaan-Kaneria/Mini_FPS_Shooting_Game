@@ -43,6 +43,11 @@ namespace FPSKit.EditorTools
         private const string FallbackArg = "-fpskitFallback";
 
         /// <summary>
+        /// Folder name under Assets/WebGLTemplates that holds the page the build ships.
+        /// </summary>
+        private const string WebTemplateName = "FPSKit";
+
+        /// <summary>
         /// Rebuilds and saves one scene per theme, registering each in Build
         /// Settings. Destructive: it overwrites every generated scene.
         /// </summary>
@@ -348,6 +353,18 @@ namespace FPSKit.EditorTools
             // A returning visitor gets the payload from the browser cache instead of
             // downloading it again.
             PlayerSettings.WebGL.dataCaching = true;
+
+            // Unity's stock page is a 960x600 canvas in the corner of a white document,
+            // titled "Unity Web Player", with no hint of what any key does and an
+            // alert() for a loading failure. Ours is in Assets/WebGLTemplates/FPSKit.
+            // Named with the PROJECT: prefix, which is how Unity tells a template in the
+            // project from one shipped with the editor.
+            PlayerSettings.WebGL.template = "PROJECT:" + WebTemplateName;
+
+            string templateDir = $"Assets/WebGLTemplates/{WebTemplateName}";
+            if (!Directory.Exists(templateDir))
+                throw new Exception($"{templateDir} is missing -- the build would " +
+                                    "silently fall back to Unity's stock page.");
 
             Debug.Log($"[FPSKitBatch] WebGL: Brotli, decompression fallback " +
                       $"{(decompressionFallback ? "ON (works on any static host)" : "OFF (host must send Content-Encoding: br)")}, " +

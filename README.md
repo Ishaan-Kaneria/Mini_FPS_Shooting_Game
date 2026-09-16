@@ -352,7 +352,7 @@ Tools/unity-batch.sh FPSKitBatch.BuildWebGL -buildTarget WebGL -fpskitFallback f
 
 The page that build ships is `Assets/WebGLTemplates/FPSKit/index.html`, not Unity's stock template: full-viewport canvas, the control legend on screen during the download, an error panel instead of `alert()`, and the pointer/keyboard handling a canvas game needs in a browser. `Build/WebGL/index.html` is output — change the template, not the copy in the build.
 
-Writes `Build/WebGL/`, which is gitignored — a WebGL payload is tens of megabytes and git would keep it forever. Upload the folder to any static host; drag it onto [app.netlify.com/drop](https://app.netlify.com/drop) and you have a link in about a minute.
+Writes `Build/WebGL/`, which is gitignored — a WebGL payload is tens of megabytes, and git would keep it forever. Upload the folder to any static host; drag it onto [app.netlify.com/drop](https://app.netlify.com/drop), and you have a link in about a minute.
 
 To rebuild and republish in one step:
 
@@ -362,7 +362,7 @@ Tools/deploy-web.sh --no-build   # deploy what is already built
 Tools/deploy-web.sh --dry-run    # build and check, stop before uploading
 ```
 
-It needs `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` in the environment and talks to Netlify's deploy API with `curl`, so there is no Node toolchain to install for one command. It refuses to upload a folder the build did not just write — publishing a stale build is the one failure that looks exactly like success from the outside.
+It needs `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` in the environment and calls Netlify's deploy API with `curl`, so there is no Node toolchain to install for one command. It refuses to upload a folder that the build did not just write — publishing a stale build is the one failure that looks exactly like success from the outside.
 
 There is no content-only update: Unity bakes every asset into `WebGL.data.br`, so changing a single number means a full rebuild. Rebuilds after the first are faster, because shader compilation dominates and that cache survives.
 
@@ -370,17 +370,17 @@ There is no content-only update: Unity bakes every asset into `WebGL.data.br`, s
 
 `.github/workflows/deploy-web.yml` does the same thing on every push to `main` that touches `Assets/`, `Packages/` or `ProjectSettings/`, and can also be run by hand from the Actions tab.
 
-Netlify cannot be pointed at this repository directly. Its build images carry Node, Python and Ruby, not a licensed Unity Editor, so the build has to happen in Actions and Netlify is handed the finished folder.
+Netlify cannot be pointed at this repository directly. Its build images carry Node, Python, and Ruby, not a licensed Unity Editor, so the build has to happen in Actions, and Netlify is handed the finished folder.
 
-Five repository secrets are needed. `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` are the same two the script uses. The other three are Unity's: `UNITY_LICENSE` (the whole contents of a `Unity_lic.ulf`), `UNITY_EMAIL` and `UNITY_PASSWORD` for the account it was issued to.
+Five repository secrets are needed. `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` are the same two the script uses. The other three are Unity's: `UNITY_LICENSE` (the contents of a `Unity_lic.ulf`), `UNITY_EMAIL`, and `UNITY_PASSWORD` for the account it was issued to.
 
-The `.ulf` has to come from Unity Hub on a machine you have signed in on — **Preferences → Licenses**. Unity has stopped supporting manual activation of Personal licences, so the old route of asking Unity for an `.alf` from CI and exchanging it for a `.ulf` no longer exists. Note that a Hub showing a valid licence has not necessarily written a `.ulf` to disk; if there is none, re-activate from that screen to make it produce one.
+The `.ulf` has to come from Unity Hub on a machine you have signed in on — **Preferences → Licenses**. Unity has stopped supporting manual activation of Personal licenses, so the old approach of asking Unity for an `.alf` from CI and exchanging it for a `.ulf` no longer works. Note that a Hub showing a valid license has not necessarily written a `.ulf` to disk; if there is none, reactivate from that screen to produce one.
 
-Expect the first run or two to need adjusting — Unity in CI usually does. If the licence cannot be made to work at all, `Tools/deploy-web.sh` does the same job from a machine that is already activated, which is every machine you can build on anyway.
+Expect the first run or two to need adjusting — Unity in CI usually does. If the license cannot be made to work at all, `Tools/deploy-web.sh` does the same job from a machine that is already activated, which is every machine you can build on anyway.
 
 All six arenas ship, plus the dashboard, which has to be index 0 or the build opens straight into a fight. The scene list is passed explicitly rather than read from Build Settings, which still carries Unity's empty `SampleScene`. Each arena is staged as a renamed copy so the touch layer can be baked in without leaving it in the generated scene — which is why a player's stars are filed under the arena's *level set* rather than under the scene name.
 
-**`-fpskitFallback` decides whether the build depends on its host.** Unity ships the payload already Brotli-compressed and needs the server to answer with `Content-Encoding: br`. Leave the fallback on (the default) and a JavaScript decompressor is bundled, so the build runs on any static host — GitHub Pages included — at the cost of a slower start. Turn it off for a host that sends the header itself, which is what the `_headers` file written beside the build configures for Netlify and Cloudflare Pages. Get this wrong and the loading bar never finishes, with nothing in the console to say why.
+**`-fpskitFallback` decides whether the build depends on its host.** Unity ships the payload already Brotli-compressed and needs the server to answer with `Content-Encoding: br`. Leave the fallback on (the default), and a JavaScript decompressor is bundled, so the build runs on any static host — GitHub Pages included — at the cost of a slower start. Turn it off for a host that sends the header itself, which is what the `_headers` file written beside the build configures for Netlify and Cloudflare Pages. Get this wrong, and the loading bar never finishes, with nothing in the console to say why.
 
 `VerifyLevels`, `VerifyFlow`, `VerifyCombat` and `VerifyReplay` enter real play mode and fail on any console error.
 
@@ -400,7 +400,7 @@ holding the gun they started with.
 
 `VerifyBuild` is the one worth running in CI. A build that throws no exception proves very little — the builder wires dozens of references by hand, and a null one shows up as a black screen or a level that never starts, not as an error. It checks the things that fail silently: the player rig and its camera, the weapon's data asset, the enemy roster and its boss entry, the arena's level set, the bomb thrower and its aim indicator, every store item's prefabs, every HUD binding, the results screen, and whether the NavMesh actually baked.
 
-Every entry point sets its own exit code, so a scene that failed to build fails the run instead of reporting green. The script refuses to start while the Unity editor holds the project lock.
+Every entry point sets its own exit code, so a scene that failed to build causes the run to fail instead of reporting green. The script refuses to start while the Unity editor holds the project lock.
 
 ---
 
@@ -408,8 +408,8 @@ Every entry point sets its own exit code, so a scene that failed to build fails 
 
 - Gameplay reads the **legacy `UnityEngine.Input` API**. The one exception is raw mouse look, which uses the Input System's `Mouse.current.delta` when available and falls back to `Input.GetAxisRaw` otherwise. Both paths are kept working on purpose.
 - Look sensitivity uses the Valorant/CS convention: degrees turned = counts × sensitivity × 0.022, read raw with no smoothing or acceleration.
-- Art comes from the *RPG/FPS Game Assets for PC — Industrial Set* pack under `Assets/RPG_FPS_game_assets_industrial/`. It is third-party material under the Unity Asset Store EULA, not this repository's licence — see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). The gameplay does not depend on it: arenas are built from primitives by `LevelTheme`, and a fork that deletes the folder still builds and plays.
-- Audio in `Assets/Audio/` is synthesised from scratch by `Tools/generate-placeholder-audio.py` with nothing but the Python standard library.
+- Art comes from the *RPG/FPS Game Assets for PC — Industrial Set* pack under `Assets/RPG_FPS_game_assets_industrial/`. It is third-party material under the Unity Asset Store EULA, not this repository's license — see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). The gameplay does not depend on it: arenas are built from primitives by `LevelTheme`, and a fork that deletes the folder still builds and plays.
+- Audio in `Assets/Audio/` is synthesized from scratch by `Tools/generate-placeholder-audio.py` with nothing but the Python standard library.
 
 ---
 
@@ -417,12 +417,12 @@ Every entry point sets its own exit code, so a scene that failed to build fails 
 
 Issues and pull requests are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup, the checks to run before opening a PR, and the five conventions that exist because breaking them produces bugs that compile cleanly — the big ones being that generated content is output rather than source, and that every static needs a reset hook because domain reload is disabled.
 
-[`CLAUDE.md`](CLAUDE.md) is the long version, with the reasoning behind each decision.
+[`CLAUDE.md`](CLAUDE.md) is the long version that includes the reasoning behind each decision.
 
 ---
 
 ## Licence
 
-[MIT](LICENSE) — for the code, the editor tooling, the CI, the WebGL template and the generated content.
+[MIT](LICENSE) — for the code, the editor tooling, the CI, the WebGL template, and the generated content.
 
 **Not** for the bundled art pack, which keeps its own terms. [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) says exactly what is covered by which.

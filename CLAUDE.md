@@ -34,7 +34,7 @@ Caveats worth knowing before you touch input:
 - The single exception is `PlayerMotor.ReadMouseCounts()`, which has a `#if ENABLE_INPUT_SYSTEM` branch using `Mouse.current.delta` for raw, unsmoothed mouse look when `rawMouseInput` is on. It falls back to `Input.GetAxisRaw` otherwise. Keep both branches working.
 - `Assets/InputSystem_Actions.inputactions` is leftover from the Unity template and is not referenced by any gameplay code.
 
-Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject (`FPSKit_Generated/Controls.asset`). Defaults are unconventional — **arrows move, Space fires, double-tap Space sprints, left click jumps** — with W/A/S/D wired as always-live alternates. Read new keys through `ControlSettings` helpers rather than calling `Input.GetKey` with a literal `KeyCode`.
+Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject (`FPSKit_Generated/Controls.asset`). What ships there is the `StandardFPS` preset — **arrows and W/A/S/D both move, left click fires, right click aims, Space jumps, Shift sprints, Ctrl/C crouch, R reloads** — and `ControlSettings.Preset` also carries `ArrowsAndMouse` and `ArrowsAndSpace` (arrows move, Space fires, double-tap Space sprints, click jumps), applied from the custom inspector. Read new keys through `ControlSettings` helpers rather than calling `Input.GetKey` with a literal `KeyCode`.
 
 ## The scene builder regenerates everything
 

@@ -1030,9 +1030,39 @@ namespace FPSKit.EditorTools
             var mat = MakeTintableMaterial(name, color, 0.3f, 0f, shared: true);
             if (mat == null) return null;
 
-            mat.SetColor("_EmissionColor", color * intensity);
-            EditorUtility.SetDirty(mat);
+            SetEmission(mat, color * intensity);
             return mat;
+        }
+
+        /// <summary>
+        /// Sets an emission colour and the GI flag that has to agree with it.
+        ///
+        /// Unity maintains the pair itself -- FixupEmissiveFlag drops EmissiveIsBlack the
+        /// moment a material with a real emission colour is loaded -- so a builder that
+        /// writes the colour without the flag is writing a state Unity will not leave
+        /// alone. The result was a permanent ping-pong: every build wrote flag 6, the
+        /// next time anyone opened the editor Unity rewrote it to 2, and five generated
+        /// materials showed up as modified in every single session. Harmless, and exactly
+        /// the kind of noise a real change gets lost in.
+        ///
+        /// Writing what Unity would normalise to is what stops that. MakeTintableMaterial
+        /// still sets the pair to BakedEmissive|EmissiveIsBlack, which is correct for the
+        /// materials that stay black and are tinted per instance by a property block.
+        /// </summary>
+        private static void SetEmission(Material mat, Color emission)
+        {
+            if (mat == null) return;
+
+            if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", emission);
+
+            bool black = emission.maxColorComponent <= 0.0001f;
+
+            mat.globalIlluminationFlags = black
+                ? MaterialGlobalIlluminationFlags.BakedEmissive |
+                  MaterialGlobalIlluminationFlags.EmissiveIsBlack
+                : MaterialGlobalIlluminationFlags.BakedEmissive;
+
+            EditorUtility.SetDirty(mat);
         }
 
         /// <summary>
@@ -3006,12 +3036,8 @@ namespace FPSKit.EditorTools
             // rebuild. Re-stamping is idempotent and the material is shared, so the
             // prefab keeps pointing at one the current builder still agrees with.
             var material = MakeTintableMaterial(assetName, color, 0.6f, 0.1f, shared: true);
-            if (material != null)
-            {
-                // Pickups glow so they read on a dark floor across the arena.
-                material.SetColor("_EmissionColor", color * 1.8f);
-                EditorUtility.SetDirty(material);
-            }
+            // Pickups glow so they read on a dark floor across the arena.
+            SetEmission(material, color * 1.8f);
 
             // Stamped out here with the material, above the existing-prefab check, so a
             // kept prefab picks the sound up on the next build.

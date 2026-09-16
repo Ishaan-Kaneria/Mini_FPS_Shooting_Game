@@ -88,6 +88,19 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Re-stamps the built-in numbers onto every EnemyArchetype asset.
+        ///
+        /// The roster assets are generated once and then left alone, so a retune written
+        /// into FPSKitEnemyRoster.Configure does not reach them on its own -- this is how
+        /// a change to the roster in code gets into the assets the game reads. Overwrites
+        /// any Inspector tuning, by design.
+        /// </summary>
+        public static void ResetEnemyArchetypes()
+        {
+            Run(FPSKitEnemyRoster.ResetAll);
+        }
+
+        /// <summary>
         /// Does nothing on purpose. Reaching it at all means every script in the
         /// project compiled, which is the cheapest pre-commit check there is.
         /// </summary>
@@ -133,6 +146,12 @@ namespace FPSKit.EditorTools
         /// pushes its own exit code, so it must not go through Run.
         /// </summary>
         public static void VerifyWaves() => FPSKitWaveTest.VerifyWaves();
+
+        /// <summary>
+        /// Plays wave one and asserts that it actually fights: armed, slower than the
+        /// player, and able to land a hit on someone standing in the middle of it.
+        /// </summary>
+        public static void VerifyCombat() => FPSKitCombatTest.VerifyCombat();
 
         /// <summary>
         /// Builds one scene and then asserts it is actually playable.

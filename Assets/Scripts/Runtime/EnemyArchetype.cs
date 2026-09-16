@@ -74,6 +74,10 @@ public class EnemyArchetype : ScriptableObject
     [Tooltip("Metres at which it commits to an attack. Melee wants ~2, a shooter wants 20+.")]
     public float attackRange = 2.2f;
 
+    [Tooltip("Reach of a swing. A shooter inside this range hits you with the rifle " +
+             "instead of firing it, so closing on one is not a free pass.")]
+    public float meleeRange = 2.4f;
+
     [Tooltip("Seconds between attacks before wave aggression shortens it.")]
     public float attackCooldown = 1.3f;
 
@@ -83,6 +87,16 @@ public class EnemyArchetype : ScriptableObject
 
     [Tooltip("Shots per ranged attack. Above 1 turns a plinker into a suppressor.")]
     [Min(1)] public int shotsPerAttack = 1;
+
+    [Tooltip("Seconds between the shots of one burst.")]
+    [Min(0f)] public float burstInterval = 0.12f;
+
+    [Tooltip("What one of its shots is worth against one of its swings. Well under 1 " +
+             "throughout the roster: a variant that shoots is already trading the need " +
+             "to close for the ability to hurt you from anywhere, and letting it keep " +
+             "full damage on top of that is what turns a crowd of riflemen into an " +
+             "unsurvivable one.")]
+    [Range(0f, 2f)] public float rangedDamageMultiplier = 0.4f;
 
     [Tooltip("Cone half-angle of ranged fire, in degrees. Larger is more forgiving.")]
     public float rangedSpread = 2.5f;
@@ -102,6 +116,14 @@ public class EnemyArchetype : ScriptableObject
     [Tooltip("Damage in one hit needed to interrupt it. Lower means easier to stagger, " +
              "so a light enemy flinches under fire and a boss shrugs it off. 0 never staggers.")]
     [Min(0f)] public float staggerThreshold = 18f;
+
+    [Tooltip("Whether sustained fire sends it looking for cover. Off for a boss, which " +
+             "is supposed to be the thing that keeps coming.")]
+    public bool canRetreat = true;
+
+    [Tooltip("Damage taken in quick succession before it breaks off. Higher on anything " +
+             "meant to hold its ground.")]
+    [Min(1f)] public float suppressionDamage = 45f;
 
     [Header("Reward")]
     [Min(0)] public int scoreValue = 100;
@@ -160,8 +182,13 @@ public class EnemyArchetype : ScriptableObject
             ai.attackCooldown = attackCooldown;
             ai.attackWindup = attackWindup;
             ai.attackDamage *= damageMultiplier * damageScale;
+            ai.meleeRange = meleeRange;
             ai.shotsPerAttack = shotsPerAttack;
+            ai.burstInterval = burstInterval;
+            ai.rangedDamageMultiplier = rangedDamageMultiplier;
             ai.rangedSpread = rangedSpread;
+            ai.canRetreat = canRetreat;
+            ai.suppressionDamage = suppressionDamage;
             ai.preferredRangedDistance = preferredRangedDistance;
             ai.strafeAmount = strafeAmount;
             ai.chargeSpeedMultiplier = chargeSpeedMultiplier;

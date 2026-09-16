@@ -66,6 +66,29 @@
 *.physicMaterial        unity-yaml
 *.physicsMaterial2D     unity-yaml
 
+# ---------------------------------------------------------------------------
+# Project override: the scenes here are NOT YAML.
+#
+# EditorSettings has m_SerializationMode: 2 (Force Binary), so every .unity file
+# in this repository is a binary asset while the template above declares the
+# whole family as text with eol=lf. Per gitattributes(5), eol implies text and
+# skips binary detection entirely -- so git was collapsing any 0x0D 0x0A pair
+# inside the binary as if it were a Windows line ending, and silently committing
+# a scene two bytes shorter than the one on disk.
+#
+# It bites at random, because it only bites when a scene happens to contain that
+# byte pair: five of the six generated scenes round-trip cleanly and the sixth
+# does not. The symptom would be a scene that opens fine locally and is corrupt
+# for everyone else, including CI.
+#
+# Assets and prefabs are unaffected -- Unity still writes those as text YAML --
+# so only the scenes are pulled back out.
+#
+# If this project is ever switched to Force Text, delete this block: the
+# template's rule is the right one for text scenes and gives them a working
+# three-way merge driver, which is the whole reason it is written that way.
+*.unity                 -text -diff merge=binary
+
 # Exclude from GitHub stats and diffs: third-party plugins, packages lock file
 Assets/Plugins/**           linguist-generated
 Packages/packages-lock.json linguist-generated

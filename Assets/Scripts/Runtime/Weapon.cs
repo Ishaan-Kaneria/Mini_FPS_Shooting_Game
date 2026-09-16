@@ -43,6 +43,61 @@ public class Weapon : MonoBehaviour
     /// <summary>Current cone half-angle in degrees, including movement penalties.</summary>
     public float CurrentSpread { get; private set; }
 
+    // ---- per-run upgrades -------------------------------------------------
+    //
+    // These live on the component and never on the WeaponData asset. That is not a
+    // style preference: WeaponData is a ScriptableObject, and a ScriptableObject is a
+    // single shared instance. Writing a wave's damage bonus into it would edit the
+    // asset on disk in the editor -- so wave 12's rifle would still be wave 12's rifle
+    // after quitting, restarting, and starting a fresh run -- and in a build it would
+    // compound across every restart for the life of the process. Every upgrade is
+    // therefore a multiplier applied on the way out, and the asset stays the baseline
+    // the run starts from. See PlayerProgression, which is what sets them.
+
+    /// <summary>Rounds added to the magazine by wave upgrades.</summary>
+    public int MagazineBonus { get; private set; }
+
+    /// <summary>Multiplier on the asset's damage. 1 is the unupgraded rifle.</summary>
+    public float DamageMultiplier { get; private set; } = 1f;
+
+    /// <summary>Multiplier on the asset's reload time. Below 1 is a faster reload.</summary>
+    public float ReloadTimeMultiplier { get; private set; } = 1f;
+
+    /// <summary>The magazine the gun actually holds right now.</summary>
+    public int MagazineSize => data == null ? 0 : Mathf.Max(1, data.magazineSize + MagazineBonus);
+
+    /// <summary>The reload the gun actually takes right now, in seconds.</summary>
+    public float ReloadTime => data == null ? 0f : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier);
+
+    /// <summary>Damage at a given range, with the run's upgrades folded in.</summary>
+    public float DamageAtDistance(float distance)
+        => data == null ? 0f : data.DamageAtDistance(distance) * DamageMultiplier;
+
+    /// <summary>
+    /// Applies a set of run upgrades. Absolute rather than incremental on purpose --
+    /// the caller owns the curve, and re-applying the same wave's values twice has to
+    /// be harmless, because the wave loop can be restarted mid-run.
+    /// </summary>
+    public void ApplyUpgrades(int magazineBonus, float damageMultiplier,
+                              float reloadTimeMultiplier, bool topUpMagazine = true)
+    {
+        MagazineBonus = Mathf.Max(0, magazineBonus);
+        DamageMultiplier = Mathf.Max(0.01f, damageMultiplier);
+        ReloadTimeMultiplier = Mathf.Clamp(reloadTimeMultiplier, 0.05f, 4f);
+
+        // A bigger magazine that arrives empty is not a reward. Topping up here also
+        // covers the case the bonus shrank -- CurrentAmmo has to come back inside it.
+        if (topUpMagazine) CurrentAmmo = MagazineSize;
+        else CurrentAmmo = Mathf.Min(CurrentAmmo, MagazineSize);
+
+        // The HUD polls the ammo counter against its own last-drawn values, so this is
+        // all it takes for a widened magazine to show up there.
+        AmmoChanged?.Invoke(this);
+    }
+
+    /// <summary>Back to the asset's own numbers. Used when a run restarts.</summary>
+    public void ResetUpgrades() => ApplyUpgrades(0, 1f, 1f);
+
     public event Action<Weapon> Fired;
     public event Action<Weapon> AmmoChanged;
     public event Action<Weapon, DamageInfo> DealtDamage;   // fires the hitmarker
@@ -82,7 +137,7 @@ public class Weapon : MonoBehaviour
 
         if (data != null)
         {
-            CurrentAmmo = data.magazineSize;
+            CurrentAmmo = MagazineSize;
             ReserveAmmo = data.reserveAmmo;
         }
     }
@@ -252,7 +307,7 @@ public class Weapon : MonoBehaviour
         if (Physics.Raycast(origin, direction, out RaycastHit hit, data.maxRange,
                             hitMask, QueryTriggerInteraction.Ignore))
         {
-            float amount = data.DamageAtDistance(hit.distance);
+            float amount = DamageAtDistance(hit.distance);
             var info = new DamageInfo(amount, hit.point, hit.normal, direction, gameObject);
 
             var hitbox = hit.collider.GetComponent<Hitbox>();
@@ -306,7 +361,7 @@ public class Weapon : MonoBehaviour
     public void TryReload()
     {
         if (IsReloading || data.infiniteAmmo) return;
-        if (CurrentAmmo >= data.magazineSize) return;
+        if (CurrentAmmo >= MagazineSize) return;
         if (ReserveAmmo <= 0 && !data.infiniteReserve) return;
 
         _reloadRoutine = StartCoroutine(ReloadRoutine());
@@ -319,13 +374,13 @@ public class Weapon : MonoBehaviour
         ReloadStarted?.Invoke(this);
         PlayClip(data.reloadClip, 0.8f);
 
-        yield return new WaitForSeconds(data.reloadTime);
+        yield return new WaitForSeconds(ReloadTime);
 
-        int needed = data.magazineSize - CurrentAmmo;
+        int needed = MagazineSize - CurrentAmmo;
 
         if (data.infiniteReserve)
         {
-            CurrentAmmo = data.magazineSize;
+            CurrentAmmo = MagazineSize;
         }
         else
         {

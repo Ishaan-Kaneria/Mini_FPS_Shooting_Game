@@ -153,6 +153,8 @@ namespace FPSKit.EditorTools
                 $"{spawnPoints.Length} spawn points placed on the NavMesh\n\n" +
                 "Use File > Save As to keep this, then press Play.";
 
+            ReportMissingClips();
+
             Debug.Log("<color=lime>[FPSKit]</color> " + summary, player);
             EditorUtility.DisplayDialog("FPSKit", summary, "Got it");
         }
@@ -286,6 +288,18 @@ namespace FPSKit.EditorTools
                 changed |= FillClip(ref ai.deathClip, "SFX/enemy_death.wav");
                 changed |= FillClip(ref ai.fireClip, "SFX/weapon_fire.wav");
 
+                if (ai.painClips == null || ai.painClips.Length == 0)
+                {
+                    var pain = Clips("SFX/enemy_pain_01.wav", "SFX/enemy_pain_02.wav",
+                                     "SFX/enemy_pain_03.wav");
+
+                    if (pain.Length > 0)
+                    {
+                        ai.painClips = pain;
+                        changed = true;
+                    }
+                }
+
                 // And anything it needs to be seen. muzzlePoint is deliberately left
                 // alone: on a hand-rigged character there is no way to guess where the
                 // barrel is, and EnemyAI already falls back to firing from the eyes.
@@ -404,9 +418,16 @@ namespace FPSKit.EditorTools
 
             Selection.activeGameObject = player;
 
+            ReportMissingClips();
+
+            // These are the StandardFPS bindings, which is what CreateControlSettings
+            // writes and what Controls.asset ships with. The line used to describe the
+            // ArrowsAndSpace preset instead -- a preset the asset has never held -- and
+            // told every build that Space fires and clicking jumps, which is neither what
+            // the game does nor what the web page tells a browser player.
             Debug.Log($"<color=lime>[FPSKit]</color> \"{sceneName}\" built. Press Play. " +
-                      "Arrows move, Space fires, double-tap Space sprints, left click jumps, " +
-                      "right click aims, R reloads, Escape pauses. " +
+                      "WASD or arrows move, left click fires, right click aims, Space jumps, " +
+                      "Shift sprints, Ctrl crouches, R reloads, Escape pauses. " +
                       "Rebind in FPSKit_Generated/Controls.asset.");
         }
 
@@ -916,8 +937,54 @@ namespace FPSKit.EditorTools
         /// is not there. Every audio field in the kit is optional, so a project that
         /// deleted the placeholder set still builds and still plays -- just quietly.
         /// </summary>
+        /// <summary>
+        /// Loads a clip, and says so loudly when it cannot.
+        ///
+        /// The warning is not decoration. Every audio field in the kit is optional and
+        /// every caller assigns the result straight into one, so a clip that fails to
+        /// load writes null into a slot that a previous build filled -- and the build
+        /// then succeeds, the scene saves, and the only symptom is silence. That is
+        /// exactly what happened here once: a corrupted asset database stopped this
+        /// project importing any AudioClip at all, and several rounds of generated
+        /// assets were committed mute before anybody noticed. A build that loses its
+        /// audio has to be a build that says it lost its audio.
+        ///
+        /// If this fires for every clip at once, the likely cause is the asset database
+        /// rather than the files: delete Library/ and let Unity reimport.
+        /// </summary>
         private static AudioClip Clip(string relativePath)
-            => AssetDatabase.LoadAssetAtPath<AudioClip>($"{AudioFolder}/{relativePath}");
+        {
+            string path = $"{AudioFolder}/{relativePath}";
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+
+            if (clip == null)
+            {
+                _missingClips++;
+
+                Debug.LogWarning($"[FPSKit] No AudioClip at {path}. Whatever was going to " +
+                                 "reference it is being built silent.");
+            }
+
+            return clip;
+        }
+
+        /// <summary>Clips that failed to load during the current build. See ReportMissingClips.</summary>
+        private static int _missingClips;
+
+        /// <summary>
+        /// Sums up the silence at the end of a build, so the count is visible even when
+        /// the individual warnings have scrolled away.
+        /// </summary>
+        private static void ReportMissingClips()
+        {
+            if (_missingClips == 0) return;
+
+            Debug.LogWarning($"[FPSKit] {_missingClips} audio clip(s) could not be loaded, so this " +
+                             "build has gaps in its sound. If it is all of them, the asset database " +
+                             "is the usual cause -- close Unity, delete Library/, and build again.");
+
+            _missingClips = 0;
+        }
 
         /// <summary>Loads several clips, silently dropping any that are missing.</summary>
         private static AudioClip[] Clips(params string[] relativePaths)
@@ -1311,6 +1378,15 @@ namespace FPSKit.EditorTools
             weapon.audioSource.playOnAwake = false;
             weapon.hitMask = ~(1 << LayerMask.NameToLayer("Player"));
 
+            // The rifle's own curve, to sit against the wave curve. Everything it does is
+            // a multiplier held on the Weapon component -- nothing is written back to
+            // TestRifle.asset, which would otherwise carry a finished run's upgrades into
+            // the next one and into the asset on disk.
+            var progression = player.AddComponent<PlayerProgression>();
+            progression.weapon = weapon;
+            progression.audioSource = playerAudio;
+            progression.upgradeClip = Clip("SFX/pickup.wav");
+
             return player;
         }
 
@@ -1476,10 +1552,23 @@ namespace FPSKit.EditorTools
             AddHitbox(rightLegMesh, hp, 0.75f, false);
 
             var agent = enemy.AddComponent<UnityEngine.AI.NavMeshAgent>();
-            agent.speed = 4f;
+
+            // The player walks at 5.6 and sprints at 8.2 (see PlayerMotor). An enemy at
+            // the player's own pace cannot be walked away from, so every fight collapses
+            // into the same shoving match; at this speed the archetype multipliers still
+            // leave the two rushers faster than a walk and nothing faster than a sprint.
+            agent.speed = 3.2f;
+
             agent.angularSpeed = 400f;
             agent.acceleration = 12f;
-            agent.stoppingDistance = 1.5f;
+
+            // An agent brakes a full stopping distance short of wherever it is sent, and
+            // that distance comes straight out of a melee enemy's reach: at the old 1.5
+            // the enemy parked outside its own 2.2m attack range and stood there. EnemyAI
+            // now budgets for whatever this is, but there is no reason to spend the reach
+            // on braking in the first place.
+            agent.stoppingDistance = 0.8f;
+
             agent.radius = 0.4f;
             agent.height = 2f;
 
@@ -1491,6 +1580,7 @@ namespace FPSKit.EditorTools
             ai.eyes = eyes.transform;
             ai.ranged = false;
             ai.attackRange = 2f;
+            ai.meleeRange = 2.4f;
             ai.attackDamage = 12f;
             ai.attackCooldown = 1.3f;
             ai.attackWindup = 0.35f;
@@ -1509,6 +1599,12 @@ namespace FPSKit.EditorTools
             ai.alertClip = Clip("SFX/enemy_alert.wav");
             ai.attackClip = Clip("SFX/enemy_attack.wav");
             ai.deathClip = Clip("SFX/enemy_death.wav");
+
+            // The grunt a hit gets out of it. Three of them, picked at random and rate
+            // limited by EnemyAI: one voice retriggered on every round of a magazine is
+            // the most obviously synthetic sound a firefight can make.
+            ai.painClips = Clips("SFX/enemy_pain_01.wav", "SFX/enemy_pain_02.wav",
+                                 "SFX/enemy_pain_03.wav");
 
             // The rifle a ranged archetype carries. Hung off the right arm so the limb
             // animator swings and raises it with the hands rather than needing to know
@@ -1533,6 +1629,11 @@ namespace FPSKit.EditorTools
             limbs.leftLeg = leftLeg;
             limbs.rightLeg = rightLeg;
             limbs.weapon = enemyWeapon;
+
+            // Matched to the agent's own speed above. The walk cycle scales its swing by
+            // speed/fullSpeed, so leaving this at a figure the enemy never reaches makes
+            // every archetype shuffle instead of walk.
+            limbs.fullSpeed = agent.speed;
 
             // Floating health bar. The material is assigned from an asset rather than
             // found at runtime, so the shader survives shader stripping in a build.
@@ -1733,6 +1834,14 @@ namespace FPSKit.EditorTools
             wm.intermissionDuration = 10f;
 
             wm.aggressionRampWaves = 18;
+
+            // The per-wave speed curve has to stop somewhere short of the player's sprint
+            // or late waves become unloseable-by-running rather than hard. 1.35 on the
+            // fastest archetype is 5.6 m/s, which is the player's walk exactly: you can
+            // still break away, but only by sprinting.
+            wm.speedGrowthPerWave = 0.02f;
+            wm.maxSpeedMultiplier = 1.35f;
+
             wm.bossWaveInterval = 5;
             wm.bossWaveEscortFraction = 0.55f;
             wm.useModifiers = true;
@@ -1891,6 +2000,7 @@ namespace FPSKit.EditorTools
             hud.weapon = player.GetComponentInChildren<Weapon>();
             hud.playerHealth = player.GetComponent<Health>();
             hud.waveManager = wave;
+            hud.progression = player.GetComponent<PlayerProgression>();
 
             var root = canvasGo.transform;
 

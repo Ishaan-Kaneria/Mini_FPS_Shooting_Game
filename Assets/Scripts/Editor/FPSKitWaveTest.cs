@@ -57,6 +57,10 @@ namespace FPSKit.EditorTools
         static int _waveReached;
         static int _killsAtEnd = -1;
 
+        /// <summary>The rifle's magazine before any wave was cleared, and after.</summary>
+        static int _magazineAtStart = -1;
+        static int _magazineAtEnd = -1;
+
         public static void VerifyWaves()
         {
             try
@@ -70,6 +74,7 @@ namespace FPSKit.EditorTools
                 Notes.Clear();
                 Stranded.Clear();
                 _populationDeadline = -1.0;
+                _magazineAtStart = _magazineAtEnd = -1;
                 _startedAt = EditorApplication.timeSinceStartup;
                 _phase = Phase.Enter;
 
@@ -112,7 +117,14 @@ namespace FPSKit.EditorTools
                         wave.intermissionDuration = TestIntermission;
                         wave.clearLeftoversOnTimeout = true;
 
-                        Notes.Append($"\n  tuned: clock {TestWaveClock}s, grace {TestGrace}s");
+                        // Read before a wave has been cleared, so the growth asserted at
+                        // the end is measured against the rifle the run started with
+                        // rather than against the asset, which upgrades never touch.
+                        var gun = Weapon();
+                        _magazineAtStart = gun != null ? gun.MagazineSize : -1;
+
+                        Notes.Append($"\n  tuned: clock {TestWaveClock}s, grace {TestGrace}s, " +
+                                     $"magazine {_magazineAtStart}");
                         _phase = Phase.AwaitWave;
                         return;
                     }
@@ -185,6 +197,9 @@ namespace FPSKit.EditorTools
                         var director = GameDirector.Instance;
                         _killsAtEnd = director != null ? director.Kills : -1;
 
+                        var gun = Weapon();
+                        _magazineAtEnd = gun != null ? gun.MagazineSize : -1;
+
                         _phase = Phase.Judge;
                         return;
                     }
@@ -237,6 +252,8 @@ namespace FPSKit.EditorTools
 
         static WaveManager Wave() => UnityEngine.Object.FindAnyObjectByType<WaveManager>();
 
+        static Weapon Weapon() => UnityEngine.Object.FindAnyObjectByType<Weapon>();
+
         static int CountEnemies() => GameObject.FindGameObjectsWithTag("Enemy").Length;
 
         static void Wait(double seconds, Phase next)
@@ -278,6 +295,13 @@ namespace FPSKit.EditorTools
                 problems.Append($"\n  - the round never got past wave {_waveWhenStranded}: a wave that " +
                                 "cannot be cleared still stalls it");
 
+            // Clearing a wave is supposed to pay for itself. Checked here because this is
+            // the test that already survives one, and because an upgrade that silently
+            // stops arriving looks exactly like a game that is simply getting harder.
+            if (_magazineAtStart > 0 && _magazineAtEnd <= _magazineAtStart)
+                problems.Append($"\n  - the rifle never grew across a cleared wave " +
+                                $"(magazine {_magazineAtStart} -> {_magazineAtEnd})");
+
             if (_killsAtEnd > 0)
                 problems.Append($"\n  - {_killsAtEnd} kill(s) were scored, so the wave may simply have " +
                                 "been cleared rather than timing out; the test is inconclusive");
@@ -291,7 +315,8 @@ namespace FPSKit.EditorTools
 
             Debug.Log($"[FPSKitBatch] verify waves passed: every enemy was dropped out of the level " +
                       $"and the round still advanced from wave {_waveWhenStranded} to {_waveReached} " +
-                      $"with {_killsAtEnd} kills.{Notes}");
+                      $"with {_killsAtEnd} kills, and the rifle's magazine grew from " +
+                      $"{_magazineAtStart} to {_magazineAtEnd}.{Notes}");
             EditorApplication.Exit(0);
         }
     }

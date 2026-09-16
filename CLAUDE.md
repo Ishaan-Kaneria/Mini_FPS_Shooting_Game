@@ -13,9 +13,9 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 
 | Concern  | Files |
 |---|---|
-| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs` |
+| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs`, `PlayerProgression.cs` (per-wave rifle upgrades) |
 | Weapons  | `Weapon.cs`, `WeaponData.cs` (ScriptableObject, `FireMode` Single/Burst/Auto), `ImpactLibrary.cs`, `TracerProjectile.cs` (flies its own tracer, so the shot outlives whoever fired it) |
-| Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs`, `EnemyLimbAnimator.cs` (swings the limbs off agent velocity -- there is no AnimatorController anywhere in the project) |
+| Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Retreat/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs`, `EnemyLimbAnimator.cs` (swings the limbs off agent velocity -- there is no AnimatorController anywhere in the project) |
 | Waves    | `WaveManager.cs` — endless spawner, per-wave growth, boss waves, `WaveModifier`, golden-angle ring spawns that avoid the player's view, an enemy leash and a wave clock so no wave can stall |
 | Run state | `GameDirector.cs` — score, combo, pause, game over, restart, PlayerPrefs records |
 | Feedback | `HUDController.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
@@ -51,7 +51,9 @@ So: **fix scene content by editing the builder, not the `.unity` file.** Hand-ed
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the three checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitWaveTest.cs` (`VerifyWaves`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the four checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitWaveTest.cs` (`VerifyWaves`, which also asserts the rifle grew across a cleared wave), `FPSKitCombatTest.cs` (`VerifyCombat`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+
+`FPSKitBatch.ResetEnemyArchetypes` is the other entry point worth knowing: the roster assets are generated once and then left alone, so retuning a number in `FPSKitEnemyRoster.Configure` does **not** reach the assets the game reads until this is run.
 
 ## The web build has its own page
 
@@ -95,6 +97,65 @@ That asymmetry is what makes it dangerous: a method guarded on the fields that s
 
 So: **anything whose type Unity cannot serialize must be created on demand, not assigned once in `Awake`.** `EnemyAI.Block` and `EnemyHealthBar.Block` are the pattern — a private property with a null check, and `Awake` left out of it entirely so the property is the only thing that can create it.
 
+## Enemies fight back, and the fight is legible
+
+Three rules hold the combat model together. They are cheap to break by retuning one
+number in isolation, so they are written down.
+
+**Reach has to be shared with the brake.** A `NavMeshAgent` stops a full
+`stoppingDistance` short of its destination. Sending a melee enemy to a point "just
+inside its attack range" therefore parks it that much *outside* the range, the attack
+check never passes, and the whole wave gathers around the player and does nothing --
+silently, with no error and every build check green. `EnemyAI.DesiredStandOff` now
+subtracts the brake before choosing a destination, and the prefab's `stoppingDistance`
+is 0.8 rather than 1.5 so there is less of it to pay for. `VerifyCombat` is the
+regression test: it stands the player inside an enemy's reach and fails if nothing hits.
+
+**A shooter is not only a shooter.** `EnemyAI.meleeRange` makes an armed enemy swing
+the rifle at anything in its face, because a shot traced from the eyes at a body
+standing inside the muzzle misses forever -- so without it, closing the distance is the
+safest place on the map. `rangedDamageMultiplier` is the counterweight: a shot is worth
+well under a swing across the whole roster, since a crowd that can reach you from
+anywhere is not the fight a crowd that must close is.
+
+**Reacting to being shot happens on three scales.** A light hit is a flinch (movement
+stops for `flinchDuration`, the next attack is pushed back by `flinchAttackDelay`), rate
+limited by `flinchCooldown` -- without that floor a held trigger at 600rpm lands a
+flinch every tenth of a second and the reaction becomes a stunlock. A hit at or above
+`staggerThreshold` staggers and costs the attack outright. Sustained fire fills a
+suppression bucket and sends the enemy looking for cover (`State.Retreat`), on a
+cooldown, and switched off entirely for bosses and armoured variants.
+
+Speed is read against the player, who walks at 5.6 m/s and sprints at 8.2. Nothing in
+the roster outruns a sprint and only the two rushers beat a walk: disengaging has to
+stay possible or positioning stops being something the player can do. The base agent is
+3.2 m/s and `WaveManager.maxSpeedMultiplier` caps the wave curve at 1.35.
+
+`EnemyAI` publishes `LastReactionTime`, `LastReactionLocal` and `LastReactionStrength`,
+and `EnemyLimbAnimator` reads them each frame to throw the body along the bullet. They
+are plain values rather than an event on purpose -- an imported character with a real
+Animator ignores them, and three floats survive a mid-play domain reload where a
+subscription would not.
+
+## The rifle has a curve too
+
+`PlayerProgression` widens the magazine, hardens the round and shortens the reload
+every time a wave is cleared. It exists because the enemy curve does: the same thirty
+rounds against twice the bodies turns a difficulty curve into a slope the player slides
+down.
+
+Every upgrade is a multiplier held on the `Weapon` **component** -- `MagazineBonus`,
+`DamageMultiplier`, `ReloadTimeMultiplier`, read back through `MagazineSize`,
+`ReloadTime` and `DamageAtDistance`. Nothing is ever written to `WeaponData`. That is
+not tidiness: a `WeaponData` is one shared ScriptableObject, so a bonus written into it
+would edit `TestRifle.asset` on disk, and the next run -- in a fresh session, after a
+restart -- would start already upgraded and compound from there. If you add an upgrade,
+add it the same way.
+
+`PlayerProgression` keys off the wave number rather than counting calls, because
+`WaveManager` restarts its own wave loop if it ever loses one and replays
+`WaveCleared` for a wave that has already paid out.
+
 ## Waves never require a total wipe
 
 A wave ends on **clear or clock**, whichever comes first. This is deliberate and must not be "simplified" back to waiting for `EnemiesRemaining == 0`: the kit is meant to run in imported levels, and in a real level an enemy that falls through a gap stays alive forever, so a wipe requirement is a guaranteed softlock.
@@ -113,3 +174,5 @@ Two independent safety nets, both in `WaveManager`:
 - Enemy navigation uses `com.unity.ai.navigation` (`NavMeshSurface`), baked at build time by the builder.
 - Tunables are `[Header]`-grouped public fields with `[Tooltip]`s written as plain prose. Match that style — the existing XML doc comments explain *why* a knob exists, not just what it is.
 - `Library/`, `Temp/`, `Logs/`, `UserSettings/` are gitignored; `.meta` files are committed and must stay in sync with their assets.
+- Placeholder audio is synthesised by `Tools/generate-placeholder-audio.py` (stdlib only). It draws from one seeded random stream, so a new clip that uses noise must save and restore `random.getstate()` around itself or every sound authored below it is re-rolled into an identical-sounding but byte-different file.
+- **If a build suddenly has no sound, suspect `Library/` before the files.** A corrupted asset database makes Unity import every `.wav` as a `DefaultAsset` rather than an `AudioClip`, with no error logged anywhere; the builder then writes null into every audio slot and saves a mute scene over a working one. Closing Unity and deleting `Library/` fixes it. `FPSKitSceneBuilder.Clip` now warns per clip and `ReportMissingClips` sums it up at the end of a build, so this is loud rather than silent.

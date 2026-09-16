@@ -27,17 +27,22 @@ MonoBehaviour:
   healthMultiplier: 0.75
   shieldFraction: 0
   damageMultiplier: 0.85
-  speedMultiplier: 1.55
+  speedMultiplier: 1.35
   ranged: 0
-  attackRange: 2
+  attackRange: 2.3
+  meleeRange: 2.4
   attackCooldown: 0.75
   attackWindup: 0.25
   shotsPerAttack: 1
+  burstInterval: 0.12
+  rangedDamageMultiplier: 0.4
   rangedSpread: 2.5
   preferredRangedDistance: 14
   strafeAmount: 0.9
   chargeSpeedMultiplier: 1.6
   staggerThreshold: 10
+  canRetreat: 1
+  suppressionDamage: 26
   scoreValue: 220
   healthDropChance: 0.05
   shieldDropChance: 0.08

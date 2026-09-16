@@ -60,6 +60,33 @@ def highpass(buf, cutoff):
         out.append(prev_out)
     return out
 
+def resonator(buf, freq, bw):
+    """Two-pole resonator. One per formant is the whole difference between a buzz
+    and a voice: the mouth is a set of resonances, and this is one of them."""
+    r = math.exp(-math.pi * bw / RATE)
+    theta = 2 * math.pi * freq / RATE
+    a1, a2 = 2 * r * math.cos(theta), -r * r
+    g = 1 - r * r
+    out, y1, y2 = [], 0.0, 0.0
+    for v in buf:
+        y = g * v + a1 * y1 + a2 * y2
+        y2, y1 = y1, y
+        out.append(y)
+    return out
+
+
+def vowel(t, f0, f1, formants, breath=0.05):
+    """A glottal buzz shaped by three formants. Falling pitch is what makes it read
+    as an involuntary noise rather than a sung note."""
+    src = mix(gain(tone(t, f0, f1, "saw"), 0.9), gain(n(secs(t)), breath))
+    return mix(*[gain(resonator(src, freq, bw), amp) for freq, bw, amp in formants])
+
+
+# Measured formant centres for the two vowels a hurt grunt actually uses.
+AH = [(730, 80, 1.0), (1090, 90, 0.55), (2440, 130, 0.20)]
+UH = [(520, 80, 1.0), (1180, 90, 0.45), (2400, 130, 0.16)]
+
+
 def mix(*parts):
     size = max(len(p) for p in parts)
     out = [0.0] * size
@@ -146,6 +173,25 @@ def growl(t, f0, f1, rasp=0.5):
 save(f"{A}/SFX/enemy_alert.wav",  env(growl(0.55, 150, 185), attack=0.03, power=2))
 save(f"{A}/SFX/enemy_attack.wav", env(growl(0.28, 220, 130, 0.8), attack=0.006, power=3))
 save(f"{A}/SFX/enemy_death.wav",  env(growl(0.85, 170, 60, 0.7), attack=0.01, power=1.6))
+
+# The hit reaction. Three of them because one grunt retriggered on every bullet is
+# the most obviously looped sound a game can make -- EnemyAI picks at random and
+# rate-limits it. Short, falling in pitch, and cut off: this is a body reacting,
+# not a performance.
+#
+# The noise stream is saved and put back around them. Every clip here draws from one
+# seeded generator, so inserting a sound that uses n() would otherwise re-roll every
+# sound authored below it -- rewriting identical-sounding files and burying a real
+# change in a diff full of churn.
+_stream = random.getstate()
+save(f"{A}/SFX/enemy_pain_01.wav",
+     env(vowel(0.30, 250, 165, AH), attack=0.006, power=2.4))
+save(f"{A}/SFX/enemy_pain_02.wav",
+     env(vowel(0.24, 205, 140, UH), attack=0.005, power=2.8))
+save(f"{A}/SFX/enemy_pain_03.wav",
+     cat(env(vowel(0.13, 290, 230, AH), attack=0.004, power=3.5),
+         env(vowel(0.22, 195, 130, UH), attack=0.01, power=2.6)))
+random.setstate(_stream)
 
 # ---- pickup -----------------------------------------------------------------
 save(f"{A}/SFX/pickup.wav",

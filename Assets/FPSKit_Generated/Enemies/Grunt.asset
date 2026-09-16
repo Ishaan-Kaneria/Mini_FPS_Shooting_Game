@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Grunt
   m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
   displayName: Grunt
-  description: Basic melee. Numerous early, thins out later.
+  description: Armed rifleman. Numerous early, thins out later.
   role: 0
   bodyColor: {r: 0.55, g: 0.18, b: 0.18, a: 1}
   headColor: {r: 0.75, g: 0.3, b: 0.25, a: 1}
@@ -27,17 +27,22 @@ MonoBehaviour:
   healthMultiplier: 1
   shieldFraction: 0
   damageMultiplier: 1
-  speedMultiplier: 1
-  ranged: 0
-  attackRange: 2.2
-  attackCooldown: 1.3
-  attackWindup: 0.4
-  shotsPerAttack: 1
-  rangedSpread: 2.5
-  preferredRangedDistance: 14
+  speedMultiplier: 0.85
+  ranged: 1
+  attackRange: 22
+  meleeRange: 2.4
+  attackCooldown: 1.9
+  attackWindup: 0.55
+  shotsPerAttack: 2
+  burstInterval: 0.15
+  rangedDamageMultiplier: 0.38
+  rangedSpread: 5
+  preferredRangedDistance: 11
   strafeAmount: 0.25
   chargeSpeedMultiplier: 1
   staggerThreshold: 18
+  canRetreat: 1
+  suppressionDamage: 40
   scoreValue: 100
   healthDropChance: 0.06
   shieldDropChance: 0.05

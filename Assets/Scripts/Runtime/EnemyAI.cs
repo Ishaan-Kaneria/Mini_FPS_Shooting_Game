@@ -6,6 +6,16 @@ using UnityEngine.AI;
 /// NavMesh hunter with line-of-sight checks, a telegraphed wind-up before it
 /// commits, ranged fire, crowd separation, strafing and a stagger reaction.
 ///
+/// It reacts to being shot on three scales, which is most of what separates an
+/// opponent from a spawner. A light hit is a flinch -- a fraction of a second of
+/// stopped movement and a beat before it comes back at you. A heavy one staggers it
+/// and costs it the attack outright. Sustained fire fills a suppression bucket and
+/// sends it looking for cover, on a cooldown so it cannot kite you forever.
+///
+/// An armed enemy is not only a ranged enemy: it shoots at range, swings the rifle at
+/// anything standing in its face, and gives ground when the player is above it so the
+/// firing line clears the lip of whatever they are standing on.
+///
 /// The behaviour is deliberately layered rather than scripted per enemy type: an
 /// <see cref="EnemyArchetype"/> stamps numbers onto these knobs at spawn, and
 /// <see cref="ApplyWaveTuning"/> sharpens them as the waves climb. One brain,
@@ -16,7 +26,7 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyAI : MonoBehaviour
 {
-    public enum State { Idle, Chase, Attack, Stagger, Dead }
+    public enum State { Idle, Chase, Attack, Stagger, Retreat, Dead }
 
     [Header("Wiring")]
     public Transform eyes;
@@ -31,6 +41,12 @@ public class EnemyAI : MonoBehaviour
     public float attackRange = 2f;
     public float attackDamage = 12f;
     public float attackCooldown = 1.3f;
+
+    [Tooltip("Reach of a swing. A shooter this close stops shooting and hits you with " +
+             "the rifle instead -- otherwise walking into its face is the safest place " +
+             "on the map, because the shot is aimed from the eyes at a body that is no " +
+             "longer in front of them.")]
+    public float meleeRange = 2.4f;
 
     [Tooltip("Telegraph time before damage lands. This is the player's reaction window, " +
              "so it is the one number wave scaling is not allowed to grind away.")]
@@ -72,6 +88,16 @@ public class EnemyAI : MonoBehaviour
     [Tooltip("Speed multiplier for a short sprint once it reaches charge range. 1 disables it.")]
     [Min(1f)] public float chargeSpeedMultiplier = 1f;
 
+    [Tooltip("How much of its speed a shooter keeps while it can see you. Below 1 it " +
+             "settles onto its firing line instead of jogging through the fight, which " +
+             "is what makes the gun read as the thing it is doing.")]
+    [Range(0.1f, 1f)] public float aimMoveSpeedMultiplier = 0.55f;
+
+    [Tooltip("Slack left between where a melee enemy parks and the edge of its reach. " +
+             "The agent brakes a full stopping distance short of wherever it is sent, so " +
+             "this is the margin left over after that has been paid for.")]
+    [Min(0f)] public float meleeApproachMargin = 0.35f;
+
     public float chargeRange = 10f;
     public float chargeDuration = 1.1f;
     public float chargeCooldown = 4f;
@@ -81,12 +107,67 @@ public class EnemyAI : MonoBehaviour
     public float preferredRangedDistance = 12f;
     public LayerMask rangedHitMask = ~0;
 
+    [Tooltip("What a shot is worth next to this enemy's own swing. Well under 1 on " +
+             "purpose: a crowd that can all reach you from across the arena is not the " +
+             "same fight as a crowd that has to close, and a rifle that hit as hard as " +
+             "a fist would end a run before the player ever saw where the fire came from.")]
+    [Range(0f, 2f)] public float rangedDamageMultiplier = 0.4f;
+
+    [Tooltip("Metres the player has to be above it before height counts as height, " +
+             "so a kerb or a ramp does not read as a rooftop.")]
+    public float elevationDeadZone = 1.5f;
+
+    [Tooltip("Extra standoff per metre the player is above it. A shooter that walks to " +
+             "the foot of the crate you are standing on loses the angle entirely and " +
+             "plinks at the underside of a ledge; backing off buys the firing line back.")]
+    public float standOffPerMetreOfRise = 1.7f;
+
+    public float maxElevationStandOff = 14f;
+
     [Header("Reactions")]
     [Tooltip("Damage in one hit needed to interrupt it. This is what makes a strong weapon " +
              "feel strong: the enemy visibly flinches and loses its wind-up. 0 never staggers.")]
     [Min(0f)] public float staggerThreshold = 18f;
 
     public float staggerDuration = 0.45f;
+
+    [Tooltip("The hitch on a hit too light to stagger. Short -- this is a body absorbing " +
+             "a round, not a stun.")]
+    [Min(0f)] public float flinchDuration = 0.14f;
+
+    [Tooltip("Minimum seconds between flinches. Without a floor here a held trigger at " +
+             "600rpm lands a flinch every tenth of a second, and the reaction that was " +
+             "meant to make hits feel solid becomes a stunlock that makes every enemy a " +
+             "statue for as long as you keep firing.")]
+    [Min(0f)] public float flinchCooldown = 0.55f;
+
+    [Tooltip("How long being hit pushes the next attack back. This is the beat between " +
+             "taking a round and coming back at you.")]
+    [Min(0f)] public float flinchAttackDelay = 0.6f;
+
+    [Header("Breaking Off")]
+    [Tooltip("Let it run for cover under sustained fire. Off for a boss, which is " +
+             "supposed to be the thing that does not care.")]
+    public bool canRetreat = true;
+
+    [Tooltip("Damage inside the window below that sends it looking for cover.")]
+    [Min(1f)] public float suppressionDamage = 45f;
+
+    [Tooltip("The window that damage has to arrive within. Together these ask 'am I " +
+             "being focused right now' rather than 'did something hurt', which is the " +
+             "difference between an enemy that reacts to being shot at and one that " +
+             "bolts from every stray round.")]
+    [Min(0.1f)] public float suppressionWindow = 1.6f;
+
+    public float retreatDuration = 2.2f;
+    public float retreatDistance = 16f;
+
+    [Tooltip("Speed multiplier while breaking off. Above 1: it is running, not walking.")]
+    [Min(0.1f)] public float retreatSpeedMultiplier = 1.5f;
+
+    [Tooltip("Seconds before it can break off again, so a wounded enemy cannot kite you " +
+             "around the arena for the rest of the wave.")]
+    public float retreatCooldown = 9f;
 
     [Tooltip("Colour the body flashes while winding up an attack. The flash is the tell -- " +
              "without it a melee hit out of a crowd is unreadable.")]
@@ -96,6 +177,15 @@ public class EnemyAI : MonoBehaviour
     public AudioClip alertClip;
     public AudioClip attackClip;
     public AudioClip deathClip;
+
+    [Tooltip("Grunts of pain, picked at random on a hit. Several, because one voice " +
+             "retriggered on every bullet is the most obviously synthetic sound in a " +
+             "firefight.")]
+    public AudioClip[] painClips;
+
+    [Tooltip("Minimum seconds between grunts, so sustained fire does not machine-gun " +
+             "the voice.")]
+    [Min(0f)] public float painCooldown = 0.35f;
 
     [Header("Ranged Feedback")]
     [Tooltip("Where the shot appears to come from. Only cosmetic -- the shot itself is " +
@@ -125,6 +215,20 @@ public class EnemyAI : MonoBehaviour
 
     /// <summary>0 on wave 1, 1 once the difficulty curve has topped out. Read by the HUD/debug.</summary>
     public float Aggression { get; private set; }
+
+    /// <summary>
+    /// The last hit worth reacting to, as three values the limb animator replays into a
+    /// jerk of the body. Kept here rather than pushed at the animator so an enemy with
+    /// no limbs rigged -- or an imported character driven by a real Animator -- simply
+    /// never reads them.
+    /// </summary>
+    public float LastReactionTime { get; private set; } = -999f;
+
+    /// <summary>Which way the round was travelling, in this enemy's own local space.</summary>
+    public Vector3 LastReactionLocal { get; private set; }
+
+    /// <summary>0 to 1 severity, so a graze and a slug do not throw the body equally.</summary>
+    public float LastReactionStrength { get; private set; }
 
     NavMeshAgent _agent;
     Health _health;
@@ -173,6 +277,12 @@ public class EnemyAI : MonoBehaviour
     float _chargeUntil;
     float _nextChargeTime;
     float _windupStart, _windupEnd;
+    float _flinchUntil;
+    float _nextFlinchTime;
+    float _nextPainTime;
+    float _suppression;
+    float _retreatUntil;
+    float _nextRetreatTime;
     bool _attacking;
     bool _hasAlerted;
     bool _flashing;
@@ -181,6 +291,10 @@ public class EnemyAI : MonoBehaviour
     GameObject _muzzleFlash;
 
     static readonly Collider[] NeighbourBuffer = new Collider[16];
+
+    /// <summary>Candidate cover positions tried per break-off. Low on purpose: this
+    /// runs once per retreat, not per frame, and the fallback is always usable.</summary>
+    const int RetreatSamples = 6;
 
     /// <summary>Every renderer that is part of the body, excluding the floating health bar.</summary>
     /// <summary>
@@ -292,6 +406,7 @@ public class EnemyAI : MonoBehaviour
         }
 
         UpdateTelegraph();
+        DecaySuppression();
 
         if (Time.time < _staggerUntil)
         {
@@ -314,6 +429,19 @@ public class EnemyAI : MonoBehaviour
 
         RecoverLostAttack();
 
+        // Breaking off outranks everything below it, including an attack already in
+        // progress. An enemy that finishes its wind-up and *then* runs has not reacted
+        // to anything.
+        if (UpdateRetreat())
+        {
+            FaceTarget();
+            ApplyAgentSpeed(canSee);
+            UpdateAnimator();
+            return;
+        }
+
+        float distance = Vector3.Distance(transform.position, target.position);
+
         bool aware = relentless || (_hasAlerted && Time.time - _lastSeenTime <= loseTargetTime);
 
         if (!aware)
@@ -323,15 +451,24 @@ public class EnemyAI : MonoBehaviour
         }
         else if (!_attacking)
         {
-            float distance = Vector3.Distance(transform.position, target.position);
+            // A shooter commits at its firing range with line of sight, or the moment
+            // you are close enough to hit with the rifle instead.
             bool inAttackPosition = ranged
-                ? (distance <= attackRange && canSee)
+                ? (distance <= meleeRange || (distance <= attackRange && canSee))
                 : distance <= attackRange;
 
             if (inAttackPosition && Time.time >= _nextAttackTime)
             {
                 CurrentState = State.Attack;
                 _attackRoutine = StartCoroutine(AttackRoutine());
+            }
+            else if (Time.time < _flinchUntil)
+            {
+                // The hit itself is the pause. Nothing is cancelled and nothing is
+                // queued -- it stops walking for a moment, and the attack clock that
+                // OnDamaged already pushed back decides when it comes at you again.
+                CurrentState = State.Chase;
+                Stop();
             }
             else
             {
@@ -344,7 +481,146 @@ public class EnemyAI : MonoBehaviour
         if (CurrentState == State.Attack || (_attacking && target != null))
             FaceTarget();
 
+        ApplyAgentSpeed(canSee);
         UpdateAnimator();
+    }
+
+    // ======================================================================
+    // Breaking off
+    // ======================================================================
+
+    /// <summary>
+    /// Bleeds the suppression bucket down.
+    ///
+    /// A leak rather than a sliding window of timestamped hits: one float and one
+    /// subtraction, and it answers the question that actually matters -- is fire
+    /// arriving faster than it drains. <see cref="suppressionWindow"/> is therefore
+    /// the time the damage that trips it has to arrive within.
+    /// </summary>
+    void DecaySuppression()
+    {
+        if (_suppression <= 0f) return;
+
+        float rate = suppressionDamage / Mathf.Max(0.1f, suppressionWindow);
+        _suppression = Mathf.Max(0f, _suppression - rate * Time.deltaTime);
+    }
+
+    /// <summary>
+    /// Runs the break-off, and returns true while it owns the frame.
+    ///
+    /// This is the half of the brain that answers being shot at. Standing in the open
+    /// trading fire is what a spawner produces; walking out of the line of fire and
+    /// coming back is what a player reads as an opponent. The cooldown is what keeps it
+    /// from becoming a kite -- an enemy that could break off every time it was hit
+    /// would never be killable at all.
+    /// </summary>
+    bool UpdateRetreat()
+    {
+        if (Time.time < _retreatUntil)
+        {
+            CurrentState = State.Retreat;
+
+            if (_agent.isOnNavMesh)
+            {
+                _agent.isStopped = false;
+
+                // Re-picked on arrival, so a short hop into a corner does not leave it
+                // standing still in the open for the rest of the retreat.
+                if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance + 0.5f)
+                    SetRetreatGoal();
+            }
+
+            return true;
+        }
+
+        if (!canRetreat || _suppression < suppressionDamage) return false;
+        if (Time.time < _nextRetreatTime) return false;
+
+        _suppression = 0f;
+        _retreatUntil = Time.time + retreatDuration;
+        _nextRetreatTime = Time.time + retreatCooldown + retreatDuration;
+
+        CancelAttack();
+        _chargeUntil = 0f;
+        _nextAttackTime = Mathf.Max(_nextAttackTime, _retreatUntil);
+
+        CurrentState = State.Retreat;
+        SetRetreatGoal();
+        return true;
+    }
+
+    /// <summary>
+    /// Sends it somewhere the player cannot shoot it, or failing that, somewhere else.
+    ///
+    /// Cover is preferred over distance every time: a straight sprint away from the
+    /// player is still a target, just a smaller one, and on an open arena floor it
+    /// reads as the enemy giving up rather than repositioning.
+    /// </summary>
+    void SetRetreatGoal()
+    {
+        if (target == null || !_agent.isOnNavMesh) return;
+
+        // The attack this retreat just cancelled had stopped the agent. Clearing that
+        // here rather than a frame later is the difference between turning and running
+        // and standing still for a beat first.
+        _agent.isStopped = false;
+
+        Vector3 away = transform.position - target.position;
+        away.y = 0f;
+        away = away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward;
+
+        Vector3 fallback = transform.position + away * retreatDistance;
+        bool haveFallback = false;
+
+        for (int i = 0; i < RetreatSamples; i++)
+        {
+            // Fanned rather than straight back, so a wave breaking off does not turn
+            // into one column running the same line.
+            Vector3 direction = Quaternion.AngleAxis(Random.Range(-75f, 75f), Vector3.up) * away;
+            Vector3 candidate = transform.position + direction * retreatDistance * Random.Range(0.65f, 1f);
+
+            if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 5f, NavMesh.AllAreas)) continue;
+
+            bool hidden = Physics.Linecast(target.position + Vector3.up * 1.4f,
+                                           hit.position + Vector3.up * 1.2f,
+                                           sightBlockers, QueryTriggerInteraction.Ignore);
+
+            if (hidden)
+            {
+                _agent.SetDestination(hit.position);
+                return;
+            }
+
+            if (!haveFallback)
+            {
+                fallback = hit.position;
+                haveFallback = true;
+            }
+        }
+
+        _agent.SetDestination(fallback);
+    }
+
+    /// <summary>
+    /// One owner for the agent's speed.
+    ///
+    /// Charging, breaking off and holding a firing line all want to change it, and each
+    /// writing the field directly is how an enemy ends up stuck at another state's
+    /// speed after that state has ended -- the old charge code left exactly that bug
+    /// waiting, because it only restored the base speed on a class that could charge at
+    /// all. Recomputed from scratch every frame, the states cannot leak into each other.
+    /// </summary>
+    void ApplyAgentSpeed(bool canSee)
+    {
+        if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh) return;
+
+        float multiplier = 1f;
+
+        if (CurrentState == State.Retreat) multiplier = retreatSpeedMultiplier;
+        else if (Time.time < _chargeUntil) multiplier = chargeSpeedMultiplier;
+        else if (ranged && canSee) multiplier = aimMoveSpeedMultiplier;
+
+        _agent.speed = _baseSpeed * multiplier;
     }
 
     // ======================================================================
@@ -378,8 +654,7 @@ public class EnemyAI : MonoBehaviour
         Vector3 forward = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : transform.forward;
         Vector3 right = Vector3.Cross(Vector3.up, forward);
 
-        // How far out it wants to sit: its firing line, or just inside melee reach.
-        float standOff = ranged ? preferredRangedDistance : attackRange * 0.7f;
+        float standOff = DesiredStandOff();
         Vector3 goal = target.position - forward * standOff;
 
         // Circle while there is still ground to cover; stop circling on arrival so
@@ -393,6 +668,43 @@ public class EnemyAI : MonoBehaviour
             _agent.SetDestination(hit.position);
         else
             _agent.SetDestination(target.position);
+    }
+
+    /// <summary>
+    /// The gap it aims to leave between itself and the player, already discounted by
+    /// the distance the agent brakes short of wherever it is sent.
+    ///
+    /// That discount is the whole point. A NavMeshAgent stops a full stoppingDistance
+    /// before its destination, so sending a melee enemy to "just inside its own reach"
+    /// parked it a stoppingDistance *outside* that reach -- with the default 2.2m range
+    /// and a 1.5m stop, it settled at roughly three metres and the attack check never
+    /// passed again. It looked exactly like the enemy arriving and then deciding to do
+    /// nothing, which is what it was: the reach is what has to be shared between the
+    /// standoff and the brake, and only the standoff is ours to give.
+    /// </summary>
+    float DesiredStandOff()
+    {
+        float brake = _agent != null ? _agent.stoppingDistance : 0f;
+
+        if (!ranged)
+            return Mathf.Max(0f, attackRange - brake - meleeApproachMargin);
+
+        float standOff = Mathf.Max(0f, preferredRangedDistance - brake);
+
+        // A player standing on something is the case a flat standoff gets wrong. The
+        // shooter walks to the foot of the crate, loses the angle over the lip, and
+        // spends the fight firing into the underside of a ledge. Trading ground for
+        // height buys the firing line back.
+        if (target != null)
+        {
+            float rise = target.position.y - transform.position.y;
+            if (rise > elevationDeadZone)
+                standOff += Mathf.Min(maxElevationStandOff,
+                                      (rise - elevationDeadZone) * standOffPerMetreOfRise);
+        }
+
+        // Never past its own range, or it would walk away from the shot it came to take.
+        return Mathf.Min(standOff, Mathf.Max(0f, attackRange - brake - 1f));
     }
 
     /// <summary>Sum of pushes away from nearby enemies, strongest when almost overlapping.</summary>
@@ -428,18 +740,14 @@ public class EnemyAI : MonoBehaviour
         return push * separationStrength;
     }
 
-    /// <summary>A short sprint in mid-range, so closing the last stretch has some threat to it.</summary>
+    /// <summary>
+    /// A short sprint in mid-range, so closing the last stretch has some threat to it.
+    /// Only decides *when* to charge -- ApplyAgentSpeed owns the speed itself.
+    /// </summary>
     void UpdateCharge(float distance)
     {
         if (chargeSpeedMultiplier <= 1f) return;
-
-        if (Time.time < _chargeUntil)
-        {
-            _agent.speed = _baseSpeed * chargeSpeedMultiplier;
-            return;
-        }
-
-        _agent.speed = _baseSpeed;
+        if (Time.time < _chargeUntil) return;
 
         bool inWindow = distance <= chargeRange && distance > attackRange;
         if (!inWindow || Time.time < _nextChargeTime) return;
@@ -501,7 +809,14 @@ public class EnemyAI : MonoBehaviour
 
         if (CurrentState != State.Dead && target != null && _targetHealth != null && !_targetHealth.IsDead)
         {
-            if (ranged)
+            // Re-measured after the wind-up rather than reused from the frame the
+            // attack was committed on: closing during the telegraph should change what
+            // lands, and a rifleman firing from the eyes at something standing inside
+            // its own muzzle misses every time.
+            bool shoot = ranged &&
+                         Vector3.Distance(transform.position, target.position) > meleeRange;
+
+            if (shoot)
             {
                 for (int i = 0; i < Mathf.Max(1, shotsPerAttack); i++)
                 {
@@ -546,9 +861,12 @@ public class EnemyAI : MonoBehaviour
 
     void TryMeleeHit()
     {
-        // Re-check the range -- backing off during the wind-up should work.
+        // Re-check the range -- backing off during the wind-up should work. A shooter
+        // swinging its rifle reaches only as far as the rifle, not as far as it shoots.
+        float reach = ranged ? meleeRange : attackRange;
+
         float distance = Vector3.Distance(transform.position, target.position);
-        if (distance > attackRange * 1.25f) return;
+        if (distance > reach * 1.25f) return;
 
         _targetHealth.ApplyDamage(new DamageInfo(
             attackDamage, target.position, Vector3.up,
@@ -579,7 +897,8 @@ public class EnemyAI : MonoBehaviour
 
         if (!struck) return;
 
-        var info = new DamageInfo(attackDamage, hit.point, hit.normal, direction, gameObject);
+        float damage = attackDamage * Mathf.Max(0f, rangedDamageMultiplier);
+        var info = new DamageInfo(damage, hit.point, hit.normal, direction, gameObject);
 
         var hitbox = hit.collider.GetComponent<Hitbox>();
         if (hitbox != null) hitbox.Receive(info);
@@ -670,22 +989,87 @@ public class EnemyAI : MonoBehaviour
         _hasAlerted = true;
         _lastSeenTime = Time.time;
 
-        if (staggerThreshold <= 0f || info.amount < staggerThreshold) return;
+        _suppression += info.amount;
+        RecordReaction(info);
+
+        // Not on the killing blow: the death sound is what that hit makes, and both at
+        // once reads as two enemies rather than one.
+        if (health == null || health.Current > 0f) PlayPain();
+
+        if (staggerThreshold <= 0f || info.amount < staggerThreshold)
+        {
+            // The light reaction: a hitch, not a stun. Rate-limited, because a hitch on
+            // every round of a 600rpm magazine is not a flinch -- it is a stunlock, and
+            // it would turn every enemy into a statue for as long as you held the
+            // trigger. What the player should get for a burst is one visible stumble
+            // and a beat before the enemy comes back at them.
+            if (Time.time < _nextFlinchTime) return;
+
+            _flinchUntil = Time.time + flinchDuration;
+            _nextFlinchTime = Time.time + flinchCooldown;
+            _nextAttackTime = Mathf.Max(_nextAttackTime, Time.time + flinchAttackDelay);
+            return;
+        }
 
         _staggerUntil = Time.time + staggerDuration;
 
+        CancelAttack();
+
+        // A stagger that did not also cost it the attack would be decoration.
+        _nextAttackTime = Mathf.Max(_nextAttackTime,
+                                    Time.time + staggerDuration + flinchAttackDelay);
+        _chargeUntil = 0f;
+    }
+
+    /// <summary>
+    /// Abandons an attack in progress, wherever it had got to.
+    ///
+    /// Shared by the stagger and the break-off because both mean the same thing: this
+    /// enemy is no longer doing what it was doing. Clearing the telegraph is part of it
+    /// -- the flash is a promise of an incoming hit, and leaving it lit on an enemy that
+    /// has stopped attacking teaches the player to dodge nothing.
+    /// </summary>
+    void CancelAttack()
+    {
         if (_attackRoutine != null)
         {
             StopCoroutine(_attackRoutine);
             _attackRoutine = null;
-            _attacking = false;
         }
 
+        _attacking = false;
         ClearTelegraph();
+    }
 
-        // A stagger that did not also cost it the attack would be decoration.
-        _nextAttackTime = Mathf.Max(_nextAttackTime, Time.time + staggerDuration);
-        _chargeUntil = 0f;
+    /// <summary>
+    /// Records the hit as something the body can replay, for EnemyLimbAnimator.
+    ///
+    /// Stored in local space so the animator can jerk the torso without doing any
+    /// transform work of its own, and so the reaction stays correct if the enemy turns
+    /// while it is still playing out.
+    /// </summary>
+    void RecordReaction(DamageInfo info)
+    {
+        Vector3 push = info.direction.sqrMagnitude > 0.0001f
+            ? info.direction.normalized
+            : -transform.forward;
+
+        LastReactionLocal = transform.InverseTransformDirection(push);
+
+        // Measured against the stagger threshold, so the same weapon reads as heavier on
+        // a light enemy than on an armoured one. The floor keeps a boss -- which has no
+        // threshold at all, by design -- still visibly reacting to being shot.
+        LastReactionStrength = Mathf.Clamp01(info.amount / Mathf.Max(8f, staggerThreshold));
+        LastReactionTime = Time.time;
+    }
+
+    void PlayPain()
+    {
+        if (painClips == null || painClips.Length == 0) return;
+        if (Time.time < _nextPainTime) return;
+
+        _nextPainTime = Time.time + painCooldown;
+        PlayClip(painClips[Random.Range(0, painClips.Length)]);
     }
 
     void OnDied(Health health)
@@ -736,6 +1120,13 @@ public class EnemyAI : MonoBehaviour
 
         strafeAmount = Mathf.Clamp01(strafeAmount + 0.35f * Aggression);
         rangedSpread = Mathf.Max(0.5f, rangedSpread * Mathf.Lerp(1f, 0.55f, Aggression));
+
+        // Breaking off is a wave-one mercy, not a permanent way out. Later waves take
+        // more fire before they give ground and spend less time behind it.
+        suppressionDamage *= Mathf.Lerp(1f, 1.9f, Aggression);
+        retreatDuration *= Mathf.Lerp(1f, 0.65f, Aggression);
+        flinchCooldown *= Mathf.Lerp(1f, 1.5f, Aggression);
+
         detectionRadius *= Mathf.Lerp(1f, 1.25f, Aggression);
         loseTargetTime *= Mathf.Lerp(1f, 1.6f, Aggression);
     }
@@ -861,6 +1252,10 @@ public class EnemyAI : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+
+        // The range it swings at, which on a shooter is nowhere near the range it fires at.
+        Gizmos.color = new Color(1f, 0.35f, 0.1f, 0.8f);
+        Gizmos.DrawWireSphere(transform.position, meleeRange);
 
         Gizmos.color = new Color(0.3f, 0.7f, 1f, 0.6f);
         Gizmos.DrawWireSphere(transform.position, separationRadius);

@@ -75,6 +75,12 @@ public class HUDController : MonoBehaviour
     public TMP_Text bannerSubtitle;
     public float bannerHold = 2.2f;
     public float bannerFadeSpeed = 3.5f;
+
+    [Tooltip("Optional. When set, the rifle's per-wave upgrade is announced on the banner " +
+             "after the wave-cleared message has had its moment.")]
+    public PlayerProgression progression;
+
+    public Color upgradeBannerColor = new Color(0.55f, 0.95f, 0.65f);
     public Color modifierBannerColor = new Color(1f, 0.6f, 0.25f);
     public Color bossBannerColor = new Color(1f, 0.3f, 0.3f);
 
@@ -112,6 +118,19 @@ public class HUDController : MonoBehaviour
     float _trail = 1f;
     float _trailHoldUntil;
     float _bannerUntil;
+
+    /// <summary>
+    /// One queued banner, shown once the current one has finished.
+    ///
+    /// A wave clearing produces two things worth saying -- the wave is over, and the
+    /// rifle got better -- and both are raised on the same frame. Shown immediately the
+    /// second would overwrite the first before it had been read; queued, they land as
+    /// two beats of the same moment. One slot rather than a list, because a third thing
+    /// to announce in the same breath is a design problem, not a queueing problem.
+    /// </summary>
+    bool _hasPendingBanner;
+    string _pendingTitle, _pendingSubtitle;
+    Color _pendingTint;
 
     readonly List<Indicator> _indicators = new List<Indicator>();
 
@@ -178,6 +197,8 @@ public class HUDController : MonoBehaviour
             waveManager.WaveCleared += OnWaveCleared;
         }
 
+        if (progression != null) progression.Upgraded += OnUpgraded;
+
         // Subscribed here rather than in Start, alongside every other source. Started in
         // Start but cancelled in OnDisable, the director's events were gone for good the
         // first time this object was toggled off and on again.
@@ -203,6 +224,8 @@ public class HUDController : MonoBehaviour
             waveManager.WaveStarted -= OnWaveStarted;
             waveManager.WaveCleared -= OnWaveCleared;
         }
+
+        if (progression != null) progression.Upgraded -= OnUpgraded;
 
         if (_director != null)
         {
@@ -548,6 +571,26 @@ public class HUDController : MonoBehaviour
     void OnWaveCleared(int wave)
         => ShowBanner($"WAVE {wave} CLEARED", $"+{waveManager.waveClearBonus * wave:N0}", Color.white);
 
+    void OnUpgraded(PlayerProgression source, int wave)
+        => QueueBanner("RIFLE UPGRADED", source.Summary, upgradeBannerColor);
+
+    /// <summary>Shows a banner now, or holds it until the one on screen has been read.</summary>
+    void QueueBanner(string title, string subtitle, Color tint)
+    {
+        if (bannerGroup == null) return;
+
+        if (bannerGroup.alpha <= 0f && Time.unscaledTime >= _bannerUntil)
+        {
+            ShowBanner(title, subtitle, tint);
+            return;
+        }
+
+        _hasPendingBanner = true;
+        _pendingTitle = title;
+        _pendingSubtitle = subtitle;
+        _pendingTint = tint;
+    }
+
     void ShowBanner(string title, string subtitle, Color tint)
     {
         if (bannerGroup == null) return;
@@ -566,7 +609,16 @@ public class HUDController : MonoBehaviour
 
     void UpdateBanner()
     {
-        if (bannerGroup == null || bannerGroup.alpha <= 0f) return;
+        if (bannerGroup == null) return;
+
+        if (_hasPendingBanner && Time.unscaledTime >= _bannerUntil)
+        {
+            _hasPendingBanner = false;
+            ShowBanner(_pendingTitle, _pendingSubtitle, _pendingTint);
+            return;
+        }
+
+        if (bannerGroup.alpha <= 0f) return;
         if (Time.unscaledTime < _bannerUntil) return;
 
         bannerGroup.alpha = Mathf.MoveTowards(bannerGroup.alpha, 0f,

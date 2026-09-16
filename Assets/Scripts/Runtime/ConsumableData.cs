@@ -61,13 +61,10 @@ public class ConsumableData : ScriptableObject
     {
         get
         {
-            var parts = new System.Collections.Generic.List<string>(3);
-
-            if (healthRestore > 0f) parts.Add($"+{healthRestore:0} HP");
-            if (shieldRestore > 0f) parts.Add($"+{shieldRestore:0} SHIELD");
-            if (HasBoost) parts.Add($"{boostDuration:0}s RUSH");
-
-            return string.Join("   ·   ", parts);
+            return UIText.Row(
+                healthRestore > 0f ? $"+{healthRestore:0} HP" : "",
+                shieldRestore > 0f ? $"+{shieldRestore:0} SHIELD" : "",
+                HasBoost ? $"{UIText.Seconds(boostDuration)} RUSH" : "");
         }
     }
 }

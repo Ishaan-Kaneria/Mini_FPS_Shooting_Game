@@ -83,9 +83,9 @@ public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
         {
             detailText.text = level == null
                 ? ""
-                : level.hasBoss
-                    ? $"{level.enemyCount} + BOSS   ·   {Mathf.RoundToInt(level.timeLimit)}s"
-                    : $"{level.enemyCount} ENEMIES   ·   {Mathf.RoundToInt(level.timeLimit)}s";
+                : UIText.Row($"{level.enemyCount} ENEMIES",
+                             level.hasBoss ? "BOSS" : "",
+                             UIText.Seconds(level.timeLimit));
         }
 
         if (stars != null)

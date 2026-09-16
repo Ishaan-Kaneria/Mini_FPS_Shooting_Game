@@ -315,7 +315,7 @@ public class StorePanel : MonoBehaviour
         float rpm = data.roundsPerMinute * (1f + gun.fireRatePerLevel * level);
         int magazine = data.magazineSize + gun.magazinePerLevel * level;
 
-        return $"{damage:0} DMG   ·   {rpm:0} RPM   ·   {magazine} MAG";
+        return UIText.Row($"{damage:0} DMG", $"{rpm:0} RPM", $"{magazine} MAG");
     }
 
     // ======================================================================
@@ -367,7 +367,9 @@ public class StorePanel : MonoBehaviour
     {
         var blast = bomb.data.Resolve(1f + bomb.damagePerLevel * level, bomb.radiusPerLevel * level);
 
-        return $"{blast.damage:0} DMG   ·   {blast.radius:0.#} m   ·   x{bomb.ChargesAt(level)}";
+        return UIText.Row($"{blast.damage:0} DMG",
+                          $"{UIText.Metres(blast.radius)} BLAST",
+                          $"{bomb.ChargesAt(level)} CHARGES");
     }
 
     // ======================================================================
@@ -390,7 +392,12 @@ public class StorePanel : MonoBehaviour
                 title = item.Label,
                 description = item.data.description,
                 stats = item.data.Effects,
-                state = isEquipped ? $"ON BELT  x{held}" : held > 0 ? $"x{held} STORED" : "",
+                // The same two words a gun and a bomb use, so one vocabulary covers the
+                // whole shop, with the count after it because a consumable is the only
+                // thing here you can have more than one of.
+                state = isEquipped ? UIText.Row("EQUIPPED", UIText.Count(held))
+                      : held > 0 ? UIText.Row("OWNED", UIText.Count(held))
+                      : "",
                 accent = item.data.tint,
 
                 primaryShown = true,
@@ -435,9 +442,19 @@ public class StorePanel : MonoBehaviour
         {
             title = "Vitality",
             description = "Permanent health and shield. No cap, only a rising price.",
-            stats = $"+{catalog.healthPerLevel * level:0} HP   ·   " +
-                    $"+{catalog.shieldPerLevel * level:0} SHIELD",
-            state = level > 0 ? $"LEVEL {level}" : "",
+
+            // What the *next* one buys, not what the last ones did. Showing the running
+            // total meant a fresh profile opened this shelf to "+0 HP   ·   +0 SHIELD",
+            // which is a true statement and a useless one -- the player is reading the
+            // card to find out what pressing the button gets them. The total they have
+            // already bought is the level in the state line.
+            stats = UIText.Row($"+{catalog.healthPerLevel:0} HP", $"+{catalog.shieldPerLevel:0} SHIELD"),
+
+            state = level > 0
+                ? UIText.Row($"LEVEL {level}",
+                             $"+{catalog.healthPerLevel * level:0} HP",
+                             $"+{catalog.shieldPerLevel * level:0} SHIELD")
+                : "",
             accent = new Color(0.45f, 0.95f, 0.55f),
 
             // No pips: this is the one upgrade with no ceiling, and a row of five dots

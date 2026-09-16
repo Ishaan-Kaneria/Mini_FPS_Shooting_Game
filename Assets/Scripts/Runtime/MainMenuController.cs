@@ -391,9 +391,13 @@ public class MainMenuController : MonoBehaviour
                 ? $"Level {result.levelIndex + 1}"
                 : $"Level {result.levelIndex + 1} - {result.levelName}";
 
-            lastRunDetail.text =
-                $"{level}{where}   ·   {result.killed}/{result.total} killed   ·   " +
-                $"{result.score:N0} points";
+            // Capitals like every other list on this screen. It read as prose while the
+            // card beside it read as a row of values, which is two typefaces' worth of
+            // difference between two labels six pixels apart.
+            lastRunDetail.text = UIText.Row($"{level}{where}",
+                                            $"{result.killed}/{result.total} KILLED",
+                                            $"{result.score:N0} POINTS",
+                                            result.coins > 0 ? $"+{Wallet.Format(result.coins)} COINS" : "");
         }
 
         // Read once. Re-opening the dashboard later should not replay it as news.

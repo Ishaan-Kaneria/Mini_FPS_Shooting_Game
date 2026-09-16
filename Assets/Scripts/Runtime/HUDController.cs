@@ -305,8 +305,10 @@ public class HUDController : MonoBehaviour
         if (bombs != null && bombs.data != null)
             equipment += $"{Key(BombKey())} {Dim}BOMB</color>     ";
 
+        // "HEAL" rather than "DRINK": the strip has room for one word per key and it
+        // should be the one that says what the key is *for*.
         if (belt != null && belt.data != null)
-            equipment += $"{Key(ItemKey())} {Dim}DRINK</color>     ";
+            equipment += $"{Key(ItemKey())} {Dim}HEAL</color>     ";
 
         if (instructionText != null)
             instructionText.text =
@@ -616,13 +618,14 @@ public class HUDController : MonoBehaviour
         bool counting = levelManager.IsBriefing && !levelManager.IsFinished;
         int seconds = counting ? Mathf.CeilToInt(levelManager.BriefingRemaining) : Hidden;
 
-        // The equipment hint is part of this label, so what it depends on is part of the
-        // key. Keying on the seconds alone would draw whatever was carried on the frame
-        // the countdown last ticked over.
-        int carried = (bombs != null && bombs.data != null && bombs.charges > 0 ? 1 : 0)
-                    + (belt != null && belt.data != null && belt.Count > 0 ? 2 : 0);
+        // The equipment hint is part of this label, so everything it depends on is part
+        // of the key -- the counts included, because the hint prints them and a player
+        // can drink during the briefing. Keying on the seconds alone would leave the
+        // number stale until the countdown next ticked over.
+        int charges = bombs != null && bombs.data != null ? Mathf.Clamp(bombs.charges, 0, 31) : 0;
+        int drinks = belt != null && belt.data != null ? Mathf.Clamp(belt.Count, 0, 31) : 0;
 
-        int keyed = counting ? seconds * 4 + carried : Hidden;
+        int keyed = counting ? seconds * 1024 + charges * 32 + drinks : Hidden;
 
         if (keyed == _shownBriefing) return;
 
@@ -670,11 +673,37 @@ public class HUDController : MonoBehaviour
 
         if (hasBomb && hasDrink) hint.Append("\n");
 
+        // Named, and with what it gives back, because "drinks an energy drink" tells a
+        // player nothing they could not guess from the word on the button -- what they
+        // need to know at three hit points is that this is the key that heals them.
         if (hasDrink)
-            hint.Append($"{Key(ItemKey())} {Dim}DRINKS AN ENERGY DRINK</color>");
+        {
+            string name = string.IsNullOrWhiteSpace(belt.data.displayName)
+                ? "A DRINK"
+                : belt.data.displayName.ToUpperInvariant();
+
+            hint.Append($"{Key(ItemKey())} {Dim}DRINKS {name} FOR {Restores(belt.data)}, " +
+                        $"{UIText.Count(belt.Count)} LEFT</color>");
+        }
 
         hint.Append("</size>");
         return hint.ToString();
+    }
+
+    /// <summary>
+    /// What a consumable gives back, in three words, read off the asset rather than
+    /// written out -- so a drink retuned to restore no shield stops claiming it does.
+    /// </summary>
+    static string Restores(ConsumableData item)
+    {
+        bool health = item.healthRestore > 0f;
+        bool shield = item.shieldRestore > 0f;
+
+        if (health && shield) return "HEALTH AND SHIELD";
+        if (shield) return "SHIELD";
+        if (health) return "HEALTH";
+
+        return "A SECOND WIND";
     }
 
     /// <summary>

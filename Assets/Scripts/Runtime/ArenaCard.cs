@@ -113,8 +113,9 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         int stars = LevelProgress.StarsInArena(entry.ProgressKey, count);
 
         return cleared <= 0
-            ? $"{count} LEVELS  ·  NOT PLAYED"
-            : $"{cleared}/{count} LEVELS  ·  {stars} STAR{(stars == 1 ? "" : "S")}";
+            ? UIText.Row($"{count} LEVELS", "NOT PLAYED")
+            : UIText.Row($"{cleared}/{count} LEVELS",
+                         $"{stars} STAR{(stars == 1 ? "" : "S")}");
     }
 
     public void OnPointerEnter(PointerEventData eventData) => _hovered = true;

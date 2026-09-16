@@ -105,9 +105,12 @@ way a level ever begins.
   it, nothing happens, and then they distrust the rest of the strip.
 - **The briefing does the teaching.** `HUDController.EquipmentHint` puts one sentence
   under the countdown at the start of a level saying that the bomb is *held* and that
-  releasing it is the throw. That is the least guessable control in the game, a key
-  listed in a strip is something you notice on your third run, and the briefing is the
-  one moment with nothing else happening. Same rule: only for equipment being carried.
+  releasing it is the throw, and another naming the drink key, what it gives back and
+  how many are left. Those are the least guessable controls in the game, a key listed in
+  a strip is something you notice on your third run, and the briefing is the one moment
+  with nothing else happening. Same rule: only for equipment being carried, and the
+  drink line is built from the `ConsumableData` so a drink retuned to restore no shield
+  stops claiming that it does.
 
 **Play in the editor starts at the dashboard**, whatever scene is open. Build Settings
 order only decides what a *player* boots into; the editor plays what is in the hierarchy,
@@ -406,6 +409,26 @@ Progress is keyed by `ArenaCatalog.Entry.ProgressKey`, which is the `LevelSet`'s
 `arenaScene`, **not** the scene name. A WebGL build stages every arena as a renamed copy
 so the touch layer can be baked in, so keying on the live scene would file a browser
 player's stars under a different arena from everyone else's.
+
+## Every screen spells a list the same way
+
+`UIText` owns it: values joined by `UIText.Separator`, a value written as a number then a
+label in capitals, and a unit lowercase and attached to its number (`38s`, `7m`) because
+it is part of the number rather than a word of its own. `UIText.Row` skips empty values,
+which is what lets a caller pass something it may not have -- a drink with no shield
+component, a level with no boss -- without building the string conditionally and getting
+the separators wrong at the seams.
+
+It exists because six labels built the same kind of row and between them used two
+spacings, two casings and three ways of writing a count, so an arena card, a level tile
+and a store card read as three different games. None of that is a bug and all of it is
+noticeable. Same reasoning as `Wallet.Format`, which is why every screen spells a coin
+balance the same way.
+
+A store card shows the value a purchase would give the player **now**, not the running
+total of what they have already bought. The health card showed the total and so opened
+on `+0 HP   ·   +0 SHIELD` for anybody who had never bought one -- true, and useless,
+because the card is read to find out what pressing the button does.
 
 ## Project conventions
 

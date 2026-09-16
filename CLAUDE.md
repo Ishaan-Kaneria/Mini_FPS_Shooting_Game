@@ -41,7 +41,7 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 ## The scene builder regenerates everything
 
-`FPSKitSceneBuilder.cs` (~1830 lines) drives the **FPSKit** menu:
+`FPSKitSceneBuilder.cs` (~3200 lines) drives the **FPSKit** menu:
 
 - **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Subway | Mars Colony]** — each calls `BuildScene(themeName)`.
 - **FPSKit > Build Scene > From Selected Theme Asset** — builds from whatever `LevelTheme` is selected in the Project window, built-in or not. This is how a new arena gets made without touching code.
@@ -99,7 +99,15 @@ way a level ever begins.
   otherwise replaces the page with a sign-off, because `Application.Quit` there just
   leaves a dead canvas.
 - `HUDController.instructionText` is the strip across the top of the arena. It is written
-  from the live bindings, never hard-coded, and hidden on a touch-only device.
+  from the live bindings, never hard-coded, and hidden on a touch-only device. It lists
+  the bomb and drink keys **only when the player is carrying that equipment** -- naming a
+  key somebody has nothing to use it with is worse than saying nothing, because they try
+  it, nothing happens, and then they distrust the rest of the strip.
+- **The briefing does the teaching.** `HUDController.EquipmentHint` puts one sentence
+  under the countdown at the start of a level saying that the bomb is *held* and that
+  releasing it is the throw. That is the least guessable control in the game, a key
+  listed in a strip is something you notice on your third run, and the briefing is the
+  one moment with nothing else happening. Same rule: only for equipment being carried.
 
 **Play in the editor starts at the dashboard**, whatever scene is open. Build Settings
 order only decides what a *player* boots into; the editor plays what is in the hierarchy,
@@ -185,7 +193,9 @@ When adding either, prefer a new asset over a new branch in the builder. If a kn
 
 That makes a specific bug class very easy to write and very hard to spot: the game works the first time you press Play and is dead the second, while every compile and build check still passes. A gate left false, a cached singleton pointing at a destroyed object, a shutdown flag set by the `OnApplicationQuit` that fires when play mode exits.
 
-So: **any static field that carries state must be cleared in a `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` hook on its own class.** That hook runs before the first scene loads on every play session, with or without a domain reload. The classes that currently own one are `PlayerMotor`, `GameDirector`, `DamageNumber`, `EnemyHealthBar` and `MobileInput`. `Time.timeScale` is not a static but persists the same way, and `GameDirector` resets it in the same hook.
+So: **any static field that carries state must be cleared in a `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` hook on its own class.** That hook runs before the first scene loads on every play session, with or without a domain reload. The classes that currently own one are `PlayerMotor`, `GameDirector`, `GameSession`, `DamageNumber`, `EnemyHealthBar`, `MobileInput` and `OneShotAudio`. `Time.timeScale` is not a static but persists the same way, and `GameDirector` resets it in the same hook.
+
+`Wallet`, `Loadout`, `LevelProgress` and `PlayerProfile` are static and deliberately have **no** hook, because they hold no state: every one of them is a set of accessors straight over PlayerPrefs, so there is nothing cached to go stale between sessions. That is the reason they are written that way and not merely a convenience -- a cached balance would be one more thing to clear, and the one nobody would think to.
 
 `Tools/unity-batch.sh FPSKitBatch.VerifyReplay` is the regression test: it plays two real sessions back to back, ends the first on a scored level (the messiest state a player can leave -- frozen clock, no input, free cursor), and fails if the second does not start clean.
 
@@ -272,6 +282,14 @@ The prices in `FPSKitStore.Configure` and the rates on `GameDirector` are one pa
 three coins a kill, sixty a star and a point-based bonus, a well-played level pays
 roughly three hundred and the whole catalogue is near fifty of them. Moving either half
 without the other is what turns a shop into a grind or a free lunch.
+
+**`LevelResult` is a struct, so everything downstream gets a copy.** The level-end coin
+bonus is therefore awarded by `LevelManager` *before* it builds the result --
+`GameDirector.AwardLevelCoins` exists only so that it can be. Written the obvious way,
+with `ReportLevelFinished` filling the coins into the result it was handed, the wallet
+and the dashboard were paid correctly while the results screen -- which is handed the
+*manager's* copy through the `LevelFinished` event -- showed nothing at all. Anything
+that has to appear in a result must be in it before it is passed anywhere.
 
 ## Upgrades escalate, and one of them never stops
 

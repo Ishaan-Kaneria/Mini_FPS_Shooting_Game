@@ -288,7 +288,7 @@ public class EnemyHealthBar : MonoBehaviour
             if (shader == null) continue;
 
             // Cached, not per enemy. Every bar draws through one shared material and
-            // gets its colour from a property block, so a wave of forty enemies is
+            // gets its colour from a property block, so a level of forty enemies is
             // forty property blocks rather than forty materials.
             _fallbackMaterial = new Material(shader) { name = "HealthBar (runtime)" };
             return _fallbackMaterial;

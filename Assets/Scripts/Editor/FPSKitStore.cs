@@ -122,8 +122,7 @@ namespace FPSKit.EditorTools
             {
                 id = "rifle",
                 displayName = "Service Rifle",
-                description = "The one you start with. Nothing it does is remarkable and " +
-                              "nothing it does is wrong.",
+                description = "Steady, forgiving, free.",
                 data = StarterRifle(resetAssets),
                 price = 0,
                 ownedFromStart = true,
@@ -138,8 +137,7 @@ namespace FPSKit.EditorTools
             {
                 id = "smg",
                 displayName = "Vector SMG",
-                description = "Empties a wide magazine very fast and asks you to be close. " +
-                              "The crowd gun.",
+                description = "Very fast, very close. The crowd gun.",
                 data = Gun(resetAssets, "SMG", g =>
                 {
                     g.weaponName = "Vector SMG";
@@ -171,8 +169,7 @@ namespace FPSKit.EditorTools
             {
                 id = "shotgun",
                 displayName = "Breacher",
-                description = "Nine pellets at once, and nothing at all past twenty metres. " +
-                              "Bosses hate it up close.",
+                description = "Nine pellets. Devastating up close, useless past twenty metres.",
                 data = Gun(resetAssets, "Shotgun", g =>
                 {
                     g.weaponName = "Breacher";
@@ -206,8 +203,7 @@ namespace FPSKit.EditorTools
             {
                 id = "burst",
                 displayName = "Tactical Burst",
-                description = "Three rounds a pull, tight and controllable. Rewards a " +
-                              "player who picks their shots.",
+                description = "Three tight rounds a pull. Rewards picking your shots.",
                 data = Gun(resetAssets, "Burst", g =>
                 {
                     g.weaponName = "Tactical Burst";
@@ -238,8 +234,7 @@ namespace FPSKit.EditorTools
             {
                 id = "dmr",
                 displayName = "Marksman DMR",
-                description = "One heavy round at a time, across the whole arena. " +
-                              "Headshots are worth real coins with this.",
+                description = "One heavy round, the length of the arena.",
                 data = Gun(resetAssets, "DMR", g =>
                 {
                     g.weaponName = "Marksman DMR";
@@ -273,8 +268,7 @@ namespace FPSKit.EditorTools
             {
                 id = "lmg",
                 displayName = "Suppressor LMG",
-                description = "A hundred rounds that never stop, and a reload you will " +
-                              "regret starting. The boss-level gun.",
+                description = "A hundred rounds, and a reload you will regret.",
                 data = Gun(resetAssets, "LMG", g =>
                 {
                     g.weaponName = "Suppressor LMG";
@@ -314,8 +308,7 @@ namespace FPSKit.EditorTools
             {
                 id = "frag",
                 displayName = "Frag Bomb",
-                description = "Two a level, thrown on a one-second arc. The ring on the " +
-                              "ground is exactly what it will hurt.",
+                description = "The standard charge. The ring is what it hurts.",
                 data = Bomb(resetAssets, "Frag", b =>
                 {
                     b.bombName = "Frag Bomb";
@@ -338,8 +331,7 @@ namespace FPSKit.EditorTools
             {
                 id = "cluster",
                 displayName = "Cluster Charge",
-                description = "Half the punch over twice the ground, and three of them a " +
-                              "level. For a crowd that will not stand still.",
+                description = "Half the punch over twice the ground.",
                 data = Bomb(resetAssets, "Cluster", b =>
                 {
                     b.bombName = "Cluster Charge";
@@ -363,8 +355,7 @@ namespace FPSKit.EditorTools
             {
                 id = "thermite",
                 displayName = "Thermite Shell",
-                description = "Everything it has, in four metres. Land it on the boss or " +
-                              "waste it.",
+                description = "Everything it has, in four metres. Land it on the boss.",
                 data = Bomb(resetAssets, "Thermite", b =>
                 {
                     b.bombName = "Thermite Shell";
@@ -393,8 +384,7 @@ namespace FPSKit.EditorTools
                 data = Consumable(resetAssets, "EnergyDrink", c =>
                 {
                     c.displayName = "Energy Drink";
-                    c.description = "Health and shield back on the spot, then twelve " +
-                                    "seconds of moving and shooting faster.";
+                    c.description = "Topped up, then twelve seconds of everything faster.";
                     c.healthRestore = 55f;
                     c.shieldRestore = 50f;
                     c.boostDuration = 12f;
@@ -414,8 +404,7 @@ namespace FPSKit.EditorTools
                 data = Consumable(resetAssets, "Adrenaline", c =>
                 {
                     c.displayName = "Adrenaline Shot";
-                    c.description = "Almost all your health at once and a short, violent " +
-                                    "rush. Nothing for the shield.";
+                    c.description = "Almost all your health, and a short violent rush.";
                     c.healthRestore = 95f;
                     c.shieldRestore = 0f;
                     c.boostDuration = 7f;

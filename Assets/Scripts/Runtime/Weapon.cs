@@ -114,9 +114,6 @@ public class Weapon : MonoBehaviour
         }
     }
 
-    /// <summary>Rounds per minute as the player would read it. For the store card.</summary>
-    public float RoundsPerMinute => SecondsBetweenShots <= 0f ? 0f : 60f / SecondsBetweenShots;
-
     /// <summary>Damage at a given range, with the upgrades folded in.</summary>
     public float DamageAtDistance(float distance)
         => data == null ? 0f : data.DamageAtDistance(distance) * DamageMultiplier;
@@ -145,9 +142,6 @@ public class Weapon : MonoBehaviour
         // all it takes for a widened magazine to show up there.
         AmmoChanged?.Invoke(this);
     }
-
-    /// <summary>Back to the asset's own numbers. Used when a run restarts.</summary>
-    public void ResetUpgrades() => ApplyUpgrades(0, 1f, 1f, 1f);
 
     /// <summary>
     /// Puts a different gun in the player's hands.
@@ -559,7 +553,15 @@ public class Weapon : MonoBehaviour
         AimProgress = Mathf.MoveTowards(AimProgress, target, data.adsSpeed * Time.deltaTime);
 
         // Slow the look down as the sights come up, the way every modern shooter does.
-        if (_motor != null)
+        //
+        // Skipped entirely while a bomb is being aimed. Both this and BombThrower write
+        // the same field, and this one writes it every frame from an AimProgress that is
+        // heading for zero -- so without the guard the bomb's slower aim was set once and
+        // overwritten on the very next frame, for the whole life of the feature. The
+        // thrower puts the multiplier back itself when the ring comes down.
+        bool bombHasTheHands = _bombs != null && _bombs.IsAiming;
+
+        if (_motor != null && !bombHasTheHands)
             _motor.LookSensitivityMultiplier =
                 Mathf.Lerp(1f, _motor.adsSensitivityMultiplier, AimProgress);
 

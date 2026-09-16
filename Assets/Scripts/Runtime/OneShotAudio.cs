@@ -55,7 +55,18 @@ public static class OneShotAudio
     /// Plays a clip at a world position. Silently does nothing without a clip, which is
     /// what lets every audio field in the kit stay optional.
     /// </summary>
-    public static void Play(AudioClip clip, Vector3 position, float volume = 1f)
+    /// <param name="pitch">
+    /// Playback rate. Variance here is what stops a sound that fires several times a
+    /// second -- an impact, a death in a crowd -- reading as one sample on a loop.
+    /// </param>
+    /// <param name="minDistance">
+    /// Metres the sound stays at full volume for before it starts rolling off. 0 keeps
+    /// the pool's own, which suits a bullet hitting a wall. A blast wants a much larger
+    /// one: rolling a detonation off from a metre and a half away makes something that
+    /// covers a quarter of the arena sound like it happened somewhere else.
+    /// </param>
+    public static void Play(AudioClip clip, Vector3 position, float volume = 1f,
+                            float pitch = 1f, float minDistance = 0f)
     {
         if (clip == null) return;
 
@@ -65,6 +76,14 @@ public static class OneShotAudio
         source.transform.position = position;
         source.clip = clip;
         source.volume = Mathf.Clamp01(volume);
+        source.pitch = Mathf.Clamp(pitch, 0.1f, 3f);
+
+        // Put back every time rather than only when overridden. A pooled source keeps
+        // whatever the last caller set, so a bullet impact borrowing the source a blast
+        // used would otherwise inherit its reach and be audible across the level.
+        source.minDistance = minDistance > 0f ? minDistance : MinDistance;
+        source.maxDistance = Mathf.Max(MaxDistance, source.minDistance * 8f);
+
         source.Play();
     }
 

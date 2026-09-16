@@ -52,22 +52,22 @@ public class ConsumableData : ScriptableObject
                              fireRateMultiplier > 1.001f ||
                              reloadTimeMultiplier < 0.999f);
 
-    /// <summary>One line for the store card, built from the numbers rather than typed twice.</summary>
+    /// <summary>
+    /// The one stats line a store card gets, built from the numbers rather than typed
+    /// out a second time somewhere they can drift apart. Same three-value shape and the
+    /// same separator every other card uses, so a shelf reads as a list.
+    /// </summary>
     public string Effects
     {
         get
         {
-            var parts = new System.Text.StringBuilder();
+            var parts = new System.Collections.Generic.List<string>(3);
 
-            if (healthRestore > 0f) parts.Append($"+{healthRestore:0} HP");
-            if (shieldRestore > 0f) parts.Append(parts.Length > 0 ? $"   +{shieldRestore:0} SHIELD" : $"+{shieldRestore:0} SHIELD");
+            if (healthRestore > 0f) parts.Add($"+{healthRestore:0} HP");
+            if (shieldRestore > 0f) parts.Add($"+{shieldRestore:0} SHIELD");
+            if (HasBoost) parts.Add($"{boostDuration:0}s RUSH");
 
-            if (!HasBoost) return parts.ToString();
-
-            if (parts.Length > 0) parts.Append("   ");
-            parts.Append($"{boostDuration:0}s RUSH");
-
-            return parts.ToString();
+            return string.Join("   ·   ", parts);
         }
     }
 }

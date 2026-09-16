@@ -149,6 +149,4 @@ public class BombData : ScriptableObject
             explosionForce = explosionForce
         };
 
-    /// <summary>The unupgraded blast. What the store card and a hand-built scene show.</summary>
-    public BlastSpec Baseline => Resolve();
 }

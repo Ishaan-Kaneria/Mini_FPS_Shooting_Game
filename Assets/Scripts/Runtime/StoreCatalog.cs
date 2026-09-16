@@ -93,11 +93,6 @@ public class StoreCatalog : ScriptableObject
         [Range(0f, 0.3f)] public float reloadPerLevel = 0.05f;
 
         public string Label => string.IsNullOrWhiteSpace(displayName) ? id : displayName;
-
-        /// <summary>One line describing what the next upgrade buys.</summary>
-        public string UpgradeSummary =>
-            $"+{damagePerLevel * 100f:0}% DMG   +{fireRatePerLevel * 100f:0}% RATE   " +
-            $"+{magazinePerLevel} MAG   -{reloadPerLevel * 100f:0}% RELOAD";
     }
 
     [Serializable]
@@ -130,10 +125,6 @@ public class StoreCatalog : ScriptableObject
         [Min(1)] public int upgradesPerExtraCharge = 2;
 
         public string Label => string.IsNullOrWhiteSpace(displayName) ? id : displayName;
-
-        public string UpgradeSummary =>
-            $"+{damagePerLevel * 100f:0}% DMG   +{radiusPerLevel:0.#}m RADIUS   " +
-            $"+1 CHARGE every {upgradesPerExtraCharge}";
 
         /// <summary>Charges a bomb at this upgrade level carries into a level.</summary>
         public int ChargesAt(int level)

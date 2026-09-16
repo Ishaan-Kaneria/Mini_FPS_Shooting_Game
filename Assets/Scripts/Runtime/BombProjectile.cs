@@ -50,12 +50,6 @@ public class BombProjectile : MonoBehaviour
     bool _armed;
     bool _detonated;
 
-    /// <summary>Where it is going to land. Read by the HUD while one is in the air.</summary>
-    public Vector3 Target => _target;
-
-    /// <summary>Seconds until it goes off. 0 once it has.</summary>
-    public float FuseRemaining => _armed && !_detonated ? Mathf.Max(0f, _flightTime - _age) : 0f;
-
     /// <summary>
     /// Throws the bomb at a point, to arrive there in exactly the data's fall time.
     ///
@@ -185,7 +179,13 @@ public class BombProjectile : MonoBehaviour
                 else Destroy(effect, 3f);
             }
 
-            OneShotAudio.Play(_data.explodeClip, at);
+            // Full volume, and held at full volume out to the blast radius before it
+            // starts rolling off. The pool's default is a metre and a half, which is
+            // right for a bullet hitting a wall and makes a detonation covering seven
+            // metres of arena sound like it happened next door.
+            OneShotAudio.Play(_data.explodeClip, at, 1f,
+                              UnityEngine.Random.Range(0.94f, 1.06f),
+                              minDistance: Mathf.Max(8f, _spec.radius * 1.5f));
 
             ShakeNearbyCamera(at);
         }

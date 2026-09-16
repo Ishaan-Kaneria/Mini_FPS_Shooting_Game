@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Item_Adrenaline
   m_EditorClassIdentifier: Assembly-CSharp::ConsumableData
   displayName: Adrenaline Shot
-  description: Almost all your health at once and a short, violent rush. Nothing for the shield.
+  description: Almost all your health, and a short violent rush.
   tint: {r: 1, g: 0.55, b: 0.6, a: 1}
   healthRestore: 95
   shieldRestore: 0

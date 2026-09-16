@@ -296,7 +296,7 @@ namespace FPSKit.EditorTools
                 if (ai.painClips == null || ai.painClips.Length == 0)
                 {
                     var pain = Clips("SFX/enemy_pain_01.wav", "SFX/enemy_pain_02.wav",
-                                     "SFX/enemy_pain_03.wav");
+                                     "SFX/enemy_pain_03.wav", "SFX/enemy_pain_04.wav");
 
                     if (pain.Length > 0)
                     {
@@ -1816,7 +1816,13 @@ namespace FPSKit.EditorTools
             // limited by EnemyAI: one voice retriggered on every round of a magazine is
             // the most obviously synthetic sound a firefight can make.
             ai.painClips = Clips("SFX/enemy_pain_01.wav", "SFX/enemy_pain_02.wav",
-                                 "SFX/enemy_pain_03.wav");
+                                 "SFX/enemy_pain_03.wav", "SFX/enemy_pain_04.wav");
+
+            // Stated rather than left to the component's defaults, because the gap
+            // between the two is the point: in a crowd the only way to tell "I hurt it"
+            // from "I killed it" without looking is that one is louder than the other.
+            ai.painVolume = 0.7f;
+            ai.deathVolume = 1f;
 
             // The rifle a ranged archetype carries. Hung off the right arm so the limb
             // animator swings and raises it with the hands rather than needing to know
@@ -2311,6 +2317,11 @@ namespace FPSKit.EditorTools
 
             hud.briefingText = MakeText(root, "Briefing", "",
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 250f), 34, TextAlignmentOptions.Center);
+
+            // Wider and taller than MakeText's default box: the briefing is the level's
+            // one line, the countdown, and -- when the player is carrying equipment --
+            // how to use it. That is three lines, and the longest of them is a sentence.
+            hud.briefingText.GetComponent<RectTransform>().sizeDelta = new Vector2(1180f, 240f);
 
             // ---- centre --------------------------------------------------
             BuildCrosshair(root, hud);

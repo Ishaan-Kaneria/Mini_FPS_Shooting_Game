@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Item_EnergyDrink
   m_EditorClassIdentifier: Assembly-CSharp::ConsumableData
   displayName: Energy Drink
-  description: Health and shield back on the spot, then twelve seconds of moving and shooting faster.
+  description: Topped up, then twelve seconds of everything faster.
   tint: {r: 0.4, g: 0.9, b: 1, a: 1}
   healthRestore: 55
   shieldRestore: 50

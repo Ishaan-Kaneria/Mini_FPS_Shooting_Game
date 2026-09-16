@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 ///
 /// It creates itself on demand, so a scene that was never touched by the scene
 /// builder still gets a working pause menu and scoreboard the moment anything
-/// asks for <see cref="Instance"/>. That is what keeps the HUD, the wave manager
+/// asks for <see cref="Instance"/>. That is what keeps the HUD, the level manager
 /// and the player from each having to own a slice of the same state.
 /// </summary>
 [DisallowMultipleComponent]
@@ -311,7 +311,7 @@ public class GameDirector : MonoBehaviour
         return awarded;
     }
 
-    /// <summary>Flat points with no combo involvement -- wave clear bonuses and the like.</summary>
+    /// <summary>Flat points with no combo involvement -- level clear bonuses and the like.</summary>
     public void AddScore(int points)
     {
         if (points == 0 || IsGameOver) return;
@@ -332,6 +332,19 @@ public class GameDirector : MonoBehaviour
         CoinsEarned += amount;
         CoinsChanged?.Invoke(this, CoinsEarned);
     }
+
+    /// <summary>
+    /// Pays the level-end bonus: coins for the stars, and coins for the points.
+    ///
+    /// Called by <see cref="LevelManager"/> *before* it builds its result, which is the
+    /// whole reason this is a separate method rather than a couple of lines inside
+    /// <see cref="ReportLevelFinished"/>. LevelResult is a struct, so a method that took
+    /// one and wrote the coins into it would be writing into a copy -- the wallet and
+    /// the dashboard would be paid correctly while the results screen, which is handed
+    /// the *manager's* copy, showed nothing at all. It did exactly that.
+    /// </summary>
+    public void AwardLevelCoins(int stars)
+        => AddCoins(Mathf.Max(0, stars) * coinsPerStar + Score / Mathf.Max(1, scorePerCoin));
 
     /// <summary>Called when the player takes a hit. Dropping the chain is the cost of being hit.</summary>
     public void BreakCombo()
@@ -379,13 +392,6 @@ public class GameDirector : MonoBehaviour
     public void ReportLevelFinished(LevelResult result)
     {
         if (IsGameOver) return;
-
-        // The level-end bonuses, added before the result is banked so the number on the
-        // results screen is the number that reached the wallet.
-        CoinsEarned += result.stars * coinsPerStar + result.score / Mathf.Max(1, scorePerCoin);
-        CoinsChanged?.Invoke(this, CoinsEarned);
-
-        result.coins = CoinsEarned;
 
         IsGameOver = true;
         IsPaused = false;

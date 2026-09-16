@@ -90,6 +90,11 @@ public class MainMenuController : MonoBehaviour
     public TMP_Text runsText;
     public TMP_Text killsText;
 
+    [Tooltip("Coins earned across every level ever played. Not the balance -- this one " +
+             "never goes down, so it measures how much has been played where the balance " +
+             "only measures what has not been spent yet.")]
+    public TMP_Text coinsEarnedText;
+
     [Header("Last Run")]
     [Tooltip("Shown only when the dashboard was reached by finishing a run, so a cold " +
              "start is not greeted by the results of a game nobody played.")]
@@ -324,6 +329,7 @@ public class MainMenuController : MonoBehaviour
         if (bestScoreText != null) bestScoreText.text = PlayerProfile.BestScore.ToString("N0");
         if (runsText != null) runsText.text = PlayerProfile.Runs.ToString();
         if (killsText != null) killsText.text = PlayerProfile.TotalKills.ToString("N0");
+        if (coinsEarnedText != null) coinsEarnedText.text = Wallet.Format(Wallet.LifetimeEarned);
     }
 
     /// <summary>Stars taken across every arena the catalog offers.</summary>

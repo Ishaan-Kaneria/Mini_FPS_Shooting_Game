@@ -15,7 +15,7 @@ MonoBehaviour:
   guns:
   - id: rifle
     displayName: Service Rifle
-    description: The one you start with. Nothing it does is remarkable and nothing it does is wrong.
+    description: Steady, forgiving, free.
     data: {fileID: 11400000, guid: dad05708dad824e469b33cb3091b4469, type: 2}
     price: 0
     ownedFromStart: 1
@@ -29,7 +29,7 @@ MonoBehaviour:
     reloadPerLevel: 0.05
   - id: smg
     displayName: Vector SMG
-    description: Empties a wide magazine very fast and asks you to be close. The crowd gun.
+    description: Very fast, very close. The crowd gun.
     data: {fileID: 11400000, guid: 56d7b27287cb2184db90df43b1cfd93f, type: 2}
     price: 1400
     ownedFromStart: 0
@@ -43,7 +43,7 @@ MonoBehaviour:
     reloadPerLevel: 0.06
   - id: shotgun
     displayName: Breacher
-    description: Nine pellets at once, and nothing at all past twenty metres. Bosses hate it up close.
+    description: Nine pellets. Devastating up close, useless past twenty metres.
     data: {fileID: 11400000, guid: 4d05e73affca01755be6a5e78bb7b488, type: 2}
     price: 2600
     ownedFromStart: 0
@@ -57,7 +57,7 @@ MonoBehaviour:
     reloadPerLevel: 0.07
   - id: burst
     displayName: Tactical Burst
-    description: Three rounds a pull, tight and controllable. Rewards a player who picks their shots.
+    description: Three tight rounds a pull. Rewards picking your shots.
     data: {fileID: 11400000, guid: 5c264f4e49779b133ad094164873ca05, type: 2}
     price: 3400
     ownedFromStart: 0
@@ -71,7 +71,7 @@ MonoBehaviour:
     reloadPerLevel: 0.05
   - id: dmr
     displayName: Marksman DMR
-    description: One heavy round at a time, across the whole arena. Headshots are worth real coins with this.
+    description: One heavy round, the length of the arena.
     data: {fileID: 11400000, guid: 7fd98e1061f9d9f5095fc673c5216bd2, type: 2}
     price: 4200
     ownedFromStart: 0
@@ -85,7 +85,7 @@ MonoBehaviour:
     reloadPerLevel: 0.05
   - id: lmg
     displayName: Suppressor LMG
-    description: A hundred rounds that never stop, and a reload you will regret starting. The boss-level gun.
+    description: A hundred rounds, and a reload you will regret.
     data: {fileID: 11400000, guid: b007f3c786d8d7e199b859de63f333f6, type: 2}
     price: 5600
     ownedFromStart: 0
@@ -100,7 +100,7 @@ MonoBehaviour:
   bombs:
   - id: frag
     displayName: Frag Bomb
-    description: Two a level, thrown on a one-second arc. The ring on the ground is exactly what it will hurt.
+    description: The standard charge. The ring is what it hurts.
     data: {fileID: 11400000, guid: 31a5b2fbf01bba49d9b39731690b10c7, type: 2}
     price: 0
     ownedFromStart: 1
@@ -113,7 +113,7 @@ MonoBehaviour:
     upgradesPerExtraCharge: 2
   - id: cluster
     displayName: Cluster Charge
-    description: Half the punch over twice the ground, and three of them a level. For a crowd that will not stand still.
+    description: Half the punch over twice the ground.
     data: {fileID: 11400000, guid: eca3caae23d32d0a6b839283fe1c2c2e, type: 2}
     price: 1800
     ownedFromStart: 0
@@ -126,7 +126,7 @@ MonoBehaviour:
     upgradesPerExtraCharge: 3
   - id: thermite
     displayName: Thermite Shell
-    description: Everything it has, in four metres. Land it on the boss or waste it.
+    description: Everything it has, in four metres. Land it on the boss.
     data: {fileID: 11400000, guid: c396e04ce06f845888cd8f9a487bd065, type: 2}
     price: 3200
     ownedFromStart: 0

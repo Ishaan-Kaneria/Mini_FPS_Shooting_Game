@@ -909,10 +909,15 @@ namespace FPSKit.EditorTools
             rows.offsetMin = new Vector2(0f, 24f);
             rows.offsetMax = new Vector2(0f, -64f);
 
-            menu.starsText = Stat(rows, "Stars", "STARS EARNED", 0, 4);
-            menu.bestScoreText = Stat(rows, "BestScore", "BEST SCORE", 1, 4);
-            menu.runsText = Stat(rows, "Runs", "RUNS PLAYED", 2, 4);
-            menu.killsText = Stat(rows, "Kills", "TOTAL KILLS", 3, 4);
+            // Five rows now, and the count is passed to every one of them rather than
+            // being a constant in Stat. Splitting a measured box n ways cannot collide at
+            // any window height; hard-coding 4 in one of five calls would put two of them
+            // on top of each other at exactly the size nobody tests at.
+            menu.starsText = Stat(rows, "Stars", "STARS EARNED", 0, 5);
+            menu.coinsEarnedText = Stat(rows, "Coins", "COINS EARNED", 1, 5);
+            menu.bestScoreText = Stat(rows, "BestScore", "BEST SCORE", 2, 5);
+            menu.runsText = Stat(rows, "Runs", "RUNS PLAYED", 3, 5);
+            menu.killsText = Stat(rows, "Kills", "TOTAL KILLS", 4, 5);
 
             // The key hints that used to sit under these are gone. They were duplicated
             // from the strip that is on screen during the whole run, and this is the
@@ -1366,38 +1371,42 @@ namespace FPSKit.EditorTools
 
             var card = root.gameObject.AddComponent<StoreItemCard>();
             card.frame = root.GetComponent<Image>();
-            card.face = inner.GetComponent<Image>();
 
             var accent = Block(inner, "AccentBar", Accent);
             Span(accent.rectTransform, 0.955f, 0.985f, 16f, 16f);
             card.accentBar = accent;
 
-            var title = Label(inner, "Title", "ITEM", 26, TextAlignmentOptions.MidlineLeft, Ink);
-            Span(title.rectTransform, 0.83f, 0.95f, 16f, 130f);
+            // The card carries four things and no more: what it is, whether you have it,
+            // one line of prose and one line of numbers. It held twice that at first and
+            // the effect was that nobody read any of it, so the bands below are generous
+            // on purpose -- the whitespace is the feature.
+            var title = Label(inner, "Title", "ITEM", 28, TextAlignmentOptions.MidlineLeft, Ink);
+            Span(title.rectTransform, 0.80f, 0.95f, 16f, 130f);
             title.characterSpacing = 3f;
-            Autosize(title, 13f, 26f);
+            Autosize(title, 14f, 28f);
             card.titleText = title;
 
             var state = Label(inner, "State", "", 17, TextAlignmentOptions.MidlineRight, Accent);
-            Span(state.rectTransform, 0.83f, 0.95f, 260f, 16f);
+            Span(state.rectTransform, 0.80f, 0.95f, 250f, 16f);
             state.characterSpacing = 3f;
             Autosize(state, 9f, 17f);
             card.stateText = state;
 
-            var description = Label(inner, "Description", "", 17,
+            // The numbers sit directly under the name and above the prose, because they
+            // are what a player is comparing one card against another with.
+            var stats = Label(inner, "Stats", "", 22, TextAlignmentOptions.MidlineLeft, Ink);
+            Span(stats.rectTransform, 0.62f, 0.78f, 16f, 16f);
+            stats.overflowMode = TextOverflowModes.Ellipsis;
+            Autosize(stats, 11f, 22f);
+            card.statsText = stats;
+
+            var description = Label(inner, "Description", "", 18,
                                     TextAlignmentOptions.TopLeft, InkDim);
-            Span(description.rectTransform, 0.58f, 0.82f, 16f, 16f);
+            Span(description.rectTransform, 0.38f, 0.58f, 16f, 16f);
             description.textWrappingMode = TextWrappingModes.Normal;
             description.overflowMode = TextOverflowModes.Ellipsis;
-            Autosize(description, 9f, 17f);
+            Autosize(description, 10f, 18f);
             card.descriptionText = description;
-
-            var stats = Label(inner, "Stats", "", 17, TextAlignmentOptions.TopLeft, Ink);
-            Span(stats.rectTransform, 0.34f, 0.57f, 16f, 16f);
-            stats.textWrappingMode = TextWrappingModes.Normal;
-            stats.overflowMode = TextOverflowModes.Ellipsis;
-            Autosize(stats, 9f, 17f);
-            card.statsText = stats;
 
             // Five pips, because five is the upgrade cap on everything that has one. The
             // card hides the ones past an item's own maximum, and all of them for the

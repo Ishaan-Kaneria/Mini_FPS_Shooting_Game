@@ -166,32 +166,88 @@ save(f"{A}/SFX/land.wav",
          gain(env(tone(0.16, 120, 48), power=5), 0.5)))
 
 # ---- enemy ------------------------------------------------------------------
+#
+# The whole block is wrapped in a save/restore of the noise stream. Every clip in this
+# file draws from one seeded generator, so changing how much noise anything in here
+# consumes would re-roll every sound authored below it -- rewriting identical-sounding
+# files and burying a real change in a diff full of churn.
+_enemy_stream = random.getstate()
+
 def growl(t, f0, f1, rasp=0.5):
     base = mix(gain(tone(t, f0, f1, "saw"), 0.6), gain(tone(t, f0 * 1.5, f1 * 1.5), 0.2))
     return mix(gain(lowpass(base, 900), 1.0), gain(lowpass(n(secs(t)), 700), rasp * 0.5))
 
 save(f"{A}/SFX/enemy_alert.wav",  env(growl(0.55, 150, 185), attack=0.03, power=2))
 save(f"{A}/SFX/enemy_attack.wav", env(growl(0.28, 220, 130, 0.8), attack=0.006, power=3))
-save(f"{A}/SFX/enemy_death.wav",  env(growl(0.85, 170, 60, 0.7), attack=0.01, power=1.6))
 
-# The hit reaction. Three of them because one grunt retriggered on every bullet is
-# the most obviously looped sound a game can make -- EnemyAI picks at random and
-# rate-limits it. Short, falling in pitch, and cut off: this is a body reacting,
-# not a performance.
+
+# ---- being shot -------------------------------------------------------------
+# A hit is two things happening at once and the sound has to carry both: something
+# striking a body, and the body reacting to it. The reaction alone -- which is all
+# these used to be -- reads as a person making a noise for no reason, because the
+# round that caused it is a separate clip playing from the gun across the arena.
 #
-# The noise stream is saved and put back around them. Every clip here draws from one
-# seeded generator, so inserting a sound that uses n() would otherwise re-roll every
-# sound authored below it -- rewriting identical-sounding files and burying a real
-# change in a diff full of churn.
-_stream = random.getstate()
+# So each one is a wet impact transient with a grunt starting a few milliseconds
+# behind it. The delay is the point: simultaneous, they fuse into one muddy sound;
+# offset, the ear hears a cause and an effect.
+
+def impact(t=0.09, cut=340, bright=0.18):
+    """The round landing. Low, short and wet -- a body, not a wall."""
+    return mix(gain(env(lowpass(n(secs(t)), cut), power=6), 0.95),
+               gain(env(highpass(n(secs(0.03)), 2200), power=11), bright),
+               gain(env(tone(0.07, 150, 70), power=7), 0.4))
+
+
+def hit(grunt_at, grunt, punch=0.09, cut=340):
+    """An impact with a reaction a few milliseconds behind it."""
+    return mix(impact(punch, cut), cat(blank(grunt_at), grunt))
+
+
+# Four rather than three, and each a different shape: a short bark, a lower groan, a
+# double take, and one that is almost all impact with barely a voice behind it. Four
+# is where a crowd under sustained fire stops sounding like one enemy.
 save(f"{A}/SFX/enemy_pain_01.wav",
-     env(vowel(0.30, 250, 165, AH), attack=0.006, power=2.4))
+     hit(0.035, gain(env(vowel(0.26, 260, 170, AH), attack=0.005, power=2.6), 0.85)))
+
 save(f"{A}/SFX/enemy_pain_02.wav",
-     env(vowel(0.24, 205, 140, UH), attack=0.005, power=2.8))
+     hit(0.030, gain(env(vowel(0.22, 200, 132, UH), attack=0.004, power=3.0), 0.8),
+         punch=0.11, cut=280))
+
 save(f"{A}/SFX/enemy_pain_03.wav",
-     cat(env(vowel(0.13, 290, 230, AH), attack=0.004, power=3.5),
-         env(vowel(0.22, 195, 130, UH), attack=0.01, power=2.6)))
-random.setstate(_stream)
+     hit(0.028, cat(env(vowel(0.11, 300, 240, AH), attack=0.003, power=3.8),
+                    gain(env(vowel(0.20, 190, 126, UH), attack=0.01, power=2.8), 0.7))))
+
+save(f"{A}/SFX/enemy_pain_04.wav",
+     hit(0.040, gain(env(vowel(0.15, 175, 120, UH), attack=0.006, power=3.4), 0.45),
+         punch=0.13, cut=240))
+
+
+# ---- dying ------------------------------------------------------------------
+# Deliberately a different *shape* from a pain grunt, not a longer one. A hit is a
+# short bark that cuts off; a death falls a long way in pitch, runs out of air
+# rather than stopping, and lands with the body. In a crowd that difference is the
+# only way a player can tell "I hurt it" from "I killed it" without looking, which
+# is most of what makes shooting into a group readable.
+
+_death_cry = mix(
+    gain(env(vowel(0.62, 205, 78, AH), attack=0.008, power=1.5), 1.0),
+    # A second voice a fifth below, drifting out of tune with the first as it falls.
+    # Two voices that do not quite agree is what stops a long note sounding sung.
+    gain(env(vowel(0.62, 138, 54, UH), attack=0.02, power=1.3), 0.45),
+    gain(impact(0.10, 300, 0.1), 0.7))
+
+# The last of the air, after the voice has gone.
+_death_rattle = cat(blank(0.52),
+                    gain(env(lowpass(highpass(n(secs(0.30)), 400), 1800), power=2.5), 0.22))
+
+# And the body arriving. Low, dull and late, so the clip finishes on the floor.
+_body_fall = cat(blank(0.66),
+                 mix(gain(env(lowpass(n(secs(0.34)), 190), power=3.5), 0.8),
+                     gain(env(tone(0.22, 95, 38), power=4), 0.55)))
+
+save(f"{A}/SFX/enemy_death.wav", mix(_death_cry, _death_rattle, _body_fall))
+
+random.setstate(_enemy_stream)
 
 # ---- pickup -----------------------------------------------------------------
 save(f"{A}/SFX/pickup.wav",
@@ -326,24 +382,50 @@ save(f"{A}/UI/level_failed.wav",
 
 
 # ---- explosives and supplies -------------------------------------------------
-# Appended last, like everything else that draws from the seeded noise stream.
+# Appended last, like everything else that draws from the seeded noise stream, and
+# wrapped in a save/restore of it so that retuning the blast -- which is the clip here
+# most likely to be tuned again -- cannot rewrite the store sounds underneath it.
+_blast_stream = random.getstate()
 
 # The throw: cloth and a grunt of effort, over in a tenth of a second.
 save(f"{A}/SFX/bomb_throw.wav",
      mix(gain(env(highpass(lowpass(n(secs(0.16)), 2600), 600), power=5), 0.55),
          gain(env(tone(0.10, 320, 180), power=6), 0.25)))
 
-# The blast. Three layers, because an explosion that is only noise is a hiss and one
-# that is only a thump is a door closing: a crack off the front, a body of filtered
-# noise with a long tail, and a sub-bass drop underneath that is most of what makes it
-# feel large on a speaker that cannot reproduce it.
-_crack = env(highpass(n(secs(0.35)), 1400), power=6)
-_body  = env(lowpass(n(secs(1.10)), 420), power=2.2)
-_rumble = env(lowpass(n(secs(1.40)), 120), power=1.4)
-_drop  = env(tone(0.70, 90, 28), power=2.0)
+# The blast.
+#
+# Five layers over two and a half seconds, because the size of an explosion is almost
+# entirely in how long it takes to stop. A short one is a door slamming however loud it
+# is; what makes one read as *big* is the tail -- the rumble still going when the crack
+# is long finished, and debris landing after that.
+#
+#   crack   the leading edge, high and gone in a tenth of a second
+#   body    the detonation itself, mid-band, with a real decay
+#   rumble  low noise that outlasts everything above it
+#   drop    a sub-bass sweep, which is what a subwoofer reproduces and a laptop implies
+#   debris  scattered late transients, so the blast has a floor to land on
+_crack  = env(highpass(n(secs(0.40)), 1600), power=7)
+_body   = env(lowpass(highpass(n(secs(1.60)), 180), 900), power=1.8)
+_rumble = env(lowpass(n(secs(2.50)), 110), power=1.0)
+_drop   = env(tone(1.10, 120, 22), power=1.5)
+
+# A second, slower sweep under the first. Two sweeps an octave apart is what turns a
+# tone falling in pitch into something collapsing.
+_drop2  = env(tone(1.60, 60, 16), power=1.2)
+
+# Rubble coming down, spread over the second half so the tail has detail in it rather
+# than being a fade. Deterministic offsets, because a seeded stream is the whole reason
+# rebuilding this file does not rewrite every clip in it.
+_debris = blank(2.50)
+for _i, (_at, _len, _cut) in enumerate([(0.55, 0.09, 900), (0.72, 0.07, 1400),
+                                        (0.94, 0.11, 600), (1.18, 0.08, 1100),
+                                        (1.45, 0.10, 500), (1.79, 0.07, 800)]):
+    _piece = cat(blank(_at), gain(env(lowpass(n(secs(_len)), _cut), power=7), 0.42))
+    _debris = mix(_debris, _piece)
 
 save(f"{A}/SFX/explosion.wav",
-     mix(gain(_crack, 0.75), gain(_body, 0.95), gain(_rumble, 0.85), gain(_drop, 0.7)))
+     mix(gain(_crack, 0.8), gain(_body, 1.0), gain(_rumble, 0.95),
+         gain(_drop, 0.85), gain(_drop2, 0.6), gain(_debris, 0.5)))
 
 # The drink: a can cracking open, three swallows, and a rising tone as the rush lands.
 def swallow(at, t):
@@ -353,6 +435,8 @@ save(f"{A}/SFX/drink.wav",
      mix(gain(env(highpass(n(secs(0.05)), 3000), power=9), 0.6),        # the tab
          swallow(0.10, 0.10), swallow(0.26, 0.10), swallow(0.42, 0.12),
          gain(cat(blank(0.30), blip(0.55, 440, 880, 1.6, attack=0.08)), 0.45)))
+
+random.setstate(_blast_stream)
 
 # ---- store -------------------------------------------------------------------
 # A coin is a short pair of high partials a fifth apart -- the interval is what makes

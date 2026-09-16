@@ -178,8 +178,13 @@ public class BombThrower : MonoBehaviour
         // for a bomb that is not going to be thrown.
         if (!IsAiming) return;
 
-        UpdateLockToggle(bindings);
+        // The aim first, then the lock. Locking pins whatever AimRange currently holds,
+        // and on the first frame of a hold that is either zero or the distance left over
+        // from the previous throw -- so a player who presses both keys together locked a
+        // range that had nothing to do with where they were looking. Costs one frame of
+        // the ring still being drawn in its unlocked colour, which is invisible.
         UpdateAim();
+        UpdateLockToggle(bindings);
     }
 
     // ======================================================================

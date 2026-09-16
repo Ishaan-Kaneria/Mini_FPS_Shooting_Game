@@ -15,6 +15,13 @@ using UnityEngine.UI;
 ///
 /// Built into the dashboard scene alongside the level select, and shown the same way --
 /// a full-screen panel over the arenas rather than a scene of its own.
+///
+/// A card carries three numbers and one line of prose, and that is the whole budget. It
+/// held twice that at first -- the current stats, then a second line spelling out what
+/// each upgrade added as four percentages -- and the effect was that nobody read any of
+/// it. The numbers shown are the *current* ones with upgrades folded in, so buying one
+/// visibly moves them, which teaches what an upgrade does far better than a list of
+/// percentages does. The pips say how many are left.
 /// </summary>
 [DisallowMultipleComponent]
 public class StorePanel : MonoBehaviour
@@ -293,16 +300,22 @@ public class StorePanel : MonoBehaviour
         }
     }
 
-    string GunStats(StoreCatalog.GunEntry gun, int level)
+    /// <summary>
+    /// Three numbers, with the bought upgrades already in them. A shotgun's are its
+    /// pellets times its damage, because "13 DMG" on a gun that fires nine at once is a
+    /// true number that tells the player the opposite of the truth.
+    /// </summary>
+    static string GunStats(StoreCatalog.GunEntry gun, int level)
     {
         var data = gun.data;
 
-        float damage = data.damage * (1f + gun.damagePerLevel * level);
+        float damage = data.damage * (1f + gun.damagePerLevel * level)
+                       * Mathf.Max(1, data.pelletsPerShot);
+
         float rpm = data.roundsPerMinute * (1f + gun.fireRatePerLevel * level);
         int magazine = data.magazineSize + gun.magazinePerLevel * level;
 
-        return $"{damage:0} DMG   {rpm:0} RPM   {magazine} MAG\n" +
-               $"<size=80%>{gun.UpgradeSummary} per level</size>";
+        return $"{damage:0} DMG   ·   {rpm:0} RPM   ·   {magazine} MAG";
     }
 
     // ======================================================================
@@ -354,8 +367,7 @@ public class StorePanel : MonoBehaviour
     {
         var blast = bomb.data.Resolve(1f + bomb.damagePerLevel * level, bomb.radiusPerLevel * level);
 
-        return $"{blast.damage:0} DMG   {blast.radius:0.#}m RADIUS   x{bomb.ChargesAt(level)}\n" +
-               $"<size=80%>{bomb.data.fallTime:0.#}s fall   {bomb.data.minRange:0}-{bomb.data.maxRange:0}m range</size>";
+        return $"{blast.damage:0} DMG   ·   {blast.radius:0.#} m   ·   x{bomb.ChargesAt(level)}";
     }
 
     // ======================================================================
@@ -377,13 +389,16 @@ public class StorePanel : MonoBehaviour
             {
                 title = item.Label,
                 description = item.data.description,
-                stats = $"{item.data.Effects}\n<size=80%>Pack of {item.packSize}   " +
-                        $"carry up to {item.maxCarried}</size>",
-                state = isEquipped ? $"ON BELT  x{held}" : held > 0 ? $"x{held} IN STORAGE" : "",
+                stats = item.data.Effects,
+                state = isEquipped ? $"ON BELT  x{held}" : held > 0 ? $"x{held} STORED" : "",
                 accent = item.data.tint,
 
                 primaryShown = true,
-                primaryLabel = full ? "BELT FULL" : "BUY",
+
+                // The pack size lives on the button rather than in the stats, because it
+                // is not a property of the drink -- it is what pressing this costs you
+                // and what it gives you, which is the one place it matters.
+                primaryLabel = full ? "BELT FULL" : $"BUY x{item.packSize}",
                 primaryPrice = full ? 0 : item.price,
                 primaryEnabled = !full && Wallet.CanAfford(item.price),
                 primaryAction = () => BuyItem(captured),
@@ -419,12 +434,9 @@ public class StorePanel : MonoBehaviour
         var content = new StoreItemCard.Content
         {
             title = "Vitality",
-            description = "Permanent maximum health and shield. There is no cap on this " +
-                          "one -- only a price that climbs every time.",
-            stats = $"+{catalog.healthPerLevel * level:0} HP   " +
-                    $"+{catalog.shieldPerLevel * level:0} SHIELD\n" +
-                    $"<size=80%>+{catalog.healthPerLevel:0} HP and +{catalog.shieldPerLevel:0} " +
-                    "shield per level</size>",
+            description = "Permanent health and shield. No cap, only a rising price.",
+            stats = $"+{catalog.healthPerLevel * level:0} HP   ·   " +
+                    $"+{catalog.shieldPerLevel * level:0} SHIELD",
             state = level > 0 ? $"LEVEL {level}" : "",
             accent = new Color(0.45f, 0.95f, 0.55f),
 

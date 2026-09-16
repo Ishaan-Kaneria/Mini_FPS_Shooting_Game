@@ -91,7 +91,7 @@ namespace FPSKit.EditorTools
         /// <summary>Every PlayerPrefs key the test writes, put back in Detach.</summary>
         static readonly string[] IntKeys =
         {
-            "FPSKit.Coins", "FPSKit.CoinsEarned", "FPSKit.CoinsSpent",
+            "FPSKit.Coins", "FPSKit.CoinsEarned",
             "FPSKit.Own.Gun." + GunId, "FPSKit.Upgrade.Gun." + GunId,
             "FPSKit.Upgrade.Health", "FPSKit.Stock." + ItemId,
             "FPSKit.Runs", "FPSKit.TotalKills", "FPSKit.BestScore",

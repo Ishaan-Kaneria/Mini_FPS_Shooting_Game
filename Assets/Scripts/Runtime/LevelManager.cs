@@ -190,9 +190,6 @@ public class LevelManager : MonoBehaviour
     /// </summary>
     public float ScoreFraction => _totalWeight <= 0f ? 0f : Mathf.Clamp01(_killedWeight / _totalWeight);
 
-    /// <summary>Stars the level would award if the clock stopped now.</summary>
-    public int StarsSoFar => LevelResult.StarsFor(ScoreFraction, Killed >= TotalEnemies, Level);
-
     /// <summary>Set once, when the level ends. Read by the results screen.</summary>
     public LevelResult Result { get; private set; }
 
@@ -513,6 +510,11 @@ public class LevelManager : MonoBehaviour
 
         var director = Director;
 
+        // The coins come after the score bonuses, because part of the payout is a
+        // fraction of the score -- and before the result is built, because the result
+        // is a struct and everything downstream gets a copy of whatever is in it now.
+        director?.AwardLevelCoins(stars);
+
         var result = new LevelResult
         {
             arena = Arena,
@@ -528,7 +530,8 @@ public class LevelManager : MonoBehaviour
             timeTaken = taken,
             timeLimit = TimeLimit,
             score = director != null ? director.Score : 0,
-            headshots = director != null ? director.Headshots : 0
+            headshots = director != null ? director.Headshots : 0,
+            coins = director != null ? director.CoinsEarned : 0
         };
 
         Result = result;

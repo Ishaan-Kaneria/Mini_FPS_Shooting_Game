@@ -1334,7 +1334,10 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 6c805c181a3ac54e8bb864dd46cdd596, type: 3}
   - {fileID: 8300000, guid: 1ba6770c5b89731c0a0d5c820e79cffa, type: 3}
   - {fileID: 8300000, guid: c4245a4dd5a9a29a8891a6fa258d264e, type: 3}
+  - {fileID: 8300000, guid: 922b5b16839337ae6b89e5dcb74814a0, type: 3}
   painCooldown: 0.35
+  painVolume: 0.7
+  deathVolume: 1
   muzzlePoint: {fileID: 3859056572513788784}
   muzzleFlashPrefab: {fileID: 2134951606029692187, guid: 8a79f2628d8bdbc7e804f0f81f251750, type: 3}
   tracerPrefab: {fileID: 2247844606418610152, guid: cafbe0e8fd18c73c9b941c758f06c078, type: 3}

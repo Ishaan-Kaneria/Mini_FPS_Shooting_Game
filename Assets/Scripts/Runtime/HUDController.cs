@@ -180,6 +180,9 @@ public class HUDController : MonoBehaviour
     float _hitmarkerUntil;
     Color _hitmarkerTint;
     Camera _camera;
+
+    /// <summary>The player's live bindings, resolved once. See PlayerControls.</summary>
+    ControlSettings _controls;
     GameDirector _director;
 
     /// <summary>
@@ -338,12 +341,20 @@ public class HUDController : MonoBehaviour
         button.onClick.AddListener(action);
     }
 
-    /// <summary>Short, uppercase and readable: "ESC", not "Escape".</summary>
+    /// <summary>
+    /// Short, uppercase and readable: "ESC", not "Escape", and "RMB" rather than
+    /// "MOUSE1" -- which is what KeyCode.ToString gives and what nobody calls it.
+    /// </summary>
     static string Key(KeyCode key) => key switch
     {
         KeyCode.Escape => "ESC",
         KeyCode.Return => "ENTER",
         KeyCode.Space => "SPACE",
+        KeyCode.Mouse0 => "LMB",
+        KeyCode.Mouse1 => "RMB",
+        KeyCode.Mouse2 => "MMB",
+        KeyCode.LeftShift => "SHIFT",
+        KeyCode.LeftControl => "CTRL",
         _ => key.ToString().ToUpperInvariant()
     };
 
@@ -605,9 +616,17 @@ public class HUDController : MonoBehaviour
         bool counting = levelManager.IsBriefing && !levelManager.IsFinished;
         int seconds = counting ? Mathf.CeilToInt(levelManager.BriefingRemaining) : Hidden;
 
-        if (seconds == _shownBriefing) return;
+        // The equipment hint is part of this label, so what it depends on is part of the
+        // key. Keying on the seconds alone would draw whatever was carried on the frame
+        // the countdown last ticked over.
+        int carried = (bombs != null && bombs.data != null && bombs.charges > 0 ? 1 : 0)
+                    + (belt != null && belt.data != null && belt.Count > 0 ? 2 : 0);
 
-        _shownBriefing = seconds;
+        int keyed = counting ? seconds * 4 + carried : Hidden;
+
+        if (keyed == _shownBriefing) return;
+
+        _shownBriefing = keyed;
 
         if (!counting)
         {
@@ -618,8 +637,44 @@ public class HUDController : MonoBehaviour
         string brief = levelManager.LevelBrief;
 
         briefingText.text = string.IsNullOrWhiteSpace(brief)
-            ? $"GET READY - {seconds}"
-            : $"{brief}\n<size=70%>GET READY - {seconds}</size>";
+            ? $"GET READY - {seconds}{EquipmentHint()}"
+            : $"{brief}\n<size=70%>GET READY - {seconds}</size>{EquipmentHint()}";
+    }
+
+    /// <summary>
+    /// How to use whatever the player brought with them, said once at the start of the
+    /// level while there is nothing else happening.
+    ///
+    /// The top strip names the keys for the whole level, but a key listed in a strip is
+    /// something you notice on your third run. A bomb is the least guessable control in
+    /// the game -- it is *held*, not tapped, and the release is the throw -- so it is
+    /// worth a sentence at the one moment the player has time to read one.
+    ///
+    /// Only for equipment actually being carried. Teaching somebody a bomb key when they
+    /// own no bomb is worse than saying nothing: they try it, nothing happens, and now
+    /// they distrust the rest of the strip.
+    /// </summary>
+    string EquipmentHint()
+    {
+        bool hasBomb = bombs != null && bombs.data != null && bombs.charges > 0;
+        bool hasDrink = belt != null && belt.data != null && belt.Count > 0;
+
+        if (!hasBomb && !hasDrink) return string.Empty;
+
+        const string Dim = "<color=#B8AFA0>";
+        var hint = new System.Text.StringBuilder("\n<size=58%>");
+
+        if (hasBomb)
+            hint.Append($"HOLD {Key(BombKey())} {Dim}TO AIM A BOMB</color>, " +
+                        $"{Key(AimKey())} {Dim}LOCKS THE RANGE, RELEASE TO THROW</color>");
+
+        if (hasBomb && hasDrink) hint.Append("\n");
+
+        if (hasDrink)
+            hint.Append($"{Key(ItemKey())} {Dim}DRINKS AN ENERGY DRINK</color>");
+
+        hint.Append("</size>");
+        return hint.ToString();
     }
 
     /// <summary>
@@ -698,9 +753,13 @@ public class HUDController : MonoBehaviour
 
         if (bombRangeText == null) return;
 
-        // Keyed at the resolution it is drawn at, like every other label here.
+        // Keyed at the resolution it is drawn at, like every other label here. The two
+        // flags are folded into the key as bits, so locking or losing the ground under
+        // the aim redraws the label without the metres having moved.
         int range = bombs.IsAiming ? Mathf.RoundToInt(bombs.AimRange) : Hidden;
-        int keyed = bombs.IsAiming ? range * 2 + (bombs.RangeLocked ? 1 : 0) : Hidden;
+        int keyed = bombs.IsAiming
+            ? range * 4 + (bombs.RangeLocked ? 2 : 0) + (bombs.AimValid ? 1 : 0)
+            : Hidden;
 
         if (keyed == _shownRange) return;
         _shownRange = keyed;
@@ -708,6 +767,17 @@ public class HUDController : MonoBehaviour
         if (!bombs.IsAiming)
         {
             bombRangeText.text = string.Empty;
+            return;
+        }
+
+        // An invalid aim says so in words as well as in the ring's colour. The ring is
+        // out on the floor where the player is looking and the readout is under the
+        // crosshair where they are aiming, and only one of those is somewhere they are
+        // certain to see the moment a throw is about to be refused.
+        if (!bombs.AimValid)
+        {
+            bombRangeText.text = $"<color=#{ColorUtility.ToHtmlStringRGB(clockWarningColor)}>" +
+                                 "NO GROUND THERE</color>";
             return;
         }
 
@@ -779,9 +849,8 @@ public class HUDController : MonoBehaviour
         return _controls;
     }
 
-    ControlSettings _controls;
-
     void OnBombDenied(BombThrower source) => _bombDeniedUntil = Time.unscaledTime + 0.6f;
+
     void OnBeltDenied(ConsumableBelt source) => _beltDeniedUntil = Time.unscaledTime + 0.6f;
 
     // ======================================================================

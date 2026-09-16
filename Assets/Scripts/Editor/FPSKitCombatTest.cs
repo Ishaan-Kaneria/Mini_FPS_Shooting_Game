@@ -319,26 +319,94 @@ namespace FPSKit.EditorTools
         /// so every enemy keeps a valid agent and a real path and the test measures the
         /// AI rather than a pile of bodies wished into contact.
         /// </summary>
+        /// <summary>
+        /// Puts the player where an enemy can actually shoot them.
+        ///
+        /// This used to be the centroid of the crowd, and it made the test a coin flip.
+        /// Three enemies arriving from three sides of a golden-angle spawn ring have a
+        /// centroid that is nowhere near any of them, and in an arena full of crates the
+        /// spot frequently had no line of sight to anybody -- so the fourteen-second
+        /// window measured the warehouse furniture rather than the AI, and reported "the
+        /// player took no damage" as if the enemies had refused to fight.
+        ///
+        /// It now stands the player at a fixed mid range in front of a chosen enemy, and
+        /// the enemy chosen is one that can see that spot. If none can, it says so rather
+        /// than running the window and blaming the result on the AI.
+        /// </summary>
         static void Engage()
         {
             var player = GameObject.FindGameObjectWithTag("Player");
             var enemies = Enemies();
             if (player == null || enemies.Count == 0) return;
 
-            Vector3 centre = Vector3.zero;
-            foreach (var ai in enemies) centre += ai.transform.position;
-            centre /= enemies.Count;
-
-            // Just off the middle of the crowd, and lifted clear so the controller does
-            // not start the frame inside the floor.
             var controller = player.GetComponent<CharacterController>();
+
+            // Well inside the roster's detection radius and well outside its melee reach,
+            // so what the window measures is shooting and not swinging.
+            const float StandOff = 11f;
+
+            Vector3 chosen = Vector3.zero;
+            EnemyAI target = null;
+
+            foreach (var ai in enemies)
+            {
+                Vector3 eye = ai.eyes != null ? ai.eyes.position : ai.transform.position + Vector3.up * 1.5f;
+
+                // Straight back from the enemy along its own facing: the one bearing it
+                // is guaranteed to have been able to see a moment ago.
+                Vector3 bearing = Vector3.ProjectOnPlane(ai.transform.forward, Vector3.up);
+                if (bearing.sqrMagnitude < 0.001f) bearing = Vector3.forward;
+
+                Vector3 spot = ai.transform.position + bearing.normalized * StandOff;
+
+                if (!UnityEngine.AI.NavMesh.SamplePosition(spot, out var hit, 6f,
+                                                           UnityEngine.AI.NavMesh.AllAreas))
+                    continue;
+
+                Vector3 chest = hit.position + Vector3.up * 1.4f;
+                if (Physics.Linecast(eye, chest, ai.sightBlockers, QueryTriggerInteraction.Ignore))
+                    continue;
+
+                chosen = hit.position;
+                target = ai;
+                break;
+            }
+
+            if (target == null)
+            {
+                // Nowhere with a clear line. Fall back to the old behaviour rather than
+                // skipping the phase, and record it, so a failure that follows can be
+                // read as "the geometry beat the test" instead of "the AI did nothing".
+                Vector3 centre = Vector3.zero;
+                foreach (var ai in enemies) centre += ai.transform.position;
+
+                chosen = centre / enemies.Count;
+                Notes.Append("\n  no enemy had a clear line to a stand-off point; " +
+                             "falling back to the middle of the crowd");
+            }
+
             if (controller != null) controller.enabled = false;
 
-            player.transform.position = centre + Vector3.up * 1.1f;
+            player.transform.position = chosen + Vector3.up * 1.1f;
+
+            // Facing the enemy, because an enemy behind the player is one the player
+            // cannot be shot in the chest by and one the damage indicator would be the
+            // only evidence of.
+            if (target != null)
+            {
+                Vector3 toTarget = Vector3.ProjectOnPlane(
+                    target.transform.position - player.transform.position, Vector3.up);
+
+                if (toTarget.sqrMagnitude > 0.001f)
+                    player.transform.rotation = Quaternion.LookRotation(toTarget);
+            }
 
             if (controller != null) controller.enabled = true;
 
-            Notes.Append($"\n  player moved into the crowd at {centre}");
+            Notes.Append($"\n  player moved to {chosen} -- " +
+                         (target != null
+                             ? $"{StandOff:0}m in front of an enemy with a clear line to it"
+                             : "the middle of the crowd"));
         }
 
         static LevelManager Level() => UnityEngine.Object.FindAnyObjectByType<LevelManager>();

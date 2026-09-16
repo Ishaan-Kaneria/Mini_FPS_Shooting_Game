@@ -13,6 +13,13 @@ using UnityEngine;
 ///
 /// Everything runs on unscaled time so a blast that lands on the frame a level is
 /// scored still plays out rather than freezing mid-expansion.
+///
+/// It ends by shrinking rather than fading, for the same reason
+/// <see cref="TransientFlash"/> does: fading needs a transparent material, the kit has
+/// none, and the unlit one these spheres use ignores the alpha channel entirely. Written
+/// as a fade it *looked* written -- the colour was set every frame and the alpha went to
+/// zero -- and what actually happened on screen was a black sphere sitting at full size
+/// until the object was destroyed underneath it.
 /// </summary>
 [DisallowMultipleComponent]
 public class Explosion : MonoBehaviour
@@ -110,12 +117,17 @@ public class Explosion : MonoBehaviour
     /// </summary>
     void Apply(float t)
     {
+        float diameter = _radius * 2f;
+
         if (ball != null)
         {
-            // Eased hard at the front: most of the expansion is over in the first
-            // fifth, because that is what an explosion looks like.
+            // Out hard and back in. The expansion is almost over in the first fifth,
+            // which is what an explosion looks like; the collapse over the back half is
+            // what a fade would have done if a fade were available.
             float grow = 1f - Mathf.Pow(1f - t, 4f);
-            ball.localScale = Vector3.one * (_radius * 2f * Mathf.Max(0.05f, grow));
+            float collapse = 1f - Mathf.Clamp01((t - 0.35f) / 0.65f);
+
+            ball.localScale = Vector3.one * (diameter * grow * collapse);
 
             Tint(_ballRenderer, Color.Lerp(Color.white, color, Mathf.Clamp01(t * 2.2f)),
                  Mathf.Clamp01(1f - t * 1.5f));
@@ -123,8 +135,13 @@ public class Explosion : MonoBehaviour
 
         if (smoke != null)
         {
+            // Slower out, and it only starts pulling in at the very end -- so the smoke
+            // is still standing when the fireball inside it has gone, which is the order
+            // a real one happens in.
             float grow = Mathf.Sqrt(t);
-            smoke.localScale = Vector3.one * (_radius * 2f * smokeScale * Mathf.Max(0.05f, grow));
+            float collapse = 1f - Mathf.Clamp01((t - 0.75f) / 0.25f);
+
+            smoke.localScale = Vector3.one * (diameter * smokeScale * grow * collapse);
 
             Tint(_smokeRenderer, Color.Lerp(color * 0.35f, new Color(0.12f, 0.12f, 0.13f), t),
                  Mathf.Clamp01(0.85f - t));

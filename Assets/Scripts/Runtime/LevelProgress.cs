@@ -90,18 +90,4 @@ public static class LevelProgress
         for (int i = 0; i < count; i++) if (StarsIn(arena, i) > 0) cleared++;
         return cleared;
     }
-
-    /// <summary>Wipes one arena's ladder. Offered on the dashboard, behind a confirm.</summary>
-    public static void ClearArena(string arena, int count)
-    {
-        if (string.IsNullOrEmpty(arena)) return;
-
-        for (int i = 0; i < count; i++)
-        {
-            PlayerPrefs.DeleteKey(StarsKey(arena, i));
-            PlayerPrefs.DeleteKey(ScoreKey(arena, i));
-        }
-
-        PlayerPrefs.Save();
-    }
 }

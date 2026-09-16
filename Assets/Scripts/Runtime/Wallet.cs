@@ -18,15 +18,16 @@ public static class Wallet
 {
     const string BalanceKey = "FPSKit.Coins";
     const string EarnedKey = "FPSKit.CoinsEarned";
-    const string SpentKey = "FPSKit.CoinsSpent";
 
     /// <summary>Coins in hand right now.</summary>
     public static int Balance => Mathf.Max(0, PlayerPrefs.GetInt(BalanceKey, 0));
 
-    /// <summary>Everything ever earned, for the dashboard. Never goes down.</summary>
+    /// <summary>
+    /// Everything ever earned, which is what the dashboard's record panel shows. It
+    /// never goes down, so it is a measure of how much has been played where the balance
+    /// is only a measure of what has not been spent yet.
+    /// </summary>
     public static int LifetimeEarned => PlayerPrefs.GetInt(EarnedKey, 0);
-
-    public static int LifetimeSpent => PlayerPrefs.GetInt(SpentKey, 0);
 
     public static bool CanAfford(int price) => price <= 0 || Balance >= price;
 
@@ -50,7 +51,6 @@ public static class Wallet
         if (Balance < price) return false;
 
         PlayerPrefs.SetInt(BalanceKey, Balance - price);
-        PlayerPrefs.SetInt(SpentKey, LifetimeSpent + price);
         PlayerPrefs.Save();
 
         return true;
@@ -70,7 +70,6 @@ public static class Wallet
     {
         PlayerPrefs.DeleteKey(BalanceKey);
         PlayerPrefs.DeleteKey(EarnedKey);
-        PlayerPrefs.DeleteKey(SpentKey);
         PlayerPrefs.Save();
     }
 

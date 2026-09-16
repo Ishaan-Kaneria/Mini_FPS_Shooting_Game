@@ -187,6 +187,15 @@ public class EnemyAI : MonoBehaviour
              "the voice.")]
     [Min(0f)] public float painCooldown = 0.35f;
 
+    [Tooltip("How loud a hit reaction is. Under the death, deliberately: in a crowd the " +
+             "only way to tell \"I hurt it\" from \"I killed it\" without looking is that " +
+             "one of the two is louder and longer than the other.")]
+    [Range(0f, 1f)] public float painVolume = 0.7f;
+
+    [Tooltip("How loud a death is. The single most useful sound in a firefight, because " +
+             "it is the one that says stop shooting this and find another target.")]
+    [Range(0f, 1f)] public float deathVolume = 1f;
+
     [Header("Ranged Feedback")]
     [Tooltip("Where the shot appears to come from. Only cosmetic -- the shot itself is " +
              "still traced from the eyes, so cover and accuracy do not change with the " +
@@ -1069,7 +1078,7 @@ public class EnemyAI : MonoBehaviour
         if (Time.time < _nextPainTime) return;
 
         _nextPainTime = Time.time + painCooldown;
-        PlayClip(painClips[Random.Range(0, painClips.Length)]);
+        PlayClip(painClips[Random.Range(0, painClips.Length)], painVolume);
     }
 
     void OnDied(Health health)
@@ -1097,7 +1106,16 @@ public class EnemyAI : MonoBehaviour
         if (animator != null && !string.IsNullOrEmpty(deathTrigger))
             animator.SetTrigger(deathTrigger);
 
-        PlayClip(deathClip);
+        // Through the pool rather than through this body's own AudioSource.
+        //
+        // The corpse is destroyed a couple of seconds from now -- sooner with no ragdoll
+        // -- and an AudioSource goes with the GameObject it is on, so a death cry longer
+        // than the destroy delay is a death cry that gets cut off mid-word. The pooled
+        // source is not on the body and does not care. It also survives the level being
+        // scored on the same frame, which is exactly when the last enemy tends to die.
+        OneShotAudio.Play(deathClip, transform.position, deathVolume,
+                          Random.Range(0.94f, 1.06f));
+
         enabled = false;
     }
 
@@ -1237,12 +1255,12 @@ public class EnemyAI : MonoBehaviour
         animator.SetFloat(speedParameter, speed);
     }
 
-    void PlayClip(AudioClip clip)
+    void PlayClip(AudioClip clip, float volume = 1f)
     {
         if (clip == null || _audio == null) return;
 
         _audio.pitch = Random.Range(0.94f, 1.06f);
-        _audio.PlayOneShot(clip);
+        _audio.PlayOneShot(clip, Mathf.Clamp01(volume));
     }
 
     void OnDrawGizmosSelected()

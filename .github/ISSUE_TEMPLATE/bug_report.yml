@@ -24,7 +24,7 @@ body:
       placeholder: |
         1. FPSKit > Build Scene > Industrial Warehouse
         2. Press Play
-        3. Survive to wave 3
+        3. Play level 3 of any arena
         4. ...
     validations:
       required: true

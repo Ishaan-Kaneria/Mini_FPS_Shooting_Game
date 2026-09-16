@@ -61,7 +61,6 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     [Header("Parts")]
     public Image frame;
-    public Image face;
     public Image accentBar;
 
     public TMP_Text titleText;

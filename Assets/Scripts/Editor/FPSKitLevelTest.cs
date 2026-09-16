@@ -320,8 +320,8 @@ namespace FPSKit.EditorTools
 
                         Notes.Append($"\n  attempt 2 scored: {_pass.Title} - {_pass.stars} star(s), " +
                                      $"{_pass.killed}/{_pass.total} killed with " +
-                                     $"{_pass.TimeRemaining:0}s left, stored stars {_starsAfterPass}, " +
-                                     $"level 2 unlocked={_nextUnlockedAfterPass}");
+                                     $"{_pass.TimeRemaining:0}s left, {_pass.coins} coins, stored " +
+                                     $"stars {_starsAfterPass}, level 2 unlocked={_nextUnlockedAfterPass}");
 
                         _phase = Phase.Judge;
                         return;
@@ -538,6 +538,13 @@ namespace FPSKit.EditorTools
             if (!_nextUnlockedAfterPass)
                 problems.Append("\n  - level 2 is still locked after level 1 was cleared, so the " +
                                 "ladder cannot be climbed at all");
+
+            // The result is a struct, so every subscriber gets a copy of it. A copy filled
+            // in after it was handed out is a results screen that tells the player they
+            // earned nothing, while the wallet quietly banks the right number.
+            if (_pass.coins <= 0)
+                problems.Append("\n  - a cleared level reported 0 coins to its subscribers, so " +
+                                "the results screen has nothing to show the player");
 
             if (problems.Length > 0)
             {

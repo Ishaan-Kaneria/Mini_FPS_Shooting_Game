@@ -178,6 +178,10 @@ baseline.
 
 ### Bombs
 
+The first level you carry one into tells you: the briefing under the countdown says the
+bomb is held rather than tapped, and the strip along the top keeps the key on screen for
+as long as you have one.
+
 Hold **G** and a ring appears on the ground where the blast will land, with a dotted arc
 showing how the bomb gets there. The ring is drawn at the bomb's real damage radius, so
 two enemies standing inside it are two enemies the bomb is going to hit. Release to throw;

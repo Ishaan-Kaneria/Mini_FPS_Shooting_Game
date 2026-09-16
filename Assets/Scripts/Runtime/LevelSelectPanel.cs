@@ -59,9 +59,6 @@ public class LevelSelectPanel : MonoBehaviour
 
     public bool IsOpen => panel != null && panel.activeSelf;
 
-    /// <summary>Levels currently drawn. Read by the flow test.</summary>
-    public int TileCount => _tiles.Count;
-
     /// <summary>Raised with the level the player picked. The menu starts the run.</summary>
     public event System.Action<ArenaCatalog.Entry, int> LevelChosen;
 

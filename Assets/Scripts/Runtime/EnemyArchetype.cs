@@ -83,7 +83,7 @@ public class EnemyArchetype : ScriptableObject
              "instead of firing it, so closing on one is not a free pass.")]
     public float meleeRange = 2.4f;
 
-    [Tooltip("Seconds between attacks before wave aggression shortens it.")]
+    [Tooltip("Seconds between attacks before the level's aggression shortens it.")]
     public float attackCooldown = 1.3f;
 
     [Tooltip("Telegraph time before the damage lands. This is the player's reaction window, " +
@@ -223,7 +223,7 @@ public class EnemyArchetype : ScriptableObject
     ///
     /// Emission is written unconditionally rather than keyword-toggled here: turning
     /// on _EMISSION per renderer would need renderer.material, and that instantiates
-    /// the material -- one copy per enemy, every wave. The builder enables the keyword
+    /// the material -- one copy per enemy, every level. The builder enables the keyword
     /// on the shared enemy material once instead, with the colour left black, so this
     /// block can drive the glow for free.
     /// </summary>

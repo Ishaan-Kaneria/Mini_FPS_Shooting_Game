@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Wave-survival FPS built on **Unity 6000.6.0f1** with the **Universal Render Pipeline** (com.unity.render-pipelines.universal 17.6.0). The player holds a rebindable arena position against endless, escalating waves of NavMesh-driven enemies.
+Level-based FPS built on **Unity 6000.6.0f1** with the **Universal Render Pipeline** (com.unity.render-pipelines.universal 17.6.0). Six arenas, a ladder of eight levels in each: a fixed crowd of NavMesh-driven enemies, a strict clock, and one to three stars. Clearing a level unlocks the next.
 
 ## Layout
 
@@ -13,17 +13,17 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 
 | Concern  | Files |
 |---|---|
-| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs`, `PlayerProgression.cs` (per-wave rifle upgrades) |
+| Player   | `PlayerMotor.cs` (CharacterController move/look/recoil/shake), `WeaponSway.cs`, `PlayerProgression.cs` (per-level rifle upgrades) |
 | Weapons  | `Weapon.cs`, `WeaponData.cs` (ScriptableObject, `FireMode` Single/Burst/Auto), `ImpactLibrary.cs`, `TracerProjectile.cs` (flies its own tracer, so the shot outlives whoever fired it) |
 | Enemies  | `EnemyAI.cs` (NavMeshAgent, `State` Idle/Chase/Attack/Stagger/Retreat/Dead), `EnemyArchetype.cs`, `Health.cs`, `Hitbox.cs`, `RagdollController.cs`, `EnemyLimbAnimator.cs` (swings the limbs off agent velocity -- there is no AnimatorController anywhere in the project) |
-| Waves    | `WaveManager.cs` — endless spawner, per-wave growth, boss waves, `WaveModifier`, golden-angle ring spawns that avoid the player's view, an enemy leash and a wave clock so no wave can stall |
-| Run state | `GameDirector.cs` — score, combo, pause, game over, return-to-dashboard, PlayerPrefs records; `GameSession.cs` (what survives a scene change), `PlayerProfile.cs` (PlayerPrefs stats) |
-| Dashboard | `MainMenuController.cs`, `ArenaCard.cs`, `ArenaCatalog.cs` (ScriptableObject) |
-| Feedback | `HUDController.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
+| Levels   | `LevelManager.cs` — runs one level: a fixed roster, a strict clock, golden-angle ring spawns that avoid the player's view, an enemy leash that replaces what it discards, and a weighted score cut into stars. `LevelSet.cs` (ScriptableObject, one ladder per arena), `LevelResult.cs` (how a level ended), `LevelProgress.cs` (stars and unlocks in PlayerPrefs) |
+| Run state | `GameDirector.cs` — score, combo, pause, end of level, return-to-dashboard, PlayerPrefs records; `GameSession.cs` (what survives a scene change), `PlayerProfile.cs` (PlayerPrefs stats) |
+| Dashboard | `MainMenuController.cs`, `ArenaCard.cs`, `ArenaCatalog.cs` (ScriptableObject), `LevelSelectPanel.cs`, `LevelButton.cs` |
+| Feedback | `HUDController.cs`, `LevelResultsUI.cs` (the stars screen), `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
-`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Enemies/` (EnemyArchetype assets), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
+`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
 
 ## Input: legacy only
 
@@ -44,17 +44,17 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 - **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Subway | Mars Colony]** — each calls `BuildScene(themeName)`.
 - **FPSKit > Build Scene > From Selected Theme Asset** — builds from whatever `LevelTheme` is selected in the Project window, built-in or not. This is how a new arena gets made without touching code.
 - **FPSKit > Build Scene > Build ALL Themes** — builds and saves one scene per theme, registering them in Build Settings so the in-game restart works.
-- **FPSKit > Add Gameplay To Current Scene** — the non-destructive path: injects player, enemies, wave manager, HUD, post-FX and a baked NavMesh into an existing level, leaving geometry and baked lighting alone. Refuses to run twice (bails if a `Player`-tagged object exists).
+- **FPSKit > Add Gameplay To Current Scene** — the non-destructive path: injects player, enemies, level manager, HUD, post-FX and a baked NavMesh into an existing level, leaving geometry and baked lighting alone. Refuses to run twice (bails if a `Player`-tagged object exists).
 
-**`BuildScene` is destructive.** It calls `EditorSceneManager.NewScene(..., NewSceneMode.Single)` and constructs the entire scene from scratch — lighting, skybox, arena geometry, player rig, weapon data, enemy prefab, spawn points, baked NavMesh, wave manager, HUD, post-processing — then saves over `Assets/FPSKit_Generated/Scenes/<Theme>.unity`. Any hand-tuning done in the Unity editor to a generated scene is lost on the next build.
+**`BuildScene` is destructive.** It calls `EditorSceneManager.NewScene(..., NewSceneMode.Single)` and constructs the entire scene from scratch — lighting, skybox, arena geometry, player rig, weapon data, enemy prefab, spawn points, baked NavMesh, level manager, HUD, results screen, post-processing — then saves over `Assets/FPSKit_Generated/Scenes/<Theme>.unity`. Any hand-tuning done in the Unity editor to a generated scene is lost on the next build.
 
 So: **fix scene content by editing the builder, not the `.unity` file.** Hand-editing a generated scene is only appropriate for a throwaway experiment. The same applies to the generated assets it writes (`Controls.asset`, `Enemy.prefab`, themes, materials) — the builder and `FPSKitThemes` recreate or re-dirty them.
 
-Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
+Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the five checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitWaveTest.cs` (`VerifyWaves`, which also asserts the rifle grew across a cleared wave), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the five checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
 
-`FPSKitBatch.ResetEnemyArchetypes` is the other entry point worth knowing: the roster assets are generated once and then left alone, so retuning a number in `FPSKitEnemyRoster.Configure` does **not** reach the assets the game reads until this is run.
+`FPSKitBatch.ResetEnemyArchetypes` and `FPSKitBatch.ResetLevelSets` are the other entry points worth knowing. Both the roster and the level ladders are generated once and then left alone, so retuning a number in `FPSKitEnemyRoster.Configure` or `FPSKitLevels.Configure` does **not** reach the assets the game reads until the matching reset is run. A level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
 
 ## The web build has its own page
 
@@ -70,11 +70,23 @@ The page owns what only the browser can answer: pointer/keyboard focus, suppress
 or `FPSKitBatch.BuildDashboard`). It is destructive in the same way the scene builder is
 and fixed the same way — edit the builder, not the scene.
 
-The loop is: dashboard → arena → back to dashboard, however the run ended.
+The loop is: dashboard → level select → arena → results → back to the dashboard, or
+straight into the next level.
+
+**An arena card opens a ladder, it does not start a run.** `MainMenuController.Choose`
+opens `LevelSelectPanel` over the dashboard; only `MainMenuController.Launch` loads a
+scene, and it refuses a level `LevelProgress` says is locked. The level select and the
+results screen both put their choice in `GameSession` and then load, so there is one
+way a level ever begins.
 
 - **Esc or P** pause. Both, because a browser takes Escape to release pointer lock, so a
   web player pressing it gets their cursor back and no menu.
-- **R** resume. **Q** leaves the run.
+- **R** resume. **Q** leaves the level.
+- On the results screen the same keys mean three different things -- **R** replay,
+  **Space** next level, **Q** dashboard -- and `LevelResultsUI` owns them.
+  `GameDirector` used to take any of its keys as "I have read this" and go back to the
+  menu, which was right when the menu was the only place to go; leaving that in would
+  steal two of the three.
 - Q is a *scene load*, not `Application.Quit`. That is the whole fix: quitting used to
   call `Application.Quit`, which does nothing in a browser, so the HUD hid the key rather
   than admit there was nowhere to go. `GameDirector.CanQuit` now only governs the
@@ -97,8 +109,16 @@ play mode and restores it in `Detach` — each one opens the scene it means to e
 would otherwise be handed the dashboard and fail on its first assertion.
 
 **The arena list is `ArenaCatalog.asset`, not code.** Adding an arena means a theme, a
-built scene, and an entry in the catalog — the dashboard clones its card template per
-entry at runtime, so the menu scene never needs rebuilding for new content.
+built scene, a `LevelSet` and an entry in the catalog — the dashboard clones its card
+template per entry at runtime, and the level select clones a tile per level, so the menu
+scene never needs rebuilding for new content.
+
+**A panel's component does not live on the panel.** `LevelSelectPanel` and
+`LevelResultsUI` are on the canvas and point at a child they switch on and off. Put the
+component on the object it hides and it can never be shown: the builder leaves the panel
+off, so `Awake` has not run, and the first `SetActive(true)` is what finally runs it --
+which switches the object straight back off. The screen then simply never opens, with
+nothing logged. `HideAtLoad` says so now instead.
 
 Four things about that screen are worth not re-deriving:
 
@@ -140,10 +160,11 @@ dashboard hint both did. Use `<color=…></color>`; `VerifyFlow` checks for it.
 
 ## Content is data, not code
 
-Two ScriptableObject types are the extension points, and both exist so that adding content never means editing the builder:
+Three ScriptableObject types are the extension points, and all three exist so that adding content never means editing the builder:
 
 - **A new arena is a `LevelTheme` asset.** Duplicate one in `FPSKit_Generated/Themes/`, retune it, select it, then **FPSKit > Build Scene > From Selected Theme Asset**. The six named menu entries are just shortcuts to the built-in assets. Re-run **FPSKit > Build Dashboard** afterwards so it gets a card and a preview.
-- **A new enemy is an `EnemyArchetype` asset.** Duplicate one in `FPSKit_Generated/Enemies/`, change the numbers, add it to the WaveManager's roster. There is one base `Enemy.prefab`; an archetype is *stamped onto* an instance at spawn (stats, scale, colour via `MaterialPropertyBlock`, behaviour, score, drops). `EnemyArchetype.Role` decides whether it joins the normal mix, counts as an elite, or is drawn only for boss waves.
+- **A new enemy is an `EnemyArchetype` asset.** Duplicate one in `FPSKit_Generated/Enemies/`, change the numbers, add it to the LevelManager's roster. There is one base `Enemy.prefab`; an archetype is *stamped onto* an instance at spawn (stats, scale, colour via `MaterialPropertyBlock`, behaviour, score, drops). `EnemyArchetype.Role` decides whether it joins the normal mix, counts as an elite, or is drawn only for boss levels. Its `unlockWave` / `weightGrowthPerWave` / `retireWave` fields are difficulty *steps* now, not wave numbers -- the names are kept because renaming a serialized field silently drops the value out of every asset already written with the old one.
+- **A new level is an entry in a `LevelSet`.** The ladders live in `FPSKit_Generated/Levels/`, one asset per arena, each a plain list. Add an entry in the Inspector and re-run **FPSKit > Build Dashboard** so the arena card picks up the new count; the level select clones a tile per entry at runtime, so nothing needs rebuilding for the tiles themselves.
 
 When adding either, prefer a new asset over a new branch in the builder. If a knob genuinely does not exist yet, add it to the ScriptableObject — not to `FPSKitSceneBuilder`.
 
@@ -155,7 +176,7 @@ That makes a specific bug class very easy to write and very hard to spot: the ga
 
 So: **any static field that carries state must be cleared in a `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` hook on its own class.** That hook runs before the first scene loads on every play session, with or without a domain reload. The classes that currently own one are `PlayerMotor`, `GameDirector`, `DamageNumber`, `EnemyHealthBar` and `MobileInput`. `Time.timeScale` is not a static but persists the same way, and `GameDirector` resets it in the same hook.
 
-`Tools/unity-batch.sh FPSKitBatch.VerifyReplay` is the regression test: it plays two real sessions back to back, ends the first on the game over screen (the messiest state a player can leave), and fails if the second does not start clean.
+`Tools/unity-batch.sh FPSKitBatch.VerifyReplay` is the regression test: it plays two real sessions back to back, ends the first on a scored level (the messiest state a player can leave -- frozen clock, no input, free cursor), and fails if the second does not start clean.
 
 ### The sibling trap: non-serializable fields after a mid-play reload
 
@@ -180,7 +201,7 @@ number in isolation, so they are written down.
 **Reach has to be shared with the brake.** A `NavMeshAgent` stops a full
 `stoppingDistance` short of its destination. Sending a melee enemy to a point "just
 inside its attack range" therefore parks it that much *outside* the range, the attack
-check never passes, and the whole wave gathers around the player and does nothing --
+check never passes, and the whole level gathers around the player and does nothing --
 silently, with no error and every build check green. `EnemyAI.DesiredStandOff` now
 subtracts the brake before choosing a destination, and the prefab's `stoppingDistance`
 is 0.8 rather than 1.5 so there is less of it to pay for. `VerifyCombat` is the
@@ -204,7 +225,7 @@ cooldown, and switched off entirely for bosses and armoured variants.
 Speed is read against the player, who walks at 5.6 m/s and sprints at 8.2. Nothing in
 the roster outruns a sprint and only the two rushers beat a walk: disengaging has to
 stay possible or positioning stops being something the player can do. The base agent is
-3.2 m/s and `WaveManager.maxSpeedMultiplier` caps the wave curve at 1.35.
+3.2 m/s and `FPSKitLevels` caps a level's `speedMultiplier` at 1.35.
 
 `EnemyAI` publishes `LastReactionTime`, `LastReactionLocal` and `LastReactionStrength`,
 and `EnemyLimbAnimator` reads them each frame to throw the body along the bullet. They
@@ -214,10 +235,10 @@ subscription would not.
 
 ## The rifle has a curve too
 
-`PlayerProgression` widens the magazine, hardens the round and shortens the reload
-every time a wave is cleared. It exists because the enemy curve does: the same thirty
-rounds against twice the bodies turns a difficulty curve into a slope the player slides
-down.
+`PlayerProgression` widens the magazine, hardens the round and shortens the reload for
+every level below the one being played. It exists because the level curve does: the same
+thirty rounds against twice the bodies turns a difficulty curve into a slope the player
+slides down.
 
 Every upgrade is a multiplier held on the `Weapon` **component** -- `MagazineBonus`,
 `DamageMultiplier`, `ReloadTimeMultiplier`, read back through `MagazineSize`,
@@ -227,20 +248,59 @@ would edit `TestRifle.asset` on disk, and the next run -- in a fresh session, af
 restart -- would start already upgraded and compound from there. If you add an upgrade,
 add it the same way.
 
-`PlayerProgression` keys off the wave number rather than counting calls, because
-`WaveManager` restarts its own wave loop if it ever loses one and replays
-`WaveCleared` for a wave that has already paid out.
+`PlayerProgression` reads `LevelManager.LevelNumber` rather than counting anything. A
+level is one scene load, so there is no run-long tally to keep: entering level 6 hands
+you the level-6 rifle whether you got there by clearing level 5 or by picking it off the
+ladder, and `LevelManager` restarting its own loop after a mid-play recompile cannot pay
+out twice.
 
-## Waves never require a total wipe
+## A level ends on the last kill or on the clock
 
-A wave ends on **clear or clock**, whichever comes first. This is deliberate and must not be "simplified" back to waiting for `EnemiesRemaining == 0`: the kit is meant to run in imported levels, and in a real level an enemy that falls through a gap stays alive forever, so a wipe requirement is a guaranteed softlock.
+Both, and the clock is checked without exception. This must not be "simplified" into
+waiting for the arena to empty: the kit is meant to run in imported levels, and in a
+real level an enemy that falls through a gap stays alive forever, so a completion
+requirement is a guaranteed softlock.
 
-Two independent safety nets, both in `WaveManager`:
+Two independent safety nets, both in `LevelManager`:
 
-- **The leash** (`SweepEnemies` / `IsLost`) discards an enemy that is too far, has fallen too far below the player, or whose agent has left the NavMesh. Discarding deliberately awards no score, no combo and no drop — it is not a kill.
-- **The wave clock** (`RunUntilWaveEnds`) ends the wave regardless of survivors, and clears them so the intermission is a real break.
+- **The leash** (`SweepEnemies` / `IsLost`) discards an enemy that is too far, has
+  fallen too far below the player, or whose agent has left the NavMesh. Discarding
+  deliberately awards no score, no combo and no drop — it is not a kill. It *does* put
+  a fresh enemy in the queue, bounded at one replacement per enemy in the level, which
+  is new and is the point: a level asks for a fixed number of kills and scores the
+  player against it, so a body that fell down a hole is not theirs to pay for.
+- **The clock** (`RunLevel`) ends the level regardless of survivors and scores it on
+  what was actually killed.
 
-`despawnDistance` is force-raised at `Start` if it is not comfortably clear of `maxSpawnDistanceFromPlayer`, because a leash inside the spawn ring deletes enemies on arrival and presents as "nothing spawns".
+`despawnDistance` is force-raised at `Start` if it is not comfortably clear of
+`maxSpawnDistanceFromPlayer`, because a leash inside the spawn ring deletes enemies on
+arrival and presents as "nothing spawns".
+
+## Stars are weighted, and the boss is most of the weight
+
+`LevelResult.StarsFor` cuts a fraction into stars, and the fraction is
+`killedWeight / totalWeight` where an ordinary enemy is worth 1 and the boss is worth
+`LevelSet.Level.bossWeight` — 5 and up. Clearing the escort of a boss level and leaving
+the boss standing is therefore about 0.7, which is one star. That is deliberate: the
+boss *is* the level.
+
+Three stars is the one result a fraction cannot buy. It is awarded only for `cleared`,
+meaning `Killed >= TotalEnemies`, because "kill them all" has to mean all of them or the
+top of the scoreboard is somewhere a player can stumble into.
+
+Two other rules hold the ladder together:
+
+- **`LevelProgress.Record` keeps the best, never the latest.** Replaying a level already
+  three-starred must not be able to take stars away, or practising is a punishment. An
+  abandoned level records a zero for exactly this reason: it is safe.
+- **Unlocking is one line and lives in `LevelProgress.IsUnlocked`.** Level 0 is always
+  open; every level after it needs a star on the one before. Nothing else may decide it —
+  the menu, the results screen and `LevelManager` all ask that method.
+
+Progress is keyed by `ArenaCatalog.Entry.ProgressKey`, which is the `LevelSet`'s
+`arenaScene`, **not** the scene name. A WebGL build stages every arena as a renamed copy
+so the touch layer can be baked in, so keying on the live scene would file a browser
+player's stars under a different arena from everyone else's.
 
 ## Project conventions
 

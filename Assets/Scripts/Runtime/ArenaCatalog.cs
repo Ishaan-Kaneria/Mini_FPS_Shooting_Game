@@ -36,6 +36,29 @@ public class ArenaCatalog : ScriptableObject
                  "still works with this empty.")]
         public LevelTheme theme;
 
+        [Tooltip("The ladder of levels this arena offers. Clicking the card opens these " +
+                 "rather than starting a run, so an arena with none is an arena with " +
+                 "nothing to play -- the level select says so on screen.")]
+        public LevelSet levels;
+
+        /// <summary>How many levels this arena offers. 0 when it has no set.</summary>
+        public int LevelCount => levels != null ? levels.Count : 0;
+
+        /// <summary>
+        /// What the player's stars for this arena are filed under.
+        ///
+        /// The level set's own name for the arena, not the scene name, because the scene
+        /// name is not stable: a WebGL build stages each arena as a renamed copy so it
+        /// can carry the touch layer, and keying progress on that would file a browser
+        /// player's stars under a different arena from a desktop player's -- and under a
+        /// new one again if the staging prefix ever changed. The set is the same asset
+        /// either way. Falls back to the scene name for an arena with no set.
+        /// </summary>
+        public string ProgressKey
+            => levels != null && !string.IsNullOrWhiteSpace(levels.arenaScene)
+                ? levels.arenaScene
+                : sceneName;
+
         public string Label => string.IsNullOrWhiteSpace(displayName) ? sceneName : displayName;
 
         /// <summary>The card's accent, taken from the theme so the grid reads as a set.</summary>

@@ -18,28 +18,34 @@ MonoBehaviour:
     description: Overcast steel and concrete. The neutral baseline.
     preview: {fileID: 2800000, guid: bf49883d1a2706a8388f94197837845d, type: 3}
     theme: {fileID: 11400000, guid: cc992e2fd94ea64489b55ba730ebcd32, type: 2}
+    levels: {fileID: 11400000, guid: dc7b985cf64a425e684e23cd676ce6b1, type: 2}
   - displayName: Desert Outpost
     sceneName: DesertOutpost
     description: High sun, bleached sand, heat haze. Long sightlines.
     preview: {fileID: 2800000, guid: b42f08e6557eabbd493d615d75311a9a, type: 3}
     theme: {fileID: 11400000, guid: 6e1c081ad385fbb48b737b71d893f61d, type: 2}
+    levels: {fileID: 11400000, guid: 19a21f71669ec452fa1bce4db121bcb6, type: 2}
   - displayName: Snowbound Station
     sceneName: SnowboundStation
     description: Low winter sun, thick fog, short engagements.
     preview: {fileID: 2800000, guid: c0a35379b809cd88b95f25251ba457fe, type: 3}
     theme: {fileID: 11400000, guid: ae4a2989451bce14e966a26b79d80e01, type: 2}
+    levels: {fileID: 11400000, guid: f2375f859674c5c87b35e3756c5a0327, type: 2}
   - displayName: Night Rooftop
     sceneName: NightRooftop
     description: City night. Dark sky, warm practicals, heavy bloom.
     preview: {fileID: 2800000, guid: 345a1d8e13e6e9f239fb2c6b9a77ccd8, type: 3}
     theme: {fileID: 11400000, guid: 4a23f423ccbc1304380c41462e4800cb, type: 2}
+    levels: {fileID: 11400000, guid: eafd0b974f354d6e09074c7a1181b549, type: 2}
   - displayName: Abandoned Subway
     sceneName: AbandonedSubway
     description: Tight, dark, claustrophobic. Flickering service lights.
     preview: {fileID: 2800000, guid: b017e94af1127023493da173d69829fe, type: 3}
     theme: {fileID: 11400000, guid: 80f0b9ea8e1d3bd4fba69311e9cd7f77, type: 2}
+    levels: {fileID: 11400000, guid: 2103e99d5365a121ca63d3aa4e9a6695, type: 2}
   - displayName: Mars Colony
     sceneName: MarsColony
     description: Rust sky, thin light, drifting dust.
     preview: {fileID: 2800000, guid: 2c20a3050f9549855bd14ad77b6cf991, type: 3}
     theme: {fileID: 11400000, guid: 13ec61b4e690b8e4cadb01144c2c65e8, type: 2}
+    levels: {fileID: 11400000, guid: 33a84de879134139cb2d8effe32ab3e3, type: 2}

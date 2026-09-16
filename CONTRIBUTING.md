@@ -27,7 +27,9 @@ holds the project lock.
 ```bash
 Tools/unity-batch.sh                             # compiles
 Tools/unity-batch.sh FPSKitBatch.VerifyBuild     # the builder wired everything up
-Tools/unity-batch.sh FPSKitBatch.VerifyWaves     # an uncleanable wave still ends
+Tools/unity-batch.sh FPSKitBatch.VerifyLevels    # a level is scored on both its endings
+Tools/unity-batch.sh FPSKitBatch.VerifyFlow      # dashboard -> levels -> arena -> back
+Tools/unity-batch.sh FPSKitBatch.VerifyCombat    # the enemies actually fight
 Tools/unity-batch.sh FPSKitBatch.VerifyReplay    # state does not leak between runs
 Tools/unity-batch.sh FPSKitBatch.VerifyStatics   # every static resets
 ```
@@ -44,9 +46,10 @@ fixes nothing past the next **FPSKit → Build Scene**, and hand-editing
 `FPSKitSceneBuilder.cs` or `Assets/WebGLTemplates/FPSKit/index.html` instead.
 
 **2. New content is a new asset, not a new branch in the builder.** A new arena
-is a `LevelTheme`; a new enemy is an `EnemyArchetype`; a new weapon is a
-`WeaponData`. Duplicate one, retune the numbers, use it. If the knob you need
-genuinely does not exist, add it to the ScriptableObject — not to the builder.
+is a `LevelTheme`; a new level is an entry in that arena's `LevelSet`; a new
+enemy is an `EnemyArchetype`; a new weapon is a `WeaponData`. Duplicate one,
+retune the numbers, use it. If the knob you need genuinely does not exist, add
+it to the ScriptableObject — not to the builder.
 
 **3. Statics need a reset hook.** Domain reload is disabled, so no C# static is
 ever cleared between play sessions. Any static field carrying state must be reset

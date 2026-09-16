@@ -1,0 +1,160 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d4b019bae083803181917a490b20462, type: 3}
+  m_Name: Levels_NightRooftop
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSet
+  arenaScene: NightRooftop
+  levels:
+  - displayName: FIRST CONTACT
+    brief: 6 hostiles. Kill them all before the clock runs out.
+    enemyCount: 6
+    timeLimit: 32
+    maxAliveAtOnce: 4
+    spawnInterval: 0.8
+    briefingTime: 4.5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossWeight: 4.5
+    bossHealthMultiplier: 1
+    healthMultiplier: 1.15
+    damageMultiplier: 1.09
+    speedMultiplier: 1.06
+    aggression: 0.12
+    rosterStep: 4
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: PUSHBACK
+    brief: 9 hostiles. Clear them for three stars.
+    enemyCount: 9
+    timeLimit: 43
+    maxAliveAtOnce: 5
+    spawnInterval: 0.7285714
+    briefingTime: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossWeight: 5
+    bossHealthMultiplier: 1
+    healthMultiplier: 1.25
+    damageMultiplier: 1.15
+    speedMultiplier: 1.09
+    aggression: 0.24857143
+    rosterStep: 6
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 1
+    brief: 12 hostiles and a boss. The boss is most of the score.
+    enemyCount: 12
+    timeLimit: 69
+    maxAliveAtOnce: 6
+    spawnInterval: 0.6571429
+    briefingTime: 3
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+    bossWeight: 5.5
+    bossHealthMultiplier: 1.3
+    healthMultiplier: 1.35
+    damageMultiplier: 1.21
+    speedMultiplier: 1.12
+    aggression: 0.37714285
+    rosterStep: 7
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: NO COVER
+    brief: 15 hostiles. Clear them for three stars.
+    enemyCount: 15
+    timeLimit: 63
+    maxAliveAtOnce: 7
+    spawnInterval: 0.5857143
+    briefingTime: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossWeight: 6
+    bossHealthMultiplier: 1.3
+    healthMultiplier: 1.45
+    damageMultiplier: 1.27
+    speedMultiplier: 1.15
+    aggression: 0.5057143
+    rosterStep: 9
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: 18 hostiles. Clear them for three stars.
+    enemyCount: 18
+    timeLimit: 73
+    maxAliveAtOnce: 8
+    spawnInterval: 0.5142857
+    briefingTime: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossWeight: 6.5
+    bossHealthMultiplier: 1.3
+    healthMultiplier: 1.55
+    damageMultiplier: 1.33
+    speedMultiplier: 1.18
+    aggression: 0.6342857
+    rosterStep: 10
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 2
+    brief: 21 hostiles and a boss. The boss is most of the score.
+    enemyCount: 21
+    timeLimit: 99
+    maxAliveAtOnce: 9
+    spawnInterval: 0.44285715
+    briefingTime: 3
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossWeight: 7
+    bossHealthMultiplier: 1.6
+    healthMultiplier: 1.65
+    damageMultiplier: 1.39
+    speedMultiplier: 1.21
+    aggression: 0.76285714
+    rosterStep: 12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: LAST STAND
+    brief: 24 hostiles. Clear them for three stars.
+    enemyCount: 24
+    timeLimit: 94
+    maxAliveAtOnce: 10
+    spawnInterval: 0.37142858
+    briefingTime: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossWeight: 7.5
+    bossHealthMultiplier: 1.6
+    healthMultiplier: 1.75
+    damageMultiplier: 1.45
+    speedMultiplier: 1.24
+    aggression: 0.89142853
+    rosterStep: 13
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 2
+    brief: 27 hostiles and a boss. The boss is most of the score.
+    enemyCount: 27
+    timeLimit: 120
+    maxAliveAtOnce: 11
+    spawnInterval: 0.3
+    briefingTime: 3
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossWeight: 8
+    bossHealthMultiplier: 1.6
+    healthMultiplier: 1.85
+    damageMultiplier: 1.51
+    speedMultiplier: 1.27
+    aggression: 1
+    rosterStep: 15
+    twoStarScore: 0.8
+    oneStarScore: 0.5

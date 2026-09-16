@@ -18,7 +18,7 @@ using UnityEngine.AI;
 ///
 /// The behaviour is deliberately layered rather than scripted per enemy type: an
 /// <see cref="EnemyArchetype"/> stamps numbers onto these knobs at spawn, and
-/// <see cref="ApplyWaveTuning"/> sharpens them as the waves climb. One brain,
+/// <see cref="ApplyDifficulty"/> sharpens them as the levels climb. One brain,
 /// many enemies, no per-variant code.
 ///
 /// Drop an Animator in and the float/trigger parameters below get driven automatically.
@@ -32,7 +32,7 @@ public class EnemyAI : MonoBehaviour
     public Transform eyes;
     public Transform target;
 
-    [Tooltip("Assigned by the WaveManager at spawn. Read for score value and drops; " +
+    [Tooltip("Assigned by the LevelManager at spawn. Read for score value and drops; " +
              "leave empty on a hand-placed enemy and it simply uses the fields below.")]
     public EnemyArchetype archetype;
 
@@ -49,7 +49,7 @@ public class EnemyAI : MonoBehaviour
     public float meleeRange = 2.4f;
 
     [Tooltip("Telegraph time before damage lands. This is the player's reaction window, " +
-             "so it is the one number wave scaling is not allowed to grind away.")]
+             "so it is the one number difficulty scaling is not allowed to grind away.")]
     public float attackWindup = 0.35f;
 
     [Tooltip("Shots fired per ranged attack.")]
@@ -166,7 +166,7 @@ public class EnemyAI : MonoBehaviour
     [Min(0.1f)] public float retreatSpeedMultiplier = 1.5f;
 
     [Tooltip("Seconds before it can break off again, so a wounded enemy cannot kite you " +
-             "around the arena for the rest of the wave.")]
+             "around the arena for the rest of the level.")]
     public float retreatCooldown = 9f;
 
     [Tooltip("Colour the body flashes while winding up an attack. The flash is the tell -- " +
@@ -213,7 +213,7 @@ public class EnemyAI : MonoBehaviour
 
     public State CurrentState { get; private set; } = State.Idle;
 
-    /// <summary>0 on wave 1, 1 once the difficulty curve has topped out. Read by the HUD/debug.</summary>
+    /// <summary>0 on level 1, 1 once the difficulty curve has topped out. Read by the HUD/debug.</summary>
     public float Aggression { get; private set; }
 
     /// <summary>
@@ -377,7 +377,7 @@ public class EnemyAI : MonoBehaviour
 
         if (target != null) _targetHealth = target.GetComponentInParent<Health>();
 
-        // Captured here rather than in Awake: the archetype and the wave's speed
+        // Captured here rather than in Awake: the archetype and the level's speed
         // growth are both applied after Instantiate returns, so Awake would bank
         // the unscaled prefab value and every charge would slow the enemy down.
         _baseSpeed = _agent.speed;
@@ -574,7 +574,7 @@ public class EnemyAI : MonoBehaviour
 
         for (int i = 0; i < RetreatSamples; i++)
         {
-            // Fanned rather than straight back, so a wave breaking off does not turn
+            // Fanned rather than straight back, so a group breaking off does not turn
             // into one column running the same line.
             Vector3 direction = Quaternion.AngleAxis(Random.Range(-75f, 75f), Vector3.up) * away;
             Vector3 candidate = transform.position + direction * retreatDistance * Random.Range(0.65f, 1f);
@@ -1106,12 +1106,12 @@ public class EnemyAI : MonoBehaviour
     // ======================================================================
 
     /// <summary>
-    /// Sharpens this enemy for a later wave. Cooldowns tighten, it circles harder
+    /// Sharpens this enemy for a later level. Cooldowns tighten, it circles harder
     /// and it shoots straighter -- but the wind-up only compresses part way and
     /// never past a floor, because that telegraph is the whole reason a crowd is
     /// survivable. Take the reaction window away and difficulty becomes unfairness.
     /// </summary>
-    public void ApplyWaveTuning(float aggression01)
+    public void ApplyDifficulty(float aggression01)
     {
         Aggression = Mathf.Clamp01(aggression01);
 
@@ -1121,7 +1121,7 @@ public class EnemyAI : MonoBehaviour
         strafeAmount = Mathf.Clamp01(strafeAmount + 0.35f * Aggression);
         rangedSpread = Mathf.Max(0.5f, rangedSpread * Mathf.Lerp(1f, 0.55f, Aggression));
 
-        // Breaking off is a wave-one mercy, not a permanent way out. Later waves take
+        // Breaking off is a level-one mercy, not a permanent way out. Later levels take
         // more fire before they give ground and spend less time behind it.
         suppressionDamage *= Mathf.Lerp(1f, 1.9f, Aggression);
         retreatDuration *= Mathf.Lerp(1f, 0.65f, Aggression);

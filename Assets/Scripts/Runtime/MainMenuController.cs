@@ -7,6 +7,11 @@ using UnityEngine.UI;
 /// <summary>
 /// The dashboard: pick an arena, see how you have been doing, or leave.
 ///
+/// Picking an arena no longer starts a run. It opens that arena's ladder -- see
+/// <see cref="LevelSelectPanel"/> -- because an arena is now six to eight levels with
+/// an unlock chain through them, and which one to play is a question only the player
+/// can answer.
+///
 /// It is the first scene the game loads and the one every run returns to, however that
 /// run ended. That is the whole reason it exists -- the kit used to boot straight into
 /// an arena and offer a quit key that, in a browser, had nowhere to go, so the only way
@@ -24,6 +29,16 @@ public class MainMenuController : MonoBehaviour
 
     [Tooltip("Music and interface sounds. Optional -- the dashboard is silent without one.")]
     public UISounds sounds;
+
+    [Header("Level Select")]
+    [Tooltip("The screen an arena card opens. Without one the card falls back to " +
+             "launching the furthest level the player has unlocked, so the dashboard " +
+             "still works in a scene built before this existed.")]
+    public LevelSelectPanel levelSelect;
+
+    [Tooltip("Hidden while the level select is open, so the two screens are not drawn " +
+             "over each other. The grid, the heading and the record panel.")]
+    public GameObject[] dashboardOnly;
 
     [Header("Arena Grid")]
     [Tooltip("Parent the cards are cloned into. A layout group on it does the placing.")]
@@ -50,8 +65,16 @@ public class MainMenuController : MonoBehaviour
     public float topWithoutResult = 200f;
 
     [Header("Profile")]
+    [Tooltip("The record panel. Hidden with the grid while the level select is open.")]
+    public GameObject profilePanel;
+
     public TMP_Text playerNameText;
-    public TMP_Text bestWaveText;
+
+    [Tooltip("Stars earned across every arena in the catalog. This replaced \"best " +
+             "wave\": with levels there is no best run to report, and the stars are " +
+             "what the player is actually collecting.")]
+    public TMP_Text starsText;
+
     public TMP_Text bestScoreText;
     public TMP_Text runsText;
     public TMP_Text killsText;
@@ -89,6 +112,9 @@ public class MainMenuController : MonoBehaviour
     float _fittedWidth = -1f;
     float _fittedHeight = -1f;
 
+    /// <summary>What was on screen before the level select covered it. See ShowDashboard.</summary>
+    bool[] _dashboardWasShown;
+
     // ======================================================================
     void Start()
     {
@@ -107,11 +133,25 @@ public class MainMenuController : MonoBehaviour
         ShowLastRun();
         FitGrid();
 
+        if (levelSelect != null)
+        {
+            levelSelect.LevelChosen += Launch;
+            levelSelect.Closed += OnLevelSelectClosed;
+        }
+
         Wire(exitButton, AskToExit);
         Wire(confirmExitButton, Exit);
         Wire(cancelExitButton, CancelExit);
 
         if (exitConfirmPanel != null) exitConfirmPanel.SetActive(false);
+    }
+
+    void OnDestroy()
+    {
+        if (levelSelect == null) return;
+
+        levelSelect.LevelChosen -= Launch;
+        levelSelect.Closed -= OnLevelSelectClosed;
     }
 
     static void Wire(Button button, UnityEngine.Events.UnityAction action)
@@ -124,6 +164,10 @@ public class MainMenuController : MonoBehaviour
 
     void Update()
     {
+        // Nothing behind the level select needs laying out while it is covering the
+        // screen, and the grid it would be measuring is switched off anyway.
+        if (levelSelect != null && levelSelect.IsOpen) return;
+
         FitGrid();
 
         // Escape backs out of the dialog. A modal with no keyboard way out is a modal
@@ -239,7 +283,7 @@ public class MainMenuController : MonoBehaviour
             if (!loadable) missing++;
 
             var captured = entry;
-            card.Bind(entry, PlayerProfile.BestWaveIn(entry.sceneName), () => Launch(captured));
+            card.Bind(entry, () => Choose(captured));
 
             if (!loadable && card.button != null) card.button.interactable = false;
 
@@ -257,10 +301,42 @@ public class MainMenuController : MonoBehaviour
     void ShowProfile()
     {
         if (playerNameText != null) playerNameText.text = PlayerProfile.Name;
-        if (bestWaveText != null) bestWaveText.text = PlayerProfile.BestWave.ToString();
+        if (starsText != null) starsText.text = $"{TotalStars()} / {PossibleStars()}";
         if (bestScoreText != null) bestScoreText.text = PlayerProfile.BestScore.ToString("N0");
         if (runsText != null) runsText.text = PlayerProfile.Runs.ToString();
         if (killsText != null) killsText.text = PlayerProfile.TotalKills.ToString("N0");
+    }
+
+    /// <summary>Stars taken across every arena the catalog offers.</summary>
+    public int TotalStars()
+    {
+        int total = 0;
+
+        if (catalog == null || catalog.arenas == null) return 0;
+
+        foreach (var entry in catalog.arenas)
+        {
+            if (entry == null) continue;
+            total += LevelProgress.StarsInArena(entry.ProgressKey, entry.LevelCount);
+        }
+
+        return total;
+    }
+
+    /// <summary>And how many there are to take, so the number has a denominator.</summary>
+    public int PossibleStars()
+    {
+        int total = 0;
+
+        if (catalog == null || catalog.arenas == null) return 0;
+
+        foreach (var entry in catalog.arenas)
+        {
+            if (entry == null) continue;
+            total += entry.LevelCount * 3;
+        }
+
+        return total;
     }
 
     void ShowLastRun()
@@ -276,22 +352,113 @@ public class MainMenuController : MonoBehaviour
             ? ""
             : $" in {GameSession.SelectedArenaLabel}";
 
+        var result = GameSession.LastResult;
+
         if (lastRunTitle != null)
-            lastRunTitle.text = GameSession.LastOutcome == GameSession.Outcome.Died
-                ? "YOU WERE KILLED"
-                : "RUN ENDED";
+        {
+            string stars = result.stars > 0 ? new string('*', result.stars) + "  " : "";
+            lastRunTitle.text = $"{stars}{result.Title}";
+        }
 
         if (lastRunDetail != null)
+        {
+            string level = string.IsNullOrEmpty(result.levelName)
+                ? $"Level {result.levelIndex + 1}"
+                : $"Level {result.levelIndex + 1} - {result.levelName}";
+
             lastRunDetail.text =
-                $"Wave {GameSession.LastWave}{where}   ·   " +
-                $"{GameSession.LastScore:N0} points   ·   {GameSession.LastKills} kills";
+                $"{level}{where}   ·   {result.killed}/{result.total} killed   ·   " +
+                $"{result.score:N0} points";
+        }
 
         // Read once. Re-opening the dashboard later should not replay it as news.
         GameSession.ClearLastRun();
     }
 
     // ======================================================================
-    public void Launch(ArenaCatalog.Entry entry)
+
+    /// <summary>
+    /// What clicking an arena card does: open its ladder.
+    ///
+    /// The card used to start a run straight away, which is why this is a separate
+    /// method from <see cref="Launch"/> rather than a branch inside it -- an arena is
+    /// chosen in two steps now, and the second step is the one that loads a scene.
+    /// </summary>
+    public void Choose(ArenaCatalog.Entry entry)
+    {
+        if (entry == null || string.IsNullOrWhiteSpace(entry.sceneName)) return;
+
+        if (levelSelect == null)
+        {
+            // No level select in this scene: fall through to the furthest level the
+            // player has earned, which is the least surprising thing a bare card can do.
+            Launch(entry, LevelProgress.HighestUnlocked(entry.ProgressKey, entry.LevelCount));
+            return;
+        }
+
+        if (entry.LevelCount <= 0)
+        {
+            Report($"\"{entry.Label}\" has no levels. Run FPSKit > Reset Level Sets, then " +
+                   "FPSKit > Build Dashboard.");
+            return;
+        }
+
+        ShowDashboard(false);
+        levelSelect.Open(entry);
+    }
+
+    void OnLevelSelectClosed()
+    {
+        ShowDashboard(true);
+
+        // The panel measured its grid against a box that was not on screen while the
+        // arenas were hidden, so the arena grid has to be measured again on the way back.
+        _fittedWidth = _fittedHeight = -1f;
+    }
+
+    /// <summary>
+    /// Hides the arena picker behind the level select, and puts it back exactly as it
+    /// was.
+    ///
+    /// What was showing is remembered rather than assumed, because some of these are
+    /// conditional: the result strip only appears after a level, and Exit Game is hidden
+    /// in a browser. Switching everything back on unconditionally would announce the
+    /// result of a level that was never played, every time somebody backed out of a
+    /// ladder.
+    /// </summary>
+    void ShowDashboard(bool shown)
+    {
+        if (dashboardOnly == null) return;
+
+        if (!shown)
+        {
+            if (_dashboardWasShown == null || _dashboardWasShown.Length != dashboardOnly.Length)
+                _dashboardWasShown = new bool[dashboardOnly.Length];
+
+            for (int i = 0; i < dashboardOnly.Length; i++)
+            {
+                if (dashboardOnly[i] == null) continue;
+
+                _dashboardWasShown[i] = dashboardOnly[i].activeSelf;
+                dashboardOnly[i].SetActive(false);
+            }
+
+            return;
+        }
+
+        for (int i = 0; i < dashboardOnly.Length; i++)
+        {
+            if (dashboardOnly[i] == null) continue;
+
+            bool was = _dashboardWasShown == null || i >= _dashboardWasShown.Length
+                       || _dashboardWasShown[i];
+
+            dashboardOnly[i].SetActive(was);
+        }
+    }
+
+    /// <summary>Starts a level. The one place a scene load can begin.</summary>
+    public void Launch(ArenaCatalog.Entry entry, int levelIndex)
     {
         if (entry == null || string.IsNullOrWhiteSpace(entry.sceneName)) return;
 
@@ -301,7 +468,14 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
+        if (!LevelProgress.IsUnlocked(entry.ProgressKey, levelIndex))
+        {
+            Report($"Level {levelIndex + 1} of \"{entry.Label}\" is still locked.");
+            return;
+        }
+
         GameSession.ChooseArena(entry.sceneName, entry.Label);
+        GameSession.ChooseLevel(levelIndex);
 
         // Handed back before the arena loads. The menu turned it off so a held key could
         // not leak in here; leaving it off would load a run the player cannot move in.

@@ -2,21 +2,27 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// Makes the rifle grow with the run: every wave survived widens the magazine,
-/// hardens the round and shortens the reload.
+/// Makes the rifle grow with the ladder: every level you are cleared to enter widens
+/// the magazine, hardens the round and shortens the reload.
 ///
-/// The curve exists because the enemy curve does. Waves get bigger, tougher and
-/// meaner on a schedule the WaveManager owns, and a weapon that never changes turns
-/// that into a slope the player slides down -- the same thirty rounds against twice
-/// the bodies, fight after fight, until the arithmetic runs out. Giving the gun its
-/// own curve means later waves are a harder fight rather than a longer one, and the
-/// reward for clearing a wave is something the player can feel in the next one.
+/// The curve exists because the level curve does. Level eight throws four times the
+/// bodies of level one at you inside a clock that has not grown as fast, and a weapon
+/// that never changes turns that into a slope the player slides down -- the same thirty
+/// rounds against twice the enemies, attempt after attempt, until the arithmetic runs
+/// out. Giving the gun its own curve means a later level is a harder fight rather than
+/// a longer one.
+///
+/// It is keyed off the level *number* rather than a tally of anything, which is the
+/// change the level system forced and an improvement anyway: a level is one scene load,
+/// so there is no run-long accumulation to lose, replaying level six always hands you
+/// the same rifle, and a player who beat level six is never sent back into it with the
+/// level-one gun because they quit to the dashboard in between.
 ///
 /// Nothing here is written to the WeaponData asset. That is the important part: the
 /// asset is one shared ScriptableObject, so a bonus written into it would survive
-/// quitting the game and start the next run already upgraded -- and would compound
+/// quitting the game and start the next attempt already upgraded -- and would compound
 /// every restart. The upgrades are multipliers held on the Weapon component, which
-/// dies with the scene the way a run's state should. See Weapon.ApplyUpgrades.
+/// dies with the scene the way a level's state should. See Weapon.ApplyUpgrades.
 /// </summary>
 [DisallowMultipleComponent]
 public class PlayerProgression : MonoBehaviour
@@ -27,51 +33,51 @@ public class PlayerProgression : MonoBehaviour
     public Weapon weapon;
 
     [Tooltip("Found in the scene when empty.")]
-    public WaveManager waveManager;
+    public LevelManager levelManager;
 
     [Header("Magazine")]
-    [Tooltip("Rounds added to the magazine for each wave cleared. The stock rifle holds " +
-             "thirty, so this is what stops a later wave from being spent reloading.")]
-    [Min(0)] public int magazineBonusPerWave = 3;
+    [Tooltip("Rounds added to the magazine for each level below this one. The stock " +
+             "rifle holds thirty, so this is what stops a later level being spent " +
+             "reloading while the clock runs.")]
+    [Min(0)] public int magazineBonusPerLevel = 4;
 
     [Tooltip("Ceiling on the added rounds. Past a point a bigger magazine stops being a " +
              "reward and starts removing the reload from the game entirely.")]
     [Min(0)] public int maxMagazineBonus = 60;
 
     [Header("Power")]
-    [Tooltip("Fraction added to damage per wave cleared. 0.07 is seven percent a wave, " +
-             "which roughly keeps pace with the enemy health curve rather than beating it.")]
-    [Range(0f, 1f)] public float damageBonusPerWave = 0.07f;
+    [Tooltip("Fraction added to damage per level. 0.09 is nine percent a level, which " +
+             "roughly keeps pace with the difficulty curve rather than beating it.")]
+    [Range(0f, 1f)] public float damageBonusPerLevel = 0.09f;
 
     [Tooltip("Ceiling on the damage multiplier. Without one the rifle eventually " +
-             "one-shots a boss and the boss waves stop being fights.")]
+             "one-shots a boss and the boss levels stop being fights.")]
     [Min(1f)] public float maxDamageMultiplier = 2.6f;
 
     [Header("Reload")]
-    [Tooltip("Fraction shaved off the reload per wave cleared.")]
-    [Range(0f, 0.5f)] public float reloadSpeedBonusPerWave = 0.04f;
+    [Tooltip("Fraction shaved off the reload per level.")]
+    [Range(0f, 0.5f)] public float reloadSpeedBonusPerLevel = 0.05f;
 
     [Tooltip("Floor on the reload multiplier, so the animation never collapses to nothing.")]
     [Range(0.1f, 1f)] public float minReloadMultiplier = 0.5f;
 
     [Header("Feedback")]
-    [Tooltip("Refill the magazine when an upgrade lands. On by default: a bigger " +
-             "magazine handed over empty is not a reward.")]
-    public bool topUpMagazineOnUpgrade = true;
-
-    [Tooltip("Played when an upgrade lands. Optional, like every audio field in the kit.")]
+    [Tooltip("Played when the rifle is handed over upgraded, at the start of a level " +
+             "past the first. Optional, like every audio field in the kit.")]
     public AudioClip upgradeClip;
 
     public AudioSource audioSource;
 
-    /// <summary>Waves cleared this run. 0 means the rifle is still the asset's rifle.</summary>
-    public int WavesCleared { get; private set; }
+    /// <summary>Levels below this one. 0 means the rifle is still the asset's rifle.</summary>
+    public int Steps { get; private set; }
 
     /// <summary>One line describing the gun as it now stands. The HUD prints this.</summary>
     public string Summary { get; private set; } = "";
 
-    /// <summary>Raised after an upgrade has been applied, with the wave that earned it.</summary>
+    /// <summary>Raised once the upgraded rifle is in hand, with the level that earned it.</summary>
     public event Action<PlayerProgression, int> Upgraded;
+
+    bool _announced;
 
     // ======================================================================
     void Start()
@@ -79,66 +85,79 @@ public class PlayerProgression : MonoBehaviour
         if (weapon == null) weapon = GetComponentInChildren<Weapon>();
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
-        if (waveManager == null) waveManager = FindAnyObjectByType<WaveManager>();
+        if (levelManager == null) levelManager = FindAnyObjectByType<LevelManager>();
 
         if (weapon == null)
         {
             Debug.LogWarning("[PlayerProgression] No Weapon found, so the rifle will not " +
-                             "improve between waves.", this);
+                             "keep up with the levels.", this);
             return;
         }
 
-        if (waveManager != null) waveManager.WaveCleared += OnWaveCleared;
+        if (levelManager != null) levelManager.LevelStarted += OnLevelStarted;
 
-        // Applied rather than assumed. WavesCleared is zero on a fresh run and this is
-        // simply the asset's own numbers -- but a script recompiled mid-play reloads the
-        // domain without re-running Awake, and the count survives that while nothing
-        // guarantees the weapon's multipliers did. Recomputing from the count means the
-        // two can never drift apart.
+        // Which of the two Starts runs first is not defined, so both orders are covered:
+        // the manager resolves its level in Start, and if it got there first the level
+        // is already known and the rifle can be handed over now rather than waiting for
+        // an event that has already been raised.
+        if (levelManager != null && levelManager.Level != null) OnLevelStarted(levelManager);
+
+        // Applied rather than assumed. Steps is zero before the level announces itself
+        // and this is simply the asset's own numbers -- but a script recompiled mid-play
+        // reloads the domain without re-running Awake, and the count survives that while
+        // nothing guarantees the weapon's multipliers did. Recomputing from the count
+        // means the two can never drift apart.
         Apply();
     }
 
     void OnDestroy()
     {
-        if (waveManager != null) waveManager.WaveCleared -= OnWaveCleared;
+        if (levelManager != null) levelManager.LevelStarted -= OnLevelStarted;
     }
 
     // ======================================================================
 
     /// <summary>
-    /// Keyed off the wave number rather than a tally of calls.
+    /// Hands over the rifle the level is owed.
     ///
-    /// The WaveManager restarts its own wave loop if it ever loses it, and a restart
-    /// replays WaveCleared for a wave that has already paid out. Taking the maximum
-    /// makes a repeat harmless, where counting calls would quietly hand out a free
-    /// upgrade for it.
+    /// Taken from the level number rather than counted, so it is idempotent: the level
+    /// loop restarts itself if it is ever lost, and a repeat of this must not be able to
+    /// hand out a second upgrade for the same level.
     /// </summary>
-    void OnWaveCleared(int wave)
+    void OnLevelStarted(LevelManager source)
     {
-        int cleared = Mathf.Max(WavesCleared, wave);
-        if (cleared == WavesCleared) return;
+        if (source == null) return;
 
-        WavesCleared = cleared;
+        int steps = Mathf.Max(0, source.LevelNumber - 1);
+        if (steps == Steps && _announced) return;
+
+        Steps = steps;
         Apply();
 
-        if (upgradeClip != null && audioSource != null) audioSource.PlayOneShot(upgradeClip);
+        if (steps <= 0) return;
 
-        Upgraded?.Invoke(this, wave);
+        if (!_announced)
+        {
+            if (upgradeClip != null && audioSource != null) audioSource.PlayOneShot(upgradeClip);
+            Upgraded?.Invoke(this, source.LevelNumber);
+        }
+
+        _announced = true;
     }
 
     void Apply()
     {
         if (weapon == null) return;
 
-        int magazine = Mathf.Min(maxMagazineBonus, magazineBonusPerWave * WavesCleared);
+        int magazine = Mathf.Min(maxMagazineBonus, magazineBonusPerLevel * Steps);
 
-        float damage = Mathf.Min(maxDamageMultiplier, 1f + damageBonusPerWave * WavesCleared);
+        float damage = Mathf.Min(maxDamageMultiplier, 1f + damageBonusPerLevel * Steps);
 
-        float reload = Mathf.Max(minReloadMultiplier, 1f - reloadSpeedBonusPerWave * WavesCleared);
+        float reload = Mathf.Max(minReloadMultiplier, 1f - reloadSpeedBonusPerLevel * Steps);
 
-        weapon.ApplyUpgrades(magazine, damage, reload, topUpMagazineOnUpgrade && WavesCleared > 0);
+        weapon.ApplyUpgrades(magazine, damage, reload, Steps > 0);
 
-        Summary = WavesCleared <= 0
+        Summary = Steps <= 0
             ? ""
             : $"MAG {weapon.MagazineSize}   DMG +{(damage - 1f) * 100f:0}%   RELOAD {weapon.ReloadTime:0.0}s";
     }

@@ -4,10 +4,13 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Drives every HUD element: ammo, the two-layer health bar, wave state and
-/// modifier banners, score and combo, a boss bar, a crosshair that opens with
-/// weapon spread, directional damage arrows, the pause menu and the game over
-/// screen.
+/// Drives every HUD element: ammo, the two-layer health bar, the level's clock and
+/// kill count, banners, score and combo, a boss bar, a crosshair that opens with
+/// weapon spread, directional damage arrows and the pause menu.
+///
+/// The screen at the *end* of a level is not here -- that is
+/// <see cref="LevelResultsUI"/>, which owns the stars, the three things to do next
+/// and the keys for them. This is the HUD for a level in progress.
 ///
 /// All references are optional -- a missing one is simply skipped, so a HUD
 /// assembled by hand can show as little or as much as it likes.
@@ -17,17 +20,25 @@ public class HUDController : MonoBehaviour
     [Header("Sources")]
     public Weapon weapon;
     public Health playerHealth;
-    public WaveManager waveManager;
+    public LevelManager levelManager;
 
     [Header("Text")]
     public TMP_Text ammoText;
     public TMP_Text healthText;
-    public TMP_Text waveText;
-    public TMP_Text enemiesLeftText;
-    public TMP_Text intermissionText;
+
+    [Tooltip("The level's name and number, top centre.")]
+    public TMP_Text levelText;
+
+    [Tooltip("Kills against the level's target, and the clock. Both, in one label: the " +
+             "only two numbers that decide the outcome should not be on opposite sides " +
+             "of the screen from each other.")]
+    public TMP_Text objectiveText;
+
+    [Tooltip("The briefing countdown before the clock starts.")]
+    public TMP_Text briefingText;
+
     public TMP_Text scoreText;
     public TMP_Text comboText;
-    public TMP_Text finalWaveText;
 
     [Header("Health Bars")]
     public Image healthFill;
@@ -39,6 +50,21 @@ public class HUDController : MonoBehaviour
 
     public float trailCatchUpDelay = 0.4f;
     public float trailCatchUpSpeed = 0.8f;
+
+    [Header("Objective Bar")]
+    [Tooltip("Fills with the weighted fraction of the level that is dead -- the number " +
+             "the stars are cut from. Optional.")]
+    public Image objectiveFill;
+
+    [Tooltip("Ticks drawn on the bar at the one- and two-star thresholds, so the player " +
+             "can see what the next star costs while there is still time to go and get " +
+             "it. Order: one star, two stars.")]
+    public RectTransform[] starMarkers;
+
+    [Tooltip("The bar turns this colour once the level is cleared outright.")]
+    public Color objectiveClearColor = new Color(0.55f, 0.95f, 0.65f);
+
+    public Color objectiveColor = new Color(0.95f, 0.78f, 0.3f);
 
     [Header("Crosshair")]
     public CanvasGroup crosshairGroup;
@@ -69,20 +95,25 @@ public class HUDController : MonoBehaviour
 
     public float indicatorDuration = 1.2f;
 
-    [Header("Wave Banner")]
+    [Header("Banner")]
     public CanvasGroup bannerGroup;
     public TMP_Text bannerTitle;
     public TMP_Text bannerSubtitle;
     public float bannerHold = 2.2f;
     public float bannerFadeSpeed = 3.5f;
 
-    [Tooltip("Optional. When set, the rifle's per-wave upgrade is announced on the banner " +
-             "after the wave-cleared message has had its moment.")]
+    [Tooltip("Optional. When set, the rifle the level handed over is announced on the " +
+             "banner after the level title has had its moment.")]
     public PlayerProgression progression;
 
     public Color upgradeBannerColor = new Color(0.55f, 0.95f, 0.65f);
-    public Color modifierBannerColor = new Color(1f, 0.6f, 0.25f);
     public Color bossBannerColor = new Color(1f, 0.3f, 0.3f);
+
+    [Tooltip("Seconds left when the clock starts flashing. A strict clock has to be " +
+             "loud about running out or it reads as unfair rather than as tight.")]
+    [Min(0f)] public float clockWarningTime = 10f;
+
+    public Color clockWarningColor = new Color(1f, 0.35f, 0.3f);
 
     [Header("Boss Bar")]
     public GameObject bossPanel;
@@ -93,17 +124,13 @@ public class HUDController : MonoBehaviour
     public GameObject pausePanel;
     public TMP_Text pauseHintText;
 
-    [Header("Game Over")]
-    public GameObject gameOverPanel;
-
-    [Header("Pause / Results Buttons")]
+    [Header("Pause Buttons")]
     [Tooltip("On-screen equivalents of the resume and quit keys. Not decoration: a phone " +
              "has no R or Q, so without these a touch player can reach the pause menu " +
              "and then has no way out of it.")]
     public Button resumeButton;
 
     public Button quitButton;
-    public Button gameOverQuitButton;
 
     [Header("Instruction Strip")]
     [Tooltip("The thin bar across the top that states the keys. Optional -- the HUD " +
@@ -116,7 +143,6 @@ public class HUDController : MonoBehaviour
     float _vignetteAlpha;
     float _hitmarkerUntil;
     Color _hitmarkerTint;
-    bool _gameOverShown;
     Camera _camera;
     GameDirector _director;
 
@@ -136,8 +162,8 @@ public class HUDController : MonoBehaviour
     /// <summary>
     /// One queued banner, shown once the current one has finished.
     ///
-    /// A wave clearing produces two things worth saying -- the wave is over, and the
-    /// rifle got better -- and both are raised on the same frame. Shown immediately the
+    /// Starting a level produces two things worth saying -- which level this is, and
+    /// what the rifle became -- and both are raised on the same frame. Shown immediately the
     /// second would overwrite the first before it had been read; queued, they land as
     /// two beats of the same moment. One slot rather than a list, because a third thing
     /// to announce in the same breath is a design problem, not a queueing problem.
@@ -167,7 +193,6 @@ public class HUDController : MonoBehaviour
         _currentGap = crosshairBaseGap;
         _hitmarkerTint = crosshairColor;
 
-        if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (pausePanel != null) pausePanel.SetActive(false);
         if (bossPanel != null) bossPanel.SetActive(false);
         if (damageVignette != null) damageVignette.color = WithAlpha(damageVignette.color, 0f);
@@ -241,7 +266,6 @@ public class HUDController : MonoBehaviour
     {
         Bind(resumeButton, () => Director?.SetPaused(false));
         Bind(quitButton, () => Director?.ReturnToMenu());
-        Bind(gameOverQuitButton, () => Director?.ReturnToMenu());
     }
 
     static void Bind(Button button, UnityEngine.Events.UnityAction action)
@@ -271,11 +295,7 @@ public class HUDController : MonoBehaviour
 
         if (playerHealth != null) playerHealth.Damaged += OnPlayerDamaged;
 
-        if (waveManager != null)
-        {
-            waveManager.WaveStarted += OnWaveStarted;
-            waveManager.WaveCleared += OnWaveCleared;
-        }
+        if (levelManager != null) levelManager.LevelStarted += OnLevelStarted;
 
         if (progression != null) progression.Upgraded += OnUpgraded;
 
@@ -299,11 +319,7 @@ public class HUDController : MonoBehaviour
 
         if (playerHealth != null) playerHealth.Damaged -= OnPlayerDamaged;
 
-        if (waveManager != null)
-        {
-            waveManager.WaveStarted -= OnWaveStarted;
-            waveManager.WaveCleared -= OnWaveCleared;
-        }
+        if (levelManager != null) levelManager.LevelStarted -= OnLevelStarted;
 
         if (progression != null) progression.Upgraded -= OnUpgraded;
 
@@ -323,6 +339,7 @@ public class HUDController : MonoBehaviour
         UpdateVignette();
         UpdateBanner();
         UpdateBossBar();
+        UpdateObjectiveBar();
         UpdateIndicators();
     }
 
@@ -331,8 +348,8 @@ public class HUDController : MonoBehaviour
     //
     // UpdateTexts runs every frame, and every label below used to rebuild an
     // interpolated string on each one -- up to seven allocations a frame, nearly all
-    // identical to the frame before, since ammo only moves when you fire and the wave
-    // number only once a wave. At 60fps that is several hundred short-lived strings a
+    // identical to the frame before, since ammo only moves when you fire and the level
+    // number never moves at all. At 60fps that is several hundred short-lived strings a
     // second to display a HUD that changes a handful of times a minute.
     //
     // So each label is keyed on the values its string is built from. Every one of them
@@ -356,9 +373,9 @@ public class HUDController : MonoBehaviour
     int _shownHealth = Unset, _shownShield = Unset;
     int _shownScore = Unset;
     int _shownCombo = Unset, _shownMultiplier = Unset;
-    int _shownWave = Unset;
-    int _shownLeft = Unset, _shownWaveClock = Unset;
-    int _shownIntermission = Unset;
+    int _shownLevel = Unset;
+    int _shownKilled = Unset, _shownClock = Unset;
+    int _shownBriefing = Unset;
 
     void UpdateTexts()
     {
@@ -371,11 +388,11 @@ public class HUDController : MonoBehaviour
             UpdateComboText();
         }
 
-        if (waveManager == null) return;
+        if (levelManager == null) return;
 
-        UpdateWaveText();
-        UpdateEnemiesLeftText();
-        UpdateIntermissionText();
+        UpdateLevelText();
+        UpdateObjectiveText();
+        UpdateBriefingText();
     }
 
     void UpdateAmmoText()
@@ -451,50 +468,116 @@ public class HUDController : MonoBehaviour
             : string.Empty;
     }
 
-    void UpdateWaveText()
+    void UpdateLevelText()
     {
-        if (waveText == null || waveManager.CurrentWave == _shownWave) return;
+        if (levelText == null || levelManager.LevelNumber == _shownLevel) return;
 
-        _shownWave = waveManager.CurrentWave;
-        waveText.text = $"WAVE {_shownWave}";
+        _shownLevel = levelManager.LevelNumber;
+
+        string name = levelManager.LevelName;
+        levelText.text = string.IsNullOrEmpty(name)
+            ? $"LEVEL {_shownLevel}"
+            : $"LEVEL {_shownLevel}  <size=70%><color=#B8AFA0>{name.ToUpperInvariant()}</color></size>";
     }
 
     /// <summary>
-    /// Enemies left, plus the wave clock once it is running. The clock matters because
-    /// the wave no longer requires a total wipe: without it, a player hunting the last
-    /// enemy has no way to know the round will move on by itself.
+    /// Kills against the target, and the clock. Both numbers decide the outcome, and
+    /// the clock is now the level's own rule rather than a safety net -- so it is
+    /// always on screen while the level is running, and it says so in red when it is
+    /// nearly gone.
     /// </summary>
-    void UpdateEnemiesLeftText()
+    void UpdateObjectiveText()
     {
-        if (enemiesLeftText == null) return;
+        if (objectiveText == null) return;
 
-        bool intermission = waveManager.IsIntermission;
-        float remaining = waveManager.WaveTimeRemaining;
+        bool running = levelManager.IsRunning && !levelManager.IsFinished;
 
-        int left = intermission ? Hidden : waveManager.EnemiesRemaining;
-        int clock = intermission || remaining <= 0f ? Hidden : Mathf.CeilToInt(remaining);
+        int killed = running ? levelManager.Killed : Hidden;
+        int clock = running ? Mathf.CeilToInt(levelManager.TimeRemaining) : Hidden;
 
-        if (left == _shownLeft && clock == _shownWaveClock) return;
+        if (killed == _shownKilled && clock == _shownClock) return;
 
-        _shownLeft = left;
-        _shownWaveClock = clock;
+        _shownKilled = killed;
+        _shownClock = clock;
 
-        if (intermission) enemiesLeftText.text = string.Empty;
-        else if (clock == Hidden) enemiesLeftText.text = $"{left} LEFT";
-        else enemiesLeftText.text = $"{left} LEFT   <size=75%>{clock / 60}:{clock % 60:00}</size>";
+        if (!running)
+        {
+            objectiveText.text = string.Empty;
+            return;
+        }
+
+        string time = $"{clock / 60}:{clock % 60:00}";
+
+        if (levelManager.TimeRemaining <= clockWarningTime)
+            time = $"<color=#{ColorUtility.ToHtmlStringRGB(clockWarningColor)}>{time}</color>";
+
+        objectiveText.text = $"{killed} / {levelManager.TotalEnemies} KILLED   <size=110%>{time}</size>";
     }
 
-    void UpdateIntermissionText()
+    void UpdateBriefingText()
     {
-        if (intermissionText == null) return;
+        if (briefingText == null) return;
 
-        bool counting = waveManager.IsIntermission && !waveManager.GameIsOver;
-        int seconds = counting ? Mathf.CeilToInt(waveManager.IntermissionRemaining) : Hidden;
+        bool counting = levelManager.IsBriefing && !levelManager.IsFinished;
+        int seconds = counting ? Mathf.CeilToInt(levelManager.BriefingRemaining) : Hidden;
 
-        if (seconds == _shownIntermission) return;
+        if (seconds == _shownBriefing) return;
 
-        _shownIntermission = seconds;
-        intermissionText.text = counting ? $"NEXT WAVE IN {seconds}" : string.Empty;
+        _shownBriefing = seconds;
+
+        if (!counting)
+        {
+            briefingText.text = string.Empty;
+            return;
+        }
+
+        string brief = levelManager.LevelBrief;
+
+        briefingText.text = string.IsNullOrWhiteSpace(brief)
+            ? $"GET READY - {seconds}"
+            : $"{brief}\n<size=70%>GET READY - {seconds}</size>";
+    }
+
+    /// <summary>
+    /// The bar that says how close the level is to being cleared, with the star
+    /// thresholds ticked on it. Without the ticks the bar is decoration; with them it
+    /// answers the only question a player has with twenty seconds left, which is
+    /// whether one more kill is worth chasing.
+    /// </summary>
+    void UpdateObjectiveBar()
+    {
+        if (levelManager == null) return;
+
+        if (objectiveFill != null)
+        {
+            objectiveFill.fillAmount = levelManager.ScoreFraction;
+            objectiveFill.color = levelManager.ScoreFraction >= 0.999f
+                ? objectiveClearColor
+                : objectiveColor;
+        }
+
+        if (starMarkers == null || starMarkers.Length < 2) return;
+
+        var level = levelManager.Level;
+        if (level == null) return;
+
+        PlaceMarker(starMarkers[0], level.oneStarScore);
+        PlaceMarker(starMarkers[1], level.twoStarScore);
+    }
+
+    /// <summary>
+    /// Puts one threshold tick at its fraction along the bar. Anchored rather than
+    /// offset in pixels, so it stays put whatever width the bar ends up.
+    /// </summary>
+    static void PlaceMarker(RectTransform marker, float fraction)
+    {
+        if (marker == null) return;
+
+        float x = Mathf.Clamp01(fraction);
+
+        marker.anchorMin = new Vector2(x, marker.anchorMin.y);
+        marker.anchorMax = new Vector2(x, marker.anchorMax.y);
+        marker.anchoredPosition = new Vector2(0f, marker.anchoredPosition.y);
     }
 
     // ======================================================================
@@ -630,28 +713,21 @@ public class HUDController : MonoBehaviour
     }
 
     // ======================================================================
-    // Wave banner
+    // Banner
     // ======================================================================
-    void OnWaveStarted(int wave)
+    void OnLevelStarted(LevelManager source)
     {
-        if (waveManager == null) return;
+        if (source == null) return;
 
-        string modifier = WaveManager.ModifierName(waveManager.CurrentModifier);
+        string target = source.HasBoss
+            ? $"{source.TotalEnemies - 1} ENEMIES AND A BOSS IN {Mathf.RoundToInt(source.TimeLimit)}s"
+            : $"{source.TotalEnemies} ENEMIES IN {Mathf.RoundToInt(source.TimeLimit)}s";
 
-        if (waveManager.IsBossWave)
-            ShowBanner($"WAVE {wave}", "BOSS INCOMING", bossBannerColor);
-        else if (!string.IsNullOrEmpty(modifier))
-            ShowBanner($"WAVE {wave} - {modifier}",
-                       WaveManager.ModifierDescription(waveManager.CurrentModifier),
-                       modifierBannerColor);
-        else
-            ShowBanner($"WAVE {wave}", string.Empty, Color.white);
+        ShowBanner($"LEVEL {source.LevelNumber}", target,
+                   source.HasBoss ? bossBannerColor : Color.white);
     }
 
-    void OnWaveCleared(int wave)
-        => ShowBanner($"WAVE {wave} CLEARED", $"+{waveManager.waveClearBonus * wave:N0}", Color.white);
-
-    void OnUpgraded(PlayerProgression source, int wave)
+    void OnUpgraded(PlayerProgression source, int level)
         => QueueBanner("RIFLE UPGRADED", source.Summary, upgradeBannerColor);
 
     /// <summary>Shows a banner now, or holds it until the one on screen has been read.</summary>
@@ -710,13 +786,13 @@ public class HUDController : MonoBehaviour
     {
         if (bossPanel == null) return;
 
-        var boss = waveManager != null ? waveManager.ActiveBoss : null;
+        var boss = levelManager != null ? levelManager.ActiveBoss : null;
         bool show = boss != null && !boss.IsDead;
 
         if (bossPanel.activeSelf != show) bossPanel.SetActive(show);
         if (!show) return;
 
-        if (bossNameText != null) bossNameText.text = waveManager.ActiveBossName;
+        if (bossNameText != null) bossNameText.text = levelManager.ActiveBossName;
         if (bossFill != null) bossFill.fillAmount = boss.TotalNormalized;
     }
 
@@ -801,30 +877,19 @@ public class HUDController : MonoBehaviour
         if (crosshairGroup != null && paused) crosshairGroup.alpha = 0f;
     }
 
+    /// <summary>
+    /// Clears the fight off the screen when the level is scored. What replaces it is
+    /// LevelResultsUI, which is a separate component because the end of a level is a
+    /// screen in its own right rather than one more HUD element.
+    /// </summary>
     void OnGameEnded(GameDirector director)
     {
-        if (_gameOverShown) return;
-        _gameOverShown = true;
-
         if (pausePanel != null) pausePanel.SetActive(false);
-
-        if (finalWaveText != null)
-        {
-            int wave = director.FinalWave;
-            string record = director.BeatBestWave
-                ? "<color=#FFD24A>NEW RECORD</color>\n"
-                : $"<size=55%>Best: wave {director.BestWave}</size>\n";
-
-            finalWaveText.text =
-                $"{record}You survived {wave} wave{(wave == 1 ? "" : "s")}\n" +
-                $"<size=65%>{director.Score:N0} points   {director.Kills} kills   " +
-                $"{director.Headshots} headshots</size>\n\n" +
-                $"<size=55%>Press {Key(director.quitKey)} for the dashboard</size>";
-        }
-
-        if (gameOverPanel != null) gameOverPanel.SetActive(true);
         if (crosshairGroup != null) crosshairGroup.alpha = 0f;
         if (bossPanel != null) bossPanel.SetActive(false);
+
+        if (objectiveText != null) objectiveText.text = string.Empty;
+        if (briefingText != null) briefingText.text = string.Empty;
     }
 
     /// <summary>

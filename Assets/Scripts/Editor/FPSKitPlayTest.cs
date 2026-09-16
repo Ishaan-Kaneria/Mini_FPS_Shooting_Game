@@ -21,8 +21,8 @@ namespace FPSKit.EditorTools
     ///
     /// Each run is measured twice. The opening snapshot, taken a beat after the world
     /// starts, is where state carried over from the previous run shows up. The settled
-    /// snapshot, taken once a wave is underway, is where a run that started clean but
-    /// cannot actually play shows up.
+    /// snapshot, taken once the level is underway, is where a run that started clean
+    /// but cannot actually play shows up.
     ///
     /// Run one holds the trigger down and pops damage numbers first, so the pooled and
     /// cached state a real player generates is in play before anything is torn down.
@@ -33,7 +33,7 @@ namespace FPSKit.EditorTools
     {
         const string ScenePath = "Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity";
 
-        /// <summary>Real seconds a run is given before it is measured. A wave starts at four.</summary>
+        /// <summary>Real seconds a run is given before it is measured. The briefing runs four.</summary>
         const double SettleSeconds = 8.0;
 
         /// <summary>Real seconds after a scene load before the new world is measured.</summary>
@@ -62,21 +62,21 @@ namespace FPSKit.EditorTools
             public bool hudBound;
             public bool gameOver;
             public int score;
-            public int wave;
+            public int level;
             public int enemiesAlive;
             public bool playerAlive;
 
             public override string ToString()
                 => $"input={inputEnabled} timeScale={timeScale:0.##} cursorLocked={cursorLocked} " +
                    $"director={directorExists} hudBound={hudBound} gameOver={gameOver} " +
-                   $"score={score} wave={wave} enemies={enemiesAlive} playerAlive={playerAlive}";
+                   $"score={score} level={level} enemies={enemiesAlive} playerAlive={playerAlive}";
         }
 
         /// <summary>
         /// Errors the running game logged, tagged with the run they came from. A play
         /// session that throws in Awake still satisfies every state assertion below --
         /// the objects exist, they just never got wired up -- so without watching the
-        /// console this test would wave through the exact failure it is meant to catch.
+        /// console this test would pass over the exact failure it is meant to catch.
         /// </summary>
         static readonly List<string> Errors = new List<string>();
 
@@ -86,7 +86,15 @@ namespace FPSKit.EditorTools
         static double _startedAt;
         static readonly Snapshot[] Opening = new Snapshot[3];
         static readonly Snapshot[] Settled = new Snapshot[3];
-        static int _bestWaveBackup, _bestScoreBackup;
+        /// <summary>
+        /// The player's own records, put back in Detach. This test finishes a level for
+        /// real, so without it a CI run would award itself stars on level one of the
+        /// warehouse and count three attempts against whoever is sitting at the machine.
+        /// </summary>
+        static int _bestScoreBackup, _runsBackup, _killsBackup, _starsBackup, _levelScoreBackup;
+
+        const string StarsKey = "FPSKit.Level.IndustrialWarehouse.0.Stars";
+        const string LevelScoreKey = "FPSKit.Level.IndustrialWarehouse.0.Score";
 
         public static void VerifyReplay()
         {
@@ -96,8 +104,11 @@ namespace FPSKit.EditorTools
                     throw new Exception($"{ScenePath} does not exist. Build it first.");
 
                 // The run records belong to the player, not to the test.
-                _bestWaveBackup = PlayerPrefs.GetInt("FPSKit.BestWave", 0);
                 _bestScoreBackup = PlayerPrefs.GetInt("FPSKit.BestScore", 0);
+                _runsBackup = PlayerPrefs.GetInt("FPSKit.Runs", 0);
+                _killsBackup = PlayerPrefs.GetInt("FPSKit.TotalKills", 0);
+                _starsBackup = PlayerPrefs.GetInt(StarsKey, 0);
+                _levelScoreBackup = PlayerPrefs.GetInt(LevelScoreKey, 0);
 
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
@@ -176,10 +187,10 @@ namespace FPSKit.EditorTools
                         Settled[1] = Capture();
                         Debug.Log($"[FPSKitBatch] run 2 settled: {Settled[1]}");
 
-                        // Leave behind the messiest state a player can: game over freezes
-                        // time, disables input and frees the cursor.
+                        // Leave behind the messiest state a player can: a scored level
+                        // freezes time, disables input and frees the cursor.
                         var ending = GameDirector.Instance;
-                        if (ending != null) ending.ReportGameOver(Mathf.Max(1, Settled[1].wave));
+                        if (ending != null) ending.ReportLevelFinished(DeathResult(Settled[1]));
 
                         _phase = Phase.ExitFirst;
                         return;
@@ -288,7 +299,7 @@ namespace FPSKit.EditorTools
         static Snapshot Capture()
         {
             var director = GameDirector.Instance;
-            var wave = UnityEngine.Object.FindAnyObjectByType<WaveManager>();
+            var manager = UnityEngine.Object.FindAnyObjectByType<LevelManager>();
             var hud = UnityEngine.Object.FindAnyObjectByType<HUDController>();
 
             var player = GameObject.FindGameObjectWithTag("Player");
@@ -302,10 +313,12 @@ namespace FPSKit.EditorTools
                 cursorLocked = Cursor.lockState == CursorLockMode.Locked,
                 directorExists = director != null,
                 hudBound = hud != null && hud.playerHealth != null && hud.weapon != null &&
-                           hud.waveManager != null,
+                           hud.levelManager != null,
                 gameOver = director != null && director.IsGameOver,
                 score = director != null ? director.Score : -1,
-                wave = wave != null ? wave.CurrentWave : -1,
+                level = manager != null && (manager.IsRunning || manager.IsFinished)
+                    ? manager.LevelNumber
+                    : -1,
                 enemiesAlive = GameObject.FindGameObjectsWithTag("Enemy").Length,
                 playerAlive = health != null && !health.IsDead
             };
@@ -324,8 +337,8 @@ namespace FPSKit.EditorTools
             // Run 1 is the control. If it did not play, the comparison means nothing, and
             // the environment is judged by what run 1 managed rather than by absolutes --
             // batch mode cannot do everything an editor with a window can.
-            if (!Settled[0].valid || Settled[0].wave < 1)
-                problems.Append("\n  - run 1 never started a wave; there is no baseline to compare against");
+            if (!Settled[0].valid || Settled[0].level < 1)
+                problems.Append("\n  - run 1 never started a level; there is no baseline to compare against");
 
             for (int i = 1; i < 3; i++) Judge(i, problems);
 
@@ -385,10 +398,10 @@ namespace FPSKit.EditorTools
             // --- settled: a run that started clean but cannot actually play ---
             if (!settled.hudBound)
                 problems.Append($"\n  - {who} has a HUD that is not bound to the player, weapon " +
-                                "and wave manager");
+                                "and level manager");
 
-            if (settled.wave < 1)
-                problems.Append($"\n  - {who} never started a wave");
+            if (settled.level < 1)
+                problems.Append($"\n  - {who} never started a level");
 
             if (control.enemiesAlive > 0 && settled.enemiesAlive < 1)
                 problems.Append($"\n  - {who} spawned no enemies (run 1 had {control.enemiesAlive})");
@@ -400,10 +413,35 @@ namespace FPSKit.EditorTools
                 problems.Append($"\n  - {who} lost input while playing");
         }
 
+        /// <summary>
+        /// A losing result for the level that is running, so the second run is handed the
+        /// frozen, input-disabled, cursor-free state a real death leaves behind. Zero
+        /// stars on purpose: the test must not be able to unlock anything.
+        /// </summary>
+        static LevelResult DeathResult(Snapshot settled)
+        {
+            var manager = UnityEngine.Object.FindAnyObjectByType<LevelManager>();
+
+            return new LevelResult
+            {
+                arena = manager != null ? manager.Arena : "",
+                levelIndex = manager != null ? manager.LevelIndex : 0,
+                levelName = manager != null ? manager.LevelName : "",
+                ending = LevelResult.Ending.Died,
+                stars = 0,
+                killed = manager != null ? manager.Killed : 0,
+                total = manager != null ? manager.TotalEnemies : Mathf.Max(1, settled.level),
+                timeLimit = manager != null ? manager.TimeLimit : 0f
+            };
+        }
+
         static void RestorePrefs()
         {
-            PlayerPrefs.SetInt("FPSKit.BestWave", _bestWaveBackup);
             PlayerPrefs.SetInt("FPSKit.BestScore", _bestScoreBackup);
+            PlayerPrefs.SetInt("FPSKit.Runs", _runsBackup);
+            PlayerPrefs.SetInt("FPSKit.TotalKills", _killsBackup);
+            PlayerPrefs.SetInt(StarsKey, _starsBackup);
+            PlayerPrefs.SetInt(LevelScoreKey, _levelScoreBackup);
             PlayerPrefs.Save();
         }
     }

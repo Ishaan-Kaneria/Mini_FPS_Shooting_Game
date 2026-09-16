@@ -16,7 +16,7 @@ namespace FPSKit.EditorTools
     /// One-click scene builder. Menu: FPSKit > Build Scene > [theme]
     ///
     /// Creates tags/layers, a themed arena, the player rig with a working gun,
-    /// an enemy prefab with hitboxes, spawn points, a baked NavMesh, the wave
+    /// an enemy prefab with hitboxes, spawn points, a baked NavMesh, the level
     /// manager, post processing and a functioning HUD. Press play immediately
     /// after.
     ///
@@ -81,7 +81,7 @@ namespace FPSKit.EditorTools
         private static void AddGameplayMenu()
         {
             if (!EditorUtility.DisplayDialog("Add gameplay to this scene",
-                "Adds the player, enemies, wave manager, HUD, post processing and a baked " +
+                "Adds the player, enemies, level manager, HUD, post processing and a baked " +
                 "NavMesh to the scene that is open right now.\n\n" +
                 "Your level geometry and baked lighting are left alone. Colliders are moved to " +
                 "the Environment layer so AI cover and bullet hits work, and any mesh without a " +
@@ -110,7 +110,7 @@ namespace FPSKit.EditorTools
             if (GameObject.FindGameObjectWithTag("Player") != null)
             {
                 EditorUtility.DisplayDialog("Already set up",
-                    "This scene already has a Player. Delete the Player, WaveManager, " +
+                    "This scene already has a Player. Delete the Player, LevelManager, " +
                     "HUD Canvas, SpawnPoints and NavMesh objects first if you want to " +
                     "start over.", "OK");
                 return;
@@ -129,10 +129,10 @@ namespace FPSKit.EditorTools
 
             var enemyPrefab = LoadOrBuildEnemyPrefab();
             var spawnPoints = BuildSpawnPointsAround(spawn);
-            var wave = BuildWaveManager(enemyPrefab, spawnPoints, player.transform);
+            var levels = BuildLevelManager(enemyPrefab, spawnPoints, player.transform);
 
             BuildGameDirector();
-            BuildHUD(player, wave);
+            BuildHUD(player, levels);
             BuildPostProcessing(player);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -407,9 +407,9 @@ namespace FPSKit.EditorTools
 
             BakeNavMesh();
 
-            var wave = BuildWaveManager(enemyPrefab, spawnPoints, player.transform);
+            var levels = BuildLevelManager(enemyPrefab, spawnPoints, player.transform);
             BuildGameDirector();
-            BuildHUD(player, wave);
+            BuildHUD(player, levels);
             BuildPostProcessing(player);
             BuildAtmosphereExtras();
 
@@ -1378,7 +1378,7 @@ namespace FPSKit.EditorTools
             weapon.audioSource.playOnAwake = false;
             weapon.hitMask = ~(1 << LayerMask.NameToLayer("Player"));
 
-            // The rifle's own curve, to sit against the wave curve. Everything it does is
+            // The rifle's own curve, to sit against the level curve. Everything it does is
             // a multiplier held on the Weapon component -- nothing is written back to
             // TestRifle.asset, which would otherwise carry a finished run's upgrades into
             // the next one and into the asset on disk.
@@ -1804,87 +1804,79 @@ namespace FPSKit.EditorTools
             surface.BuildNavMesh();
         }
 
-        private static WaveManager BuildWaveManager(GameObject enemyPrefab, Transform[] spawns, Transform player)
+        /// <summary>
+        /// The level manager, wired to this arena's own ladder.
+        ///
+        /// Almost nothing here is difficulty: the enemy count, the clock, the boss and
+        /// the star thresholds all live in the LevelSet asset, which is the whole point
+        /// of it being an asset. What is set here is the level-independent stuff -- the
+        /// roster, the drops, the spawn ring and the leash -- which is about this arena
+        /// being a place rather than about any level in it.
+        /// </summary>
+        private static LevelManager BuildLevelManager(GameObject enemyPrefab, Transform[] spawns,
+                                                      Transform player)
         {
-            var go = new GameObject("WaveManager");
-            var wm = go.AddComponent<WaveManager>();
+            var go = new GameObject("LevelManager");
+            var manager = go.AddComponent<LevelManager>();
 
             // One prefab, many variants. Every entry is an archetype asset, so a new
             // enemy means duplicating an asset and adding it here -- never a new prefab.
-            wm.baseEnemyPrefab = enemyPrefab;
-            wm.enemyTypes = BuildRoster();
+            manager.baseEnemyPrefab = enemyPrefab;
+            manager.enemyTypes = BuildRoster();
 
-            wm.healthPickupPrefab = CreatePickupPrefab("Pickup_Health", Pickup.Kind.Health,
+            manager.levels = FPSKitLevels.GetOrCreate(_theme.themeName);
+
+            manager.healthPickupPrefab = CreatePickupPrefab("Pickup_Health", Pickup.Kind.Health,
                 new Color(0.25f, 0.95f, 0.45f), PrimitiveType.Sphere);
-            wm.shieldPickupPrefab = CreatePickupPrefab("Pickup_Shield", Pickup.Kind.Shield,
+            manager.shieldPickupPrefab = CreatePickupPrefab("Pickup_Shield", Pickup.Kind.Shield,
                 new Color(0.3f, 0.7f, 1f), PrimitiveType.Cube);
 
             // Ammo drops are left unwired on purpose: the generated rifle has an
             // infinite reserve, so they would be pickups that do nothing. Turn that off
             // in TestRifle.asset and drop a Pickup here to bring the ammo economy back.
 
-            wm.spawnPoints = spawns;
-            wm.player = player;
-            wm.baseEnemiesPerWave = 5;
-            wm.enemiesPerWaveGrowth = 1.3f;
-            wm.maxEnemiesPerWave = 60;
-            wm.maxAliveAtOnce = 18;
-            wm.spawnInterval = 0.3f;
-            wm.timeBeforeFirstWave = 4f;
-            wm.intermissionDuration = 10f;
+            manager.spawnPoints = spawns;
+            manager.player = player;
 
-            wm.aggressionRampWaves = 18;
-
-            // The per-wave speed curve has to stop somewhere short of the player's sprint
-            // or late waves become unloseable-by-running rather than hard. 1.35 on the
-            // fastest archetype is 5.6 m/s, which is the player's walk exactly: you can
-            // still break away, but only by sprinting.
-            wm.speedGrowthPerWave = 0.02f;
-            wm.maxSpeedMultiplier = 1.35f;
-
-            wm.bossWaveInterval = 5;
-            wm.bossWaveEscortFraction = 0.55f;
-            wm.useModifiers = true;
-            wm.modifierStartWave = 3;
-            wm.modifierChance = 0.55f;
-            wm.waveClearBonus = 250;
-
-            // Far enough that a wave has to cross open ground to reach you, which is the
-            // breathing room between fights; close enough that it still arrives.
-            wm.minSpawnDistanceFromPlayer = 20f;
-            wm.maxSpawnDistanceFromPlayer = Mathf.Max(30f, _theme.arenaSize * 0.55f);
+            // Far enough that the level has to cross open ground to reach you, which is
+            // the breathing room inside a fight; close enough that it still arrives
+            // inside a clock that is deliberately tight.
+            manager.minSpawnDistanceFromPlayer = 18f;
+            manager.maxSpawnDistanceFromPlayer = Mathf.Max(30f, _theme.arenaSize * 0.55f);
 
             // The leash sits well outside the spawn ring so nothing is culled on arrival.
-            wm.despawnDistance = Mathf.Max(95f, wm.maxSpawnDistanceFromPlayer * 1.6f);
-            wm.despawnGraceTime = 4f;
-            wm.fallKillDepth = 60f;
-            wm.despawnOffNavMesh = true;
+            manager.despawnDistance = Mathf.Max(95f, manager.maxSpawnDistanceFromPlayer * 1.6f);
+            manager.despawnGraceTime = 4f;
+            manager.fallKillDepth = 60f;
+            manager.despawnOffNavMesh = true;
+            manager.replaceLostEnemies = true;
 
-            wm.waveTimeLimit = 45f;
-            wm.waveTimeLimitPerEnemy = 5f;
-            wm.clearLeftoversOnTimeout = true;
-            wm.useDynamicSpawnPoints = true;
-            wm.avoidPlayerView = true;
-            wm.playerViewAngle = 70f;
-            wm.spawnSightBlockers = 1 << LayerMask.NameToLayer("Environment");
+            manager.useDynamicSpawnPoints = true;
+            manager.avoidPlayerView = true;
+            manager.playerViewAngle = 70f;
+            manager.spawnSightBlockers = 1 << LayerMask.NameToLayer("Environment");
 
-            return wm;
+            manager.levelClearBonus = 400;
+            manager.timeBonusPerSecond = 25;
+            manager.starBonus = 500;
+
+            return manager;
         }
 
         /// <summary>
         /// Turns every archetype asset into a roster entry. Ordering does not matter --
-        /// the WaveManager selects by weight and unlock wave, and bosses are drawn from
-        /// their own pool.
+        /// the LevelManager selects by weight and difficulty step, and bosses are drawn
+        /// from their own pool.
         /// </summary>
-        private static WaveManager.EnemyType[] BuildRoster()
+        private static LevelManager.EnemyType[] BuildRoster()
         {
             var archetypes = FPSKitEnemyRoster.GetOrCreateAll();
-            var entries = new List<WaveManager.EnemyType>(archetypes.Count);
+            var entries = new List<LevelManager.EnemyType>(archetypes.Count);
 
             foreach (var archetype in archetypes)
             {
                 if (archetype == null) continue;
-                entries.Add(new WaveManager.EnemyType { archetype = archetype });
+                entries.Add(new LevelManager.EnemyType { archetype = archetype });
             }
 
             return entries.ToArray();
@@ -1985,7 +1977,7 @@ namespace FPSKit.EditorTools
         }
 
         // ==================================================================
-        private static void BuildHUD(GameObject player, WaveManager wave)
+        private static void BuildHUD(GameObject player, LevelManager levels)
         {
             var canvasGo = new GameObject("HUD Canvas");
             var canvas = canvasGo.AddComponent<Canvas>();
@@ -2001,7 +1993,7 @@ namespace FPSKit.EditorTools
             var hud = canvasGo.AddComponent<HUDController>();
             hud.weapon = player.GetComponentInChildren<Weapon>();
             hud.playerHealth = player.GetComponent<Health>();
-            hud.waveManager = wave;
+            hud.levelManager = levels;
             hud.progression = player.GetComponent<PlayerProgression>();
 
             var root = canvasGo.transform;
@@ -2023,19 +2015,20 @@ namespace FPSKit.EditorTools
             BuildPlayerHealthBar(root, hud);
 
             // ---- top centre ----------------------------------------------
-            hud.waveText = MakeText(root, "WaveText", "WAVE 1",
-                new Vector2(0.5f, 1f), new Vector2(0f, -50f), 40, TextAlignmentOptions.Top);
-            hud.enemiesLeftText = MakeText(root, "EnemiesLeft", "0 LEFT",
-                new Vector2(0.5f, 1f), new Vector2(0f, -100f), 28, TextAlignmentOptions.Top);
+            hud.levelText = MakeText(root, "LevelText", "LEVEL 1",
+                new Vector2(0.5f, 1f), new Vector2(0f, -50f), 38, TextAlignmentOptions.Top);
+            hud.objectiveText = MakeText(root, "Objective", "0 / 0 KILLED   0:00",
+                new Vector2(0.5f, 1f), new Vector2(0f, -98f), 28, TextAlignmentOptions.Top);
 
+            BuildObjectiveBar(root, hud);
             BuildBossBar(root, hud);
 
-            hud.intermissionText = MakeText(root, "Intermission", "",
+            hud.briefingText = MakeText(root, "Briefing", "",
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 250f), 34, TextAlignmentOptions.Center);
 
             // ---- centre --------------------------------------------------
             BuildCrosshair(root, hud);
-            BuildWaveBanner(root, hud);
+            BuildBanner(root, hud);
             BuildInstructionStrip(root, hud);
             BuildDamageIndicators(root, hud);
 
@@ -2050,7 +2043,59 @@ namespace FPSKit.EditorTools
             hud.damageVignette = vigImg;
 
             hud.pausePanel = BuildPausePanel(root, hud);
-            hud.gameOverPanel = BuildGameOverPanel(root, hud);
+
+            BuildResultsPanel(canvasGo, levels);
+        }
+
+        /// <summary>
+        /// The bar under the kill counter, with the one- and two-star thresholds ticked
+        /// on it.
+        ///
+        /// The ticks are the reason it is worth drawing at all. A bar that only says
+        /// "some of the level is dead" is decoration; one that says where the next star
+        /// is answers the question the player actually has with twenty seconds left.
+        /// HUDController moves them to whatever the current level's thresholds are.
+        /// </summary>
+        private static void BuildObjectiveBar(Transform parent, HUDController hud)
+        {
+            var group = new GameObject("ObjectiveBar", typeof(RectTransform));
+            group.transform.SetParent(parent, false);
+
+            var groupRect = group.GetComponent<RectTransform>();
+            groupRect.anchorMin = groupRect.anchorMax = groupRect.pivot = new Vector2(0.5f, 1f);
+            groupRect.anchoredPosition = new Vector2(0f, -132f);
+            groupRect.sizeDelta = new Vector2(420f, 10f);
+
+            var left = new Vector2(0f, 0.5f);
+            var size = new Vector2(420f, 8f);
+
+            MakeImage(group.transform, "Background", left, left, Vector2.zero, size,
+                      new Color(0.04f, 0.04f, 0.05f, 0.75f));
+
+            hud.objectiveFill = MakeImage(group.transform, "Fill", left, left, Vector2.zero, size,
+                                          new Color(0.95f, 0.78f, 0.3f), filled: true);
+            hud.objectiveFill.fillAmount = 0f;
+
+            // Anchored rather than offset, so HUDController can slide them along the bar
+            // by fraction and they stay put whatever width the bar ends up.
+            hud.starMarkers = new[]
+            {
+                StarMarker(group.transform, "OneStar"),
+                StarMarker(group.transform, "TwoStar")
+            };
+        }
+
+        private static RectTransform StarMarker(Transform parent, string name)
+        {
+            var image = MakeImage(parent, name, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                                  Vector2.zero, new Vector2(3f, 16f),
+                                  new Color(1f, 1f, 1f, 0.55f));
+
+            var rect = image.rectTransform;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+
+            return rect;
         }
 
         /// <summary>
@@ -2133,9 +2178,9 @@ namespace FPSKit.EditorTools
             };
         }
 
-        private static void BuildWaveBanner(Transform parent, HUDController hud)
+        private static void BuildBanner(Transform parent, HUDController hud)
         {
-            var banner = new GameObject("WaveBanner", typeof(RectTransform), typeof(CanvasGroup));
+            var banner = new GameObject("Banner", typeof(RectTransform), typeof(CanvasGroup));
             banner.transform.SetParent(parent, false);
 
             var rect = banner.GetComponent<RectTransform>();
@@ -2145,7 +2190,7 @@ namespace FPSKit.EditorTools
             hud.bannerGroup = banner.GetComponent<CanvasGroup>();
             hud.bannerGroup.alpha = 0f;
 
-            hud.bannerTitle = MakeText(banner.transform, "BannerTitle", "WAVE 1",
+            hud.bannerTitle = MakeText(banner.transform, "BannerTitle", "LEVEL 1",
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 170f), 62, TextAlignmentOptions.Center);
 
             hud.bannerSubtitle = MakeText(banner.transform, "BannerSubtitle", "",
@@ -2194,7 +2239,7 @@ namespace FPSKit.EditorTools
         /// player who cannot find pause does not look for a manual; they close the tab.
         ///
         /// Anchored to the top centre and kept narrow so it sits above the crosshair and
-        /// clear of the wave counter, and dim enough not to compete with the fight.
+        /// clear of the level counter, and dim enough not to compete with the fight.
         /// HUDController fills in the text from the live key bindings.
         /// </summary>
         private static void BuildInstructionStrip(Transform parent, HUDController hud)
@@ -2260,23 +2305,113 @@ namespace FPSKit.EditorTools
             return panel;
         }
 
-        private static GameObject BuildGameOverPanel(Transform parent, HUDController hud)
+        /// <summary>
+        /// The screen at the end of a level: the stars, what they were cut from, and the
+        /// three things the player can do next.
+        ///
+        /// It replaced the game over panel outright. That panel said how many waves you
+        /// survived and offered one way out, which is the whole shape of the old game:
+        /// nothing to beat, nothing to replay for, nowhere to go but the menu. This one
+        /// has to answer "did I pass", "how close was three", and "again or on" -- so it
+        /// gets its own component and its own audio source.
+        /// </summary>
+        private static void BuildResultsPanel(GameObject canvasGo, LevelManager levels)
         {
-            var panel = new GameObject("GameOverPanel", typeof(RectTransform), typeof(Image));
-            panel.transform.SetParent(parent, false);
+            var results = canvasGo.AddComponent<LevelResultsUI>();
+            results.levelManager = levels;
+
+            var source = canvasGo.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.spatialBlend = 0f;
+
+            // Unscaled, or nothing here makes a sound: the level ends with the game
+            // frozen, and an AudioSource obeying the scaled clock is a silent one.
+            source.ignoreListenerPause = true;
+
+            results.audioSource = source;
+            results.clearedClip = Clip("UI/level_cleared.wav");
+            results.failedClip = Clip("UI/level_failed.wav");
+            results.starClip = Clip("UI/star.wav");
+
+            var panel = new GameObject("ResultsPanel", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(canvasGo.transform, false);
             Stretch(panel.GetComponent<RectTransform>());
-            panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.78f);
 
-            hud.finalWaveText = MakeText(panel.transform, "FinalWave", "You survived 0 waves",
-                new Vector2(0.5f, 0.5f), Vector2.zero, 44, TextAlignmentOptions.Center);
-            hud.finalWaveText.GetComponent<RectTransform>().sizeDelta = new Vector2(1200f, 400f);
+            var shade = panel.GetComponent<Image>();
+            shade.color = new Color(0.02f, 0.03f, 0.04f, 0.85f);
+            shade.sprite = UISprite();
 
-            hud.gameOverQuitButton = PanelButton(panel.transform, "DashboardButton",
-                                                  "BACK TO DASHBOARD", new Vector2(0f, -230f),
-                                                  new Color(0.3f, 0.42f, 0.6f, 0.9f));
+            // The shade swallows clicks meant for whatever is under it, so the screen is
+            // genuinely modal rather than merely drawn on top.
+            shade.raycastTarget = true;
 
+            results.titleText = MakeText(panel.transform, "Title", "LEVEL CLEARED",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 250f), 58, TextAlignmentOptions.Center);
+
+            BuildStarRow(panel.transform, results);
+
+            results.summaryText = MakeText(panel.transform, "Summary", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), 30, TextAlignmentOptions.Center);
+            results.summaryText.GetComponent<RectTransform>().sizeDelta = new Vector2(1100f, 80f);
+
+            results.detailText = MakeText(panel.transform, "Detail", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -92f), 28, TextAlignmentOptions.Center);
+            results.detailText.GetComponent<RectTransform>().sizeDelta = new Vector2(1100f, 80f);
+            results.detailText.color = new Color(0.72f, 0.75f, 0.78f);
+
+            results.retryButton = PanelButton(panel.transform, "RetryButton", "REPLAY LEVEL",
+                                              new Vector2(-350f, -210f),
+                                              new Color(0.42f, 0.44f, 0.50f, 0.95f));
+
+            results.nextButton = PanelButton(panel.transform, "NextButton", "NEXT LEVEL",
+                                             new Vector2(0f, -210f),
+                                             new Color(0.30f, 0.58f, 0.40f, 0.95f));
+
+            results.dashboardButton = PanelButton(panel.transform, "DashboardButton", "DASHBOARD",
+                                                  new Vector2(350f, -210f),
+                                                  new Color(0.30f, 0.42f, 0.60f, 0.95f));
+
+            results.hintText = MakeText(panel.transform, "Hint", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -300f), 22, TextAlignmentOptions.Center);
+            results.hintText.color = new Color(0.65f, 0.67f, 0.70f);
+
+            results.panel = panel;
             panel.SetActive(false);
-            return panel;
+        }
+
+        /// <summary>
+        /// Three star plates, side by side. Drawn as squares rather than as a star glyph
+        /// on purpose: the project has one font and no UI art, and a rotated block of
+        /// colour that lands with a note reads as deliberate where a text asterisk reads
+        /// as a placeholder.
+        /// </summary>
+        private static void BuildStarRow(Transform parent, LevelResultsUI results)
+        {
+            var row = new GameObject("Stars", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+
+            var rowRect = row.GetComponent<RectTransform>();
+            rowRect.anchorMin = rowRect.anchorMax = rowRect.pivot = new Vector2(0.5f, 0.5f);
+            rowRect.anchoredPosition = new Vector2(0f, 110f);
+            rowRect.sizeDelta = new Vector2(600f, 160f);
+
+            var stars = new Image[3];
+            var centre = new Vector2(0.5f, 0.5f);
+
+            for (int i = 0; i < stars.Length; i++)
+            {
+                stars[i] = MakeImage(row.transform, $"Star{i + 1}", centre, centre,
+                                     new Vector2((i - 1) * 190f, 0f), new Vector2(104f, 104f),
+                                     new Color(1f, 1f, 1f, 0.12f));
+
+                // Turned on the diagonal, so three squares read as three stars.
+                stars[i].rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+                // The middle one sits higher, which is the shape every star rating has.
+                if (i == 1) stars[i].rectTransform.anchoredPosition += new Vector2(0f, 26f);
+            }
+
+            results.stars = stars;
         }
 
         /// <summary>

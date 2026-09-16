@@ -14,7 +14,6 @@ using UnityEngine.SceneManagement;
 [DisallowMultipleComponent]
 public class GameDirector : MonoBehaviour
 {
-    const string BestWaveKey = "FPSKit.BestWave";
     const string BestScoreKey = "FPSKit.BestScore";
 
     public static GameDirector Instance { get; private set; }
@@ -103,14 +102,21 @@ public class GameDirector : MonoBehaviour
     public float ComboRemaining => Combo <= 1 ? 0f : Mathf.Max(0f, _comboExpiry - Time.time);
 
     public bool IsPaused { get; private set; }
-    public bool IsGameOver { get; private set; }
-    public int FinalWave { get; private set; }
 
-    public int BestWave => PlayerPrefs.GetInt(BestWaveKey, 0);
+    /// <summary>
+    /// True once the level has been scored. Still called "game over" because that is
+    /// what it is to everything reading it -- input off, clock stopped, a panel on
+    /// screen -- whether the level was cleared or lost.
+    /// </summary>
+    public bool IsGameOver { get; private set; }
+
+    /// <summary>The level just scored. Default-valued until one finishes.</summary>
+    public LevelResult FinalResult { get; private set; }
+
     public int BestScore => PlayerPrefs.GetInt(BestScoreKey, 0);
 
-    /// <summary>True when this run beat the stored best wave. Drives the "new record" line.</summary>
-    public bool BeatBestWave { get; private set; }
+    /// <summary>True when this level beat the stored best score. Drives the record line.</summary>
+    public bool BeatBestScore { get; private set; }
 
     public event Action<GameDirector> ScoreChanged;
     public event Action<GameDirector> ComboChanged;
@@ -186,12 +192,12 @@ public class GameDirector : MonoBehaviour
         bool resume = Pressed(resumeKey);
         bool leave = Pressed(quitKey);
 
-        // The results screen takes any of the three as "I have read this", because there
-        // is nothing else to do from there and a screen that ignores every key a player
-        // tries reads as frozen.
+        // Only the quit key here. The results screen offers three different things --
+        // replay, next level, dashboard -- and LevelResultsUI owns the keys for them,
+        // so taking any key as "back to the menu" would steal two of the three.
         if (IsGameOver)
         {
-            if (leave || resume || pause) ReturnToMenu();
+            if (leave) ReturnToMenu();
             return;
         }
 
@@ -310,17 +316,24 @@ public class GameDirector : MonoBehaviour
     // ======================================================================
     // End of run
     // ======================================================================
-    public void ReportGameOver(int waveReached)
+    /// <summary>
+    /// Ends the level, however it ended.
+    ///
+    /// Called once by <see cref="LevelManager"/> with the scored result. Everything the
+    /// end of a level means to the rest of the game is here: the clock stops, the cursor
+    /// comes back, the result is banked, and whatever is showing a results screen is
+    /// told to show it.
+    /// </summary>
+    public void ReportLevelFinished(LevelResult result)
     {
         if (IsGameOver) return;
 
         IsGameOver = true;
         IsPaused = false;
-        FinalWave = waveReached;
+        FinalResult = result;
 
-        BeatBestWave = waveReached > BestWave;
-        if (BeatBestWave) PlayerPrefs.SetInt(BestWaveKey, waveReached);
-        if (Score > BestScore) PlayerPrefs.SetInt(BestScoreKey, Score);
+        BeatBestScore = result.score > BestScore;
+        if (BeatBestScore) PlayerPrefs.SetInt(BestScoreKey, result.score);
         PlayerPrefs.Save();
 
         PlayerMotor.InputEnabled = false;
@@ -328,8 +341,8 @@ public class GameDirector : MonoBehaviour
         Time.timeScale = 0f;
 
         // Banked before the results screen is shown rather than on the way out of it,
-        // so a player who closes the tab on the results still keeps the run.
-        GameSession.RecordRun(GameSession.Outcome.Died, waveReached, Score, Kills);
+        // so a player who closes the tab on the results still keeps the stars.
+        GameSession.RecordResult(result);
 
         GameEnded?.Invoke(this);
     }
@@ -344,11 +357,10 @@ public class GameDirector : MonoBehaviour
     /// </summary>
     public void ReturnToMenu()
     {
-        // A run abandoned mid-fight still counts. Reporting it here rather than in
-        // ReportGameOver covers the quit path without double-counting the death one,
-        // which has already banked its own result by the time this runs.
-        if (!IsGameOver)
-            GameSession.RecordRun(GameSession.Outcome.Quit, FinalWaveForSummary(), Score, Kills);
+        // A level abandoned mid-fight still counts as an attempt. Reported here rather
+        // than in ReportLevelFinished so the quit path is covered without
+        // double-counting a scored one, which has already banked its result by now.
+        if (!IsGameOver) GameSession.RecordResult(AbandonedResult());
 
         Time.timeScale = 1f;
         IsPaused = false;
@@ -360,16 +372,34 @@ public class GameDirector : MonoBehaviour
     }
 
     /// <summary>
-    /// The wave to credit a quit with: whatever the spawner has reached, or the wave
-    /// already recorded if the run is over. Asked for separately because FinalWave is
-    /// only set on death.
+    /// What to record for a level the player walked out of.
+    ///
+    /// Built from the live manager where there is one, so the dashboard can say how far
+    /// they had got rather than showing an empty line. No stars, by construction: an
+    /// abandoned level is not a passed one, and LevelProgress keeps the best of what it
+    /// is given, so recording a zero can never take an earned star away.
     /// </summary>
-    int FinalWaveForSummary()
+    LevelResult AbandonedResult()
     {
-        if (FinalWave > 0) return FinalWave;
+        var level = FindAnyObjectByType<LevelManager>();
 
-        var waves = FindAnyObjectByType<WaveManager>();
-        return waves != null ? waves.CurrentWave : 0;
+        return new LevelResult
+        {
+            arena = level != null ? level.Arena : GameSession.SelectedArena,
+            levelIndex = level != null ? level.LevelIndex : GameSession.SelectedLevel,
+            levelName = level != null ? level.LevelName : "",
+            ending = LevelResult.Ending.Abandoned,
+            stars = 0,
+            killed = level != null ? level.Killed : Kills,
+            total = level != null ? level.TotalEnemies : 0,
+            scoreFraction = level != null ? level.ScoreFraction : 0f,
+            bossKilled = level != null && level.BossKilled,
+            hadBoss = level != null && level.HasBoss,
+            timeTaken = level != null ? level.TimeLimit - level.TimeRemaining : 0f,
+            timeLimit = level != null ? level.TimeLimit : 0f,
+            score = Score,
+            headshots = Headshots
+        };
     }
 
     /// <summary>
@@ -414,10 +444,9 @@ public class GameDirector : MonoBehaviour
     }
 
     /// <summary>
-    /// Reloads the arena in place. No longer bound to a key: the dashboard is where a
-    /// run is started, so "again" means picking the same card. Kept because replaying
-    /// the current scene without a trip through the menu is what a retry button wants,
-    /// and because the play-mode test restarts a run this way.
+    /// Reloads the arena in place, at whatever level GameSession now names. This is
+    /// what the results screen's Replay and Next Level do: same scene, different level,
+    /// no trip through the dashboard.
     /// </summary>
     public void Restart()
     {

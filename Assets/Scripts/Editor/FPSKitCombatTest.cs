@@ -9,7 +9,7 @@ using UnityEngine;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// Proves that the enemies of wave one actually fight.
+    /// Proves that the enemies of level one actually fight.
     ///
     /// This is the regression test for the failure that is hardest to see in a build
     /// check and most obvious to a player: enemies that arrive, gather round and then
@@ -21,9 +21,9 @@ namespace FPSKit.EditorTools
     /// passed.
     ///
     /// So the assertions here are behavioural rather than structural. It walks the
-    /// player into the middle of wave one and requires, within a few seconds, that
+    /// player into the middle of level one and requires, within a few seconds, that
     /// enemies reach Attack and that the player's health actually falls. It also
-    /// checks the things that make that fight readable: the wave-one enemy is armed,
+    /// checks the things that make that fight readable: the level-one enemy is armed,
     /// its rifle is visible, and it is slower than the player.
     ///
     ///   Tools/unity-batch.sh FPSKitBatch.VerifyCombat
@@ -42,7 +42,7 @@ namespace FPSKit.EditorTools
         /// <summary>How close the player is held during the point-blank phase.</summary>
         const float PointBlank = 1.6f;
 
-        enum Phase { Enter, AwaitWave, Inspect, Engage, CloseIn, Judge }
+        enum Phase { Enter, AwaitLevel, Inspect, Engage, CloseIn, Judge }
 
         static Phase _phase;
         static double _deadline;
@@ -105,7 +105,7 @@ namespace FPSKit.EditorTools
                 FPSKitPlayMode.SuspendStartScene();
                 EditorApplication.update += Tick;
 
-                Debug.Log("[FPSKitBatch] combat test: wave one must arrive armed, slower than you, and fight");
+                Debug.Log("[FPSKitBatch] combat test: level one must arrive armed, slower than you, and fight");
             }
             catch (Exception e)
             {
@@ -125,13 +125,13 @@ namespace FPSKit.EditorTools
                 {
                     case Phase.Enter:
                         if (!EditorApplication.isPlaying) { EditorApplication.EnterPlaymode(); return; }
-                        _phase = Phase.AwaitWave;
+                        _phase = Phase.AwaitLevel;
                         return;
 
-                    case Phase.AwaitWave:
+                    case Phase.AwaitLevel:
                     {
-                        var wave = Wave();
-                        if (wave == null || wave.CurrentWave < 1) return;
+                        var level = Level();
+                        if (level == null || !level.IsRunning) return;
                         if (Enemies().Count < 3) return;
 
                         _phase = Phase.Inspect;
@@ -248,7 +248,7 @@ namespace FPSKit.EditorTools
 
         // ==================================================================
 
-        /// <summary>Records what wave one actually turned up as, before anything is moved.</summary>
+        /// <summary>Records what level one actually turned up as, before anything is moved.</summary>
         static void Inspect()
         {
             var motor = UnityEngine.Object.FindAnyObjectByType<PlayerMotor>();
@@ -267,7 +267,7 @@ namespace FPSKit.EditorTools
                 if (ai.ranged) _sawRangedShot = true;
             }
 
-            Notes.Append($"\n  wave one: {_inspected} enemies, {_armed} armed, " +
+            Notes.Append($"\n  level one: {_inspected} enemies, {_armed} armed, " +
                          $"{_weaponVisible} with the rifle switched on");
             Notes.Append($"\n  fastest enemy {_fastestEnemy:0.00} m/s against a player walk of " +
                          $"{_playerWalkSpeed:0.00} m/s");
@@ -301,7 +301,7 @@ namespace FPSKit.EditorTools
             Notes.Append($"\n  player moved into the crowd at {centre}");
         }
 
-        static WaveManager Wave() => UnityEngine.Object.FindAnyObjectByType<WaveManager>();
+        static LevelManager Level() => UnityEngine.Object.FindAnyObjectByType<LevelManager>();
 
         static Health PlayerHealth()
         {
@@ -400,10 +400,10 @@ namespace FPSKit.EditorTools
             foreach (var error in Errors) problems.Append($"\n  - {error}");
 
             if (_inspected == 0)
-                problems.Append("\n  - wave one produced no enemies to test");
+                problems.Append("\n  - level one produced no enemies to test");
 
             if (_armed == 0)
-                problems.Append("\n  - no enemy in wave one is armed: the opening wave has no guns");
+                problems.Append("\n  - no enemy in level one is armed: the opening level has no guns");
 
             if (_armed > 0 && _weaponVisible == 0)
                 problems.Append("\n  - armed enemies are carrying an invisible rifle: the weapon " +
@@ -432,7 +432,7 @@ namespace FPSKit.EditorTools
 
             if (_poolAfterRanged >= _poolAtEngage)
                 problems.Append($"\n  - the player took no damage in {EngageWindow}s under fire from " +
-                                $"wave one's firing line (pool {_poolAtEngage:0.0} -> {_poolAfterRanged:0.0})");
+                                $"level one's firing line (pool {_poolAtEngage:0.0} -> {_poolAfterRanged:0.0})");
 
             if (_closeAttacks == 0)
                 problems.Append("\n  - no enemy attacked while the player stood inside its reach");
@@ -444,12 +444,12 @@ namespace FPSKit.EditorTools
 
             if (problems.Length > 0)
             {
-                Debug.LogError($"[FPSKitBatch] FAILED: wave one does not fight:{problems}\n{Notes}");
+                Debug.LogError($"[FPSKitBatch] FAILED: level one does not fight:{problems}\n{Notes}");
                 EditorApplication.Exit(1);
                 return;
             }
 
-            Debug.Log($"[FPSKitBatch] verify combat passed: {_armed}/{_inspected} of wave one arrived " +
+            Debug.Log($"[FPSKitBatch] verify combat passed: {_armed}/{_inspected} of level one arrived " +
                       $"armed, the fastest moved at {_fastestEnemy:0.00} m/s against a {_playerWalkSpeed:0.00} " +
                       $"m/s walk, they shot the player from {_poolAtEngage:0.0} to {_poolAfterRanged:0.0} " +
                       $"and hit them again at point-blank range for {_poolBeforeClose - _poolAtEnd:0.0} " +

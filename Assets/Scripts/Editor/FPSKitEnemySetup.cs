@@ -11,7 +11,7 @@ namespace FPSKit.EditorTools
     /// avatar) into a working enemy: per-bone hitboxes with damage multipliers,
     /// NavMeshAgent, EnemyAI, Animator wiring and an optional ragdoll.
     ///
-    /// Saves over FPSKit_Generated/Enemy.prefab, so the WaveManager picks it up
+    /// Saves over FPSKit_Generated/Enemy.prefab, so the LevelManager picks it up
     /// with no other changes.
     ///
     /// Menu: FPSKit > Enemy Setup
@@ -92,7 +92,7 @@ namespace FPSKit.EditorTools
 
             EditorGUILayout.HelpBox(
                 $"Overwrites {PrefabPath}. Rebuild the scene afterwards, or just press Play -- " +
-                "the WaveManager already points at that prefab.", MessageType.None);
+                "the LevelManager already points at that prefab.", MessageType.None);
 
             if (!string.IsNullOrEmpty(_status))
             {

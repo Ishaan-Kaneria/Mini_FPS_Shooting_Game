@@ -52,7 +52,14 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         ApplyHover(0f);
     }
 
-    public void Bind(ArenaCatalog.Entry entry, int bestWave, UnityEngine.Events.UnityAction onChosen)
+    /// <summary>
+    /// Fills the card in. The progress line is the arena's ladder rather than a single
+    /// best run: how many of its levels have been cleared, and how many of the stars
+    /// they were worth have actually been taken. "3/8 LEVELS - 7 STARS" says both what
+    /// there is left to do here and how well it has been done, which one best-ever
+    /// number never could.
+    /// </summary>
+    public void Bind(ArenaCatalog.Entry entry, UnityEngine.Events.UnityAction onChosen)
     {
         Entry = entry;
         if (entry == null) return;
@@ -62,8 +69,7 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         if (nameText != null) nameText.text = entry.Label.ToUpperInvariant();
         if (descriptionText != null) descriptionText.text = entry.description ?? "";
 
-        if (bestText != null)
-            bestText.text = bestWave > 0 ? $"BEST  WAVE {bestWave}" : "NOT PLAYED";
+        if (bestText != null) bestText.text = ProgressLine(entry);
 
         if (accentBar != null) accentBar.color = entry.Accent;
 
@@ -96,6 +102,19 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
             button.onClick.RemoveAllListeners();
             if (onChosen != null) button.onClick.AddListener(onChosen);
         }
+    }
+
+    static string ProgressLine(ArenaCatalog.Entry entry)
+    {
+        int count = entry.LevelCount;
+        if (count <= 0) return "NO LEVELS";
+
+        int cleared = LevelProgress.LevelsCleared(entry.ProgressKey, count);
+        int stars = LevelProgress.StarsInArena(entry.ProgressKey, count);
+
+        return cleared <= 0
+            ? $"{count} LEVELS  ·  NOT PLAYED"
+            : $"{cleared}/{count} LEVELS  ·  {stars} STAR{(stars == 1 ? "" : "S")}";
     }
 
     public void OnPointerEnter(PointerEventData eventData) => _hovered = true;

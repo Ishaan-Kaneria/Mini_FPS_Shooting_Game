@@ -17,9 +17,10 @@ namespace FPSKit.EditorTools
     /// go, a dashboard that never comes back. None of it is reachable from a scene
     /// build check, because every part exists; what fails is the joins between them.
     ///
-    /// It asserts the three things that make the loop a loop: the dashboard offers every
-    /// arena in the catalog and can load one, the arena states its keys on screen, and
-    /// quitting lands back on the dashboard with the run recorded.
+    /// It asserts the four things that make the loop a loop: the dashboard offers every
+    /// arena in the catalog, an arena opens its ladder of levels with the right ones
+    /// locked, the arena loads and states its keys on screen, and quitting lands back on
+    /// the dashboard with the attempt recorded.
     ///
     ///   Tools/unity-batch.sh FPSKitBatch.VerifyFlow
     /// </summary>
@@ -27,7 +28,12 @@ namespace FPSKit.EditorTools
     {
         const double HardTimeout = 240.0;
 
-        enum Phase { Enter, InspectMenu, OpenDialog, ExitDialog, Launch, AwaitArena, InspectArena, Quit, AwaitMenu, Judge }
+        enum Phase
+        {
+            Enter, InspectMenu, OpenDialog, ExitDialog,
+            OpenLevels, InspectLevels, Launch,
+            AwaitArena, InspectArena, Quit, AwaitMenu, Judge
+        }
 
         static Phase _phase;
         static double _deadline;
@@ -48,6 +54,12 @@ namespace FPSKit.EditorTools
         static string _dialogUnclickable = "";
         static string _dialogQuestion = "";
         static string _launched = "";
+        static int _levelsOffered;
+        static int _levelsExpected;
+        static int _levelsUnlocked;
+        static bool _levelOneOpen;
+        static bool _lockedIsInert = true;
+        static string _levelUnclickable = "";
         static string _arenaScene = "";
         static string _strip = "";
         static bool _returned;
@@ -68,6 +80,10 @@ namespace FPSKit.EditorTools
                 Errors.Clear();
                 Notes.Clear();
                 _catalogCount = _cardsShown = _cardsPlayable = 0;
+                _levelsOffered = _levelsExpected = _levelsUnlocked = 0;
+                _levelOneOpen = false;
+                _lockedIsInert = true;
+                _levelUnclickable = "";
                 _launched = _arenaScene = _strip = "";
                 _returned = _resultShown = false;
                 _dialogOpened = _dialogClosed = false;
@@ -199,6 +215,71 @@ namespace FPSKit.EditorTools
                         Notes.Append($"\n  exit dialog: opened={_dialogOpened} " +
                                      $"closed on cancel={_dialogClosed}, asks \"{_dialogQuestion}\"");
 
+                        _phase = Phase.OpenLevels;
+                        return;
+                    }
+
+                    case Phase.OpenLevels:
+                    {
+                        var menu = Menu();
+                        var entry = FirstPlayable(menu);
+
+                        if (entry == null) throw new Exception("no arena in the catalog can be loaded");
+
+                        _launched = entry.sceneName;
+                        _levelsExpected = entry.LevelCount;
+
+                        if (menu.levelSelect == null)
+                            throw new Exception("the dashboard has no level select, so an arena " +
+                                                "card has no ladder to open");
+
+                        // Through the same call the card is wired to, rather than by
+                        // poking the panel: what is being tested is that clicking an
+                        // arena opens its levels.
+                        menu.Choose(entry);
+
+                        // A frame before anything is raycast at it. A graphic enabled
+                        // this frame is not in the canvas yet, so a raycast fired
+                        // immediately reports a perfectly good tile as unclickable.
+                        Wait(0.5, Phase.InspectLevels);
+                        return;
+                    }
+
+                    case Phase.InspectLevels:
+                    {
+                        if (Waiting()) return;
+
+                        var menu = Menu();
+                        var select = menu.levelSelect;
+
+                        if (!select.IsOpen)
+                            throw new Exception($"clicking \"{_launched}\" did not open its levels");
+
+                        foreach (var tile in UnityEngine.Object.FindObjectsByType<LevelButton>(
+                                     FindObjectsSortMode.None))
+                        {
+                            if (!tile.gameObject.activeInHierarchy) continue;
+
+                            _levelsOffered++;
+
+                            if (tile.Unlocked)
+                            {
+                                _levelsUnlocked++;
+                                if (tile.Index == 0) _levelOneOpen = true;
+                            }
+                            else if (tile.button != null && tile.button.interactable)
+                            {
+                                // A locked tile that still takes a click is a locked tile
+                                // in name only, and the whole ladder is decoration.
+                                _lockedIsInert = false;
+                            }
+                        }
+
+                        _levelUnclickable = UnclickableButtonIn(menu);
+
+                        Notes.Append($"\n  levels: {_levelsOffered} tiles for {_levelsExpected} in the " +
+                                     $"set, {_levelsUnlocked} unlocked, level one open={_levelOneOpen}");
+
                         _phase = Phase.Launch;
                         return;
                     }
@@ -208,12 +289,9 @@ namespace FPSKit.EditorTools
                         var menu = Menu();
                         var entry = FirstPlayable(menu);
 
-                        if (entry == null) throw new Exception("no arena in the catalog can be loaded");
+                        Notes.Append($"\n  launching \"{entry.Label}\" ({entry.sceneName}) at level 1");
 
-                        _launched = entry.sceneName;
-                        Notes.Append($"\n  launching \"{entry.Label}\" ({entry.sceneName})");
-
-                        menu.Launch(entry);
+                        menu.Launch(entry, 0);
                         Wait(12.0, Phase.AwaitArena);
                         return;
                     }
@@ -230,7 +308,7 @@ namespace FPSKit.EditorTools
 
                         _arenaScene = active.name;
 
-                        // Let the arena settle: the wave manager, HUD and player all wire
+                        // Let the arena settle: the level manager, HUD and player all wire
                         // themselves up over the first few frames.
                         Wait(3.0, Phase.InspectArena);
                         return;
@@ -485,6 +563,21 @@ namespace FPSKit.EditorTools
                 problems.Append($"\n  - the exit dialog's \"{_dialogUnclickable}\" button cannot be " +
                                 "clicked: a raycast at it hits nothing");
 
+            if (_levelsExpected > 0 && _levelsOffered != _levelsExpected)
+                problems.Append($"\n  - the level select shows {_levelsOffered} tiles for " +
+                                $"{_levelsExpected} levels in the set");
+
+            if (_levelsExpected > 0 && !_levelOneOpen)
+                problems.Append("\n  - level one is locked, so the arena cannot be started at all");
+
+            if (!_lockedIsInert)
+                problems.Append("\n  - a locked level can still be clicked: the unlock chain is " +
+                                "decoration");
+
+            if (!string.IsNullOrEmpty(_levelUnclickable))
+                problems.Append($"\n  - the level select's \"{_levelUnclickable}\" button cannot be " +
+                                "clicked: a raycast at it hits nothing");
+
             if (!string.IsNullOrEmpty(_unclickable))
                 problems.Append($"\n  - the \"{_unclickable}\" button cannot be clicked: a raycast at " +
                                 "it hits nothing, so no listener on it will ever run");
@@ -517,7 +610,7 @@ namespace FPSKit.EditorTools
                 problems.Append("\n  - quitting the run did not return to the dashboard");
 
             if (!_resultShown)
-                problems.Append("\n  - the dashboard did not show the result of the run just played");
+                problems.Append("\n  - the dashboard did not show the result of the level just played");
 
             if (_runsBefore >= 0 && _runsAfter <= _runsBefore)
                 problems.Append($"\n  - the run was not recorded in the profile " +
@@ -531,8 +624,9 @@ namespace FPSKit.EditorTools
             }
 
             Debug.Log($"[FPSKitBatch] verify flow passed: {_cardsShown} arenas offered, " +
-                      $"\"{_arenaScene}\" loaded and played, quitting returned to the dashboard " +
-                      $"with the run recorded ({_runsBefore} -> {_runsAfter}).{Notes}");
+                      $"\"{_arenaScene}\" offered {_levelsOffered} levels with {_levelsUnlocked} " +
+                      $"unlocked, level one loaded and played, and quitting returned to the " +
+                      $"dashboard with the attempt recorded ({_runsBefore} -> {_runsAfter}).{Notes}");
             EditorApplication.Exit(0);
         }
     }

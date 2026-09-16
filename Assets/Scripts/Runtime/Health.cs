@@ -221,8 +221,8 @@ public class Health : MonoBehaviour
     }
 
     /// <summary>
-    /// Resizes the pool and optionally refills it. The WaveManager uses this to make
-    /// later waves tougher: Awake has already run on a freshly spawned enemy, so
+    /// Resizes the pool and optionally refills it. The LevelManager uses this to make
+    /// later levels tougher: Awake has already run on a freshly spawned enemy, so
     /// raising maxHealth alone would leave it sitting at the old value.
     /// </summary>
     public void SetMaxHealth(float value, bool refill = true)

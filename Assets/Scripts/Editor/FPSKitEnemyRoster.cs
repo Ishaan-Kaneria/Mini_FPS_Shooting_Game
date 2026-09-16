@@ -6,12 +6,12 @@ using UnityEngine;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// Generates the built-in EnemyArchetype assets -- the roster the WaveManager
+    /// Generates the built-in EnemyArchetype assets -- the roster the LevelManager
     /// draws from.
     ///
     /// This mirrors FPSKitThemes on purpose: variety lives in assets, not in code.
     /// A seventh enemy is a duplicated asset with different numbers dropped into the
-    /// WaveManager's roster, and nothing here has to change for it to work.
+    /// LevelManager's roster, and nothing here has to change for it to work.
     /// </summary>
     public static class FPSKitEnemyRoster
     {
@@ -40,9 +40,9 @@ namespace FPSKit.EditorTools
 
             EditorUtility.DisplayDialog("FPSKit Enemies",
                 $"{roster.Count} enemy archetypes are ready in:\n{RosterFolder}\n\n" +
-                "Select any of them to retune stats, colours, unlock wave and drops. " +
+                "Select any of them to retune stats, colours, difficulty step and drops. " +
                 "Duplicate one to add a brand new enemy -- then drop it into the " +
-                "WaveManager's roster. No prefab, no code.", "OK");
+                "LevelManager's roster. No prefab, no code.", "OK");
 
             EditorUtility.FocusProjectWindow();
             Selection.activeObject = roster[0];
@@ -109,7 +109,7 @@ namespace FPSKit.EditorTools
 
         // ==================================================================
         // The numbers below are multipliers on the base enemy prefab: 100 health,
-        // 12 damage, 3.2 m/s. The wave curve multiplies these again on top.
+        // 12 damage, 3.2 m/s. The level's own difficulty multiplies these again on top.
         //
         // Speed is read against the player, who walks at 5.6 and sprints at 8.2. Every
         // multiplier here is set so that nothing outruns a sprint and only the two
@@ -127,8 +127,8 @@ namespace FPSKit.EditorTools
             switch (displayName)
             {
                 // ----------------------------------------------------------
-                // The wave-one enemy, and the yardstick everything else is read
-                // against. Its weight falls away so later waves are not still
+                // The level-one enemy, and the yardstick everything else is read
+                // against. Its weight falls away so later levels are not still
                 // mostly grunts.
                 case "Grunt":
                     a.description = "Armed rifleman. Numerous early, thins out later.";
@@ -141,7 +141,7 @@ namespace FPSKit.EditorTools
                     a.healthMultiplier = 1f;
                     a.damageMultiplier = 1f;
 
-                    // Well under the player's 5.6 m/s walk. A wave-one enemy that matches
+                    // Well under the player's 5.6 m/s walk. A level-one enemy that matches
                     // your own speed cannot be disengaged from, which turns the opening
                     // fight into a shoving match rather than something you can back out
                     // of, reposition against and shoot.
@@ -159,7 +159,7 @@ namespace FPSKit.EditorTools
                     // how you learn that the flash means something.
                     a.attackWindup = 0.55f;
 
-                    // Deliberately loose. This is the wave-one gun, and it is meant to
+                    // Deliberately loose. This is the level-one gun, and it is meant to
                     // pressure the player from across the arena, not to hit every shot.
                     a.rangedSpread = 5f;
                     a.rangedDamageMultiplier = 0.38f;

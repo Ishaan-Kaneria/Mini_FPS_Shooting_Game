@@ -4,24 +4,29 @@ using UnityEngine.AI;
 /// <summary>
 /// One enemy variant, described as data rather than as a prefab.
 ///
-/// The WaveManager spawns a single base enemy prefab and then stamps an archetype
+/// The LevelManager spawns a single base enemy prefab and then stamps an archetype
 /// onto the instance: stats, size, colour, behaviour and what it is worth. That is
 /// deliberate -- a new enemy is a new asset created from the Create menu, with no
 /// prefab to rig, no scene to rebuild and no code to touch. Duplicate an existing
-/// one, change the numbers, drop it in the WaveManager roster, done.
+/// one, change the numbers, drop it in the LevelManager roster, done.
+///
+/// The three fields still named "wave" are the difficulty step a level names in its
+/// LevelSet, not a wave number -- the names are kept because renaming a serialized
+/// field on a ScriptableObject silently drops the value out of every asset already
+/// written with the old one.
 /// </summary>
 [CreateAssetMenu(menuName = "FPSKit/Enemy Archetype", fileName = "Archetype")]
 public class EnemyArchetype : ScriptableObject
 {
     public enum Role
     {
-        /// <summary>Ordinary wave filler.</summary>
+        /// <summary>Ordinary filler. The bulk of a level.</summary>
         Standard,
 
         /// <summary>Rarer and meaner. Still drawn from the normal roster.</summary>
         Elite,
 
-        /// <summary>Only ever spawned as a wave's boss, one at a time, with its own HUD bar.</summary>
+        /// <summary>Only ever spawned as a level's boss, one at a time, with its own HUD bar.</summary>
         Boss
     }
 
@@ -42,19 +47,19 @@ public class EnemyArchetype : ScriptableObject
     [Range(0.4f, 3f)] public float scaleMultiplier = 1f;
 
     [Header("When It Shows Up")]
-    [Tooltip("First wave this variant can appear on.")]
+    [Tooltip("Lowest difficulty step a level can name and still draw this variant.")]
     [Min(1)] public int unlockWave = 1;
 
     [Tooltip("Relative chance of being picked once unlocked, before growth is applied.")]
     [Min(0f)] public float baseWeight = 1f;
 
-    [Tooltip("Added to the weight for every wave past the unlock. Above zero the variant " +
+    [Tooltip("Added to the weight for every step past the unlock. Above zero the variant " +
              "starts rare and takes over; at zero it stays a constant share of the mix.")]
     public float weightGrowthPerWave;
 
     [Min(0f)] public float maxWeight = 12f;
 
-    [Tooltip("Stop spawning this variant once the wave passes here, so early trash " +
+    [Tooltip("Stop spawning this variant once the step passes here, so early trash " +
              "makes way for the real threats. 0 means it never retires.")]
     [Min(0)] public int retireWave;
 
@@ -137,26 +142,26 @@ public class EnemyArchetype : ScriptableObject
              "reserve, which is the default -- turn that off and this starts mattering.")]
     [Range(0f, 1f)] public float ammoDropChance;
 
-    /// <summary>True if this variant is eligible on the given wave, ignoring role.</summary>
-    public bool IsAvailable(int wave)
-        => wave >= unlockWave && (retireWave <= 0 || wave <= retireWave);
+    /// <summary>True if this variant is eligible at the given difficulty step, ignoring role.</summary>
+    public bool IsAvailable(int step)
+        => step >= unlockWave && (retireWave <= 0 || step <= retireWave);
 
     /// <summary>
-    /// Selection weight on a given wave. Growth is what makes the mix drift: grunts
-    /// thin out, the things that were rare on wave 5 are the bulk of wave 20.
+    /// Selection weight at a difficulty step. Growth is what makes the mix drift: grunts
+    /// thin out, and the things that were rare at step 5 are the bulk of step 20.
     /// </summary>
-    public float WeightAtWave(int wave)
+    public float WeightAtStep(int step)
     {
-        if (!IsAvailable(wave)) return 0f;
+        if (!IsAvailable(step)) return 0f;
 
-        float grown = baseWeight + weightGrowthPerWave * (wave - unlockWave);
+        float grown = baseWeight + weightGrowthPerWave * (step - unlockWave);
         return Mathf.Clamp(grown, 0f, Mathf.Max(0.01f, maxWeight));
     }
 
     /// <summary>
     /// Stamps this variant onto a freshly spawned enemy. The scale arguments are the
-    /// WaveManager's per-wave growth, applied on top of the archetype's own multipliers
-    /// so the two curves compose instead of fighting.
+    /// level's own difficulty, applied on top of the archetype's own multipliers so the
+    /// two compose instead of fighting.
     /// </summary>
     public void ApplyTo(GameObject enemy, float healthScale = 1f, float damageScale = 1f,
                         float speedScale = 1f)

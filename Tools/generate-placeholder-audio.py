@@ -279,3 +279,47 @@ for root, notes in PROGRESSION:
     bars.append(bar[: secs(BAR)])
 
 save(f"{A}/Music/menu_loop.wav", gain(cat(*bars), 0.75), loop=True)
+
+
+# ---- level results -----------------------------------------------------------
+# The sounds the star rating is made of. Appended last for the same reason the rest
+# of the interface set is: they draw from the same seeded noise stream, and inserting
+# them anywhere earlier would re-roll every sound authored below them into an
+# identical-sounding but byte-different file.
+#
+# These matter more than their length suggests. A star awarded silently is a number;
+# a star that lands with a note is the thing people replay a level for. LevelResultsUI
+# plays star.wav once per star, pitched up a fifth each time, so the clip is
+# deliberately plain -- the tune is in the sequence, not in the sample.
+
+save(f"{A}/UI/star.wav",
+     mix(gain(blip(0.30, 1318, 1318, 2.2, attack=0.002), 0.85),
+         gain(cat(blank(0.01), blip(0.26, 1976, 1976, 2.6)), 0.25)))
+
+
+def note(at, t, freq, level=0.5, power=2.2):
+    """One voice of a fanfare: a tone with an octave and a fifth over it, placed at a
+    time offset. The partials are what stop four sine notes reading as a test tone."""
+    body = mix(gain(tone(t, freq, freq), 1.0),
+               gain(tone(t, freq * 2, freq * 2), 0.30),
+               gain(tone(t, freq * 3, freq * 3), 0.12))
+    return cat(blank(at), gain(env(body, attack=0.004, power=power), level))
+
+
+# A major arpeggio walking up to the octave, then the triad held under it. Rising and
+# major, because this is the sound of having beaten something.
+save(f"{A}/UI/level_cleared.wav",
+     mix(note(0.00, 0.30, 523.25, 0.55, 3.0),    # C5
+         note(0.11, 0.30, 659.25, 0.55, 3.0),    # E5
+         note(0.22, 0.34, 783.99, 0.60, 3.0),    # G5
+         note(0.33, 0.95, 1046.50, 0.70, 1.6),   # C6, held
+         note(0.33, 0.95, 783.99, 0.30, 1.6),
+         note(0.33, 0.95, 523.25, 0.26, 1.6)))
+
+# Two notes down onto a minor third, over a soft thud. Short: a failure screen that
+# announces itself at length is one the player resents before they have read it.
+save(f"{A}/UI/level_failed.wav",
+     mix(note(0.00, 0.26, 349.23, 0.55, 3.2),    # F4
+         note(0.14, 0.70, 277.18, 0.60, 1.9),    # C#4
+         note(0.14, 0.70, 233.08, 0.32, 1.9),    # A#3
+         gain(env(lowpass(n(secs(0.35)), 220), power=4), 0.30)))

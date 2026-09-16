@@ -115,6 +115,21 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Re-stamps the built-in curve onto every LevelSet asset.
+        ///
+        /// Exactly the same trap as the archetypes, and worth stating twice because the
+        /// symptom is different: the level assets are generated once and then left alone,
+        /// so retuning a clock or a star threshold in FPSKitLevels.Configure does not
+        /// reach the assets the game reads until this is run. Overwrites any Inspector
+        /// tuning, by design. Stars the player has already earned are untouched -- those
+        /// live in PlayerPrefs, not in the asset.
+        /// </summary>
+        public static void ResetLevelSets()
+        {
+            Run(FPSKitLevels.ResetAll);
+        }
+
+        /// <summary>
         /// Does nothing on purpose. Reaching it at all means every script in the
         /// project compiled, which is the cheapest pre-commit check there is.
         /// </summary>
@@ -155,14 +170,15 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// Proves a wave that cannot be cleared still ends. Delegates to
-        /// <see cref="FPSKitWaveTest"/>, which drives play mode asynchronously and
-        /// pushes its own exit code, so it must not go through Run.
+        /// Plays a level to both endings: failed on the clock with the arena full of
+        /// enemies that cannot be reached, then cleared outright for three stars and an
+        /// unlock. Delegates to <see cref="FPSKitLevelTest"/>, which drives play mode
+        /// asynchronously and pushes its own exit code, so it must not go through Run.
         /// </summary>
-        public static void VerifyWaves() => FPSKitWaveTest.VerifyWaves();
+        public static void VerifyLevels() => FPSKitLevelTest.VerifyLevels();
 
         /// <summary>
-        /// Plays wave one and asserts that it actually fights: armed, slower than the
+        /// Plays level one and asserts that it actually fights: armed, slower than the
         /// player, and able to land a hit on someone standing in the middle of it.
         /// </summary>
         public static void VerifyCombat() => FPSKitCombatTest.VerifyCombat();
@@ -178,7 +194,7 @@ namespace FPSKit.EditorTools
         ///
         /// A build that throws no exception still proves very little: the builder wires
         /// dozens of references by hand, and a null one shows up as a black screen or a
-        /// wave that never starts rather than as an error. This checks the things that
+        /// level that never starts rather than as an error. This checks the things that
         /// silently break, and fails the run when any of them is missing.
         /// </summary>
         public static void VerifyBuild()
@@ -197,7 +213,7 @@ namespace FPSKit.EditorTools
                 var problems = new List<string>();
 
                 CheckPlayer(problems);
-                CheckWaves(problems);
+                CheckLevels(problems);
                 CheckHud(problems);
 
                 if (UnityEngine.Object.FindAnyObjectByType<GameDirector>() == null)
@@ -238,28 +254,37 @@ namespace FPSKit.EditorTools
             else if (weapon.data == null) problems.Add("weapon has no WeaponData: it could not fire");
         }
 
-        private static void CheckWaves(List<string> problems)
+        private static void CheckLevels(List<string> problems)
         {
-            var wave = UnityEngine.Object.FindAnyObjectByType<WaveManager>();
-            if (wave == null)
+            var manager = UnityEngine.Object.FindAnyObjectByType<LevelManager>();
+            if (manager == null)
             {
-                problems.Add("no WaveManager");
+                problems.Add("no LevelManager");
                 return;
             }
 
-            if (wave.player == null) problems.Add("WaveManager has no player reference");
-            if (wave.baseEnemyPrefab == null) problems.Add("WaveManager has no base enemy prefab");
+            if (manager.player == null) problems.Add("LevelManager has no player reference");
+            if (manager.baseEnemyPrefab == null) problems.Add("LevelManager has no base enemy prefab");
 
-            if (wave.enemyTypes == null || wave.enemyTypes.Length == 0)
+            // A missing level set is the one failure that still plays: the manager falls
+            // back to a stand-in level, so the arena looks fine and offers exactly one
+            // unnamed level that the dashboard knows nothing about.
+            if (manager.levels == null)
+                problems.Add("LevelManager has no LevelSet: the arena would fall back to one " +
+                             "stand-in level and the dashboard would show no ladder");
+            else if (manager.levels.Count == 0)
+                problems.Add("the arena's LevelSet is empty: there is nothing to play");
+
+            if (manager.enemyTypes == null || manager.enemyTypes.Length == 0)
             {
-                problems.Add("WaveManager roster is empty: no enemy would ever spawn");
+                problems.Add("LevelManager roster is empty: no enemy would ever spawn");
                 return;
             }
 
             int usable = 0;
             int bosses = 0;
 
-            foreach (var type in wave.enemyTypes)
+            foreach (var type in manager.enemyTypes)
             {
                 if (type == null || type.archetype == null) continue;
 
@@ -268,10 +293,17 @@ namespace FPSKit.EditorTools
             }
 
             if (usable == 0) problems.Add("no roster entry has an archetype");
-            if (bosses == 0 && wave.bossWaveInterval > 0)
-                problems.Add("boss waves are enabled but no archetype has the Boss role");
 
-            if (wave.healthPickupPrefab == null) problems.Add("no health pickup prefab wired");
+            bool wantsBoss = false;
+
+            if (manager.levels != null)
+                foreach (var level in manager.levels.levels)
+                    if (level != null && level.hasBoss) wantsBoss = true;
+
+            if (bosses == 0 && wantsBoss)
+                problems.Add("a level asks for a boss but no archetype has the Boss role");
+
+            if (manager.healthPickupPrefab == null) problems.Add("no health pickup prefab wired");
         }
 
         private static void CheckHud(List<string> problems)
@@ -285,19 +317,47 @@ namespace FPSKit.EditorTools
 
             if (hud.playerHealth == null) problems.Add("HUD is not bound to player health");
             if (hud.weapon == null) problems.Add("HUD is not bound to the weapon");
-            if (hud.waveManager == null) problems.Add("HUD is not bound to the wave manager");
+            if (hud.levelManager == null) problems.Add("HUD is not bound to the level manager");
             if (hud.healthFill == null) problems.Add("HUD has no health bar fill");
             if (hud.bossPanel == null) problems.Add("HUD has no boss bar");
             if (hud.pausePanel == null) problems.Add("HUD has no pause panel");
-            if (hud.gameOverPanel == null) problems.Add("HUD has no game over panel");
 
             if (hud.crosshairArms == null || hud.crosshairArms.Length < 4)
                 problems.Add("HUD crosshair needs four arms");
+
+            CheckResults(problems);
 
             // A filled Image silently ignores fillAmount with no sprite, so the bars
             // would render as full blocks that never move.
             if (hud.healthFill != null && hud.healthFill.sprite == null)
                 problems.Add("health bar has no sprite: fillAmount would do nothing");
+        }
+
+        /// <summary>
+        /// The results screen is the whole reward loop, and every one of its parts is an
+        /// optional reference that fails silently when it is not wired: no stars, no
+        /// Next Level, or -- worst -- no panel at all, which reads as the game hanging
+        /// the moment a level ends.
+        /// </summary>
+        private static void CheckResults(List<string> problems)
+        {
+            var results = UnityEngine.Object.FindAnyObjectByType<LevelResultsUI>();
+            if (results == null)
+            {
+                problems.Add("no LevelResultsUI: nothing would appear when a level ends");
+                return;
+            }
+
+            if (results.panel == null) problems.Add("the results screen has no panel to show");
+            if (results.levelManager == null) problems.Add("the results screen is not bound to the level manager");
+
+            if (results.stars == null || results.stars.Length < 3)
+                problems.Add("the results screen needs three stars");
+
+            if (results.retryButton == null) problems.Add("the results screen has no replay button");
+            if (results.nextButton == null) problems.Add("the results screen has no next-level button");
+            if (results.dashboardButton == null) problems.Add("the results screen has no dashboard button");
+            if (results.titleText == null) problems.Add("the results screen has no title");
         }
 
         // ==================================================================

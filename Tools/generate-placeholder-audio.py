@@ -451,3 +451,24 @@ save(f"{A}/UI/purchase.wav",
      mix(gain(blip(0.10, 784, 1046, 3.0), 0.75),
          gain(cat(blank(0.08), blip(0.34, 1318, 1568, 2.0)), 0.7),
          gain(env(lowpass(n(secs(0.18)), 300), power=5), 0.3)))
+
+
+# ---- arming a bomb -----------------------------------------------------------
+# Drawn from its own saved stream for the reason the blast is: this is the newest
+# clip in the file, so it is the one most likely to be retuned again, and an
+# un-wrapped draw here would re-roll every noise clip written above it.
+_pin_stream = random.getstate()
+
+# The pin.
+#
+# Holding the bomb key was the only control in the game that made no sound at all,
+# which reads as a key that did nothing -- the ring is on the floor, and a player
+# looking down the sights never sees it. A pin is two metal events a hair apart:
+# the lever letting go, and the ring coming off. Short and dry, because it plays
+# under whatever else is happening and has to be heard, not listened to.
+save(f"{A}/SFX/bomb_pin.wav",
+     mix(gain(env(highpass(n(secs(0.05)), 3400), power=9), 0.55),          # the catch
+         gain(cat(blank(0.035), blip(0.14, 2093, 1976, 5.0)), 0.5),        # the ring
+         gain(cat(blank(0.035), env(lowpass(n(secs(0.12)), 700), power=6)), 0.3)))
+
+random.setstate(_pin_stream)

@@ -68,8 +68,16 @@ public class BombProjectile : MonoBehaviour
     /// gravity a one-second throw peaks about a metre up and flies flat into the first
     /// crate in the way. See BombData.gravityScale.
     /// </summary>
+    /// <param name="flightTime">
+    /// Seconds the throw is solved to take. Handed in rather than read off the data,
+    /// because the thrower scales it with the distance and the aiming arc has already
+    /// been drawn with the number it chose -- a bomb that recomputed its own would be a
+    /// bomb flying a different curve from the dotted line the player aimed along.
+    /// Non-positive falls back to the data's own answer for this distance.
+    /// </param>
     public void Launch(Vector3 target, BombData data, BlastSpec spec, GameObject attacker,
-                       LayerMask damageMask, LayerMask collisionMask, GameObject selfRoot = null)
+                       LayerMask damageMask, LayerMask collisionMask, GameObject selfRoot = null,
+                       float flightTime = -1f)
     {
         _data = data;
         _spec = spec;
@@ -79,7 +87,7 @@ public class BombProjectile : MonoBehaviour
         _collisionMask = collisionMask;
 
         _target = target;
-        _flightTime = data != null ? Mathf.Max(0.05f, data.fallTime) : 1f;
+        _flightTime = ResolveFlightTime(data, transform.position, target, flightTime);
         _gravityScale = data != null ? Mathf.Max(0.1f, data.gravityScale) : 1f;
         _origin = transform.position;
         _velocity = SolveVelocity(_origin, target, _flightTime, _gravityScale);
@@ -93,6 +101,21 @@ public class BombProjectile : MonoBehaviour
             fuseLight.enabled = true;
             fuseLight.color = data != null ? data.blastColor : Color.red;
         }
+    }
+
+    /// <summary>
+    /// The flight time to use: the caller's if it gave one, otherwise the data's own
+    /// answer for how far this throw actually is.
+    /// </summary>
+    static float ResolveFlightTime(BombData data, Vector3 from, Vector3 target, float given)
+    {
+        if (given > 0f) return Mathf.Max(0.05f, given);
+        if (data == null) return 1f;
+
+        float distance = Vector2.Distance(new Vector2(from.x, from.z),
+                                          new Vector2(target.x, target.z));
+
+        return Mathf.Max(0.05f, data.FlightTimeFor(distance));
     }
 
     /// <summary>The acceleration a bomb falls under. Several times the world's.</summary>
@@ -179,13 +202,20 @@ public class BombProjectile : MonoBehaviour
                 else Destroy(effect, 3f);
             }
 
-            // Full volume, and held at full volume out to the blast radius before it
-            // starts rolling off. The pool's default is a metre and a half, which is
-            // right for a bullet hitting a wall and makes a detonation covering seven
-            // metres of arena sound like it happened next door.
+            // Full volume, and held at full volume across the whole distance the bomb
+            // can be thrown.
+            //
+            // The reach used to come off the blast radius, which is the wrong quantity:
+            // it says how far the bomb hurts, not how far away the person who threw it
+            // is standing. Seven metres of radius bought ten metres of full volume for a
+            // bomb whose own range is thirty-four, so the ordinary throw -- the one you
+            // make from cover, at the far end of the ring -- arrived at about a third of
+            // its level, quieter than a footstep, which is the whole of "the bomb has no
+            // sound". The player is never inside their own blast; they are always out at
+            // the range they threw it.
             OneShotAudio.Play(_data.explodeClip, at, 1f,
                               UnityEngine.Random.Range(0.94f, 1.06f),
-                              minDistance: Mathf.Max(8f, _spec.radius * 1.5f));
+                              minDistance: Mathf.Max(12f, _data.maxRange));
 
             ShakeNearbyCamera(at);
         }

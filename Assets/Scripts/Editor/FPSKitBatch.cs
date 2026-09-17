@@ -235,6 +235,14 @@ namespace FPSKit.EditorTools
         public static void VerifyStore() => FPSKitStoreTest.VerifyStore();
 
         /// <summary>
+        /// Plays a level and aims, throws and listens to a bomb: the ring has to follow
+        /// the mouse smoothly across the whole throw range, a short throw has to land
+        /// sooner than a long one, the bomb has to go off where the ring said, and the
+        /// pin, the throw and the blast all have to be audible.
+        /// </summary>
+        public static void VerifyBomb() => FPSKitBombTest.VerifyBomb();
+
+        /// <summary>
         /// Builds one scene and then asserts it is actually playable.
         ///
         /// A build that throws no exception still proves very little: the builder wires

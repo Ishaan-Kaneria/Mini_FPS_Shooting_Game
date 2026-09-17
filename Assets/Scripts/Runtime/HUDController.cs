@@ -102,6 +102,22 @@ public class HUDController : MonoBehaviour
              "that silently does nothing reads as a broken key.")]
     public Color equipmentEmptyColor = new Color(1f, 0.4f, 0.35f);
 
+    [Header("Bomb Cursor")]
+    [Tooltip("The reticle drawn while a bomb is being aimed, which the mouse moves. " +
+             "Built on demand when empty, so an existing or imported scene gets one " +
+             "without being rebuilt.")]
+    public RectTransform bombCursor;
+
+    [Tooltip("Pixels across. Bigger than the crosshair on purpose -- it is a thing " +
+             "being moved to a place, not a thing being held on a target.")]
+    [Min(8f)] public float bombCursorSize = 34f;
+
+    public Color bombCursorColor = new Color(1f, 0.72f, 0.2f);
+
+    [Tooltip("Shown when the throw cannot be made, so the reticle and the ring on the " +
+             "ground always agree about whether the bomb can go there.")]
+    public Color bombCursorBlockedColor = new Color(1f, 0.3f, 0.25f);
+
     [Header("Crosshair")]
     public CanvasGroup crosshairGroup;
 
@@ -417,6 +433,7 @@ public class HUDController : MonoBehaviour
         UpdateTexts();
         UpdateHealthBars();
         UpdateCrosshair();
+        UpdateBombCursor();
         UpdateVignette();
         UpdateBanner();
         UpdateBossBar();
@@ -667,9 +684,23 @@ public class HUDController : MonoBehaviour
         const string Dim = "<color=#B8AFA0>";
         var hint = new System.Text.StringBuilder("\n<size=58%>");
 
+        // How the bomb is *placed* is named too, and it is named differently for the
+        // two ways of placing it. The key teaches itself the moment a ring appears on
+        // the floor; what does not is whether the thing that moves it is the mouse or
+        // your head, and a player who guesses wrong concludes the control is broken.
         if (hasBomb)
-            hint.Append($"HOLD {Key(BombKey())} {Dim}TO AIM A BOMB</color>, " +
-                        $"{Key(AimKey())} {Dim}LOCKS THE RANGE, RELEASE TO THROW</color>");
+        {
+            string place = bombs.UsingCursor
+                ? "TO AIM A BOMB, MOVE THE MOUSE TO PLACE IT"
+                : "TO AIM A BOMB, LOOK DOWN TO BRING THE RING IN";
+
+            // Both ways of ending it are named. The tap is the one a laptop player
+            // needs -- a held key stops their touchpad reporting motion at all -- and
+            // it is the one nobody discovers on their own.
+            hint.Append($"TAP {Key(BombKey())} {Dim}{place}, TAP AGAIN TO THROW</color>" +
+                        $"\n<size=90%>{Dim}OR HOLD </color>{Key(BombKey())}" +
+                        $"{Dim} AND RELEASE, {Key(AimKey())} LOCKS THE RANGE</color></size>");
+        }
 
         if (hasBomb && hasDrink) hint.Append("\n");
 
@@ -917,6 +948,110 @@ public class HUDController : MonoBehaviour
     }
 
     // ======================================================================
+    /// <summary>
+    /// Draws the bomb reticle where <see cref="BombThrower.AimScreenPoint"/> says, and
+    /// nowhere otherwise.
+    ///
+    /// Built on demand rather than by the scene builder, for the reason the minimap
+    /// draws itself: the kit has to come up correct in a level it did not build, and
+    /// FPSKit > Add Gameplay To Current Scene cannot go back and add a child to a
+    /// canvas somebody else authored. A scene that does have one wired uses that.
+    ///
+    /// It is a screen-space position written straight to anchoredPosition against a
+    /// bottom-left anchor, which is the one arrangement where a pixel from the thrower
+    /// and a pixel on the canvas are the same pixel at every resolution.
+    /// </summary>
+    void UpdateBombCursor()
+    {
+        bool wanted = bombs != null && bombs.IsAiming && bombs.UsingCursor;
+
+        if (!wanted)
+        {
+            if (bombCursor != null && bombCursor.gameObject.activeSelf)
+                bombCursor.gameObject.SetActive(false);
+
+            return;
+        }
+
+        if (bombCursor == null) bombCursor = BuildBombCursor();
+        if (bombCursor == null) return;
+
+        if (!bombCursor.gameObject.activeSelf) bombCursor.gameObject.SetActive(true);
+
+        // Placed in world space rather than by anchoredPosition, which is the one way
+        // that needs no assumption about the parent's anchors or pivot.
+        //
+        // Written the obvious way it is wrong and looks broken rather than off:
+        // ScreenPointToLocalPointInRectangle measures from the parent's *pivot*, the
+        // middle of a full-screen canvas, while anchoredPosition on a bottom-left
+        // anchored rect measures from the corner. Assigning one to the other puts the
+        // middle of the screen in the bottom-left corner and everything else off the
+        // edge entirely -- so the reticle is simply not on screen, and with the view
+        // deliberately held still the whole control reads as a dead mouse.
+        var canvas = bombCursor.GetComponentInParent<Canvas>();
+        var parent = bombCursor.parent as RectTransform;
+
+        if (parent != null && canvas != null)
+        {
+            var eye = canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null
+                : canvas.worldCamera;
+
+            if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    parent, bombs.AimScreenPoint, eye, out Vector3 world))
+                bombCursor.position = world;
+        }
+
+        foreach (var image in bombCursor.GetComponentsInChildren<Image>())
+            image.color = bombs.AimValid ? bombCursorColor : bombCursorBlockedColor;
+    }
+
+    /// <summary>
+    /// A ring of four ticks around a dot. Drawn rather than textured because the kit
+    /// ships no sprites, and every part of it has raycastTarget off -- the pause menu
+    /// lives on this canvas, and a reticle over the middle of the screen would sit on
+    /// top of whatever the player tried to click.
+    /// </summary>
+    RectTransform BuildBombCursor()
+    {
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return null;
+
+        var root = new GameObject("BombCursor", typeof(RectTransform));
+        root.transform.SetParent(canvas.transform, false);
+
+        var rect = (RectTransform)root.transform;
+
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(bombCursorSize, bombCursorSize);
+
+        float tick = Mathf.Max(2f, bombCursorSize * 0.09f);
+        float arm = bombCursorSize * 0.34f;
+
+        Tick(rect, "Up", new Vector2(0f, arm), new Vector2(tick, arm * 0.8f));
+        Tick(rect, "Down", new Vector2(0f, -arm), new Vector2(tick, arm * 0.8f));
+        Tick(rect, "Left", new Vector2(-arm, 0f), new Vector2(arm * 0.8f, tick));
+        Tick(rect, "Right", new Vector2(arm, 0f), new Vector2(arm * 0.8f, tick));
+        Tick(rect, "Dot", Vector2.zero, new Vector2(tick * 1.4f, tick * 1.4f));
+
+        return rect;
+    }
+
+    static void Tick(RectTransform parent, string name, Vector2 offset, Vector2 size)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(parent, false);
+
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = offset;
+        rect.sizeDelta = size;
+
+        go.GetComponent<Image>().raycastTarget = false;
+    }
+
     void UpdateCrosshair()
     {
         if (crosshairArms == null || crosshairArms.Length < 4) return;
@@ -938,6 +1073,18 @@ public class HUDController : MonoBehaviour
         Color tint = Time.unscaledTime < _hitmarkerUntil ? _hitmarkerTint : crosshairColor;
         foreach (var image in CrosshairImages())
             if (image != null) image.color = tint;
+
+        // Hidden entirely while a bomb is being placed. Firing is suppressed anyway,
+        // so it marks a shot that cannot be taken -- and a second reticle in the middle
+        // of the screen is the thing most likely to be mistaken for the one the player
+        // is supposed to be moving.
+        if (bombs != null && bombs.IsAiming && bombs.UsingCursor)
+        {
+            if (crosshairGroup != null)
+                crosshairGroup.alpha = Mathf.Lerp(crosshairGroup.alpha, 0f,
+                                                  Mathf.Clamp01(crosshairSmoothing * Time.unscaledDeltaTime));
+            return;
+        }
 
         if (crosshairGroup != null)
         {

@@ -21,6 +21,7 @@ MonoBehaviour:
   selfDamageFraction: 0.6
   explosionForce: 1400
   fallTime: 1
+  minFallTime: 0.42
   minRange: 8
   maxRange: 34
   gravityScale: 5.5
@@ -31,5 +32,6 @@ MonoBehaviour:
   blastColor: {r: 1, g: 0.92, b: 0.5, a: 1}
   bombPrefab: {fileID: 7132256317698093118, guid: 2a736e18107e01cd388fed3d6ae24f8e, type: 3}
   explosionPrefab: {fileID: 1966626841067709592, guid: 0b7ccf98f29b6d92c8928cd2981b2c68, type: 3}
+  armClip: {fileID: 8300000, guid: df514ad562521ad70a1170aff44e595a, type: 3}
   throwClip: {fileID: 8300000, guid: 33f031c31c074de5d881a11f540839b4, type: 3}
   explodeClip: {fileID: 8300000, guid: 8dfd0b0e4446cd06487d6fc021c80868, type: 3}

@@ -84,10 +84,16 @@ public class BombData : ScriptableObject
     [Min(0f)] public float explosionForce = 900f;
 
     [Header("Flight")]
-    [Tooltip("Seconds from leaving your hand to going off. One second is deliberate: " +
-             "long enough to watch it arc, short enough that the ring you aimed at is " +
-             "still the fight you aimed it at.")]
+    [Tooltip("Seconds a throw at maximum range takes to arrive. One second is " +
+             "deliberate: long enough to watch it arc, short enough that the ring you " +
+             "aimed at is still the fight you aimed it at.")]
     [Range(0.2f, 4f)] public float fallTime = 1f;
+
+    [Tooltip("Seconds a throw at minimum range takes. Shorter, because the flight time " +
+             "scales with the distance -- see FlightTimeFor. A bomb lobbed six metres " +
+             "and a bomb lobbed thirty-four both hanging in the air for a full second " +
+             "is what made the short throw, which is the panic throw, feel broken.")]
+    [Range(0.15f, 4f)] public float minFallTime = 0.42f;
 
     [Tooltip("Closest the landing ring can be placed, in metres. Inside this you are " +
              "inside your own blast.")]
@@ -131,8 +137,33 @@ public class BombData : ScriptableObject
     public GameObject explosionPrefab;
 
     [Header("Audio (optional)")]
+    [Tooltip("The pin, played the moment the ring comes up. Holding the bomb key was " +
+             "the one control in the game that made no sound at all, and a key that " +
+             "makes no sound is a key the player decides is broken -- the ring is on " +
+             "the floor, and somebody looking down the sights never sees it.")]
+    public AudioClip armClip;
+
     public AudioClip throwClip;
     public AudioClip explodeClip;
+
+    /// <summary>
+    /// Seconds a throw of this length spends in the air.
+    ///
+    /// Scaled rather than fixed. The flight is solved to arrive in exactly this time,
+    /// so a constant made every throw take the same second whether it was six metres or
+    /// thirty-four -- and six metres in one second is not a throw, it is a bomb placed
+    /// gently on the floor while the enemy who prompted it walks away. The far end is
+    /// unchanged, because that is the one the arc height was tuned against.
+    /// </summary>
+    public float FlightTimeFor(float distance)
+    {
+        float far = Mathf.Max(0.2f, fallTime);
+        float near = Mathf.Clamp(minFallTime, 0.15f, far);
+
+        float t = Mathf.InverseLerp(minRange, Mathf.Max(minRange + 0.01f, maxRange), distance);
+
+        return Mathf.Lerp(near, far, t);
+    }
 
     /// <summary>
     /// The asset's numbers with a set of bought upgrades folded in. The only way

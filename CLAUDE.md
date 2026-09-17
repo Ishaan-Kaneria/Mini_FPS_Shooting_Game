@@ -34,8 +34,23 @@ Gameplay reads the **legacy `UnityEngine.Input` API** (`Input.GetKey`, `Input.Ge
 Caveats worth knowing before you touch input:
 
 - The project's `activeInputHandler` is `2` (**Both**), and `com.unity.inputsystem` is installed as a package dependency. That is deliberate — it keeps the legacy API alive while allowing one optional path.
-- The single exception is `PlayerMotor.ReadMouseCounts()`, which has a `#if ENABLE_INPUT_SYSTEM` branch using `Mouse.current.delta` for raw, unsmoothed mouse look when `rawMouseInput` is on. It falls back to `Input.GetAxisRaw` otherwise. Keep both branches working.
+- The single exception is `PlayerMotor.ReadMouseCounts()`, which has a `#if ENABLE_INPUT_SYSTEM` branch using `Mouse.current.delta` for raw, unsmoothed mouse look when `rawMouseInput` is on, and falls back to `Input.GetAxisRaw`. Keep both branches working — and note **the fallback is reached on an empty reading, not only on a missing package.** On some platforms, Linux/X11 most reliably, `Mouse.current.delta` reports zero on every frame the cursor is locked while `Mouse.current` itself is present and every other control on it works. Written as an unconditional `return`, that is a game with no mouse look at all: live device, locked cursor, focused window, sixty frames a second, nothing logged. It took a diagnostic reading 296 consecutive frames of `LookDeltaDegrees` at exactly zero to see it, because from the outside it is indistinguishable from a player who is not touching the mouse. Consulting the legacy axis on a frame the Input System says the mouse did not move cannot double-count, and it must stay `GetAxisRaw` — the smoothed axis keeps reporting after the mouse stops, which would turn the view on frames that really were still.
 - `Assets/InputSystem_Actions.inputactions` is leftover from the Unity template and is not referenced by any gameplay code.
+
+**Mouse look is gated on the pointer lock, and losing it is silent.** `PlayerMotor.HandleLook`
+reads no mouse at all unless `Cursor.lockState == Locked`, and the lock is dropped
+constantly by things the game does not control: Escape releases it in every browser, the
+editor drops it the moment the Game view loses focus, and alt-tab drops it anywhere. What
+a player sees is the keyboard still working and the mouse dead -- they can walk, they can
+hold the bomb key and watch the ring sit there, and turning does nothing, with nothing
+logged because nothing went wrong. Recovery used to be a left click and nothing else,
+which is undiscoverable, and worse while a bomb is up because that is the one button
+`Weapon` suppresses -- so the click that would have fixed it also produced no shot and no
+sign it had done anything. `HandleCursor` now re-locks on any key that means "I am
+playing", held rather than pressed, rate limited because WebGL only grants a lock off a
+real gesture. Escape is deliberately not on that list: it is the pause key, and re-locking
+the pointer on the frame the pause menu opens takes the cursor away from the menu it just
+opened.
 
 Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject (`FPSKit_Generated/Controls.asset`). What ships there is the `StandardFPS` preset — **arrows and W/A/S/D both move, left click fires, right click aims, Space jumps, Shift sprints, Ctrl/C crouch, R reloads** — and `ControlSettings.Preset` also carries `ArrowsAndMouse` and `ArrowsAndSpace` (arrows move, Space fires, double-tap Space sprints, click jumps), applied from the custom inspector. Read new keys through `ControlSettings` helpers rather than calling `Input.GetKey` with a literal `KeyCode`.
 
@@ -54,7 +69,7 @@ So: **fix scene content by editing the builder, not the `.unity` file.** Hand-ed
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the six checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the seven checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
 
 **Three generators, three reset entry points, one trap.** `FPSKitBatch.ResetEnemyArchetypes`, `ResetLevelSets` and `ResetStore` exist because the roster, the level ladders and the store are all generated once and then left alone. Retuning a number in `FPSKitEnemyRoster.Configure`, `FPSKitLevels.Configure` or `FPSKitStore.Configure` does **not** reach the assets the game reads until the matching reset is run. A price or a level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
 
@@ -365,25 +380,123 @@ belt, resizes the health pool, and then calls `PlayerProgression.Apply`, which m
 the *bought* upgrades by the *level* curve. Both calls are absolute and idempotent,
 because which of the two `Start` methods Unity runs first is not defined.
 
-## The bomb lands where the ring says, in one second
+## The bomb lands where the ring says, in the time the arc was drawn for
 
 `BombThrower` puts a ring on the ground at the blast radius and a dotted arc to it, and
-the throw is solved to arrive in exactly `BombData.fallTime`. Four things make that a
-promise rather than a hope:
+the throw is solved to arrive in exactly the time `BombData.FlightTimeFor` gives for that
+distance. Five things make that a promise rather than a hope:
 
 - **The bomb flies its own parabola.** `v = (target - p0)/t - ½gt²`, integrated by hand
   and swept against the world between frames. A Rigidbody clipping a crate would land
   somewhere else and blame the physics engine.
 - **`BombAimIndicator` draws the same equation**, so the dotted line cannot disagree with
-  where the bomb actually goes.
+  where the bomb actually goes. It is handed the flight time rather than reading it, and
+  so is `BombProjectile.Launch`, because the thrower is the one that chose it.
 - **`BombThrower.Throw` clamps into range**, including for a caller that hands in a point
-  of its own. The flight time is fixed, so distance *is* speed: a throw far enough out of
-  range simply meets the first wall between here and there.
+  of its own. Measured from the *player*, which is the frame the ring and the HUD readout
+  use -- clamping against the throw origin instead is clamping against the muzzle, the
+  better part of a metre further forward, which moved a landing point the ring had
+  already placed exactly on the limit.
+- **The flight time scales with the distance.** `fallTime` is the far end, `minFallTime`
+  the near one. A flat second for every throw meant a six-metre lob -- the panic throw,
+  the one you make with something already in your face -- spent as long in the air as one
+  sent across the whole arena.
 - **Gravity is the bomb's own**, several times the world's -- `BombData.gravityScale`.
   The horizontal speed is fixed by the distance and the time, so the only thing left to
   choose is height, and under real gravity a one-second throw peaks about a metre up and
   flies flat into the first crate in the way. This was not a theory: the store test found
   it, with a thirty-metre throw that hurt nobody.
+
+**Tap the key, do not hold it -- and the reason is not preference.** A laptop touchpad
+stops reporting motion while a key is held. That is libinput's *disable-while-typing*,
+it is on by default on GNOME and most desktops, and it applies system wide. So
+"hold this key and move the pointer" is a gesture the majority of laptop players cannot
+physically perform: the key goes down, the touchpad goes dead, and the game looks
+frozen. Nothing in the game can detect it -- Unity is simply handed no mouse motion, and
+every reading inside the process stays perfectly healthy while the player sees a dead
+mouse. This cost six rounds of debugging to find, in the game, where it was never going
+to be.
+
+So `BombThrower.PumpAim` accepts both. Tap the key and the ring latches open with
+nothing held down; tap again to throw. Hold it and releasing throws, as before.
+`tapToLatch` is the window that separates them. `VerifyBomb` drives `PumpAim` directly
+rather than going through `Update`, because batch mode cannot synthesise a legacy key
+press and a rule about *when* a key was released is exactly the kind written once and
+never exercised again. Any new hold-to-do-something control needs the same treatment.
+
+**The mouse moves a cursor, not the player's head.** Holding the key hands the look to
+`BombThrower` through `PlayerMotor.LookCaptured`: the motor still measures the mouse and
+publishes `LookDeltaDegrees`, but stops applying it to the view, and the thrower spends
+those same degrees moving a reticle across the screen instead. The bomb goes where the
+reticle points -- `ResolveLanding` traces `ScreenPointToRay(AimScreenPoint)` rather than
+the camera's forward -- and pushing the reticle into the edge of the screen turns the
+view by the leftover, so nothing is out of reach.
+
+Borrowing the look rather than reading the mouse directly is what keeps this component
+ignorant of which input backend is live, keeps one sensitivity setting governing both
+the head and the cursor, and makes the cursor work for a player on the keyboard look
+keys. Degrees become pixels through the camera's own field of view, read every frame
+because aiming down sights changes it, so the cursor lands on whatever the crosshair
+would have been pointing at had the view turned instead.
+
+**Aiming it by turning your whole body reads as the mouse having stopped working.** That
+was the original build and it is worth writing down, because every measurement of it
+came back healthy: the view turned, the ring followed, the geometry was exact, and the
+player's report was "I can't move my mouse to place the bomb". The control was doing
+precisely what it was written to do and that was the defect. A thrown explosive wants
+"put it there", not "face it".
+
+**The pitch mapping is the touch path.** A phone has no pointer to move, so
+`UsingCursor` is false whenever `MobileInput.Active` is, and the ring's distance comes
+from how far below the horizon the player is looking. `RangeFromPitch` maps that evenly.
+It must not go back to tracing the camera forward onto the floor, which is the obvious
+build and is unusable: the eye is a metre and a half up, so the distance goes as
+`height / tan(pitch)`, nearly vertical at the horizon. On a flat arena the entire 6--34m
+range lived inside about twelve degrees of pitch, no pitch produced fifteen metres, and
+every degree *above* the horizon gave the same maximum. `VerifyBomb` sweeps a degree at
+a time with the cursor switched off and fails if one degree moves the ring more than two
+metres, if either end is unreachable, or if nothing lands in the middle -- that last one
+matters, because a ring frozen at maximum range is perfectly smooth.
+
+Nothing shortens the throw for a wall in between, deliberately. The high gravity exists
+so a throw lobs *over* cover, and the dotted arc already shows a player the line going
+into anything it genuinely cannot clear. A wall test on the straight eye ray cut a
+thirty-four metre throw to seventeen over a chest-high crate the bomb would have sailed
+past -- and did it on the one degree of pitch where the ray stopped clearing the crate's
+top edge, which is the same cliff in a new place.
+
+`VerifyBomb` covers the cursor on both counts, because they break separately: that
+cursor-left puts the bomb left and cursor-low brings it in, and that the view does **not**
+drift while the reticle moves inside the screen. The second is what makes it a cursor
+rather than a slower way of turning your head, and it is what silently comes back if
+`LookCaptured` is ever dropped. Two traps in writing that test: `TurnBy` writes the
+motor's own yaw field and the transform is not touched until `HandleLook` runs, so an
+edge-push reading taken in the same tick that asked for the turn sees nothing; and a big
+shove turns the view several hundred degrees, which `Mathf.DeltaAngle` wraps back to
+almost zero and reports as a dead edge push.
+
+**Half of `VerifyBomb` drives the private methods and half holds the key for real.** The
+first half is precise and proves the geometry; it proves nothing about the game, because
+it never runs `Update`. The second sets `MobileInput.BombAim`, which `BombThrower.Update`
+reads as an OR beside the `G` binding, so `BeginAiming`, `UpdateAim` and the lock toggle
+all run once a frame exactly as a held key makes them -- with `PlayerMotor` turning the
+view in between. That is the only way to catch something *outside* the component eating
+the look while the ring is up, which is what "I hold the bomb key and the mouse stops"
+describes. The look is fed through `MobileInput.AddLook` rather than the mouse because
+batch mode will not grant a cursor lock and `PlayerMotor` reads no mouse without one;
+both paths scale by the same `LookSensitivityMultiplier`, which is the thing that can be
+wrong. Note that the rig splits the two angles -- `PlayerMotor` writes pitch to the camera
+*holder* -- so a test that sets the camera's own local rotation is adding its angle to
+whatever the player's look left on the holder.
+
+**All three of the bomb's sounds have to reach the player.** The pin (`BombData.armClip`)
+plays when the ring comes up, because holding the key was otherwise the one control in
+the game that made no sound, and what it draws is a ring on the floor that somebody
+looking at an enemy never sees. The blast's audible reach is `BombData.maxRange`, not its
+damage radius: the radius says how far the bomb *hurts*, and the player is never inside
+their own blast -- they are out at the distance they threw it from. Seven metres of radius
+bought ten metres of full volume on a bomb thrown up to thirty-four, so the ordinary
+throw arrived quieter than a footstep.
 
 `Explosion.Blast` is a static that needs no prefab, so a bomb with nothing wired still
 does its damage. It damages one `Health` at most once however many colliders it has --

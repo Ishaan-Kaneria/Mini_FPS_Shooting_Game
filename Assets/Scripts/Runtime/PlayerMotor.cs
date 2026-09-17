@@ -175,6 +175,23 @@ public class PlayerMotor : MonoBehaviour
     /// <summary>Multiplier on look sensitivity. Weapon drives this down while aiming.</summary>
     public float LookSensitivityMultiplier { get; set; } = 1f;
 
+    /// <summary>
+    /// While true the look is still measured and published through
+    /// <see cref="LookDeltaDegrees"/>, but it is not applied to the view.
+    ///
+    /// This is how the mouse gets lent to something else without that thing having to
+    /// read the mouse itself. <see cref="BombThrower"/> takes it while a bomb is being
+    /// aimed so the same mouse motion drives a screen cursor instead of the head, and
+    /// hands it back on release. Measuring and publishing regardless is the point: the
+    /// borrower gets the motion in the same degrees the view would have turned, so the
+    /// cursor moves exactly as far as the aim would have, and one sensitivity setting
+    /// still governs both.
+    ///
+    /// Recoil, shake and the pitch clamp are untouched, so a player shot while placing
+    /// a bomb still gets kicked.
+    /// </summary>
+    public bool LookCaptured { get; set; }
+
     /// <summary>Degrees the view turned this frame (x = yaw, y = pitch). Drives weapon sway.</summary>
     public Vector2 LookDeltaDegrees { get; private set; }
 
@@ -192,6 +209,7 @@ public class PlayerMotor : MonoBehaviour
     int _jumpsUsed;
     float _lastSprintTapTime = -99f;
     bool _sprintLatched;
+    float _nextCursorAttempt;
     float _bobTimer, _stepAccumulator;
     Vector3 _bobOffset;
     float _landDip;
@@ -241,13 +259,63 @@ public class PlayerMotor : MonoBehaviour
     }
 
     // ======================================================================
+    /// <summary>
+    /// Puts the pointer lock back when it has been lost, because without it
+    /// <see cref="HandleLook"/> reads no mouse at all.
+    ///
+    /// The lock gets dropped constantly and mostly not by the game: Escape releases it
+    /// in every browser, the editor drops it the moment the Game view loses focus, and
+    /// alt-tabbing drops it anywhere. What the player sees is that the keyboard still
+    /// works and the mouse has died -- they can walk, they can hold the bomb key and
+    /// watch the ring sit there, and turning does nothing. Nothing is logged, because
+    /// nothing went wrong.
+    ///
+    /// This used to re-lock on a left click and nothing else, which is a poor recovery
+    /// for two reasons. It is undiscoverable -- there is no reason a player would guess
+    /// that clicking fixes the mouse -- and while a bomb is being aimed the left button
+    /// is the one input suppressed by <see cref="Weapon"/>, so a player who did try it
+    /// got no shot, no feedback, and no idea the click had done anything at all.
+    ///
+    /// Any key that means "I am playing" now does it, held rather than pressed, so it
+    /// is back before the player has finished noticing. Escape is deliberately not on
+    /// the list and neither is "any key": Escape is the pause key, and re-locking the
+    /// pointer on the frame the pause menu opens would take the cursor away from the
+    /// menu it just opened. That is also why this runs below the InputEnabled gate in
+    /// Update -- a paused game does not reach here at all.
+    /// </summary>
     void HandleCursor()
     {
-        // Escape is the GameDirector's pause key, not a cursor key -- unlocking the
-        // mouse while the game kept running just got you killed in a menu.
-        if (lockCursor && !MobileInput.Active && Input.GetMouseButtonDown(0) &&
-            Cursor.lockState != CursorLockMode.Locked)
-            SetCursorLocked(true);
+        if (!lockCursor || MobileInput.Active) return;
+        if (Cursor.lockState == CursorLockMode.Locked) return;
+        if (!WantsToPlay()) return;
+
+        // Rate limited because WebGL only grants a pointer lock off a real user
+        // gesture: a refused request retried every frame is a console full of warnings
+        // for a lock the browser was never going to give us this frame anyway.
+        if (Time.unscaledTime < _nextCursorAttempt) return;
+
+        _nextCursorAttempt = Time.unscaledTime + 0.25f;
+        SetCursorLocked(true);
+    }
+
+    /// <summary>
+    /// True while the player is touching anything the game is played with. Held, not
+    /// pressed, so a key already down when the lock was lost still counts.
+    /// </summary>
+    bool WantsToPlay()
+    {
+        if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) return true;
+        if (controls == null) return false;
+
+        return controls.MoveForwardHeld || controls.MoveBackHeld ||
+               controls.MoveLeftHeld || controls.MoveRightHeld || controls.CrouchHeld ||
+               ControlSettings.Held(controls.fire) ||
+               ControlSettings.Held(controls.aim) ||
+               ControlSettings.Held(controls.jump) ||
+               ControlSettings.Held(controls.reload) ||
+               ControlSettings.Held(controls.sprintKey) ||
+               ControlSettings.Held(controls.bomb) ||
+               ControlSettings.Held(controls.useItem);
     }
 
     public void SetCursorLocked(bool locked)
@@ -266,9 +334,12 @@ public class PlayerMotor : MonoBehaviour
 
             LookDeltaDegrees = counts * scale;
 
-            _yaw += LookDeltaDegrees.x;
-            _pitch -= LookDeltaDegrees.y * (invertY ? -1f : 1f);
-            _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
+            if (!LookCaptured)
+            {
+                _yaw += LookDeltaDegrees.x;
+                _pitch -= LookDeltaDegrees.y * (invertY ? -1f : 1f);
+                _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
+            }
         }
         else
         {
@@ -282,9 +353,12 @@ public class PlayerMotor : MonoBehaviour
 
             if (touch.sqrMagnitude > 0f)
             {
-                _yaw += touch.x;
-                _pitch -= touch.y * (invertY ? -1f : 1f);
-                _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
+                if (!LookCaptured)
+                {
+                    _yaw += touch.x;
+                    _pitch -= touch.y * (invertY ? -1f : 1f);
+                    _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
+                }
 
                 LookDeltaDegrees += touch;
             }
@@ -350,13 +424,53 @@ public class PlayerMotor : MonoBehaviour
     /// Raw mouse counts since the last frame -- no smoothing, no acceleration, no
     /// Input Manager scaling. This 1:1 response is what separates a shooter that
     /// feels tight from one that feels like dragging the view through syrup.
+    ///
+    /// The Input System's delta is preferred and the legacy axis is the fallback, but
+    /// the fallback is reached on an *empty reading* rather than only on a missing
+    /// package. That is not belt and braces, it is the fix for a real and completely
+    /// silent failure: on some platforms -- Linux/X11 most reliably --
+    /// <c>Mouse.current.delta</c> reports zero for every frame the cursor is locked,
+    /// while <c>Mouse.current</c> itself is present and every other control on it
+    /// works. Written as an unconditional return, that is a game whose mouse look
+    /// simply does not exist, with a live mouse device, a locked cursor, a running
+    /// game at sixty frames a second and nothing logged anywhere. It was measured
+    /// here: 296 consecutive frames of <see cref="LookDeltaDegrees"/> at exactly zero
+    /// with the cursor locked and the window focused.
+    ///
+    /// Consulting the legacy axis when the delta is empty cannot double-count. The two
+    /// are read in the same frame and report the same motion, and the preferred one
+    /// wins whenever it has anything at all to say -- the fallback is only reached on
+    /// a frame the Input System says the mouse did not move. It is
+    /// <c>GetAxisRaw</c> rather than <c>GetAxis</c> for the same reason: the smoothed
+    /// axis keeps reporting movement after the mouse has stopped, which would turn the
+    /// view on frames that really were still.
     /// </summary>
     Vector2 ReadMouseCounts()
     {
 #if ENABLE_INPUT_SYSTEM
-        if (rawMouseInput && Mouse.current != null) return Mouse.current.delta.ReadValue();
+        if (rawMouseInput && Mouse.current != null)
+        {
+            Vector2 raw = Mouse.current.delta.ReadValue();
+            if (raw.sqrMagnitude > 0f) return raw;
+        }
 #endif
         return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * legacyAxisScale;
+    }
+
+    /// <summary>
+    /// Turns the view by an explicit amount, in the same degrees the look uses.
+    ///
+    /// For a borrower that has taken the look through <see cref="LookCaptured"/> and
+    /// needs to give some of it back -- the bomb cursor pushing at the edge of the
+    /// screen, which has to turn the head or the player could only ever place a bomb
+    /// inside the frustum they started the throw in. Applied through the same clamp as
+    /// the mouse, so the pitch cannot be pushed past vertical.
+    /// </summary>
+    public void TurnBy(Vector2 degrees)
+    {
+        _yaw += degrees.x;
+        _pitch -= degrees.y * (invertY ? -1f : 1f);
+        _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
     }
 
     /// <summary>Called by Weapon on every shot. Vertical is degrees up, horizontal is plus/minus yaw.</summary>

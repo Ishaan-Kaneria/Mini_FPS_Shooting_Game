@@ -1294,6 +1294,7 @@ namespace FPSKit.EditorTools
             var bombPrefab = CreateBombPrefab();
             var explosionPrefab = CreateExplosionPrefab();
 
+            var armClip = Clip("SFX/bomb_pin.wav");
             var throwClip = Clip("SFX/bomb_throw.wav");
             var explodeClip = Clip("SFX/explosion.wav");
 
@@ -1303,6 +1304,7 @@ namespace FPSKit.EditorTools
 
                 bomb.data.bombPrefab = bombPrefab;
                 bomb.data.explosionPrefab = explosionPrefab;
+                bomb.data.armClip = armClip;
                 bomb.data.throwClip = throwClip;
                 bomb.data.explodeClip = explodeClip;
 

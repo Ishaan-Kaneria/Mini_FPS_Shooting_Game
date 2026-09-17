@@ -76,10 +76,8 @@
         /* A short landscape phone cannot fit title, bar, legend and note at once, and
            the body cannot scroll by design, so this panel has to do it itself. */
         overflow-y: auto;
-        transition: opacity 0.4s ease-out;
       }
 
-      #overlay.fading { opacity: 0; pointer-events: none; }
       #overlay.gone { display: none; }
 
       #title {
@@ -133,12 +131,8 @@
       /* ---------- controls legend ---------- */
       /* Nothing in this layer may swallow a click: the first click on the canvas is what
          captures the mouse, and an overlay that ate it would look like a dead game. */
-      #legend, #hint {
-        pointer-events: none;
-        transition: opacity 0.5s ease-out;
-      }
-
       #legend {
+        pointer-events: none;
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
         gap: 10px 22px;
@@ -165,30 +159,6 @@
         font-weight: 600;
         white-space: nowrap;
       }
-
-      #hint {
-        display: none;
-        padding: 12px 26px;
-        border-radius: 8px;
-        background: var(--panel);
-        font-size: 15px;
-        font-weight: 600;
-      }
-
-      /* Once the game is up, the panel keeps only the legend and the prompt and floats
-         them over the live arena. Parking them in a corner instead would mean picking a
-         corner that the HUD does not already use -- and on a phone the bottom left, the
-         obvious choice, is exactly where the movement stick sits. */
-      #overlay.handoff {
-        background: none;
-        pointer-events: none;
-        gap: 18px;
-      }
-
-      #overlay.handoff #title,
-      #overlay.handoff #track,
-      #overlay.handoff #progress,
-      #overlay.handoff #note { display: none; }
 
       /* ---------- in-game warnings (Unity's showBanner) ---------- */
       #banner {
@@ -311,7 +281,6 @@
         <div><span>Quit to menu</span><span>Q</span></div>
       </div>
 
-      <div id="hint">Click to play</div>
       <div id="failure"></div>
       <div id="note">First load downloads about 26&nbsp;MB. It is cached after that.</div>
     </div>
@@ -325,7 +294,6 @@
       var fill       = document.querySelector("#fill");
       var progress   = document.querySelector("#progress");
       var legend     = document.querySelector("#legend");
-      var hint       = document.querySelector("#hint");
       var failure    = document.querySelector("#failure");
       var note       = document.querySelector("#note");
       var banner     = document.querySelector("#banner");
@@ -379,7 +347,6 @@
           "<div><span>Move</span><span>Left stick</span></div>" +
           "<div><span>Look</span><span>Drag the right half</span></div>" +
           "<div><span>Fire / aim / jump</span><span>On-screen buttons</span></div>";
-        hint.textContent = "Tap to play";
       }
 
       function fail(message) {
@@ -389,7 +356,7 @@
         legend.style.display = "none";
         failure.style.display = "block";
         failure.textContent = message;
-        overlay.classList.remove("fading", "gone", "handoff");
+        overlay.classList.remove("gone");
       }
 
       // Unity routes non-fatal warnings here. The stock template answers with alert(),
@@ -410,12 +377,13 @@
         }, 5000);
       }
 
-      // Called once the player has touched the game. The legend has done its job by
-      // then -- it was on screen for the whole download -- so it gets out of the way.
-      function dismissHints() {
-        if (!started || overlay.classList.contains("fading")) return;
-        overlay.classList.add("fading");
-        setTimeout(function () { overlay.classList.add("gone"); }, 500);
+      // The overlay is the loading screen, so it belongs to the download and to
+      // nothing after it. It is taken down the moment the dashboard is on the canvas,
+      // in the same frame and without a fade: a legend still sitting over a menu the
+      // player can already click reads as a screen that has not finished loading, and
+      // one that is fading out reads as a click that did not register.
+      function hideOverlay() {
+        overlay.classList.add("gone");
       }
 
       var config = {
@@ -465,12 +433,11 @@
           }).then(function (unityInstance) {
             started = true;
 
-            // The panel goes see-through rather than putting a "play" button in the
-            // way: the click that dismisses a button never reaches the canvas, so the
-            // player would have to click twice -- once for the page, once to capture
-            // the mouse. Now the first click does the only thing it needs to.
-            overlay.classList.add("handoff");
-            hint.style.display = "block";
+            // No "play" button and no hand-off panel: the first click has to reach the
+            // canvas, both because the dashboard is made of buttons and because on
+            // desktop that click is what captures the mouse. Anything left on top would
+            // eat it and look like a dead game.
+            hideOverlay();
             canvas.focus();
             if (!touchOnly) fsButton.style.display = "block";
 
@@ -482,10 +449,6 @@
               lockLandscape();
               checkOrientation();
             }
-
-            // A player who reads nothing and clicks straight away clears this on the
-            // first click. This is for the one who does not click at all.
-            setTimeout(dismissHints, 8000);
 
             fsButton.addEventListener("click", function () {
               unityInstance.SetFullscreen(1);
@@ -508,10 +471,7 @@
       // go to the document and the player walks nowhere.
       canvas.addEventListener("pointerdown", function () {
         canvas.focus();
-        dismissHints();
       });
-
-      window.addEventListener("keydown", dismissHints);
 
       // Esc drops the pointer lock and opens the game's own pause menu, so the
       // fullscreen button is only reachable in that state. It hides itself during play

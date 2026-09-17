@@ -2335,6 +2335,7 @@ namespace FPSKit.EditorTools
 
             BuildPlayerHealthBar(root, hud);
             BuildEquipmentPanels(root, hud);
+            BuildMinimap(root, player, levels);
 
             // ---- top centre ----------------------------------------------
             hud.levelText = MakeText(root, "LevelText", "LEVEL 1",
@@ -2372,6 +2373,140 @@ namespace FPSKit.EditorTools
             hud.pausePanel = BuildPausePanel(root, hud);
 
             BuildResultsPanel(canvasGo, levels);
+        }
+
+        /// <summary>
+        /// The map in the top-left corner: the level from above, turning under a fixed
+        /// player arrow, with every live enemy on it in its own colour.
+        ///
+        /// Only the frame is built here. What goes inside it is read out of the scene at
+        /// runtime by <see cref="Minimap"/>, which is the whole reason the map needs no
+        /// authoring and works in an imported level -- there is no plan of the arena
+        /// anywhere for a rebuilt arena to disagree with.
+        ///
+        /// Top left because every other corner is taken: ammo bottom right, health and
+        /// equipment bottom left, score top right, and the level and its clock across
+        /// the top centre. It is also the one corner a phone leaves alone -- the
+        /// movement stick sits bottom left and the look area is the right half.
+        ///
+        /// Nothing in it is clickable, by the player's own request and because the pause
+        /// menu and the results screen are on this same canvas. Every graphic here and
+        /// every graphic the component makes later has its raycast target off.
+        /// </summary>
+        private static Minimap BuildMinimap(Transform parent, GameObject player, LevelManager levels)
+        {
+            const float size = 300f;
+            const float inset = 4f;
+
+            var group = new GameObject("Minimap", typeof(RectTransform));
+            group.transform.SetParent(parent, false);
+
+            var groupRect = group.GetComponent<RectTransform>();
+            groupRect.anchorMin = groupRect.anchorMax = groupRect.pivot = new Vector2(0f, 1f);
+            groupRect.anchoredPosition = new Vector2(38f, -38f);
+            groupRect.sizeDelta = new Vector2(size, size);
+
+            var full = new Vector2(0.5f, 0.5f);
+
+            MakeImage(group.transform, "Backdrop", full, full, Vector2.zero,
+                      new Vector2(size, size), new Color(0.03f, 0.05f, 0.07f, 0.72f));
+
+            // The clipped box. RectMask2D rather than a Mask: it needs no stencil buffer
+            // and no extra draw call, and a rectangle is all the clipping a square map
+            // has ever needed.
+            var view = new GameObject("View", typeof(RectTransform), typeof(RectMask2D));
+            view.transform.SetParent(group.transform, false);
+
+            var viewRect = view.GetComponent<RectTransform>();
+            viewRect.anchorMin = viewRect.anchorMax = viewRect.pivot = full;
+            viewRect.sizeDelta = new Vector2(size - inset * 2f, size - inset * 2f);
+
+            // Drawn after the view, so the border lies over the clipped edge instead of
+            // being cut off by it.
+            float edge = size - inset;
+            MakeImage(group.transform, "EdgeTop", full, full, new Vector2(0f, edge * 0.5f),
+                      new Vector2(size, 2f), new Color(0.62f, 0.68f, 0.78f, 0.5f));
+            MakeImage(group.transform, "EdgeBottom", full, full, new Vector2(0f, -edge * 0.5f),
+                      new Vector2(size, 2f), new Color(0.62f, 0.68f, 0.78f, 0.5f));
+            MakeImage(group.transform, "EdgeLeft", full, full, new Vector2(-edge * 0.5f, 0f),
+                      new Vector2(2f, size), new Color(0.62f, 0.68f, 0.78f, 0.5f));
+            MakeImage(group.transform, "EdgeRight", full, full, new Vector2(edge * 0.5f, 0f),
+                      new Vector2(2f, size), new Color(0.62f, 0.68f, 0.78f, 0.5f));
+
+            var map = group.AddComponent<Minimap>();
+            map.view = viewRect;
+            map.blipSprite = BlipSprite();
+            map.player = player.transform;
+            map.levelManager = levels;
+
+            // The camera rather than the body, so the map agrees with what is on screen.
+            var cam = player.GetComponentInChildren<Camera>();
+            if (cam != null) map.facing = cam.transform;
+
+            // Everything solid is on this layer -- the builder puts it there, and
+            // PrepareExistingGeometry moves an imported level onto it. A project whose
+            // layer is somehow missing gets every layer rather than none, because a
+            // cluttered map is a map and an empty one is a bug nobody can see.
+            int envLayer = LayerMask.NameToLayer("Environment");
+            map.structureLayers = envLayer >= 0 ? 1 << envLayer : ~0;
+
+            map.playerMarker = BuildMinimapArrow(viewRect);
+            map.northPip = BuildMinimapNorthPip(viewRect);
+
+            return map;
+        }
+
+        /// <summary>
+        /// The player, at the centre of their own map: a diamond with a line out of the
+        /// front of it. Two quads, and between them they say both where the player is
+        /// and which way they are looking -- which the dot on its own does not, and the
+        /// heading is half of what the map is being read for.
+        /// </summary>
+        private static RectTransform BuildMinimapArrow(RectTransform view)
+        {
+            var arrow = new GameObject("PlayerMarker", typeof(RectTransform));
+            arrow.transform.SetParent(view, false);
+
+            var rect = arrow.GetComponent<RectTransform>();
+            var centre = new Vector2(0.5f, 0.5f);
+            rect.anchorMin = rect.anchorMax = rect.pivot = centre;
+            rect.sizeDelta = Vector2.zero;
+
+            var tint = new Color(0.95f, 0.97f, 1f, 0.95f);
+
+            MakeImage(arrow.transform, "Heading", centre, centre, new Vector2(0f, 9f),
+                      new Vector2(2.5f, 14f), tint);
+
+            var body = MakeImage(arrow.transform, "Body", centre, centre, Vector2.zero,
+                                 new Vector2(11f, 11f), tint);
+            body.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+            return rect;
+        }
+
+        /// <summary>
+        /// A pip that rides the rim pointing at world north. A map that turns is easier
+        /// to aim with and harder to remember, and this is the one thing in it that
+        /// always means the same thing.
+        /// </summary>
+        private static RectTransform BuildMinimapNorthPip(RectTransform view)
+        {
+            var pip = new GameObject("NorthPip", typeof(RectTransform));
+            pip.transform.SetParent(view, false);
+
+            var rect = pip.GetComponent<RectTransform>();
+            var centre = new Vector2(0.5f, 0.5f);
+            rect.anchorMin = rect.anchorMax = rect.pivot = centre;
+            rect.sizeDelta = Vector2.zero;
+
+            // Parented to the pip rather than drawn as one, so it stays upright while the
+            // pip is moved around the rim.
+            var label = MakeText(pip.transform, "N", "N", centre, Vector2.zero, 20,
+                                 TextAlignmentOptions.Center);
+            label.color = new Color(0.72f, 0.79f, 0.9f, 0.85f);
+            label.rectTransform.sizeDelta = new Vector2(28f, 28f);
+
+            return rect;
         }
 
         /// <summary>
@@ -2922,6 +3057,70 @@ namespace FPSKit.EditorTools
         }
 
         private static Sprite _uiSprite;
+
+        /// <summary>
+        /// A soft-edged white disc, written once and reused, for the minimap's pips.
+        ///
+        /// Made rather than found because Unity's built-in UI skin has no circle, and
+        /// the difference between a round pip and a square one is the difference between
+        /// reading a map and decoding it: everything the map draws for a building is a
+        /// rectangle, so anything alive has to not be.
+        /// </summary>
+        private static Sprite BlipSprite()
+        {
+            if (_blipSprite != null) return _blipSprite;
+
+            string path = $"{AssetFolder}/MinimapBlip.png";
+            var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (existing != null)
+            {
+                _blipSprite = existing;
+                return _blipSprite;
+            }
+
+            const int size = 64;
+            const float radius = size * 0.5f - 1f;
+
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color32[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x + 0.5f - size * 0.5f;
+                    float dy = y + 0.5f - size * 0.5f;
+
+                    // One pixel of falloff at the rim. Without it a 6px pip on a dark
+                    // panel is a visibly jagged blob.
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = Mathf.Clamp01(radius - d);
+
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(path);
+
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.alphaIsTransparency = true;
+                importer.mipmapEnabled = false;
+                importer.SaveAndReimport();
+            }
+
+            _blipSprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            return _blipSprite;
+        }
+
+        private static Sprite _blipSprite;
 
         private static Image MakeImage(Transform parent, string name, Vector2 anchor, Vector2 pivot,
                                        Vector2 offset, Vector2 size, Color color,

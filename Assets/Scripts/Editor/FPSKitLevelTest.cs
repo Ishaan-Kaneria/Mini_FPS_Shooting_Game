@@ -47,7 +47,7 @@ namespace FPSKit.EditorTools
 
         enum Phase
         {
-            Enter, TuneFail, AwaitFill, Strand, AwaitDiscard, AwaitFailure,
+            Enter, TuneFail, AwaitFill, MapCheck, Strand, AwaitDiscard, AwaitFailure,
             Reload, TunePass, AwaitPassFill, Clear, AwaitPass, Judge
         }
 
@@ -77,6 +77,16 @@ namespace FPSKit.EditorTools
 
         static bool _passScored;
         static LevelResult _pass;
+
+        /// <summary>
+        /// What the minimap was drawing while the level was full. -1 means the sample
+        /// never ran, which is a failure in itself -- a map that draws nothing looks
+        /// exactly like a map that is working.
+        /// </summary>
+        static int _mapTerrain = -1;
+        static int _mapEnemiesInRange = -1;
+        static int _mapMisplaced = -1;
+        static float _mapWorstError = -1f;
 
         static int _magazineAtLevelOne = -1;
         static int _starsAfterFail = -1;
@@ -192,6 +202,25 @@ namespace FPSKit.EditorTools
                             _populationDeadline = EditorApplication.timeSinceStartup + 8.0;
 
                         if (alive < 3 && EditorApplication.timeSinceStartup < _populationDeadline) return;
+
+                        // The map notices a new enemy on its own schedule, a third of a
+                        // second apart, which is right in a game and a race in a test:
+                        // one that had just spawned would be read here as one the map
+                        // had lost. Pinned to every frame for the sample and put back
+                        // straight afterwards.
+                        PrimeMinimap();
+                        Wait(0.5, Phase.MapCheck);
+                        return;
+                    }
+
+                    case Phase.MapCheck:
+                    {
+                        if (Waiting()) return;
+
+                        // Read while the level is full and before anything is dropped
+                        // through the floor: this is the one moment there is a crowd on
+                        // the map to check the map against.
+                        SampleMinimap();
 
                         _phase = Phase.Strand;
                         return;
@@ -342,6 +371,122 @@ namespace FPSKit.EditorTools
         }
 
         // ==================================================================
+
+        /// <summary>
+        /// Checks that the minimap is drawing the level, and drawing it the right way
+        /// round.
+        ///
+        /// Counting quads catches an empty map. The second half catches something an
+        /// empty map never would: every enemy well inside the map's range is projected
+        /// here from first principles -- how far along the player's right it is, and how
+        /// far along the player's forward -- and a pip has to be within a few pixels of
+        /// that. Written with dot products rather than with the sine and cosine the
+        /// component uses, because the failure being guarded against is a sign error in
+        /// exactly that trigonometry, and a test that repeats the formula would repeat
+        /// the mistake with it.
+        ///
+        /// A mirrored map is the reason this is worth the lines. It is right whenever
+        /// the player faces a cardinal direction, wrong the rest of the time, and looks
+        /// entirely plausible either way.
+        /// </summary>
+        static float _mapScanBackup = -1f;
+
+        /// <summary>
+        /// Makes the map re-read the level every frame for the length of the sample, so
+        /// what it is drawing and what is actually in the arena cannot be a frame apart.
+        /// </summary>
+        static void PrimeMinimap()
+        {
+            var map = UnityEngine.Object.FindAnyObjectByType<Minimap>();
+            if (map == null) return;
+
+            _mapScanBackup = map.actorScanInterval;
+            map.actorScanInterval = 0f;
+        }
+
+        static void SampleMinimap()
+        {
+            var map = UnityEngine.Object.FindAnyObjectByType<Minimap>();
+            if (map == null || map.view == null || map.player == null) return;
+
+            if (_mapScanBackup >= 0f)
+            {
+                map.actorScanInterval = _mapScanBackup;
+                _mapScanBackup = -1f;
+            }
+
+            _mapTerrain = VisibleChildren(map.view.Find("Terrain"));
+
+            var blipRoot = map.view.Find("Blips");
+            if (blipRoot == null) return;
+
+            var facing = map.facing != null ? map.facing : map.player;
+            Vector3 forward = facing.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f) return;
+
+            forward.Normalize();
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+
+            float halfPx = Mathf.Min(map.view.rect.width, map.view.rect.height) * 0.5f;
+            float scale = halfPx / Mathf.Max(map.worldRadius, 0.01f);
+
+            _mapEnemiesInRange = 0;
+            _mapMisplaced = 0;
+            _mapWorstError = 0f;
+
+            var enemies = UnityEngine.Object.FindObjectsByType<EnemyAI>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+            foreach (var ai in enemies)
+            {
+                if (ai == null || ai.CurrentState == EnemyAI.State.Dead) continue;
+
+                Vector3 rel = ai.transform.position - map.player.position;
+                rel.y = 0f;
+
+                // Well inside the rim. A pip held at the edge is deliberately not where
+                // its enemy is, so measuring one would fail an intended behaviour.
+                if (rel.magnitude > map.worldRadius * 0.8f) continue;
+
+                var expected = new Vector2(Vector3.Dot(rel, right), Vector3.Dot(rel, forward)) * scale;
+                _mapEnemiesInRange++;
+
+                float best = float.MaxValue;
+                for (int i = 0; i < blipRoot.childCount; i++)
+                {
+                    var image = blipRoot.GetChild(i).GetComponent<UnityEngine.UI.Image>();
+                    if (image == null || !image.enabled) continue;
+
+                    float d = Vector2.Distance(image.rectTransform.anchoredPosition, expected);
+                    if (d < best) best = d;
+                }
+
+                if (best > _mapWorstError) _mapWorstError = best;
+
+                // Four pixels is about a metre and a half on a map this wide, which is
+                // one frame of an enemy walking. A wrong sign is off by tens.
+                if (best > 4f) _mapMisplaced++;
+            }
+
+            Notes.Append($"\n  minimap: {_mapTerrain} structure(s) drawn, " +
+                         $"{_mapEnemiesInRange} enemy(s) in range placed to within " +
+                         $"{_mapWorstError:0.0}px");
+        }
+
+        static int VisibleChildren(Transform root)
+        {
+            if (root == null) return 0;
+
+            int count = 0;
+            for (int i = 0; i < root.childCount; i++)
+            {
+                var image = root.GetChild(i).GetComponent<UnityEngine.UI.Image>();
+                if (image != null && image.enabled) count++;
+            }
+
+            return count;
+        }
 
         /// <summary>
         /// Shortens the live level so the test measures the mechanism rather than
@@ -545,6 +690,22 @@ namespace FPSKit.EditorTools
             if (_pass.coins <= 0)
                 problems.Append("\n  - a cleared level reported 0 coins to its subscribers, so " +
                                 "the results screen has nothing to show the player");
+
+            // ---- the map ----
+            if (_mapTerrain < 0)
+                problems.Append("\n  - there is no minimap in the arena, or it has no view rect, so " +
+                                "the HUD the builder makes is not the HUD that ships");
+            else if (_mapTerrain < 8)
+                problems.Append($"\n  - the minimap drew {_mapTerrain} structure(s) in a full arena, " +
+                                "so it is showing the player an empty level");
+
+            if (_mapEnemiesInRange <= 0)
+                problems.Append("\n  - no enemy was close enough to check the map's placement against, " +
+                                "so the half of this test that matters never ran");
+            else if (_mapMisplaced > 0)
+                problems.Append($"\n  - {_mapMisplaced} of {_mapEnemiesInRange} enemies are in the " +
+                                $"wrong place on the minimap (worst {_mapWorstError:0.0}px out), which " +
+                                "is what a mirrored or rotated projection looks like");
 
             if (problems.Length > 0)
             {

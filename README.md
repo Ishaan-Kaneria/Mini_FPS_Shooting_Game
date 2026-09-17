@@ -231,6 +231,22 @@ Both sides use the same two-layer system — a **shield** that soaks damage firs
 - Enemies show a floating bar only once they are actually hurt. Elites and bosses carry a visible armour segment you have to break before the kill starts counting.
 - Enemies drop health and shield cells; walk near one to collect it. A pickup refuses to be consumed when it would be wasted, so it stays on the floor for later.
 
+### The map
+
+The square in the top-left corner is the level from above. It turns with you, so what is
+at the top of the map is what is in front of you, and the pip on the rim marked **N**
+stays pointing at north however far you turn. Buildings and walls are the pale shapes,
+cover is the dim ones, and everything alive is a round pip: enemies in the colour of the
+variant they are, pickups in the colour of what they give you, and the boss in gold,
+pulsing, because the boss is the level. An enemy off the edge of the map is held at the
+rim and dimmed — you get the direction it is coming from without being told a distance
+that is not true.
+
+Nothing on it is clickable, and it needs no setup: it reads the level it is in, so a
+level you built yourself gets a correct map the first time you press Play. Put a
+`MinimapMarker` on anything the geometry cannot explain by itself — water, a bridge, a
+way out — to give it its own colour and shape.
+
 ### Score
 
 Kills score, headshots score more, and chaining kills inside a short window builds a multiplier up to 4×. Taking a hit breaks the chain — the scoreboard rewards staying in the fight, not retreating to a corner. Clearing a level pays a bonus scaled by the level number, a bonus per second left on the clock, and a bonus per star.
@@ -313,7 +329,7 @@ Assets/
     Runtime/                  gameplay, flat, global namespace
     Editor/                   FPSKit.EditorTools, all #if UNITY_EDITOR
   FPSKit_Generated/           tool output - regenerable
-    Scenes/  Themes/  Levels/  Enemies/  Store/  Materials/
+    Scenes/  Themes/  Levels/  Enemies/  Store/  Materials/  Previews/
   WebGLTemplates/FPSKit/      the page the browser build ships
   Plugins/WebGL/              jslib the page and the game share
   RPG_FPS_game_assets_industrial/   art pack

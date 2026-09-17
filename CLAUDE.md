@@ -21,11 +21,11 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | Levels   | `LevelManager.cs` — runs one level: a fixed roster, a strict clock, golden-angle ring spawns that avoid the player's view, an enemy leash that replaces what it discards, and a weighted score cut into stars. `LevelSet.cs` (ScriptableObject, one ladder per arena), `LevelResult.cs` (how a level ended), `LevelProgress.cs` (stars and unlocks in PlayerPrefs) |
 | Run state | `GameDirector.cs` — score, combo, pause, end of level, return-to-dashboard, PlayerPrefs records; `GameSession.cs` (what survives a scene change), `PlayerProfile.cs` (PlayerPrefs stats) |
 | Dashboard | `MainMenuController.cs`, `ArenaCard.cs`, `ArenaCatalog.cs` (ScriptableObject), `LevelSelectPanel.cs`, `LevelButton.cs` |
-| Feedback | `HUDController.cs`, `LevelResultsUI.cs` (the stars screen), `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
+| Feedback | `HUDController.cs`, `LevelResultsUI.cs` (the stars screen), `Minimap.cs` (the map in the corner), `MinimapMarker.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
-`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), `Store/` (the catalog plus its WeaponData, BombData and ConsumableData), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `Enemy.prefab`, `Bomb.prefab`, `Explosion.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
+`Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), `Store/` (the catalog plus its WeaponData, BombData and ConsumableData), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `MinimapBlip.png`, `Enemy.prefab`, `Bomb.prefab`, `Explosion.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
 
 ## Input: legacy only
 
@@ -178,6 +178,58 @@ Four things about that screen are worth not re-deriving:
 TMP has no closing `</alpha>` tag — `<alpha=#99>` applies from where it appears. Writing
 one prints those eight characters on screen, which is what the instruction strip and the
 dashboard hint both did. Use `<color=…></color>`; `VerifyFlow` checks for it.
+
+## The map reads the level, it does not have one
+
+`Minimap` is the square in the top-left of the HUD: the level from above, turning under
+a player arrow that stays put, every live enemy on it in the colour its archetype is
+wearing. `FPSKitSceneBuilder.BuildMinimap` builds the frame; everything inside it is
+worked out at runtime.
+
+**It is drawn, not rendered.** A second camera pointed at the floor is the obvious
+build and the wrong one: it costs a full extra pass over the arena every frame on a
+platform where the whole game has to fit in a browser tab, and what it produces is a
+top-down photograph of grey boxes on a grey floor. Instead `ScanStructures` walks the
+scene once, keeps the footprint of everything solid, and redraws those footprints as
+flat quads — a few dozen of them, tone-separated into walls and cover by height.
+
+That is also what makes it work in a level the kit never built. There is no plan of the
+arena anywhere, so **a rebuilt arena cannot disagree with its map**, and
+**FPSKit > Add Gameplay To Current Scene** drops it into somebody else's level correct
+on the first frame. Four things fall out of that and are worth not re-deriving:
+
+- **Footprints come from local bounds through the transform, never from world bounds.**
+  A world bounding box is axis aligned, so a cover wall laid at forty-five degrees comes
+  back as a square twice its size — and half of what the builder places is turned.
+- **A stack of crates is one shape from above.** Three cubes on the same square metre
+  are three identical quads, and the arena is built out of stacks: collapsing them
+  (`Covered`) is most of the difference between a map and a field of speckle. The other
+  half is `minStructureSize`, measured on the *long* side so a thin cover wall survives
+  and a crate does not.
+- **Actors are never scenery.** The structure sweep happens once, so an enemy standing
+  in it would be baked into the map as a wall for the rest of the level. Anything with a
+  `Health` or a `Pickup` above it is skipped and drawn live instead.
+- **Nothing it draws is clickable.** The pause menu and the results screen are on the
+  same canvas; every quad it makes has `raycastTarget` off, the same rule as
+  `FPSKitMenuBuilder`.
+
+**`MinimapMarker` is the seam.** Geometry can say how tall something is and not what it
+is, so a river is a grey box and so is the bridge over it. Drop the component on an
+object and the map draws it the component's way — colour, footprint or pip, and a draw
+order so a bridge lands on top of its water — skipping every filter above. A new kind of
+terrain is a marker, not a branch in the minimap.
+
+**The projection is the part to be careful with.** Unity turns `+Z` into
+`(sin y, cos y)`, so the rotation that puts the player's forward at the top of the map
+is by the yaw itself and not by its negative. Get that sign wrong and the map is correct
+whenever the player faces a cardinal direction and mirrored the rest of the time, which
+is very easy not to notice. `FPSKitLevelTest` is the regression test: with the level
+full, it projects every nearby enemy from first principles — how far along the player's
+right, how far along their forward — and fails if a pip is more than four pixels from
+where that says it should be. It is written with dot products rather than with the sine
+and cosine the component uses, because a test that repeated the formula would repeat the
+mistake with it. It also fails a map drawing nothing, which otherwise looks exactly like
+a map that works.
 
 ## Content is data, not code
 

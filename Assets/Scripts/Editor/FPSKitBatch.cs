@@ -243,6 +243,13 @@ namespace FPSKit.EditorTools
         public static void VerifyBomb() => FPSKitBombTest.VerifyBomb();
 
         /// <summary>
+        /// Audits every binding in every control scheme for collisions and unbound
+        /// actions, then plays a level and drives each action in turn: walk, sprint in
+        /// all directions, crouch, jump, fire, reload and aim.
+        /// </summary>
+        public static void VerifyControls() => FPSKitControlsTest.VerifyControls();
+
+        /// <summary>
         /// Builds one scene and then asserts it is actually playable.
         ///
         /// A build that throws no exception still proves very little: the builder wires

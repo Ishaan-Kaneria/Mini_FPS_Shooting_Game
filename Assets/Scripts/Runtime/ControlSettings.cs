@@ -62,8 +62,16 @@ public class ControlSettings : ScriptableObject
     [Tooltip("Maximum seconds between the two taps.")]
     public float doubleTapWindow = 0.3f;
 
-    [Tooltip("Sprint ends as soon as you stop moving forward.")]
+    [Tooltip("Sprint ends as soon as you stop moving.")]
     public bool sprintEndsWhenNotAdvancing = true;
+
+    [Tooltip("Require movement before the sprint key does anything. Off, which means " +
+             "holding the key while standing still already counts as sprinting, so the " +
+             "first step you take is at full speed.\n\n" +
+             "On, the key is dead until you are already moving, and a player who holds " +
+             "it and then walks off spends the first moment at walking pace for no " +
+             "reason they can see.")]
+    public bool sprintNeedsMovement;
 
     [Header("Keyboard Look (optional, leave None for mouse-only)")]
     public KeyCode lookLeft = KeyCode.None;
@@ -113,6 +121,7 @@ public class ControlSettings : ScriptableObject
         bomb = KeyCode.G;
         useItem = KeyCode.F;
         sprintEndsWhenNotAdvancing = true;
+        sprintNeedsMovement = false;
         lookLeft = lookRight = lookUp = lookDown = KeyCode.None;
 
         switch (preset)

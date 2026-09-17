@@ -570,7 +570,11 @@ public class Weapon : MonoBehaviour
         Vector3 basePosition = Vector3.Lerp(_hipPosition, data.adsPosition, AimProgress);
         transform.localPosition = basePosition + Vector3.back * _kickback;
 
-        float sprintFov = (_motor != null && _motor.IsSprinting) ? _baseFieldOfView * 1.05f : _baseFieldOfView;
+        // Widened for the speed, not for the intent. IsSprinting is true the moment
+        // the key goes down, standing still included, so keying the FOV off it alone
+        // would pull the view out while the player has not moved a step.
+        bool running = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f;
+        float sprintFov = running ? _baseFieldOfView * 1.05f : _baseFieldOfView;
         float targetFov = Mathf.Lerp(sprintFov, data.adsFieldOfView, AimProgress);
 
         fpsCamera.fieldOfView = Mathf.Lerp(fpsCamera.fieldOfView, targetFov,

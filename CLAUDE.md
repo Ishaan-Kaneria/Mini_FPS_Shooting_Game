@@ -69,7 +69,27 @@ So: **fix scene content by editing the builder, not the `.unity` file.** Hand-ed
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the seven checks behind it are `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the eight checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+
+**A play-mode test that measures speed must set `Time.captureDeltaTime`.** Under
+`-batchmode -nographics` the game's delta time is very nearly zero, so anything that
+accumulates per frame barely moves: movement ramps at 55 m/s^2, and fifty frames worth
+half a millisecond each reached 1.2 m/s against a 5.6 m/s walk. Every speed in
+`VerifyControls` was measuring the batch frame rate rather than the game, and it read as
+four separate product bugs. `Time.captureDeltaTime = 1f/60f` pins the step; it is a
+global, so it goes back to 0 in `Detach` like every other borrowed piece of state. The
+same test throws away the first third of each measurement burst, because a burst starts
+at whatever speed the previous one left behind -- walking measured straight after
+sprinting is a sprint.
+
+**Sprint is not forward-only and does not need movement.** `EvaluateSprint` used to test
+`moveInput.y > 0.1f`, so the sprint key did nothing at all while strafing or backing up,
+and nothing while standing still. Both are now gone: any direction sprints, and holding
+the key while stationary engages it so the first step out of cover is already at full
+speed (`ControlSettings.sprintNeedsMovement` restores the old requirement). Standing
+still at a sprint costs nothing -- there is no speed to apply and `PlanarSpeed01` stays
+at zero -- but `Weapon` keys its sprint FOV widen off actual speed rather than off
+`IsSprinting`, or the view would pull out while the player had not moved.
 
 **Three generators, three reset entry points, one trap.** `FPSKitBatch.ResetEnemyArchetypes`, `ResetLevelSets` and `ResetStore` exist because the roster, the level ladders and the store are all generated once and then left alone. Retuning a number in `FPSKitEnemyRoster.Configure`, `FPSKitLevels.Configure` or `FPSKitStore.Configure` does **not** reach the assets the game reads until the matching reset is run. A price or a level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
 

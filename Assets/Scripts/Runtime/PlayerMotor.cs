@@ -488,16 +488,34 @@ public class PlayerMotor : MonoBehaviour
     public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount));
 
     /// <summary>
-    /// Sprint is a double-tap rather than a held key, so the sprint key can double
-    /// as the fire key. The first tap still fires -- that is unavoidable when one
-    /// key carries both jobs, and in practice it reads fine.
+    /// Whether the player is sprinting this frame.
+    ///
+    /// Two things this deliberately does *not* require, both of which it used to:
+    ///
+    /// - **Moving forward.** The test was `moveInput.y > 0.1f`, so the sprint key did
+    ///   nothing at all while strafing or backing up. Nothing about running is
+    ///   forward-only, and a key that works on one of the four movement directions
+    ///   reads as a key that intermittently fails.
+    /// - **Moving at all**, unless <see cref="ControlSettings.sprintNeedsMovement"/>
+    ///   asks for it. Holding the key while standing still now counts, so the first
+    ///   step out of cover is already at full speed. Standing still at a sprint costs
+    ///   nothing -- there is no speed to apply and <see cref="PlanarSpeed01"/> stays at
+    ///   zero, so weapon spread and bob are untouched -- and it is the difference
+    ///   between a control that answers when you press it and one that seems dead
+    ///   until you happen to also be moving.
+    ///
+    /// The double-tap scheme exists so the sprint key can double as the fire key; the
+    /// first tap still fires, which is unavoidable when one key carries both jobs.
     /// </summary>
     bool EvaluateSprint(Vector2 moveInput)
     {
-        if (MobileInput.Sprint && moveInput.y > 0.1f) return true;
+        bool moving = moveInput.sqrMagnitude > 0.01f;
+        bool allowed = moving || !controls.sprintNeedsMovement;
+
+        if (MobileInput.Sprint) return allowed;
 
         if (!controls.sprintByDoubleTap)
-            return ControlSettings.Held(controls.sprintKey) && moveInput.y > 0.1f;
+            return ControlSettings.Held(controls.sprintKey) && allowed;
 
         if (ControlSettings.Pressed(controls.sprintKey))
         {
@@ -505,9 +523,10 @@ public class PlayerMotor : MonoBehaviour
             _lastSprintTapTime = Time.time;
         }
 
-        // Drop out of the sprint once you stop advancing, or once you crouch --
-        // otherwise standing back up silently resumes a sprint you never asked for.
-        if (controls.sprintEndsWhenNotAdvancing && moveInput.y <= 0.1f) _sprintLatched = false;
+        // A latched sprint does have to end on its own, or it silently survives until
+        // the next double tap. Movement in any direction keeps it, so a sprint does not
+        // drop the moment the player sidesteps something.
+        if (controls.sprintEndsWhenNotAdvancing && !moving) _sprintLatched = false;
         if (IsCrouching) _sprintLatched = false;
 
         return _sprintLatched;

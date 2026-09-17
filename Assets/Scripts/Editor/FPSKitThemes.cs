@@ -44,15 +44,34 @@ namespace FPSKit.EditorTools
                 "Re-applies the built-in values to every theme asset.\n\n" +
                 "Any tuning you did in the Inspector will be lost.", "Reset them", "Cancel")) return;
 
+            ResetAll();
+        }
+
+        /// <summary>
+        /// Re-applies <see cref="Configure"/> to every theme asset.
+        ///
+        /// Public and dialog-free because this is the only way a change to the numbers
+        /// in this file ever reaches the assets the builder actually reads. GetOrCreate
+        /// deliberately leaves an existing asset alone -- a theme is meant to be tuned in
+        /// the Inspector and kept -- so a retune in code that is never reset is a change
+        /// that compiles, builds, ships and does nothing at all. Same trap as the enemy
+        /// roster, the level ladders and the store, and now the same way out.
+        /// </summary>
+        public static int ResetAll()
+        {
+            int count = 0;
+
             foreach (var name in Names)
             {
                 var theme = GetOrCreate(name);
                 Configure(theme, name);
                 EditorUtility.SetDirty(theme);
+                count++;
             }
 
             AssetDatabase.SaveAssets();
-            Debug.Log("<color=lime>[FPSKit]</color> Theme assets reset to defaults.");
+            Debug.Log($"<color=lime>[FPSKit]</color> {count} theme asset(s) reset to defaults.");
+            return count;
         }
 
         public static List<LevelTheme> GetOrCreateAll()
@@ -130,13 +149,17 @@ namespace FPSKit.EditorTools
                     t.atmosphereThickness = 0.7f;
                     t.skyExposure = 1.35f;
                     t.sunColor = new Color(1f, 0.94f, 0.78f);
-                    t.sunIntensity = 1.7f;
+                    t.sunIntensity = 1.45f;
                     t.sunAngles = new Vector2(68f, 140f);
                     t.fogColor = new Color(0.78f, 0.71f, 0.56f);
                     t.fogDensity = 0.004f;
-                    t.ambientSky = new Color(0.68f, 0.62f, 0.50f);
-                    t.ambientEquator = new Color(0.48f, 0.42f, 0.33f);
-                    t.ambientGround = new Color(0.32f, 0.26f, 0.18f);
+                    // Lifted for the open zone. One hard sun over a map with
+                    // hundred-metre rock on it puts whole faces in shadow, and at the
+                    // walled arena's ambient those faces came back near black -- which
+                    // is a place an enemy can stand and not be seen.
+                    t.ambientSky = new Color(0.74f, 0.68f, 0.56f);
+                    t.ambientEquator = new Color(0.60f, 0.53f, 0.42f);
+                    t.ambientGround = new Color(0.44f, 0.37f, 0.27f);
                     t.floorColor = new Color(0.62f, 0.54f, 0.38f);
                     t.wallColor = new Color(0.70f, 0.62f, 0.46f);
                     t.coverColors = new[]
@@ -146,15 +169,53 @@ namespace FPSKit.EditorTools
                         new Color(0.45f, 0.40f, 0.36f)
                     };
                     t.coverTag = "Concrete";
-                    t.arenaSize = 150f;
-                    // Fewer, taller obstructions -- the point here is long sightlines.
+
+                    // The open zone. Four hundred and fifty metres of ground with a
+                    // river cut through it, rather than a hundred and fifty metres of
+                    // floor with walls at the edge -- see FPSKitOpenZone.
+                    t.openZone = true;
+                    t.arenaSize = 450f;
+                    t.apronSize = 1100f;
+                    t.wallHeight = 5f;
+
+                    // Thin, because the whole point of this arena is that you can see to
+                    // the horizon. At the walled arena's 0.004 the mesas are solid fog.
+                    t.fogDensity = 0.0011f;
+
+                    t.hazard = LevelTheme.Hazard.River;
+                    t.hazardWidth = 58f;
+                    t.hazardDepth = 22f;
+                    t.hazardOffset = 92f;
+                    t.hazardMeander = 30f;
+                    t.hazardColor = new Color(0.22f, 0.44f, 0.46f);
+                    t.bankColor = new Color(0.52f, 0.44f, 0.31f);
+                    t.bridgeColor = new Color(0.50f, 0.45f, 0.38f);
+                    t.bridgeWidth = 9f;
+                    t.bridgeCount = 2;
+
+                    t.backdropCount = 38;
+                    t.backdropDistance = new Vector2(640f, 1180f);
+                    t.backdropHeight = new Vector2(60f, 210f);
+                    t.backdropWidth = new Vector2(80f, 280f);
+                    t.backdropColor = new Color(0.50f, 0.40f, 0.30f);
+                    t.landmarkCount = 12;
+
+                    t.outpostCount = 10;
+                    t.vantageCount = 10;
+                    t.coverLineCount = 18;
+                    t.scatterClusterCount = 40;
+
+                    // Unused while openZone is on -- kept tuned so that turning it off
+                    // gives back the arena this used to be rather than an empty field.
                     t.roomCount = 2;
                     t.platformCount = 3;
                     t.coverWallCount = 6;
                     t.crateStackCount = 5;
                     t.pillarCount = 8;
+                    t.propCount = 14;
+
                     t.saturation = -6f;
-                    t.contrast = 10f;
+                    t.contrast = 6f;
                     t.filmGrain = 0.12f;
                     t.randomSeed = 21;
                     break;

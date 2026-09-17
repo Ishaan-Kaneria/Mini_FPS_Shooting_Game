@@ -143,6 +143,24 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Re-applies the built-in values to every LevelTheme asset.
+        ///
+        /// The fourth of the same trap. A theme is generated once and then left alone --
+        /// it is meant to be tuned in the Inspector and kept -- so reshaping an arena in
+        /// FPSKitThemes.Configure does not reach the asset the scene builder reads until
+        /// this has run, and the arena rebuilds exactly as it was. Overwrites any
+        /// Inspector tuning, by design. Run it before BuildAllThemes, not after.
+        /// </summary>
+        public static void ResetThemes()
+        {
+            Run(() =>
+            {
+                FPSKitSceneBuilder.EnsureProjectTagsAndLayers();
+                Debug.Log($"[FPSKitBatch] {FPSKitThemes.ResetAll()} theme asset(s) reset");
+            });
+        }
+
+        /// <summary>
         /// Does nothing on purpose. Reaching it at all means every script in the
         /// project compiled, which is the cheapest pre-commit check there is.
         /// </summary>
@@ -201,6 +219,13 @@ namespace FPSKit.EditorTools
         /// dashboard with the run recorded.
         /// </summary>
         public static void VerifyFlow() => FPSKitFlowTest.VerifyFlow();
+
+        /// <summary>
+        /// Checks every open-zone arena for the failures that are invisible in a build:
+        /// a gorge that does not block, banks that are not joined, spawn points off the
+        /// navmesh and water that is not lethal. Edit mode, so it costs seconds.
+        /// </summary>
+        public static void VerifyZone() => FPSKitZoneTest.VerifyZone();
 
         /// <summary>
         /// Plays the economy end to end: coins earned by killing, spent in the store, and

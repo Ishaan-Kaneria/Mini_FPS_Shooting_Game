@@ -20,20 +20,42 @@ MonoBehaviour:
   atmosphereThickness: 0.7
   skyExposure: 1.35
   sunColor: {r: 1, g: 0.94, b: 0.78, a: 1}
-  sunIntensity: 1.7
+  sunIntensity: 1.45
   sunAngles: {x: 68, y: 140}
   shadowStrength: 0.85
   fogEnabled: 1
   fogColor: {r: 0.78, g: 0.71, b: 0.56, a: 1}
-  fogDensity: 0.004
-  ambientSky: {r: 0.68, g: 0.62, b: 0.5, a: 1}
-  ambientEquator: {r: 0.48, g: 0.42, b: 0.33, a: 1}
-  ambientGround: {r: 0.32, g: 0.26, b: 0.18, a: 1}
-  arenaSize: 150
+  fogDensity: 0.0011
+  ambientSky: {r: 0.74, g: 0.68, b: 0.56, a: 1}
+  ambientEquator: {r: 0.6, g: 0.53, b: 0.42, a: 1}
+  ambientGround: {r: 0.44, g: 0.37, b: 0.27, a: 1}
+  arenaSize: 450
   wallHeight: 5
   randomSeed: 21
   scaleLayoutWithArea: 1
   layoutReferenceSize: 60
+  openZone: 1
+  apronSize: 1100
+  hazard: 0
+  hazardWidth: 58
+  hazardDepth: 22
+  hazardOffset: 92
+  hazardMeander: 30
+  hazardColor: {r: 0.22, g: 0.44, b: 0.46, a: 1}
+  bankColor: {r: 0.52, g: 0.44, b: 0.31, a: 1}
+  bridgeWidth: 9
+  bridgeCount: 2
+  bridgeColor: {r: 0.5, g: 0.45, b: 0.38, a: 1}
+  backdropCount: 38
+  backdropDistance: {x: 640, y: 1180}
+  backdropHeight: {x: 60, y: 210}
+  backdropWidth: {x: 80, y: 280}
+  backdropColor: {r: 0.5, g: 0.4, b: 0.3, a: 1}
+  landmarkCount: 12
+  outpostCount: 10
+  vantageCount: 10
+  coverLineCount: 18
+  scatterClusterCount: 40
   roomCount: 2
   platformCount: 3
   coverWallCount: 6
@@ -65,7 +87,7 @@ MonoBehaviour:
   coverMaterial: {fileID: 0}
   crateMaterial: {fileID: 0}
   propPrefabs: []
-  propCount: 40
+  propCount: 14
   weatherPrefab: {fileID: 0}
   ambienceLoop: {fileID: 0}
   ambienceVolume: 0.35
@@ -73,7 +95,7 @@ MonoBehaviour:
   bloomIntensity: 0.45
   postExposure: 0
   saturation: -6
-  contrast: 10
+  contrast: 6
   colorFilter: {r: 1, g: 1, b: 1, a: 1}
   vignetteIntensity: 0.28
   filmGrain: 0.12

@@ -59,6 +59,107 @@ public class LevelTheme : ScriptableObject
 
     public int ScaledCount(int baseCount) => Mathf.Max(0, Mathf.RoundToInt(baseCount * LayoutScale));
 
+    // ==================================================================
+    // Open zone
+    // ==================================================================
+    /// <summary>
+    /// How the deadly water reads. Only the dressing changes -- every one of these is
+    /// the same gorge with the same trigger at the bottom of it, because the thing the
+    /// player has to learn is "that is the edge and the bridge is the way over", and
+    /// they should only have to learn it once.
+    /// </summary>
+    public enum Hazard
+    {
+        River,
+        /// <summary>Ice over water. The gap is the part that has already broken.</summary>
+        Ice,
+        /// <summary>A dry drop. No surface at the bottom, just the fall.</summary>
+        Chasm,
+        Lava,
+        /// <summary>Flooded or live rail. Shallow, so it burns rather than drowns.</summary>
+        Electrified
+    }
+
+    [Header("Open Zone")]
+    [Tooltip("Build this arena as open ground with a horizon instead of as a walled box. " +
+             "Everything under this heading is ignored when it is off, and the arena is " +
+             "built the old way -- a floor, four perimeter walls and scattered cover.")]
+    public bool openZone;
+
+    [Tooltip("Metres the ground runs past the playable edge before the backdrop takes " +
+             "over. This is the difference between standing in a level and standing in a " +
+             "place: the eye needs something between the last wall and the sky.")]
+    [Min(0f)] public float apronSize = 900f;
+
+    [Tooltip("What the water is. Dressing only -- the gorge and the kill trigger in the " +
+             "bottom of it are the same whichever this is.")]
+    public Hazard hazard = Hazard.River;
+
+    [Tooltip("Metres across. This is the length of the bridge, and the bridge is the " +
+             "most dangerous ground in the level, so it is really a question about how " +
+             "long the player is out in the open.")]
+    [Min(4f)] public float hazardWidth = 55f;
+
+    [Tooltip("Metres from the rim down to the water. Deep enough that falling in reads " +
+             "as a mistake rather than as a shortcut.")]
+    [Min(2f)] public float hazardDepth = 20f;
+
+    [Tooltip("Metres east of the middle the gorge runs. Off-centre on purpose: the " +
+             "player starts at the origin, so a gorge through the middle would start " +
+             "them on the rim of it with nowhere to back up to.")]
+    public float hazardOffset = 90f;
+
+    [Tooltip("How far the gorge wanders as it crosses the map, in metres. A channel " +
+             "ruled dead straight is a channel nobody believes water cut.")]
+    [Min(0f)] public float hazardMeander = 26f;
+
+    public Color hazardColor = new Color(0.20f, 0.42f, 0.52f);
+    public Color bankColor = new Color(0.44f, 0.38f, 0.28f);
+
+    [Tooltip("Width of the bridge deck. Wide enough for two people to pass and narrow " +
+             "enough to be a decision.")]
+    [Min(2f)] public float bridgeWidth = 9f;
+
+    [Tooltip("Number of crossings. One is a choke and a story; two is an option and a " +
+             "flank. Above two the gorge stops being an obstacle at all.")]
+    [Range(1, 3)] public int bridgeCount = 2;
+
+    public Color bridgeColor = new Color(0.46f, 0.42f, 0.36f);
+
+    [Header("Open Zone: Backdrop")]
+    [Tooltip("Silhouettes ringed around the level far past the boundary -- mesas, " +
+             "ridges, a skyline. No colliders, and off the navigation bake.")]
+    [Min(0)] public int backdropCount = 34;
+
+    [Tooltip("Metres out. Far enough that it never reads as somewhere you could walk to.")]
+    public Vector2 backdropDistance = new Vector2(620f, 1150f);
+
+    public Vector2 backdropHeight = new Vector2(55f, 190f);
+    public Vector2 backdropWidth = new Vector2(70f, 260f);
+    public Color backdropColor = new Color(0.44f, 0.36f, 0.28f);
+
+    [Tooltip("Second, nearer band of the same thing, on the ground and solid. These are " +
+             "what the player navigates by -- the big rock you go round to get to the " +
+             "bridge.")]
+    [Min(0)] public int landmarkCount = 9;
+
+    [Header("Open Zone: Content")]
+    [Tooltip("Walled compounds with a way in. The strongpoints -- they are what the open " +
+             "ground is open between, and what makes crossing it a choice.")]
+    [Min(0)] public int outpostCount = 7;
+
+    [Tooltip("Raised decks with a ramp and a lip to shoot over, placed to overlook the " +
+             "crossings and the compounds rather than dropped at random.")]
+    [Min(0)] public int vantageCount = 8;
+
+    [Tooltip("Rows of chest-high barriers laid across the approaches, so there is a way " +
+             "to cross open ground that is not just running at it.")]
+    [Min(0)] public int coverLineCount = 14;
+
+    [Tooltip("Clusters of rock or rubble scattered between everything else. The filler " +
+             "that stops the ground between two compounds being a killing field.")]
+    [Min(0)] public int scatterClusterCount = 26;
+
     [Header("Arena Layout")]
     [Tooltip("Roofless buildings with doorways. The backbone of the level.")]
     public int roomCount = 3;

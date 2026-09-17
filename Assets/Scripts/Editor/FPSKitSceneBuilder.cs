@@ -22,8 +22,14 @@ namespace FPSKit.EditorTools
     ///
     /// Put this file in Assets/Scripts/Editor/ -- it MUST be in a folder named
     /// "Editor" or the build will fail.
+    ///
+    /// Partial, with the open-zone arena in FPSKitOpenZone.cs. Two reasons rather than
+    /// tidiness: the two arena shapes share the whole rest of the file -- the player,
+    /// the enemy, the HUD, the bake -- so splitting anywhere else would mean passing
+    /// half the builder around; and a walled box and an open valley have nothing to say
+    /// to each other, so the one thing worth keeping apart is the layout.
     /// </summary>
-    public static class FPSKitSceneBuilder
+    public static partial class FPSKitSceneBuilder
     {
         private const string AssetFolder = "Assets/FPSKit_Generated";
         private const string MaterialFolder = AssetFolder + "/Materials";
@@ -544,6 +550,8 @@ namespace FPSKit.EditorTools
 
         private static void BuildArena()
         {
+            if (_theme.openZone) { BuildOpenZone(); return; }
+
             _claimed.Clear();
 
             var root = new GameObject("Arena").transform;
@@ -1574,6 +1582,15 @@ namespace FPSKit.EditorTools
             cam.fieldOfView = 75f;
             cam.nearClipPlane = 0.02f;
 
+            // An open zone puts its horizon a kilometre out, and Unity's default far
+            // plane is 1000 -- so the mesas that exist to say "this is a place" get
+            // clipped away one by one as the player walks, which looks like the world
+            // dissolving. Only raised for the arenas that need it: a far plane is depth
+            // precision spent, and a walled box has nothing out there to see.
+            cam.farClipPlane = _theme != null && _theme.openZone
+                ? Mathf.Max(1200f, _theme.backdropDistance.y * 1.7f)
+                : 1000f;
+
             var motor = player.AddComponent<PlayerMotor>();
             motor.cameraHolder = holder.transform;
             motor.footstepSource = playerAudio;
@@ -2027,6 +2044,8 @@ namespace FPSKit.EditorTools
         // ==================================================================
         private static Transform[] BuildSpawnPoints()
         {
+            if (_theme.openZone) return BuildOpenZoneSpawnPoints();
+
             var root = new GameObject("SpawnPoints").transform;
             var list = new List<Transform>();
 
@@ -2049,6 +2068,15 @@ namespace FPSKit.EditorTools
             var go = new GameObject("NavMesh");
             var surface = go.AddComponent<NavMeshSurface>();
             surface.collectObjects = CollectObjects.All;
+
+            // The horizon is mesh without collider, and a NavMeshSurface collects render
+            // meshes by default -- so left in, a ring of hundred-metre mesas a kilometre
+            // out is baked as walkable ground, and the bake spends its budget on scenery
+            // no agent can ever stand on. Excluded by layer rather than by geometry mode
+            // so that a prop with no collider inside the level still blocks.
+            int backdrop = LayerMask.NameToLayer("Backdrop");
+            if (backdrop >= 0) surface.layerMask = ~(1 << backdrop);
+
             surface.BuildNavMesh();
         }
 
@@ -2090,10 +2118,27 @@ namespace FPSKit.EditorTools
             // the breathing room inside a fight; close enough that it still arrives
             // inside a clock that is deliberately tight.
             manager.minSpawnDistanceFromPlayer = 18f;
-            manager.maxSpawnDistanceFromPlayer = Mathf.Max(30f, _theme.arenaSize * 0.55f);
 
-            // The leash sits well outside the spawn ring so nothing is culled on arrival.
-            manager.despawnDistance = Mathf.Max(95f, manager.maxSpawnDistanceFromPlayer * 1.6f);
+            // A fraction of the arena, until the arena stops being a room.
+            //
+            // Half the width is the right answer for a hundred-metre box, where it means
+            // "the far corner" and the far corner is eight seconds away. On the
+            // four-hundred-and-fifty-metre zone the same fraction is two hundred and
+            // fifty metres, which is a minute of walking into a level with a strict
+            // clock -- an empty map and a timer running down, with nothing in the log to
+            // say why. Past a point the ring has to be a distance rather than a
+            // proportion, because what it is really setting is how long the player waits.
+            manager.maxSpawnDistanceFromPlayer = _theme.openZone
+                ? Mathf.Clamp(_theme.arenaSize * 0.16f, 45f, 80f)
+                : Mathf.Max(30f, _theme.arenaSize * 0.55f);
+
+            // The leash sits well outside the spawn ring so nothing is culled on arrival,
+            // and wider still on an open zone -- crossing a bridge with a crowd behind
+            // you is the fight that map exists for, and a leash tight to the ring would
+            // quietly delete them halfway over.
+            manager.despawnDistance = _theme.openZone
+                ? Mathf.Max(150f, manager.maxSpawnDistanceFromPlayer * 2.2f)
+                : Mathf.Max(95f, manager.maxSpawnDistanceFromPlayer * 1.6f);
             manager.despawnGraceTime = 4f;
             manager.fallKillDepth = 60f;
             manager.despawnOffNavMesh = true;
@@ -2398,6 +2443,14 @@ namespace FPSKit.EditorTools
             const float size = 300f;
             const float inset = 4f;
 
+            // How much world the map covers. Fixed, it is either a map of a box arena or
+            // a map of one corner of an open one -- and on the open one the thing the
+            // player most needs it for, which is where the river and the crossings are,
+            // is the thing that falls off the edge of it.
+            float range = _theme != null
+                ? Mathf.Clamp(_theme.arenaSize * 0.3f, 45f, 150f)
+                : 62f;
+
             var group = new GameObject("Minimap", typeof(RectTransform));
             group.transform.SetParent(parent, false);
 
@@ -2436,6 +2489,7 @@ namespace FPSKit.EditorTools
             var map = group.AddComponent<Minimap>();
             map.view = viewRect;
             map.blipSprite = BlipSprite();
+            map.worldRadius = range;
             map.player = player.transform;
             map.levelManager = levels;
 
@@ -3418,8 +3472,8 @@ namespace FPSKit.EditorTools
         /// <summary>Public so the other FPSKit tools can guarantee these exist before they run.</summary>
         public static void EnsureProjectTagsAndLayers()
         {
-            EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh");
-            EnsureLayers("Player", "Enemy", "Environment");
+            EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh", "Water");
+            EnsureLayers("Player", "Enemy", "Environment", "Backdrop");
         }
 
         private static void EnsureTags(params string[] tags)

@@ -34,6 +34,28 @@ MonoBehaviour:
   randomSeed: 13
   scaleLayoutWithArea: 1
   layoutReferenceSize: 60
+  openZone: 0
+  apronSize: 900
+  hazard: 0
+  hazardWidth: 55
+  hazardDepth: 20
+  hazardOffset: 90
+  hazardMeander: 26
+  hazardColor: {r: 0.2, g: 0.42, b: 0.52, a: 1}
+  bankColor: {r: 0.44, g: 0.38, b: 0.28, a: 1}
+  bridgeWidth: 9
+  bridgeCount: 2
+  bridgeColor: {r: 0.46, g: 0.42, b: 0.36, a: 1}
+  backdropCount: 34
+  backdropDistance: {x: 620, y: 1150}
+  backdropHeight: {x: 55, y: 190}
+  backdropWidth: {x: 70, y: 260}
+  backdropColor: {r: 0.44, g: 0.36, b: 0.28, a: 1}
+  landmarkCount: 9
+  outpostCount: 7
+  vantageCount: 8
+  coverLineCount: 14
+  scatterClusterCount: 26
   roomCount: 4
   platformCount: 1
   coverWallCount: 10

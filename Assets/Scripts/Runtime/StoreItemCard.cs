@@ -1,7 +1,6 @@
 using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -17,8 +16,7 @@ using UnityEngine.UI;
 /// Built once by the dashboard builder as a hidden template and cloned per item at
 /// runtime, the same way <see cref="ArenaCard"/> and <see cref="LevelButton"/> are.
 /// </summary>
-[DisallowMultipleComponent]
-public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class StoreItemCard : HoverCard
 {
     /// <summary>
     /// Everything the card draws, filled in by <see cref="StorePanel"/>. A struct with
@@ -60,7 +58,6 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     }
 
     [Header("Parts")]
-    public Image frame;
     public Image accentBar;
 
     public TMP_Text titleText;
@@ -79,12 +76,6 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     public TMP_Text upgradeLabelText;
 
     [Header("Feel")]
-    public float hoverScale = 0.03f;
-    public float hoverSpeed = 14f;
-
-    public Color frameColor = new Color(0.18f, 0.20f, 0.24f, 1f);
-    public Color frameHoverColor = new Color(0.95f, 0.75f, 0.35f, 1f);
-
     [Tooltip("Lit when the pip has been bought.")]
     public Color pipFilledColor = new Color(1f, 0.82f, 0.25f);
 
@@ -96,15 +87,6 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     public Color unaffordableColor = new Color(0.95f, 0.42f, 0.36f);
 
     public Color affordableColor = new Color(0.92f, 0.91f, 0.89f);
-
-    bool _hovered;
-    float _hover;
-
-    void OnEnable()
-    {
-        _hovered = false;
-        ApplyHover(0f);
-    }
 
     public void Bind(Content content)
     {
@@ -172,31 +154,5 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         label.color = enabled || price <= 0 || Wallet.CanAfford(price)
             ? affordableColor
             : unaffordableColor;
-    }
-
-    public void OnPointerEnter(PointerEventData eventData) => _hovered = true;
-    public void OnPointerExit(PointerEventData eventData) => _hovered = false;
-
-    void Update()
-    {
-        // Unscaled: the dashboard can be reached from a frozen game, and a hover that
-        // only animates at timeScale 1 would look broken exactly then.
-        float target = _hovered ? 1f : 0f;
-        ApplyHover(Mathf.MoveTowards(_hover, target, hoverSpeed * Time.unscaledDeltaTime));
-    }
-
-    /// <summary>
-    /// Grows the card and lights its frame. Scale rather than position, for the same
-    /// reason ArenaCard and LevelButton do it: a GridLayoutGroup owns anchoredPosition on
-    /// every child it places, and a hover that wrote one each frame would drag every card
-    /// onto the same spot.
-    /// </summary>
-    void ApplyHover(float amount)
-    {
-        _hover = amount;
-
-        transform.localScale = Vector3.one * (1f + hoverScale * amount);
-
-        if (frame != null) frame.color = Color.Lerp(frameColor, frameHoverColor, amount);
     }
 }

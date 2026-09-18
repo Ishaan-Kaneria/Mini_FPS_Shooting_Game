@@ -42,6 +42,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         private const string FallbackArg = "-fpskitFallback";
 
+        /// <summary>Turns a job that reports by default into one that acts.</summary>
+        private const string ApplyArg = "-fpskitApply";
+
         /// <summary>
         /// Folder name under Assets/WebGLTemplates that holds the page the build ships.
         /// </summary>
@@ -158,6 +161,22 @@ namespace FPSKit.EditorTools
                 FPSKitSceneBuilder.EnsureProjectTagsAndLayers();
                 Debug.Log($"[FPSKitBatch] {FPSKitThemes.ResetAll()} theme asset(s) reset");
             });
+        }
+
+        /// <summary>
+        /// Deletes generated materials nothing references.
+        ///
+        /// The material folder grows every time a theme colour is retuned: the builder
+        /// names a material after its colour and reuses the asset at that path, so a new
+        /// colour writes a new asset and the old one stays on disk, referenced by
+        /// nothing and named closely enough to its replacement to look deliberate.
+        ///
+        /// Reports by default and deletes only with <c>-fpskitApply</c>, because it is
+        /// the one maintenance job here that cannot be undone by re-running a builder.
+        /// </summary>
+        public static void PruneMaterials()
+        {
+            Run(() => FPSKitPrune.Prune(HasFlag(ApplyArg)));
         }
 
         /// <summary>
@@ -753,6 +772,14 @@ namespace FPSKit.EditorTools
                 EditorApplication.Exit(1);
             }
         }
+
+        /// <summary>
+        /// Whether a valueless switch was passed. ReadArg cannot answer this: it returns
+        /// the *next* argument, so a trailing flag reads as absent and a flag followed by
+        /// another flag reads as that flag's name.
+        /// </summary>
+        private static bool HasFlag(string flag)
+            => Array.IndexOf(Environment.GetCommandLineArgs(), flag) >= 0;
 
         private static string ReadArg(string flag)
         {

@@ -67,6 +67,23 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 So: **fix scene content by editing the builder, not the `.unity` file.** Hand-editing a generated scene is only appropriate for a throwaway experiment. The same applies to the generated assets it writes (`Controls.asset`, `Enemy.prefab`, themes, materials) — the builder and `FPSKitThemes` recreate or re-dirty them.
 
+**Generated scenes are saved in binary, so you cannot grep them.** A GUID lives in one
+as sixteen raw bytes rather than as the hex string a text search looks for, so grepping
+the scenes for a material or a prefab finds nothing and reports it as unreferenced —
+which is a very convincing way to talk yourself into deleting a whole arena. Ask
+`AssetDatabase.GetDependencies` instead; it is the only answer that is true, and it is
+the same one the build uses.
+
+**The material folder grows on its own.** `FPSKitSceneBuilder.MakeMaterialAt` names a
+material after its theme, its role and its colour (`DesertOutpost_Crate_8A6A44`) and
+reuses the asset already at that path, which is what stops a rebuild churning every
+material in the project. The cost is that retuning one colour writes a *new* material
+and leaves the old one on disk forever, referenced by nothing and named closely enough
+to its replacement to look deliberate. `FPSKitPrune.cs` (**FPSKit > Prune Unused
+Generated Materials**, or `FPSKitBatch.PruneMaterials`, which reports and only deletes
+with `-fpskitApply`) is how that is cleared; anything the builder still wants, it
+recreates on the next build.
+
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
 The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the eight checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
@@ -226,8 +243,17 @@ Four things about that screen are worth not re-deriving:
 - **Nothing may write `anchoredPosition` on a card.** A `GridLayoutGroup` owns that
   property on every child it places, so the hover animation doing so dragged all six
   cards onto one spot — a grid that looked like a single card with five hidden under it,
-  while every structural check still counted six. `ArenaCard` animates `localScale`
+  while every structural check still counted six. `HoverCard` animates `localScale`
   instead, and `VerifyFlow` fails if two cards share a position.
+- **Every clickable tile is a `HoverCard`.** `ArenaCard`, `LevelButton` and
+  `StoreItemCard` share one base rather than three copies of the same twenty lines —
+  the copies had already drifted to three different growth amounts nobody chose, and
+  the three screens sit on top of each other, so a card that grows differently from the
+  one it replaced reads as the interface being slightly unreliable. Same reasoning as
+  `UIText`. A subclass overrides `ApplyHover` and calls base to add what is particular
+  to it (`ArenaCard` brightens its preview), and overrides `Hoverable` to say when the
+  pointer should do nothing at all — `LevelButton` returns `Unlocked`, because a locked
+  tile that lights up and then does nothing reads as broken rather than as locked.
 - **Cell sizes are computed, not fixed.** A fixed cell is only right at one aspect ratio:
   three 404px cards fit 16:9 and slide under the record panel at 4:3, and a browser window
   is whatever shape the player left it. Card internals are anchored as fractions for the

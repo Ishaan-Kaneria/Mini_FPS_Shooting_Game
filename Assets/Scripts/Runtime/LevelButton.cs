@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -15,12 +14,10 @@ using UnityEngine.UI;
 /// square. Seeing that level 6 is a boss with forty seconds on the clock is most of
 /// the reason to go and beat level 5.
 /// </summary>
-[DisallowMultipleComponent]
-public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class LevelButton : HoverCard
 {
     [Header("Parts")]
     public Button button;
-    public Image frame;
     public Image face;
 
     [Tooltip("Left to right. Filled for stars earned, dimmed for the rest.")]
@@ -34,12 +31,6 @@ public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     public TMP_Text lockText;
 
     [Header("Feel")]
-    public float hoverScale = 0.04f;
-    public float hoverSpeed = 14f;
-
-    public Color frameColor = new Color(0.18f, 0.20f, 0.24f, 1f);
-    public Color frameHoverColor = new Color(0.95f, 0.75f, 0.35f, 1f);
-
     [Tooltip("The face of a level that is open, and of one that is not. A locked tile " +
              "has to read as locked without anybody having to find the small text.")]
     public Color unlockedColor = new Color(0.12f, 0.14f, 0.17f, 1f);
@@ -52,19 +43,10 @@ public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     public Color inkColor = new Color(0.91f, 0.90f, 0.89f, 1f);
     public Color inkLockedColor = new Color(0.45f, 0.47f, 0.50f, 1f);
 
-    bool _hovered;
-    float _hover;
-
     /// <summary>Zero-based position in the set. What gets handed to the session.</summary>
     public int Index { get; private set; } = -1;
 
     public bool Unlocked { get; private set; }
-
-    void OnEnable()
-    {
-        _hovered = false;
-        ApplyHover(0f);
-    }
 
     public void Bind(int index, LevelSet.Level level, int starsEarned, bool unlocked,
                      UnityEngine.Events.UnityAction onChosen)
@@ -125,29 +107,11 @@ public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
         ApplyHover(0f);
     }
 
-    public void OnPointerEnter(PointerEventData eventData) => _hovered = Unlocked;
-    public void OnPointerExit(PointerEventData eventData) => _hovered = false;
-
-    void Update()
-    {
-        // Unscaled: the dashboard can be reached from a frozen game, and a hover that
-        // only animates at timeScale 1 would look broken exactly then.
-        float target = _hovered ? 1f : 0f;
-        ApplyHover(Mathf.MoveTowards(_hover, target, hoverSpeed * Time.unscaledDeltaTime));
-    }
-
     /// <summary>
-    /// Grows the tile and lights its frame. Scale rather than position: a
-    /// GridLayoutGroup owns anchoredPosition on every child it places, and a hover that
-    /// wrote one each frame would drag every tile onto the same spot -- which is exactly
-    /// what it did to the arena grid once. ArenaCard animates its hover the same way.
+    /// A locked tile does not light up. It is still drawn in full -- seeing that level 6
+    /// is a boss with forty seconds on the clock is most of the reason to go and beat
+    /// level 5 -- but highlighting under the pointer and then doing nothing reads as a
+    /// broken button rather than a locked one.
     /// </summary>
-    void ApplyHover(float amount)
-    {
-        _hover = amount;
-
-        transform.localScale = Vector3.one * (1f + hoverScale * amount);
-
-        if (frame != null) frame.color = Color.Lerp(frameColor, frameHoverColor, amount);
-    }
+    protected override bool Hoverable => Unlocked;
 }

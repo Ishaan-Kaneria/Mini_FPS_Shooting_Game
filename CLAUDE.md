@@ -140,6 +140,121 @@ way round now that the key does move them.
 
 The page owns what only the browser can answer: pointer/keyboard focus, suppressing the context menu over the arena, capping `devicePixelRatio` on phones, and the `(any-pointer: coarse)` test behind `Assets/Plugins/WebGL/FPSKitWebDevice.jslib`, which `WebDevice.IsTouchOnly` reads. That test exists because `Application.isMobilePlatform` on WebGL is a user-agent match an iPad fails — it has called itself a Macintosh since iPadOS 13 — so `TouchControls` would hide the on-screen controls on the one device with no other way to play.
 
+## A touch is also a mouse click, and that was the worst bug in the game
+
+**Unity maps touch 0 onto `KeyCode.Mouse0`** on mobile and in a browser. The default
+fire binding is `Mouse0`, and `ControlSettings.Held` went straight to
+`Input.GetKey` -- so on a phone the gun fired continuously while the player dragged the
+move stick, and once for every tap on any button or on empty space. The legacy read
+bypasses the EventSystem entirely, so it made no difference that the joystick had
+swallowed the touch as far as UI was concerned. The same mapping fires the jump in the
+`ArrowsAndSpace` preset, where `Mouse0` is the jump key.
+
+It is invisible on a desktop, invisible in the editor, and it is not in the touch layer,
+which is where anybody would look. `ControlSettings.Readable` now refuses mouse bindings
+whenever `MobileInput.Active`: on a touch device the on-screen controls are the only
+thing that speaks for touch. Keyboard bindings stay readable, because a tablet with a
+keyboard should work. Desktop is untouched -- `MobileInput.Active` is false there,
+including on a touchscreen laptop, which `TouchControls` deliberately does not count as
+a touch device.
+
+`ControlSettings.CanRead` is public **only** so `VerifyTouch` can assert the rule. Batch
+mode has no mouse to press, so a check written against `Held` would pass identically with
+the rule deleted -- which is a worse test than none.
+
+## The on-screen controls are tuned in millimetres, not pixels
+
+`TouchProfile` (`FPSKit_Generated/TouchProfile.asset`) holds every number the touch stack
+is tuned by, for the reason `ControlSettings` is an asset: touch feel is a dozen settings
+that only make sense together. `TouchMetrics` converts pixels to physical distance, and
+falls back to a typical phone when `Screen.dpi` reports something impossible -- which it
+does, including 0, on plenty of Android devices.
+
+Four things in that stack are worth not re-deriving:
+
+- **The fire button is drag-fire.** Press it and keep dragging: the trigger stays down
+  while the same gesture turns the view. A phone has two thumbs, the left one moves, so
+  the right one must aim *and* shoot -- and if holding fire occupies it, every fight is a
+  choice between firing where the enemy was and tracking them without firing. Players
+  report that as the game being unresponsive, never as a layout problem.
+- **Look is corrected for screen density before it becomes degrees.** Raw pixels mean the
+  same physical swipe turns twice as far on a 1440p phone as on a 720p one.
+  `TouchLookArea` normalises to a reference density, so `PlayerMotor.touchSensitivity`
+  and `VerifyBomb` keep working in one unit and neither has to know what a screen is.
+- **Sprint comes from pushing the stick**, not from a button -- the sprint button and the
+  look surface want the same thumb, so a sprint costing a button press is a sprint taken
+  while unable to aim. It latches, because easing off to steer is not stopping. Button
+  and stick are two sources on `MobileInput` for the same reason the two fire sources
+  are: sharing one bool means whichever wrote last wins.
+- **Everything hangs off `SafeAreaFitter`.** A canvas fills the panel, cutout included,
+  and the pause button is anchored top-right -- which on a landscape phone is where the
+  front camera is. It is also the only way out of a level.
+
+**Aim assist is touch-only and it is not a concession.** A mouse resolves a hundredth of
+a degree; a thumb moving a contact patch the size of its target resolves about one. With
+no assist the player is not being tested on aim but on a motor task nobody can perform,
+and that reads as the game not registering input rather than as difficulty.
+`TouchAimAssist` slows the look inside a 6-degree cone -- the half nobody notices and the
+half that does the work -- and adds weak adhesion toward the target, **gated on the
+player already turning or firing**. Without that gate it is magnetism: the camera
+creeping toward enemies while the player stands still, which feels like the game
+wrestling them for control. It aims at centre mass, never the head, or it would hand out
+the headshot bonus for pointing vaguely at somebody; it needs line of sight; and it is
+skipped while `LookCaptured`, because those degrees move the bomb reticle rather than the
+head.
+
+`VerifyTouch` is the regression test for all of it. It builds the layer into a real arena
+and fails on a missing or unwired part, on two buttons overlapping (one thumb, two
+actions -- invisible in an editor where a mouse presses one pixel), and on the mouse rule
+above. Until it existed the touch layer was exercised by nothing until a player had the
+finished app, and a control that fails to wire does not throw or log: it produces a game
+where the thumb does nothing.
+
+## The Android build exists, and one setting in it is permanent
+
+`FPSKitBatch.BuildAndroid` (`-buildTarget Android`) produces the App Bundle Google Play
+wants, or an APK with `-fpskitApk` for a real device. Four things about it are worth not
+re-deriving:
+
+- **The touch layer is not optional, and it is not in the scenes.** `StageTouchScenes`
+  copies every arena, runs `FPSKitMobileControls.AddMobileControls` into the copy, and
+  builds the copies — the same trick `BuildWebGL` uses, now shared rather than written
+  twice. Skip it and the game is not merely awkward on a phone: `TouchControls` switches
+  `MobileInput` on because `Application.isMobilePlatform` is true, finds no joystick, no
+  look area and no buttons in the scene, and the player lands in an arena unable to move,
+  look or fire, with nothing logged. The copies are throwaway because a generated scene
+  carrying something the builder does not put there is a half-state the next `BuildScene`
+  would silently wipe.
+- **The application id is refused rather than warned about.** It is the app's identity on
+  Play: permanent after the first upload, unchangeable by anyone, and changing your mind
+  means a new listing with no installs and no reviews. The project shipped with the URP
+  template's `com.UnityTechnologies.com.unity.template.urpblank`, which is a placeholder
+  *and* a claim to be Unity Technologies. `ResolveApplicationId` throws on any id
+  matching `ForbiddenIdFragments`, because a warning in a build log is read after the
+  upload.
+- **`companyName` and `productName` must not be touched to fix that.** They are what
+  Unity derives the WebGL storage path from, so renaming either orphans every browser
+  player's coins, stars and purchases — the data stays in their IndexedDB and the game
+  looks somewhere else for it. Only `applicationIdentifier.Android` was changed, which is
+  per-platform and touches nothing on the web.
+- **No INTERNET permission.** The game has no network code at all, so `ConfigureAndroid`
+  sets `forceInternetPermission = false`. Unity adds it by default; a permission in the
+  manifest is something a player is shown and something the Data Safety form has to
+  answer for.
+
+Signing comes from `FPSKIT_KEYSTORE`, `FPSKIT_KEYSTORE_PASS`, `FPSKIT_KEY_ALIAS` and
+`FPSKIT_KEY_PASS` in the environment and never from the repository — this repo is public,
+and a committed keystore is a signing key published to the world. `.gitignore` refuses
+`*.keystore`, `*.jks`, `*.p12`, `*.pepk` and `keystore.properties` by pattern rather than
+by discipline, because `git add -A` does not ask. With no key set the build is
+debug-signed and says so: that installs on a device and Play rejects it.
+
+`targetSdkVersion` is set explicitly rather than left on Automatic, which means "the
+highest SDK installed" — and a preview SDK is something an editor install quietly
+acquires. An app targeting one is not publishable, and the setting that caused it reads
+as the sensible choice. Play's floor rises every year, so `TargetSdk` is a number to
+check against the Console before a release.
+
 ## The game boots into a dashboard
 
 `Menu.unity` is scene 0, built by `FPSKitMenuBuilder.cs` (**FPSKit > Build Dashboard**,

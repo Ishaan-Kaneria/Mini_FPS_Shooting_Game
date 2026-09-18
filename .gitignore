@@ -85,6 +85,20 @@ mono_crash.*
 *.unitypackage.meta
 *.app
 
+# Signing material. This repository is public, so a keystore committed here is a
+# signing key published to the world -- and the upload key is the only thing that
+# proves an update to Google Play came from you. Ignored by pattern rather than by
+# discipline, because "git add -A" does not ask.
+*.keystore
+*.jks
+*.p12
+*.pepk
+keystore.properties
+key.properties
+/Build/Android/
+google-play-*.json
+play-service-account*.json
+
 # Crashlytics generated file
 crashlytics-build.properties
 

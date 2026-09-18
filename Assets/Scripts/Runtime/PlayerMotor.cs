@@ -45,6 +45,10 @@ public class PlayerMotor : MonoBehaviour
              "0.2 is a comfortable default; mobile shooters run 0.15 to 0.3.")]
     public float touchSensitivity = 0.2f;
 
+    [Tooltip("Optional. Helps a thumb hold a target on touch devices, and does nothing " +
+             "at all for a player on a mouse. Leave empty to turn it off outright.")]
+    public TouchAimAssist aimAssist;
+
     public float pitchClamp = 89f;
     public bool invertY;
     public bool lockCursor = true;
@@ -350,6 +354,14 @@ public class PlayerMotor : MonoBehaviour
         if (MobileInput.Active)
         {
             Vector2 touch = MobileInput.ConsumeLook() * touchSensitivity * LookSensitivityMultiplier;
+
+            // Aim assist adjusts the thumb's degrees before they are applied, so there
+            // is still exactly one thing in the project that turns the view. It is
+            // skipped while the bomb has the look: those degrees are moving a reticle
+            // across the screen, not the head, and pulling them toward an enemy would
+            // drag the landing point somewhere the player did not put it.
+            if (aimAssist != null && !LookCaptured)
+                touch = aimAssist.Adjust(touch, MobileInput.Fire, Time.deltaTime);
 
             if (touch.sqrMagnitude > 0f)
             {

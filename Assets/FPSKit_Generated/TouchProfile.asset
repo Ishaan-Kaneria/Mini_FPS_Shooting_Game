@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3adb9e0696b9e99d39a9c29e8f9bea7f, type: 3}
+  m_Name: TouchProfile
+  m_EditorClassIdentifier: Assembly-CSharp::TouchProfile
+  lookSensitivity: 1
+  adsSensitivity: 0.6
+  lookSmoothing: 0
+  lookDeadZoneMm: 0.15
+  stickRadiusMm: 9
+  stickDeadZone: 0.15
+  sprintPush: 0.85
+  sprintLatches: 1
+  dragFire: 1
+  tapToFire: 0
+  minButtonMm: 9
+  buttonOpacity: 1

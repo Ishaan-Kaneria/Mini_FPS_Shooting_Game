@@ -91,15 +91,58 @@ public class ControlSettings : ScriptableObject
     // ------------------------------------------------------------------
     public static bool Held(KeyCode primary, KeyCode alternate = KeyCode.None)
     {
-        if (primary != KeyCode.None && Input.GetKey(primary)) return true;
-        return alternate != KeyCode.None && Input.GetKey(alternate);
+        if (Readable(primary) && Input.GetKey(primary)) return true;
+        return Readable(alternate) && Input.GetKey(alternate);
     }
 
     public static bool Pressed(KeyCode primary, KeyCode alternate = KeyCode.None)
     {
-        if (primary != KeyCode.None && Input.GetKeyDown(primary)) return true;
-        return alternate != KeyCode.None && Input.GetKeyDown(alternate);
+        if (Readable(primary) && Input.GetKeyDown(primary)) return true;
+        return Readable(alternate) && Input.GetKeyDown(alternate);
     }
+
+    /// <summary>
+    /// Whether a binding may be read from the legacy input at all right now.
+    ///
+    /// <b>On a touch device a mouse button is not an input, it is the same finger
+    /// reported twice.</b> Unity maps touch 0 onto mouse button 0 on mobile and in a
+    /// browser, so `Input.GetKey(KeyCode.Mouse0)` is true whenever any finger is
+    /// anywhere on the glass -- and the legacy read goes straight to the device,
+    /// bypassing the EventSystem, so it does not matter that the joystick or a button
+    /// swallowed that touch for UI purposes.
+    ///
+    /// What that produced is the bug this exists to kill: the default binding for fire
+    /// is Mouse0, so on a phone the gun fired continuously while the player moved the
+    /// stick, and once for every tap anywhere on the screen -- the pause button, the
+    /// reload button, empty space. It reads as the game shooting on its own, and no
+    /// amount of looking at the touch layer explains it, because the touch layer is not
+    /// where it happens. The same mapping makes Mouse0 fire the jump in the
+    /// ArrowsAndSpace preset, for the same reason.
+    ///
+    /// So when the on-screen controls are live they are the only thing that speaks for
+    /// touch, and the mouse half of the legacy input is ignored. Keyboard bindings stay
+    /// readable: a phone has no keyboard, and a tablet with one attached should still
+    /// work. Desktop is untouched, because <see cref="MobileInput.Active"/> is false
+    /// there -- including on a touchscreen laptop, which TouchControls deliberately does
+    /// not count as a touch device.
+    /// </summary>
+    /// <summary>
+    /// Whether a binding may be read right now. Public only so the touch check can
+    /// assert the rule below without a mouse to press -- in batch mode every button is
+    /// up, so a test written against Held would pass whether the rule existed or not.
+    /// </summary>
+    public static bool CanRead(KeyCode key) => Readable(key);
+
+    static bool Readable(KeyCode key)
+    {
+        if (key == KeyCode.None) return false;
+
+        return !MobileInput.Active || !IsMouseButton(key);
+    }
+
+    /// <summary>KeyCode.Mouse0 through Mouse6 are contiguous.</summary>
+    static bool IsMouseButton(KeyCode key)
+        => key >= KeyCode.Mouse0 && key <= KeyCode.Mouse6;
 
     public bool MoveForwardHeld => Held(moveForward, altForward);
     public bool MoveBackHeld => Held(moveBack, altBack);

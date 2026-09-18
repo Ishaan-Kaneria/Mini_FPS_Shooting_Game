@@ -372,19 +372,20 @@ namespace FPSKit.EditorTools
         static void StartBurst(PlayerMotor motor, Weapon weapon)
         {
             MobileInput.Move = Vector2.zero;
-            MobileInput.Sprint = MobileInput.Crouch = MobileInput.Aim = false;
+            MobileInput.SetSprintButton(false);
+            MobileInput.Crouch = MobileInput.Aim = false;
             MobileInput.SetFireButton(false);
 
             switch (_step)
             {
                 case 0: MobileInput.Move = Vector2.up; break;
-                case 1: MobileInput.Move = Vector2.up; MobileInput.Sprint = true; break;
+                case 1: MobileInput.Move = Vector2.up; MobileInput.SetSprintButton(true); break;
                 case 2: MobileInput.Move = Vector2.right; break;
-                case 3: MobileInput.Move = Vector2.right; MobileInput.Sprint = true; break;
+                case 3: MobileInput.Move = Vector2.right; MobileInput.SetSprintButton(true); break;
 
                 // Standing still with the sprint key down. The player asked for this to
                 // engage, so that the first step out of cover is already at full speed.
-                case 4: MobileInput.Sprint = true; break;
+                case 4: MobileInput.SetSprintButton(true); break;
 
                 case 5: MobileInput.Move = Vector2.up; MobileInput.Crouch = true; break;
                 case 6: MobileInput.QueueJump(); break;

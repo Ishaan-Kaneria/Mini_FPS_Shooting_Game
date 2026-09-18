@@ -54,9 +54,19 @@ namespace FPSKit.EditorTools
             var controls = canvas.gameObject.AddComponent<TouchControls>();
             controls.group = group;
 
-            BuildLookArea(canvas.transform);
-            BuildJoystick(canvas.transform);
-            BuildButtons(canvas.transform);
+            var profile = GetOrCreateProfile();
+
+            // Everything the player touches hangs off the safe area rather than off the
+            // canvas. A canvas fills the panel, cutout included -- so the pause button,
+            // anchored to the top-right corner, is drawn under the front camera on most
+            // modern phones held in landscape. It is also the only way out of a level.
+            var safeArea = BuildSafeArea(canvas.transform);
+
+            BuildLookArea(safeArea, profile);
+            BuildJoystick(safeArea, profile);
+            BuildButtons(safeArea, profile);
+
+            AttachAimAssist(profile);
 
             EditorSceneManager.MarkSceneDirty(scene);
             Selection.activeGameObject = canvas.gameObject;
@@ -90,6 +100,84 @@ namespace FPSKit.EditorTools
 #endif
         }
 
+        /// <summary>
+        /// Puts aim assist on the player and points the motor at it.
+        ///
+        /// Built here rather than by the scene builder because it is touch-only: it
+        /// compensates for a thumb, and a scene that never gets on-screen controls must
+        /// never get it. Wiring it into the arena itself would hand it to desktop
+        /// players too, which is both unfair and worse to play.
+        /// </summary>
+        private static void AttachAimAssist(TouchProfile profile)
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player == null)
+            {
+                Debug.LogWarning("[FPSKit] no Player in this scene, so aim assist was not added.");
+                return;
+            }
+
+            var motor = player.GetComponent<PlayerMotor>();
+            if (motor == null) return;
+
+            var assist = player.GetComponent<TouchAimAssist>();
+            if (assist == null) assist = player.AddComponent<TouchAimAssist>();
+
+            assist.profile = profile;
+            assist.eye = player.GetComponentInChildren<Camera>();
+
+            // The same mask the enemies use to decide they can see the player, so the
+            // two agree about what counts as a wall.
+            int environment = LayerMask.NameToLayer("Environment");
+            assist.sightBlockers = environment >= 0 ? 1 << environment : ~0;
+
+            motor.aimAssist = assist;
+        }
+
+        /// <summary>Where the touch tuning lives, created on first use.</summary>
+        public const string ProfilePath = "Assets/FPSKit_Generated/TouchProfile.asset";
+
+        /// <summary>
+        /// The one asset every touch control reads its tuning from.
+        ///
+        /// Created rather than required, so a scene built on a machine that has never
+        /// seen one still gets working controls -- and generated rather than hand-made,
+        /// so the defaults live in code and can be re-stamped like every other generated
+        /// asset in the kit.
+        /// </summary>
+        public static TouchProfile GetOrCreateProfile()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<TouchProfile>(ProfilePath);
+            if (existing != null) return existing;
+
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ProfilePath));
+
+            var profile = ScriptableObject.CreateInstance<TouchProfile>();
+            AssetDatabase.CreateAsset(profile, ProfilePath);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"[FPSKit] created {ProfilePath}");
+            return profile;
+        }
+
+        /// <summary>
+        /// A full-screen child that insets itself to the safe area at runtime. The
+        /// controls parent to this rather than to the canvas, whose RectTransform is
+        /// driven by the Canvas component and cannot be inset.
+        /// </summary>
+        private static Transform BuildSafeArea(Transform parent)
+        {
+            var go = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaFitter));
+            go.transform.SetParent(parent, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+
+            return go.transform;
+        }
+
         private static Canvas BuildCanvas()
         {
             var go = new GameObject(RootName);
@@ -112,7 +200,7 @@ namespace FPSKit.EditorTools
         /// Full-screen invisible drag surface. Built first so every button added
         /// afterwards sits above it and swallows its own touches.
         /// </summary>
-        private static void BuildLookArea(Transform parent)
+        private static void BuildLookArea(Transform parent, TouchProfile profile)
         {
             var go = new GameObject("LookArea", typeof(RectTransform), typeof(Image), typeof(TouchLookArea));
             go.transform.SetParent(parent, false);
@@ -134,7 +222,9 @@ namespace FPSKit.EditorTools
             // Tap-to-fire stays off. With a FIRE button on screen it is redundant, and
             // because this surface is most of the screen it meant every tap that missed
             // a button by a few pixels fired the weapon.
-            go.GetComponent<TouchLookArea>().tapToFire = false;
+            var look = go.GetComponent<TouchLookArea>();
+            look.tapToFire = false;
+            look.profile = profile;
         }
 
         /// <summary>
@@ -146,7 +236,7 @@ namespace FPSKit.EditorTools
         /// fall through to the look surface behind. A region that accepts a thumb
         /// anywhere cannot be missed.
         /// </summary>
-        private static void BuildJoystick(Transform parent)
+        private static void BuildJoystick(Transform parent, TouchProfile profile)
         {
             var region = new GameObject("MoveRegion", typeof(RectTransform), typeof(Image),
                                         typeof(VirtualJoystick));
@@ -196,6 +286,7 @@ namespace FPSKit.EditorTools
             joystick.handle = handleRect;
             joystick.radius = 150f;
             joystick.hideWhenIdle = true;
+            joystick.profile = profile;
         }
 
         /// <summary>
@@ -207,47 +298,54 @@ namespace FPSKit.EditorTools
         private const float LeftRegion = 0.38f;
 
         // ==================================================================
-        private static void BuildButtons(Transform parent)
+        private static void BuildButtons(Transform parent, TouchProfile profile)
         {
             // A right-thumb cluster, laid out so nothing overlaps and the two pressed
             // most sit lowest and largest. Positions are bottom-right anchored at the
             // canvas's 1920x1080 reference, and the gaps between them are deliberate:
             // a thumb is about 120 reference-pixels wide, so buttons that touch each
             // other are buttons that get pressed together.
-            MakeButton(parent, "FireButton", "FIRE", TouchButton.ActionKind.Fire, false,
-                       new Vector2(-230f, 230f), 240f, new Color(1f, 0.42f, 0.35f, 0.32f));
+            // FIRE is drag-fire: press it and keep dragging, and the trigger stays down
+            // while the same gesture turns the view. Without that the right thumb cannot
+            // shoot and aim at once, and every fight becomes a choice between firing at
+            // where the enemy was and tracking them without firing.
+            var fire = MakeButton(parent, "FireButton", "FIRE", TouchButton.ActionKind.Fire,
+                                  false, new Vector2(-230f, 230f), 240f,
+                                  new Color(1f, 0.42f, 0.35f, 0.32f), profile);
+
+            fire.GetComponent<TouchButton>().dragFire = profile == null || profile.dragFire;
 
             MakeButton(parent, "AimButton", "ADS", TouchButton.ActionKind.Aim, true,
-                       new Vector2(-470f, 330f), 160f, new Color(1f, 1f, 1f, 0.20f));
+                       new Vector2(-470f, 330f), 160f, new Color(1f, 1f, 1f, 0.20f), profile);
 
             MakeButton(parent, "JumpButton", "JUMP", TouchButton.ActionKind.Jump, false,
-                       new Vector2(-230f, 490f), 160f, new Color(1f, 1f, 1f, 0.20f));
+                       new Vector2(-230f, 490f), 160f, new Color(1f, 1f, 1f, 0.20f), profile);
 
             MakeButton(parent, "SprintButton", "RUN", TouchButton.ActionKind.Sprint, true,
-                       new Vector2(-450f, 560f), 150f, new Color(0.5f, 0.85f, 1f, 0.22f));
+                       new Vector2(-450f, 560f), 150f, new Color(0.5f, 0.85f, 1f, 0.22f), profile);
 
             MakeButton(parent, "CrouchButton", "CROUCH", TouchButton.ActionKind.Crouch, true,
-                       new Vector2(-660f, 400f), 150f, new Color(1f, 1f, 1f, 0.20f));
+                       new Vector2(-660f, 400f), 150f, new Color(1f, 1f, 1f, 0.20f), profile);
 
             MakeButton(parent, "ReloadButton", "RELOAD", TouchButton.ActionKind.Reload, false,
-                       new Vector2(-660f, 200f), 150f, new Color(1f, 0.85f, 0.4f, 0.22f));
+                       new Vector2(-660f, 200f), 150f, new Color(1f, 0.85f, 0.4f, 0.22f), profile);
 
             // The bomb is a hold: press to bring the ring up, slide the look around to
             // place it, release to throw. It sits above the fire button because those
             // two are the only controls a thumb uses in the middle of a fight, and it is
             // the larger of the pair the thumb has to find without looking.
             MakeButton(parent, "BombButton", "BOMB", TouchButton.ActionKind.Bomb, false,
-                       new Vector2(-450f, 760f), 170f, new Color(1f, 0.6f, 0.2f, 0.26f));
+                       new Vector2(-450f, 760f), 170f, new Color(1f, 0.6f, 0.2f, 0.26f), profile);
 
             MakeButton(parent, "ItemButton", "DRINK", TouchButton.ActionKind.UseItem, false,
-                       new Vector2(-660f, 600f), 150f, new Color(0.4f, 0.9f, 1f, 0.24f));
+                       new Vector2(-660f, 600f), 150f, new Color(0.4f, 0.9f, 1f, 0.24f), profile);
 
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no
             // Escape key, so without it a touch player cannot pause, cannot quit and
             // cannot get back to the dashboard.
             var pause = MakeButton(parent, "PauseButton", "II", TouchButton.ActionKind.Pause,
-                                   false, Vector2.zero, 110f, new Color(1f, 1f, 1f, 0.18f));
+                                   false, Vector2.zero, 110f, new Color(1f, 1f, 1f, 0.18f), profile);
 
             var pauseRect = (RectTransform)pause.transform;
             pauseRect.anchorMin = pauseRect.anchorMax = new Vector2(1f, 1f);
@@ -256,8 +354,12 @@ namespace FPSKit.EditorTools
 
         private static GameObject MakeButton(Transform parent, string name, string label,
                                             TouchButton.ActionKind action, bool toggle,
-                                            Vector2 anchoredPosition, float size, Color color)
+                                            Vector2 anchoredPosition, float size, Color color,
+                                            TouchProfile profile)
         {
+            if (profile != null)
+                color = new Color(color.r, color.g, color.b, color.a * profile.buttonOpacity);
+
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(TouchButton));
             go.transform.SetParent(parent, false);
 
@@ -275,6 +377,7 @@ namespace FPSKit.EditorTools
             button.action = action;
             button.toggle = toggle;
             button.target = image;
+            button.profile = profile;
             button.activeColor = new Color(color.r, color.g, color.b, Mathf.Min(1f, color.a + 0.45f));
 
             // Label

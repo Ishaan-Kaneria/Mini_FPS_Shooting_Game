@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -44,6 +45,20 @@ namespace FPSKit.EditorTools
 
         /// <summary>Turns a job that reports by default into one that acts.</summary>
         private const string ApplyArg = "-fpskitApply";
+
+        /// <summary>Overrides the Android application id for one build.</summary>
+        private const string AppIdArg = "-fpskitAppId";
+
+        /// <summary>Marketing version ("1.2.0") and the integer Play files it under.</summary>
+        private const string VersionArg = "-fpskitVersion";
+        private const string VersionCodeArg = "-fpskitVersionCode";
+
+        /// <summary>Build a sideloadable APK instead of the AAB Play wants.</summary>
+        private const string ApkArg = "-fpskitApk";
+
+        /// <summary>Prefixes for the throwaway scene copies that carry the touch layer.</summary>
+        private const string WebStagingTag = "_WebGLStaging_";
+        private const string AndroidStagingTag = "_AndroidStaging_";
 
         /// <summary>
         /// Folder name under Assets/WebGLTemplates that holds the page the build ships.
@@ -267,6 +282,18 @@ namespace FPSKit.EditorTools
         /// all directions, crouch, jump, fire, reload and aim.
         /// </summary>
         public static void VerifyControls() => FPSKitControlsTest.VerifyControls();
+
+        /// <summary>
+        /// Builds the on-screen control layer into a real arena and asserts every part
+        /// of it is present, wired and not overlapping.
+        ///
+        /// The touch layer is added only while staging a mobile build, so until this
+        /// existed it was exercised by nothing until a player had the finished app. A
+        /// control that failed to wire does not throw and does not log: it produces a
+        /// game where the thumb does nothing, which a player cannot tell apart from the
+        /// game having frozen.
+        /// </summary>
+        public static void VerifyTouch() => FPSKitTouchTest.VerifyTouch();
 
         /// <summary>
         /// Builds one scene and then asserts it is actually playable.
@@ -549,46 +576,15 @@ namespace FPSKit.EditorTools
                 ConfigureWebGL(fallback);
 
                 // The dashboard first: index 0 is what the player boots into.
-                var scenes = new List<string> { menu };
                 var staged = new List<string>();
+                var scenes = StageTouchScenes(menu, WebStagingTag, staged);
 
                 try
                 {
-                    foreach (string themeName in FPSKitThemes.Names)
-                    {
-                        string source = $"Assets/FPSKit_Generated/Scenes/" +
-                                        $"{themeName.Replace(" ", "")}.unity";
-
-                        if (!File.Exists(source))
-                        {
-                            Debug.LogWarning($"[FPSKitBatch] {source} is missing and is being " +
-                                             "left out of the build. Run BuildAllThemes.");
-                            continue;
-                        }
-
-                        // The touch layer goes into a throwaway copy rather than into the
-                        // scene itself. Saving it back would leave a generated scene
-                        // carrying something the builder does not put there, which the
-                        // next BuildScene would silently wipe -- a half-state that is
-                        // worse than either end of it.
-                        string copy = $"Assets/FPSKit_Generated/Scenes/_WebGLStaging_" +
-                                      $"{themeName.Replace(" ", "")}.unity";
-
-                        var scene = EditorSceneManager.OpenScene(source, OpenSceneMode.Single);
-                        FPSKitMobileControls.AddMobileControls(askFirst: false);
-                        EditorSceneManager.SaveScene(scene, copy, saveAsCopy: true);
-
-                        staged.Add(copy);
-                        scenes.Add(copy);
-                    }
-
-                    if (scenes.Count < 2)
-                        throw new Exception("no arenas were available to build.");
-
                     // The dashboard loads arenas by name, and a staged copy is called
                     // something else -- so the catalog has to point at the staged names
                     // for the duration of the build.
-                    RemapCatalogToStaged(staged);
+                    RemapCatalogToStaged(staged, WebStagingTag);
 
                     var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                     {
@@ -620,6 +616,302 @@ namespace FPSKit.EditorTools
             });
         }
 
+        /// <summary>
+        /// Copies every arena, drops the on-screen controls into the copy, and returns
+        /// the scene list to build -- dashboard first, because index 0 is what the
+        /// player boots into.
+        ///
+        /// <b>The touch layer goes into a throwaway copy rather than into the scene.</b>
+        /// Saving it back would leave a generated scene carrying something the builder
+        /// does not put there, which the next BuildScene would silently wipe -- a
+        /// half-state worse than either end of it.
+        ///
+        /// Which is exactly why this has to be shared rather than copied per platform.
+        /// A phone build without it is not a broken-looking game, it is a game with no
+        /// controls at all: TouchControls turns MobileInput on because
+        /// Application.isMobilePlatform is true, and then there is no joystick, no look
+        /// area and no buttons in the scene for it to read. The player lands in an arena
+        /// and cannot move, look or fire, and nothing anywhere says why.
+        /// </summary>
+        private static List<string> StageTouchScenes(string menuScene, string tag,
+                                                     List<string> staged)
+        {
+            var scenes = new List<string> { menuScene };
+
+            foreach (string themeName in FPSKitThemes.Names)
+            {
+                string bare = themeName.Replace(" ", "");
+                string source = $"Assets/FPSKit_Generated/Scenes/{bare}.unity";
+
+                if (!File.Exists(source))
+                {
+                    Debug.LogWarning($"[FPSKitBatch] {source} is missing and is being left out " +
+                                     "of the build. Run BuildAllThemes.");
+                    continue;
+                }
+
+                string copy = $"Assets/FPSKit_Generated/Scenes/{tag}{bare}.unity";
+
+                var scene = EditorSceneManager.OpenScene(source, OpenSceneMode.Single);
+                FPSKitMobileControls.AddMobileControls(askFirst: false);
+                EditorSceneManager.SaveScene(scene, copy, saveAsCopy: true);
+
+                staged.Add(copy);
+                scenes.Add(copy);
+            }
+
+            if (scenes.Count < 2) throw new Exception("no arenas were available to build.");
+
+            return scenes;
+        }
+
+        // ==================================================================
+        /// <summary>
+        /// Builds an Android App Bundle for Google Play, or an APK for a real device.
+        ///
+        ///   Tools/unity-batch.sh FPSKitBatch.BuildAndroid -buildTarget Android
+        ///   ... -fpskitApk                     sideloadable APK instead of an AAB
+        ///   ... -fpskitAppId com.you.game      overrides the application id
+        ///   ... -fpskitVersion 1.1.0 -fpskitVersionCode 4
+        ///
+        /// Ships the dashboard and every arena through <see cref="StageTouchScenes"/>,
+        /// which is not optional on a phone: without it the game has no controls at all.
+        ///
+        /// Signing comes from the environment and never from the repository --
+        /// FPSKIT_KEYSTORE, FPSKIT_KEYSTORE_PASS, FPSKIT_KEY_ALIAS, FPSKIT_KEY_PASS. With
+        /// none of them set the output is debug-signed, which runs on a device and is
+        /// rejected by Play; the build says so rather than letting that be discovered at
+        /// upload time.
+        /// </summary>
+        public static void BuildAndroid()
+        {
+            Run(() =>
+            {
+                bool apk = HasFlag(ApkArg);
+                string output = ReadArg(OutputArg) ??
+                                $"Build/Android/{SafeFileName(PlayerSettings.productName)}" +
+                                (apk ? ".apk" : ".aab");
+
+                string menu = FPSKitMenuBuilder.MenuScenePath;
+                if (!File.Exists(menu))
+                    throw new Exception($"{menu} is missing. Run BuildDashboard first.");
+
+                ConfigureAndroid(apk);
+
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output)));
+
+                var staged = new List<string>();
+                var scenes = StageTouchScenes(menu, AndroidStagingTag, staged);
+
+                try
+                {
+                    RemapCatalogToStaged(staged, AndroidStagingTag);
+
+                    var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                    {
+                        scenes = scenes.ToArray(),
+                        locationPathName = output,
+                        target = BuildTarget.Android,
+                        targetGroup = BuildTargetGroup.Android,
+                        options = BuildOptions.None,
+                    });
+
+                    var summary = report.summary;
+
+                    if (summary.result != BuildResult.Succeeded)
+                        throw new Exception($"Android build {summary.result} with " +
+                                            $"{summary.totalErrors} error(s)");
+
+                    Debug.Log($"[FPSKitBatch] Android build succeeded -> {output} " +
+                              $"({scenes.Count} scenes, {summary.totalSize / 1048576f:0.0} MB, " +
+                              $"{summary.totalTime.TotalMinutes:0.0} min)");
+                }
+                finally
+                {
+                    RestoreCatalog();
+
+                    foreach (string copy in staged) AssetDatabase.DeleteAsset(copy);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Everything a Play upload depends on, set in code rather than left to whatever
+        /// the last person to open the Inspector chose.
+        /// </summary>
+        private static void ConfigureAndroid(bool apk)
+        {
+            string id = ResolveApplicationId();
+
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, id);
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android,
+                                               ScriptingImplementation.IL2CPP);
+
+            // Both architectures. ARM64 alone satisfies Play's 64-bit rule and is what
+            // the project had, but it also refuses to install on a 32-bit-only phone --
+            // which is exactly the hardware most likely to be somebody's only one.
+            PlayerSettings.Android.targetArchitectures =
+                AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
+
+            PlayerSettings.Android.minSdkVersion = (AndroidSdkVersions)MinSdk;
+
+            // Explicit, not Automatic. Automatic means "the highest SDK installed", and
+            // a preview SDK is a thing an editor install can quietly acquire -- an app
+            // targeting one is not publishable, and the setting that caused it reads as
+            // the sensible choice.
+            PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)TargetSdk;
+
+            // The game has no network code of any kind, so it must not ask for the
+            // network. Unity adds INTERNET by default; a permission in the manifest is
+            // something a player is shown and something the Data Safety form has to
+            // answer for, and "we do not use it" is not an answer.
+            PlayerSettings.Android.forceInternetPermission = false;
+            PlayerSettings.Android.forceSDCardPermission = false;
+
+            PlayerSettings.Android.androidIsGame = true;
+            PlayerSettings.Android.useAPKExpansionFiles = false;
+            EditorUserBuildSettings.buildAppBundle = !apk;
+
+            FPSKitGraphics.ApplyOrientation();
+
+            string version = ReadArg(VersionArg);
+            if (!string.IsNullOrWhiteSpace(version)) PlayerSettings.bundleVersion = version;
+
+            string code = ReadArg(VersionCodeArg);
+            if (int.TryParse(code, out int parsed))
+            {
+                if (parsed <= 0) throw new Exception($"{VersionCodeArg} must be a positive integer.");
+                PlayerSettings.Android.bundleVersionCode = parsed;
+            }
+
+            ConfigureSigning();
+
+            Debug.Log($"[FPSKitBatch] Android: id \"{id}\", version " +
+                      $"{PlayerSettings.bundleVersion} (code {PlayerSettings.Android.bundleVersionCode}), " +
+                      $"minSdk {MinSdk}, targetSdk {TargetSdk}, IL2CPP, ARMv7+ARM64, " +
+                      $"{(apk ? "APK" : "AAB")}, no INTERNET permission");
+        }
+
+        /// <summary>Android 8.0. Below this the 64-bit and IL2CPP story stops being worth it.</summary>
+        private const int MinSdk = 26;
+
+        /// <summary>
+        /// The API level the app declares it was written for. Play enforces a floor that
+        /// rises every year, so this is a number to check against the Console before a
+        /// release rather than one to set once and forget.
+        /// </summary>
+        private const int TargetSdk = 36;
+
+        /// <summary>
+        /// Application ids that must never reach Play, because they are somebody else's
+        /// name or an obvious placeholder.
+        /// </summary>
+        private static readonly string[] ForbiddenIdFragments =
+        {
+            "unity.template", "unitytechnologies", "unity3d", "defaultcompany",
+            "com.company", "com.example", "com.mycompany", "yourcompany", "changeme"
+        };
+
+        /// <summary>
+        /// The application id to build with, refusing anything that would be a permanent
+        /// mistake.
+        ///
+        /// <b>This is the one setting in the project that cannot be taken back.</b> An
+        /// application id is the app's identity on Google Play: after the first upload it
+        /// can never be changed, by anyone, and changing your mind means a new listing
+        /// with no installs, no reviews and no history. The project shipped with Unity's
+        /// URP template id -- com.UnityTechnologies.com.unity.template.urpblank -- which
+        /// is both a placeholder and a claim to be Unity Technologies, and it would have
+        /// been permanent the moment anybody pressed upload.
+        ///
+        /// So a build refuses rather than warns. A warning in a log is read after the
+        /// upload.
+        /// </summary>
+        private static string ResolveApplicationId()
+        {
+            string id = ReadArg(AppIdArg);
+
+            if (string.IsNullOrWhiteSpace(id))
+                id = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
+
+            if (string.IsNullOrWhiteSpace(id))
+                throw new Exception($"No Android application id is set. Pass {AppIdArg} com.you.game");
+
+            foreach (string bad in ForbiddenIdFragments)
+                if (id.IndexOf(bad, StringComparison.OrdinalIgnoreCase) >= 0)
+                    throw new Exception(
+                        $"The Android application id is \"{id}\", which contains \"{bad}\" -- a " +
+                        "placeholder or somebody else's name. An application id is permanent " +
+                        "once the app is on Google Play and can never be changed afterwards, so " +
+                        $"this build is refused. Set your own with {AppIdArg} com.yourdomain.game");
+
+            // Play's own rule: two or more segments, each starting with a letter, and
+            // nothing in them but letters, digits and underscores.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    id, @"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$"))
+                throw new Exception(
+                    $"\"{id}\" is not a valid Android application id. It needs at least two " +
+                    "dot-separated segments, each starting with a letter and containing only " +
+                    "letters, digits and underscores -- for example com.yourdomain.game");
+
+            return id;
+        }
+
+        /// <summary>
+        /// Signing, taken from the environment and never from the repository.
+        ///
+        /// A keystore committed to a public repository is a signing key published to the
+        /// world, and the upload key is the only thing that proves an update to Play came
+        /// from you. The .gitignore refuses the file types; this refuses to want them
+        /// anywhere near the project in the first place.
+        ///
+        /// An unsigned build is not failed, because it is exactly what you want for a
+        /// device test -- but it is stated plainly, because a debug-signed bundle is
+        /// rejected at upload and the message Play gives for it is not obvious.
+        /// </summary>
+        private static void ConfigureSigning()
+        {
+            string store = Environment.GetEnvironmentVariable("FPSKIT_KEYSTORE");
+            string storePass = Environment.GetEnvironmentVariable("FPSKIT_KEYSTORE_PASS");
+            string alias = Environment.GetEnvironmentVariable("FPSKIT_KEY_ALIAS");
+            string aliasPass = Environment.GetEnvironmentVariable("FPSKIT_KEY_PASS");
+
+            bool complete = !string.IsNullOrEmpty(store) && !string.IsNullOrEmpty(storePass) &&
+                            !string.IsNullOrEmpty(alias) && !string.IsNullOrEmpty(aliasPass);
+
+            if (!complete)
+            {
+                PlayerSettings.Android.useCustomKeystore = false;
+
+                Debug.LogWarning(
+                    "[FPSKitBatch] No signing key in the environment, so this build is " +
+                    "debug-signed. It installs on a device and Google Play will reject it. " +
+                    "Set FPSKIT_KEYSTORE, FPSKIT_KEYSTORE_PASS, FPSKIT_KEY_ALIAS and " +
+                    "FPSKIT_KEY_PASS to sign it for upload.");
+
+                return;
+            }
+
+            if (!File.Exists(store))
+                throw new Exception($"FPSKIT_KEYSTORE points at \"{store}\", which does not exist.");
+
+            PlayerSettings.Android.useCustomKeystore = true;
+            PlayerSettings.Android.keystoreName = store;
+            PlayerSettings.Android.keystorePass = storePass;
+            PlayerSettings.Android.keyaliasName = alias;
+            PlayerSettings.Android.keyaliasPass = aliasPass;
+
+            // The path only. Never the passwords, and never the alias -- a log is a file
+            // that gets pasted into issues.
+            Debug.Log($"[FPSKitBatch] Signing with the keystore at {store}");
+        }
+
+        private static string SafeFileName(string value)
+        {
+            foreach (char bad in Path.GetInvalidFileNameChars()) value = value.Replace(bad, '_');
+            return value.Replace(" ", "");
+        }
+
         /// <summary>Scene name each catalog entry had before the build renamed it.</summary>
         private static readonly Dictionary<string, string> OriginalSceneNames =
             new Dictionary<string, string>();
@@ -632,7 +924,7 @@ namespace FPSKit.EditorTools
         /// would report the arena as missing from Build Settings and refuse to start.
         /// Undone in RestoreCatalog, which the build's finally block always reaches.
         /// </summary>
-        private static void RemapCatalogToStaged(List<string> staged)
+        private static void RemapCatalogToStaged(List<string> staged, string tag)
         {
             var catalog = AssetDatabase.LoadAssetAtPath<ArenaCatalog>(FPSKitMenuBuilder.CatalogPath);
             if (catalog == null) return;
@@ -642,7 +934,7 @@ namespace FPSKit.EditorTools
             foreach (string path in staged)
             {
                 string stagedName = Path.GetFileNameWithoutExtension(path);
-                string realName = stagedName.Replace("_WebGLStaging_", "");
+                string realName = stagedName.Replace(tag, "");
 
                 var entry = catalog.Find(realName);
                 if (entry == null) continue;

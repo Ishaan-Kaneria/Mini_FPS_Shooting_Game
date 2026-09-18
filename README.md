@@ -358,6 +358,9 @@ Tools/unity-batch.sh FPSKitBatch.ResetLevelSets         # re-stamp the built-in 
 Tools/unity-batch.sh FPSKitBatch.ResetStore             # re-stamp the built-in stock and prices
 Tools/unity-batch.sh FPSKitBatch.VerifyReplay           # play three times over, assert every run is clean
 Tools/unity-batch.sh FPSKitBatch.VerifyStatics          # every static resets between play sessions
+Tools/unity-batch.sh FPSKitBatch.VerifyTouch            # the on-screen controls build and wire
+Tools/unity-batch.sh FPSKitBatch.PruneMaterials         # report generated materials nothing references
+Tools/unity-batch.sh FPSKitBatch.BuildAndroid -buildTarget Android   # App Bundle for Google Play
 ```
 
 ### Publishing a browser build
@@ -417,6 +420,85 @@ holding the gun they started with.
 `VerifyBuild` is the one worth running in CI. A build that throws no exception proves very little — the builder wires dozens of references by hand, and a null one shows up as a black screen or a level that never starts, not as an error. It checks the things that fail silently: the player rig and its camera, the weapon's data asset, the enemy roster and its boss entry, the arena's level set, the bomb thrower and its aim indicator, every store item's prefabs, every HUD binding, the results screen, and whether the NavMesh actually baked.
 
 Every entry point sets its own exit code, so a scene that failed to build causes the run to fail instead of reporting green. The script refuses to start while the Unity editor holds the project lock.
+
+---
+
+## Touch controls
+
+On a phone the game shows an on-screen layer: a floating stick on the left, a look
+surface on the right, and a thumb cluster of actions. Three things make it playable
+rather than merely present.
+
+**Press and drag on FIRE.** The trigger stays down while the same drag turns the view, so
+the right thumb aims and shoots at once. Holding a fire button that pins your aiming thumb
+is what makes most phone shooters feel broken.
+
+**Push the stick to run.** Past 85% of full travel the player sprints, and it stays
+sprinting while you steer. Running costs no button press, because the sprint button and
+the look surface want the same thumb.
+
+**Aim assist is on, and it is subtle.** The look slows while the crosshair is near a
+target, and is drawn gently toward it *only while you are already turning or firing*. It
+tracks centre mass, never heads, and never through walls. A thumb resolves about a
+degree where a mouse resolves a hundredth of one; without assist a phone player is being
+tested on something nobody can do.
+
+Everything is tuned in `FPSKit_Generated/TouchProfile.asset` — sensitivity, sights
+multiplier, stick size, sprint threshold, assist strength. Sizes are in millimetres and
+sensitivity is corrected for screen density, so the same settings feel the same on a
+cheap 720p phone and a flagship.
+
+```bash
+Tools/unity-batch.sh FPSKitBatch.VerifyTouch   # the layer builds, wires and does not overlap
+```
+
+## Android and Google Play
+
+The game builds an Android App Bundle for Play, or an APK you can sideload:
+
+```bash
+Tools/unity-batch.sh FPSKitBatch.BuildAndroid -buildTarget Android
+Tools/unity-batch.sh FPSKitBatch.BuildAndroid -buildTarget Android -fpskitApk
+Tools/unity-batch.sh FPSKitBatch.BuildAndroid -buildTarget Android \
+    -fpskitAppId com.yourdomain.game -fpskitVersion 1.1.0 -fpskitVersionCode 4
+```
+
+It ships the dashboard and all six arenas, each staged through
+`FPSKitMobileControls` so the on-screen controls are in the build. That step is not
+cosmetic: the generated arenas do not contain the touch layer, so a build without it
+puts the player in a level they cannot move, look or fire in.
+
+**The application id is permanent.** `com.ishaankaneria.minifpsshootinggame` is a
+placeholder until you own a domain — change it *before* your first upload, because after
+that Google Play will not let you or anyone else change it, and a different id means a
+new listing with no installs and no reviews. The build refuses any id that looks like a
+template or somebody else's name rather than warning about it.
+
+**Signing never touches the repository.** This repo is public, so a committed keystore is
+a signing key published to the world, and the upload key is the only thing proving an
+update came from you. Pass it through the environment:
+
+```bash
+export FPSKIT_KEYSTORE=/secure/path/upload.keystore
+export FPSKIT_KEYSTORE_PASS=... FPSKIT_KEY_ALIAS=upload FPSKIT_KEY_PASS=...
+```
+
+Without them the build is debug-signed — fine on a device, rejected by Play, and it says
+so rather than letting you find out at upload time. `.gitignore` refuses `*.keystore`,
+`*.jks`, `*.p12`, `*.pepk` and `keystore.properties` by pattern. Enrol in **Play App
+Signing** so a lost or leaked upload key can be reset instead of ending the app.
+
+What the build sets for you: IL2CPP, ARMv7 + ARM64, `minSdk` 26, an explicit `targetSdk`
+(not "Automatic", which can pick up a preview SDK and make the app unpublishable),
+landscape orientation, and **no INTERNET permission** — the game has no network code, so
+it should not ask for the network.
+
+Still yours to do in the Play Console: a privacy policy URL, the content rating
+questionnaire (answer the violence questions honestly), store listing art, and the Data
+Safety form. That last one can truthfully say **no data collected and none shared** —
+there is no analytics (every service in `UnityConnectSettings.asset` is disabled), no
+`UnityWebRequest`, `HttpClient` or `System.Net` anywhere in `Assets/Scripts/`, and
+progress is `PlayerPrefs` on the device. Keep it that way and the declaration stays true.
 
 ---
 

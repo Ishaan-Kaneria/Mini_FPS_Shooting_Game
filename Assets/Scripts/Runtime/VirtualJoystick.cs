@@ -23,12 +23,22 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
     public RectTransform handle;
 
     [Tooltip("Pixels of travel at the canvas reference resolution before the stick is " +
-             "fully pushed.")]
+             "fully pushed. Overridden by the profile's physical radius when one is set.")]
     public float radius = 140f;
 
     [Tooltip("Below this the stick reads as centred, which stops thumb drift creeping " +
              "you forward.")]
     [Range(0f, 0.5f)] public float deadZone = 0.15f;
+
+    [Tooltip("Optional. Supplies the stick's physical size, its dead zone and the " +
+             "push-to-sprint threshold. Without one the pixel values above apply.")]
+    public TouchProfile profile;
+
+    /// <summary>
+    /// Latched while a full push is sprinting, so easing off to steer does not drop it.
+    /// Cleared when the stick comes back through the dead zone -- see UpdateSprint.
+    /// </summary>
+    bool _sprintLatched;
 
     [Tooltip("Hide the pad until a thumb is down. A ring sitting in the corner of the " +
              "screen suggests the stick only works there, which is the opposite of true.")]
@@ -48,6 +58,7 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
     {
         _pointerId = int.MinValue;
         MobileInput.Move = Vector2.zero;
+        SetSprint(false);
         ShowPad(!hideWhenIdle);
     }
 
@@ -70,11 +81,72 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
         if (eventData.pointerId != _pointerId) return;
         if (!LocalPoint(eventData, out Vector2 local)) return;
 
-        Vector2 offset = Vector2.ClampMagnitude(local - _origin, radius);
+        float reach = Reach;
+
+        Vector2 offset = Vector2.ClampMagnitude(local - _origin, reach);
         if (handle != null) handle.anchoredPosition = offset;
 
-        Vector2 value = offset / radius;
-        MobileInput.Move = value.magnitude < deadZone ? Vector2.zero : value;
+        Vector2 value = offset / reach;
+        float push = value.magnitude;
+
+        float zone = profile != null ? profile.stickDeadZone : deadZone;
+        MobileInput.Move = push < zone ? Vector2.zero : value;
+
+        UpdateSprint(push, zone);
+    }
+
+    /// <summary>
+    /// Full travel in canvas units, from the profile's physical radius when there is one.
+    ///
+    /// Physical rather than pixel, because a thumb is the same size on every phone and a
+    /// pixel is not. A stick tuned to 140px is a comfortable roll on one device and a
+    /// reach across the palm on another, and the player feels that as the game being
+    /// badly made rather than as a units problem.
+    /// </summary>
+    float Reach
+    {
+        get
+        {
+            if (profile == null) return Mathf.Max(1f, radius);
+
+            var canvas = _rect != null ? _rect.GetComponentInParent<Canvas>() : null;
+            float scale = canvas != null ? canvas.scaleFactor : 1f;
+
+            return Mathf.Max(1f, TouchMetrics.MinimumTouchSize(profile.stickRadiusMm, scale));
+        }
+    }
+
+    /// <summary>
+    /// Sprint by pushing the stick to its edge, so running costs no button.
+    ///
+    /// The button still exists and still works -- they are two independent sources on
+    /// MobileInput for exactly that reason -- but the stick is the one that matters. The
+    /// sprint button and the look surface both want the right thumb, so a sprint that
+    /// costs a button press is a sprint taken while unable to aim, which is the moment
+    /// you least want to be blind.
+    ///
+    /// It latches because steering is not stopping. Without the latch, easing the stick
+    /// off full push to turn a corner drops the sprint, and a chase becomes a rapid
+    /// flicker in and out of running that reads as the game deciding on its own.
+    /// </summary>
+    void UpdateSprint(float push, float deadZoneFraction)
+    {
+        if (profile == null)
+        {
+            if (_sprintLatched) SetSprint(false);
+            return;
+        }
+
+        if (push >= profile.sprintPush) SetSprint(true);
+        else if (!profile.sprintLatches || push <= deadZoneFraction) SetSprint(false);
+    }
+
+    void SetSprint(bool on)
+    {
+        if (_sprintLatched == on) return;
+
+        _sprintLatched = on;
+        MobileInput.SetSprintStick(on);
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -83,6 +155,7 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
 
         _pointerId = int.MinValue;
         MobileInput.Move = Vector2.zero;
+        SetSprint(false);
 
         if (handle != null) handle.anchoredPosition = Vector2.zero;
         ShowPad(!hideWhenIdle);

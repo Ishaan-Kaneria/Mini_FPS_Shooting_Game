@@ -15,8 +15,28 @@ public static class MobileInput
 
     public static Vector2 Move;      // -1..1 per axis, from the joystick
     public static bool Aim;
-    public static bool Sprint;
     public static bool Crouch;
+
+    /// <summary>
+    /// True while anything on screen is asking to sprint.
+    ///
+    /// Two controls can ask, and they overlap the same way the two fire sources do: the
+    /// sprint button while it is toggled on, and the move stick while it is pushed past
+    /// <see cref="TouchProfile.sprintPush"/>. Sharing one bool would mean whichever
+    /// wrote last won -- easing the stick back to steer would switch off a sprint the
+    /// player had toggled deliberately, and letting go of the stick would clear the
+    /// button's state with no way to see why.
+    /// </summary>
+    public static bool Sprint => _sprintButton || _sprintStick;
+
+    static bool _sprintButton;
+    static bool _sprintStick;
+
+    /// <summary>Toggled state of the on-screen sprint button.</summary>
+    public static void SetSprintButton(bool on) => _sprintButton = on;
+
+    /// <summary>Set while the move stick is pushed far enough to mean "run".</summary>
+    public static void SetSprintStick(bool on) => _sprintStick = on;
 
     /// <summary>
     /// Held while the on-screen bomb button is down. A held flag rather than a queued
@@ -125,7 +145,8 @@ public static class MobileInput
     {
         Move = Vector2.zero;
         _lookDelta = Vector2.zero;
-        Aim = Sprint = Crouch = BombAim = false;
+        Aim = Crouch = BombAim = false;
+        _sprintButton = _sprintStick = false;
         _fireButton = _fireTap = false;
         _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = false;
     }

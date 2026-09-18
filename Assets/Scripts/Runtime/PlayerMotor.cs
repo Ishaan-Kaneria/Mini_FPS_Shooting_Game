@@ -749,12 +749,4 @@ public class PlayerMotor : MonoBehaviour
         footstepSource.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
         footstepSource.PlayOneShot(clip, footstepVolume * (IsCrouching ? 0.4f : 1f));
     }
-
-    public void Teleport(Vector3 position)
-    {
-        _cc.enabled = false;
-        transform.position = position;
-        _velocity = Vector3.zero;
-        _cc.enabled = true;
-    }
 }

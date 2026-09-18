@@ -91,22 +91,6 @@ public class GameDirector : MonoBehaviour
     [Tooltip("Scene the dashboard lives in. Loaded when a run ends, however it ended.")]
     public string menuScene = "Menu";
 
-    /// <summary>
-    /// Whether closing the application outright is a thing this build can do.
-    ///
-    /// This is no longer what the pause menu's quit key does -- that returns to the
-    /// dashboard, which works everywhere. It is only consulted by the dashboard's own
-    /// Exit button, which really does mean "leave", and which on the web hands over to
-    /// WebDevice.Exit rather than calling Application.Quit and leaving a frozen canvas
-    /// on the page with no way back but a reload.
-    /// </summary>
-    public static bool CanQuit =>
-#if UNITY_WEBGL && !UNITY_EDITOR
-        false;
-#else
-        true;
-#endif
-
     public int Score { get; private set; }
     public int Kills { get; private set; }
     public int Headshots { get; private set; }
@@ -126,9 +110,6 @@ public class GameDirector : MonoBehaviour
     public int Combo { get; private set; }
 
     public float ComboMultiplier { get; private set; } = 1f;
-
-    /// <summary>Seconds left on the chain, for a HUD timer bar. 0 when there is no chain.</summary>
-    public float ComboRemaining => Combo <= 1 ? 0f : Mathf.Max(0f, _comboExpiry - Time.time);
 
     public bool IsPaused { get; private set; }
 
@@ -364,8 +345,6 @@ public class GameDirector : MonoBehaviour
     // ======================================================================
     // Pause
     // ======================================================================
-    public void TogglePause() => SetPaused(!IsPaused);
-
     public void SetPaused(bool paused)
     {
         if (IsGameOver || IsPaused == paused) return;

@@ -172,7 +172,6 @@ public class LevelManager : MonoBehaviour
     public int TotalEnemies { get; private set; }
 
     public int Killed { get; private set; }
-    public int EnemiesRemaining => _alive.Count + _pendingSpawns;
 
     /// <summary>Enemies removed for being lost rather than killed. Diagnostic only.</summary>
     public int EnemiesDiscarded { get; private set; }

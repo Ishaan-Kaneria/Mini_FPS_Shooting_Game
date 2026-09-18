@@ -9,9 +9,6 @@ EditorBuildSettings:
     path: Assets/FPSKit_Generated/Scenes/Menu.unity
     guid: 633d36dc7460e1ab4afe85bf2827a515
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 1
     path: Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity
     guid: e22de6949a649e44f80d5400bc80c5c6
   - enabled: 1

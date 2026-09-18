@@ -113,8 +113,12 @@ public class MainMenuController : MonoBehaviour
     public Button confirmExitButton;
     public Button cancelExitButton;
 
-    [Tooltip("Hidden in a browser, where there is no application to close -- the button " +
-             "still works there, but it hands over to the page rather than quitting.")]
+    [Tooltip("The Exit Game row. Listed in dashboardOnly so the level select can hide " +
+             "it: a button left switched on behind a full-screen panel is one the " +
+             "pointer can never reach.\n\n" +
+             "It is shown in a browser too, where there is no application to close -- " +
+             "ExitApplication hands over to WebDevice.Exit, which closes the tab if the " +
+             "browser allows it and otherwise replaces the page with a sign-off.")]
     public GameObject exitRow;
 
     [Header("Status")]
@@ -474,10 +478,10 @@ public class MainMenuController : MonoBehaviour
     /// was.
     ///
     /// What was showing is remembered rather than assumed, because some of these are
-    /// conditional: the result strip only appears after a level, and Exit Game is hidden
-    /// in a browser. Switching everything back on unconditionally would announce the
-    /// result of a level that was never played, every time somebody backed out of a
-    /// ladder.
+    /// conditional -- the result strip only appears after a level, and the status line
+    /// only after something went wrong. Switching everything back on unconditionally
+    /// would announce the result of a level that was never played, every time somebody
+    /// backed out of a ladder.
     /// </summary>
     void ShowDashboard(bool shown)
     {

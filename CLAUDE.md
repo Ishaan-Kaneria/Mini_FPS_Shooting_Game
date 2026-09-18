@@ -148,11 +148,14 @@ way a level ever begins.
   steal two of the three.
 - Q is a *scene load*, not `Application.Quit`. That is the whole fix: quitting used to
   call `Application.Quit`, which does nothing in a browser, so the HUD hid the key rather
-  than admit there was nowhere to go. `GameDirector.CanQuit` now only governs the
-  dashboard's **Exit Game** button, which on the web hands over to `WebDevice.Exit` and
-  the `FPSKitExit` jslib export — it closes the tab where the browser allows it and
-  otherwise replaces the page with a sign-off, because `Application.Quit` there just
-  leaves a dead canvas.
+  than admit there was nowhere to go. The dashboard's **Exit Game** button is the only
+  thing left that really means "leave", and it is shown everywhere: on the web
+  `GameDirector.ExitApplication` hands over to `WebDevice.Exit` and the `FPSKitExit`
+  jslib export, which closes the tab where the browser allows it and otherwise replaces
+  the page with a sign-off, because `Application.Quit` there just leaves a dead canvas.
+  There is no longer a `CanQuit` gate — it was a leftover that nothing consulted, and
+  the tooltip claiming the row was hidden in a browser described a build that never
+  shipped.
 - `HUDController.instructionText` is the strip across the top of the arena. It is written
   from the live bindings, never hard-coded, and hidden on a touch-only device. It lists
   the bomb and drink keys **only when the player is carrying that equipment** -- naming a
@@ -335,7 +338,13 @@ inside its attack range" therefore parks it that much *outside* the range, the a
 check never passes, and the whole level gathers around the player and does nothing --
 silently, with no error and every build check green. `EnemyAI.DesiredStandOff` now
 subtracts the brake before choosing a destination, and the prefab's `stoppingDistance`
-is 0.8 rather than 1.5 so there is less of it to pay for. `VerifyCombat` is the
+is 0.8 rather than 1.5 so there is less of it to pay for. **It is a small fixed number
+in both places that set it** -- `FPSKitSceneBuilder` and `FPSKitEnemySetup` -- and never
+derived from the attack range, which is the same bug wearing a formula: at `range * 0.7`
+a 2.2m melee reach keeps 0.66m to stand in and a 25m rifle keeps none, so
+`DesiredStandOff` returns zero, `preferredRangedDistance` stops meaning anything, and
+the shooter settles wherever 17.5m of braking put it. `VerifyCombat` only fights the
+builder's prefab, so the setup tool is the copy that can drift unnoticed. `VerifyCombat` is the
 regression test: it stands the player inside an enemy's reach and fails if nothing hits.
 
 **A shooter is not only a shooter.** `EnemyAI.meleeRange` makes an armed enemy swing
@@ -352,6 +361,20 @@ flinch every tenth of a second and the reaction becomes a stunlock. A hit at or 
 `staggerThreshold` staggers and costs the attack outright. Sustained fire fills a
 suppression bucket and sends the enemy looking for cover (`State.Retreat`), on a
 cooldown, and switched off entirely for bosses and armoured variants.
+
+**Seeing you is rationed; noticing you is not.** `CanSeeTarget` is the one thing every
+enemy does on every frame, and its third test is a physics cast -- forty enemies at
+sixty frames a second is thousands of casts a second on a platform that has to fit in a
+browser tab, for an answer that changes when somebody walks behind a crate. So the cast
+runs at `EnemyAI.sightCheckInterval` (0.1s) and the answer is held between casts, with
+the first one seeded at a random offset in `Awake` so a level's worth of enemies does
+not all cast on the same frame and turn the saving into a stutter. The range and
+field-of-view tests are still made every frame, because they are arithmetic and because
+a failure has to clear the cache rather than leave a stale `true` behind it -- what this
+must never do is delay the cast that *first* sees the player. The field-of-view test is
+also skipped outright once `_hasAlerted`, which is almost the whole of a fight: written
+as `angle > fov && !_hasAlerted` it reads the same and computes an arc cosine per enemy
+per frame to throw the answer away.
 
 Speed is read against the player, who walks at 5.6 m/s and sprints at 8.2. Nothing in
 the roster outruns a sprint and only the two rushers beat a walk: disengaging has to
@@ -588,6 +611,18 @@ Two independent safety nets, both in `LevelManager`:
 `despawnDistance` is force-raised at `Start` if it is not comfortably clear of
 `maxSpawnDistanceFromPlayer`, because a leash inside the spawn ring deletes enemies on
 arrival and presents as "nothing spawns".
+
+**Spawn points are placed geometrically and then snapped onto the navmesh.** Those are
+two different questions, and the open zone is where they come apart:
+`BuildOpenZoneSpawnPoints` shoves a point clear of the river and then clamps it back
+inside the arena, and the clamp can put it straight back over the water, because the
+river meanders and the shove was measured at one `z`. What that costs is invisible --
+the level spawns from the ring it was given, an agent placed off the mesh is discarded
+by the leash on arrival, and the level simply has one fewer direction to arrive from,
+with nothing logged. `FPSKitSceneBuilder.SnapSpawnPointsToNavMesh` runs after
+`BakeNavMesh`, which is the first moment the answer exists at all, widening its search
+(6m, then 18m, then 45m) and warning about anything it still cannot place. `VerifyZone`
+is the regression test.
 
 ## Stars are weighted, and the boss is most of the weight
 

@@ -482,6 +482,11 @@ public class HUDController : MonoBehaviour
     /// <summary>When the equipment counters stop being flashed red. Unscaled.</summary>
     float _bombDeniedUntil, _beltDeniedUntil;
 
+    RectTransform _cachedBombCursor, _bombCursorParent;
+    Canvas _bombCursorCanvas;
+    Image[] _bombCursorImages;
+    int _shownBombCursorValid = Unset;
+
     void UpdateTexts()
     {
         if (ammoText != null && weapon != null) UpdateAmmoText();
@@ -978,6 +983,8 @@ public class HUDController : MonoBehaviour
 
         if (!bombCursor.gameObject.activeSelf) bombCursor.gameObject.SetActive(true);
 
+        CacheBombCursor();
+
         // Placed in world space rather than by anchoredPosition, which is the one way
         // that needs no assumption about the parent's anchors or pivot.
         //
@@ -988,22 +995,50 @@ public class HUDController : MonoBehaviour
         // middle of the screen in the bottom-left corner and everything else off the
         // edge entirely -- so the reticle is simply not on screen, and with the view
         // deliberately held still the whole control reads as a dead mouse.
-        var canvas = bombCursor.GetComponentInParent<Canvas>();
-        var parent = bombCursor.parent as RectTransform;
-
-        if (parent != null && canvas != null)
+        if (_bombCursorParent != null && _bombCursorCanvas != null)
         {
-            var eye = canvas.renderMode == RenderMode.ScreenSpaceOverlay
+            var eye = _bombCursorCanvas.renderMode == RenderMode.ScreenSpaceOverlay
                 ? null
-                : canvas.worldCamera;
+                : _bombCursorCanvas.worldCamera;
 
             if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
-                    parent, bombs.AimScreenPoint, eye, out Vector3 world))
+                    _bombCursorParent, bombs.AimScreenPoint, eye, out Vector3 world))
                 bombCursor.position = world;
         }
 
-        foreach (var image in bombCursor.GetComponentsInChildren<Image>())
-            image.color = bombs.AimValid ? bombCursorColor : bombCursorBlockedColor;
+        // Only on the frame it changes. The cursor is up for as long as the player is
+        // aiming, and repainting five images every one of those frames writes the same
+        // colour it already had a hundred times for each time the answer moves.
+        int valid = bombs.AimValid ? 1 : 0;
+        if (valid == _shownBombCursorValid) return;
+
+        _shownBombCursorValid = valid;
+
+        Color tint = bombs.AimValid ? bombCursorColor : bombCursorBlockedColor;
+        for (int i = 0; i < _bombCursorImages.Length; i++)
+            if (_bombCursorImages[i] != null) _bombCursorImages[i].color = tint;
+    }
+
+    /// <summary>
+    /// Resolves the cursor's canvas, its parent rect and its images once per cursor
+    /// rather than once per frame.
+    ///
+    /// GetComponentsInChildren allocates the array it returns, so calling it from the
+    /// aiming path was a fresh array every frame the ring was up, for a set of images
+    /// that is fixed the moment the cursor is built. Keyed on the transform rather than
+    /// on a flag, so a cursor swapped in the inspector still re-resolves -- and rebuilt
+    /// from scratch if the cache came back null across a mid-play domain reload, which
+    /// an array of Object references survives but is cheap to prove.
+    /// </summary>
+    void CacheBombCursor()
+    {
+        if (_cachedBombCursor == bombCursor && _bombCursorImages != null) return;
+
+        _cachedBombCursor = bombCursor;
+        _bombCursorCanvas = bombCursor.GetComponentInParent<Canvas>();
+        _bombCursorParent = bombCursor.parent as RectTransform;
+        _bombCursorImages = bombCursor.GetComponentsInChildren<Image>();
+        _shownBombCursorValid = Unset;
     }
 
     /// <summary>

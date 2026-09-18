@@ -9,6 +9,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 using Unity.AI.Navigation;
+using UnityEngine.AI;
 
 namespace FPSKit.EditorTools
 {
@@ -234,8 +235,8 @@ namespace FPSKit.EditorTools
 
                 Vector3 candidate = centre + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
 
-                if (!UnityEngine.AI.NavMesh.SamplePosition(candidate, out var hit, 12f,
-                                                           UnityEngine.AI.NavMesh.AllAreas)) continue;
+                if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 12f, NavMesh.AllAreas))
+                    continue;
 
                 var point = new GameObject("Spawn_" + i).transform;
                 point.SetParent(root);
@@ -423,6 +424,7 @@ namespace FPSKit.EditorTools
             var spawnPoints = BuildSpawnPoints();
 
             BakeNavMesh();
+            SnapSpawnPointsToNavMesh(spawnPoints);
 
             var levels = BuildLevelManager(enemyPrefab, spawnPoints, player.transform);
             BuildGameDirector();
@@ -2063,6 +2065,71 @@ namespace FPSKit.EditorTools
             }
 
             return list.ToArray();
+        }
+
+        /// <summary>
+        /// Pulls every spawn point onto the baked navmesh, and says so when one cannot
+        /// be pulled far enough.
+        ///
+        /// Spawn points are placed geometrically -- a ring, or a ring pushed clear of a
+        /// hazard -- and geometry is not the same question as "can an agent stand here".
+        /// The open zone is where the two come apart: `BuildOpenZoneSpawnPoints` shoves
+        /// a point clear of the river and then clamps it back inside the arena, and the
+        /// clamp can put it straight back over the water, because the river meanders and
+        /// the shove was measured at one z.
+        ///
+        /// What that costs is invisible: `LevelManager` spawns from the ring of points
+        /// it was given, an agent placed off the mesh is discarded by the leash on
+        /// arrival, and the level simply has one fewer direction to arrive from. It
+        /// never errors, and nothing on screen says a twelfth of the spawns are gone.
+        ///
+        /// So it runs after the bake, which is the first moment the answer exists at
+        /// all. The search widens rather than using one radius: 6m is the test's own
+        /// tolerance, and a point pushed out over a forty-metre gorge needs more than
+        /// that to come back.
+        /// </summary>
+        private static void SnapSpawnPointsToNavMesh(Transform[] points)
+        {
+            if (points == null) return;
+
+            int moved = 0, stranded = 0;
+
+            foreach (var point in points)
+            {
+                if (point == null) continue;
+
+                Vector3 from = point.position;
+                bool landed = false;
+
+                foreach (float radius in new[] { 6f, 18f, 45f })
+                {
+                    if (!NavMesh.SamplePosition(from, out NavMeshHit hit, radius, NavMesh.AllAreas))
+                        continue;
+
+                    landed = true;
+
+                    if ((hit.position - from).sqrMagnitude > 0.01f)
+                    {
+                        // Kept off the floor by the same margin the ring was placed at, so
+                        // a spawn is never started a millimetre inside the ground.
+                        point.position = new Vector3(hit.position.x, hit.position.y + 0.1f,
+                                                     hit.position.z);
+                        moved++;
+                    }
+
+                    break;
+                }
+
+                if (!landed) stranded++;
+            }
+
+            if (moved > 0)
+                Debug.Log($"[FPSKit] Moved {moved} of {points.Length} spawn points onto the navmesh.");
+
+            if (stranded > 0)
+                Debug.LogWarning($"[FPSKit] {stranded} of {points.Length} spawn points are more than " +
+                                 "45m from any navmesh, so the level has fewer directions to arrive " +
+                                 "from than it was built with.");
         }
 
         private static void BakeNavMesh()

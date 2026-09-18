@@ -78,8 +78,6 @@ public class StorePanel : MonoBehaviour
     /// <summary>Cards currently drawn. Read by the flow test.</summary>
     public int CardCount => _cards.Count;
 
-    public Tab CurrentTab => _tab;
-
     /// <summary>Raised when the player backs out. The dashboard shows the arenas again.</summary>
     public event System.Action Closed;
 

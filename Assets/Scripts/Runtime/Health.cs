@@ -101,9 +101,6 @@ public class Health : MonoBehaviour
     public bool IsInvulnerable => invulnerabilityWindow > 0f &&
                                   Time.time - LastDamageTime < invulnerabilityWindow;
 
-    public bool IsRegenerating => regenerates && !IsDead && Current < maxHealth &&
-                                  Time.time - LastDamageTime >= regenDelay;
-
     /// <summary>Raised before death is evaluated. Second arg is the post-multiplier hit.</summary>
     public event Action<Health, DamageInfo> Damaged;
     public event Action<Health> Died;

@@ -150,7 +150,16 @@ namespace FPSKit.EditorTools
             agent.speed = _moveSpeed;
             agent.angularSpeed = 400f;
             agent.acceleration = 12f;
-            agent.stoppingDistance = Mathf.Max(1f, _attackRange * 0.7f);
+            // Small and fixed, exactly as the scene builder sets it, and deliberately
+            // not derived from the attack range. A NavMeshAgent brakes a full
+            // stoppingDistance short of wherever it is sent, and EnemyAI.DesiredStandOff
+            // has to give that distance back out of the reach it was going to use -- so
+            // range * 0.7 spends most of the reach on the brake. At 2.2m of melee it
+            // left 0.66m to stand in; at 25m of rifle it left none at all, which makes
+            // DesiredStandOff return zero, preferredRangedDistance do nothing, and the
+            // shooter settle wherever 17.5m of braking happened to put it. See the
+            // "reach has to be shared with the brake" rule.
+            agent.stoppingDistance = 0.8f;
             agent.radius = 0.4f;
             agent.height = 1.8f;
 

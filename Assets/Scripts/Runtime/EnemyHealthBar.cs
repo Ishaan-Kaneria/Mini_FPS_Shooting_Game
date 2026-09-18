@@ -94,6 +94,11 @@ public class EnemyHealthBar : MonoBehaviour
     void OnEnable()
     {
         if (_health != null) _health.Changed += OnHealthChanged;
+
+        // Forces the next LateUpdate to write the scale correction, whatever the cache
+        // below is holding. A bar coming back with a rebuilt or reparented root is the
+        // one case where the values it remembers are not the values on the transform.
+        _appliedParentScale = Vector3.negativeInfinity;
     }
 
     void OnDisable()
@@ -127,13 +132,30 @@ public class EnemyHealthBar : MonoBehaviour
         // at the eye makes the row of them fan outwards at the screen edges.
         _root.rotation = _camera.transform.rotation;
 
-        // Parent scale would squash the bar on a resized archetype, so undo it.
+        // Parent scale would squash the bar on a resized archetype, so undo it -- but
+        // only when it has actually moved. An archetype stamps its scale once at spawn
+        // and nothing touches it again, so rewriting localScale and localPosition every
+        // frame dirties the transform of every enemy in the level to put back the values
+        // already there. lossyScale is a matrix decompose besides, which is why it is
+        // read once and reused for both lines.
         Vector3 parentScale = transform.lossyScale;
-        _root.localScale = new Vector3(
-            SafeInverse(parentScale.x), SafeInverse(parentScale.y), SafeInverse(parentScale.z));
 
-        _root.localPosition = Vector3.up * (heightOffset / Mathf.Max(0.0001f, parentScale.y));
+        if ((parentScale - _appliedParentScale).sqrMagnitude > 1e-8f ||
+            !Mathf.Approximately(heightOffset, _appliedHeightOffset))
+        {
+            _appliedParentScale = parentScale;
+            _appliedHeightOffset = heightOffset;
+
+            _root.localScale = new Vector3(
+                SafeInverse(parentScale.x), SafeInverse(parentScale.y), SafeInverse(parentScale.z));
+
+            _root.localPosition = Vector3.up * (heightOffset / Mathf.Max(0.0001f, parentScale.y));
+        }
     }
+
+    /// <summary>What the last scale correction was written for. See LateUpdate.</summary>
+    Vector3 _appliedParentScale = Vector3.negativeInfinity;
+    float _appliedHeightOffset = float.NaN;
 
     static float SafeInverse(float value) => Mathf.Abs(value) < 0.0001f ? 1f : 1f / value;
 

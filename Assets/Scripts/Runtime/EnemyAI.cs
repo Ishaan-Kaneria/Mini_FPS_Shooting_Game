@@ -65,6 +65,16 @@ public class EnemyAI : MonoBehaviour
     public float loseTargetTime = 6f;
     public float repathInterval = 0.2f;
 
+    [Tooltip("Seconds between the line-of-sight raycasts, which is the one thing every " +
+             "enemy does every frame and the most expensive. A level's worth of them at " +
+             "sixty frames a second is thousands of casts a second on a platform that " +
+             "has to fit in a browser tab, for an answer that changes when somebody " +
+             "walks behind a crate.\n\n" +
+             "The range and field-of-view tests are still made every frame -- they are " +
+             "arithmetic -- so this only delays noticing cover, never noticing you. " +
+             "Set it to 0 to cast every frame.")]
+    [Range(0f, 0.5f)] public float sightCheckInterval = 0.1f;
+
     [Tooltip("Keep pathing toward the player even with no line of sight. Essential on a " +
              "large map -- otherwise enemies spawn far away, never see you, and stand idle. " +
              "They still need sight or range to actually attack.")]
@@ -296,6 +306,10 @@ public class EnemyAI : MonoBehaviour
     bool _hasAlerted;
     bool _flashing;
 
+    /// <summary>The last answer CanSeeTarget cast for, and when it may cast again.</summary>
+    bool _sawTarget;
+    float _nextSightCheck;
+
     /// <summary>The one muzzle flash, replayed per shot. See PlayMuzzleFlash.</summary>
     GameObject _muzzleFlash;
 
@@ -350,6 +364,11 @@ public class EnemyAI : MonoBehaviour
 
         if (eyes == null) eyes = transform;
         if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        // Scattered rather than aligned. Every enemy in a level is spawned within a
+        // frame or two of every other, so a shared interval would land all of their
+        // sight casts on the same frame -- the same total work, delivered as a spike.
+        _nextSightCheck = Time.time + Random.value * sightCheckInterval;
 
         _renderers = BodyRenderers();
     }
@@ -781,19 +800,49 @@ public class EnemyAI : MonoBehaviour
     }
 
     // ======================================================================
+    /// <summary>
+    /// Whether the player is visible from the eyes right now.
+    ///
+    /// Three tests in increasing order of cost, and only the last of them is rationed:
+    ///
+    /// - **Range**, squared on both sides rather than taking a square root to compare
+    ///   against a number that is already known.
+    /// - **Field of view**, skipped entirely once alerted. The `!_hasAlerted` term used
+    ///   to be written after the angle, which reads the same and computes an arc cosine
+    ///   for every enemy on every frame of a fight only to throw the answer away --
+    ///   `_hasAlerted` is true for almost the whole of one.
+    /// - **The line itself**, which is a physics cast and is the expensive one. It is
+    ///   made at most every <see cref="sightCheckInterval"/> and the answer is held
+    ///   between casts, with the first one seeded at a random offset in
+    ///   <see cref="Awake"/> so a level's worth of enemies does not cast on the same
+    ///   frame and leave a stutter every tenth of a second.
+    ///
+    /// Holding the answer is safe because of what reads it: freshness feeds
+    /// `loseTargetTime`, which is seconds, and an attack commit, which is already
+    /// re-measured after the wind-up. What it must not do is *delay* the cast that
+    /// first sees the player -- so the two cheap tests still run every frame, and a
+    /// failure clears the cache rather than leaving a stale true behind it.
+    /// </summary>
     bool CanSeeTarget()
     {
-        if (target == null) return false;
+        if (target == null) return _sawTarget = false;
 
         Vector3 origin = eyes.position;
         Vector3 targetPoint = target.position + Vector3.up * 1.4f;
         Vector3 toTarget = targetPoint - origin;
 
-        if (toTarget.magnitude > detectionRadius) return false;
-        if (Vector3.Angle(transform.forward, toTarget) > fieldOfView * 0.5f && !_hasAlerted) return false;
+        if (toTarget.sqrMagnitude > detectionRadius * detectionRadius) return _sawTarget = false;
+
+        if (!_hasAlerted && Vector3.Angle(transform.forward, toTarget) > fieldOfView * 0.5f)
+            return _sawTarget = false;
+
+        if (Time.time < _nextSightCheck) return _sawTarget;
+
+        _nextSightCheck = Time.time + sightCheckInterval;
 
         // Anything on the blocker layers between us breaks the line.
-        return !Physics.Linecast(origin, targetPoint, sightBlockers, QueryTriggerInteraction.Ignore);
+        return _sawTarget = !Physics.Linecast(origin, targetPoint, sightBlockers,
+                                              QueryTriggerInteraction.Ignore);
     }
 
     // ======================================================================

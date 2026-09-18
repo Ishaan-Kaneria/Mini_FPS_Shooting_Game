@@ -163,9 +163,6 @@ public class BombThrower : MonoBehaviour
     /// </summary>
     public BlastSpec Blast => data != null ? data.Resolve(damageMultiplier, radiusBonus) : default;
 
-    /// <summary>Seconds until another bomb can be thrown. 0 when ready.</summary>
-    public float CooldownRemaining => Mathf.Max(0f, _nextThrowTime - Time.time);
-
     /// <summary>True when there is a bomb, a charge for it, and the cooldown has run out.</summary>
     public bool CanThrow => data != null && charges > 0 && Time.time >= _nextThrowTime;
 

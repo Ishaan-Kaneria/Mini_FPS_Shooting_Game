@@ -1294,6 +1294,7 @@ MonoBehaviour:
     m_Bits: 1024
   loseTargetTime: 6
   repathInterval: 0.2
+  sightCheckInterval: 0.1
   relentless: 1
   strafeAmount: 0.35
   strafeFlipInterval: 2.6

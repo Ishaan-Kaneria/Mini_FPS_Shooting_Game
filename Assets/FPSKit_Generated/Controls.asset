@@ -30,6 +30,8 @@ MonoBehaviour:
   sprintKey: 304
   doubleTapWindow: 0.3
   sprintEndsWhenNotAdvancing: 1
+  sprintNeedsMovement: 0
+  sprintDrivesForward: 1
   lookLeft: 0
   lookRight: 0
   lookUp: 0

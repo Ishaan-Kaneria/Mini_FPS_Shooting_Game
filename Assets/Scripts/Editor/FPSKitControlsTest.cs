@@ -55,6 +55,8 @@ namespace FPSKit.EditorTools
 
         // ---- what each burst measured ----
         static float _walkAhead, _sprintAhead, _walkSide, _sprintSide, _crouchAhead;
+        static float _sprintAlone = -1f;
+        static bool _drivesForward = true;
         static bool _sprintedStandingStill, _crouched, _leftTheGround, _aimedDownSights;
         static int _ammoBefore = -1, _ammoAfterFiring = -1, _ammoAfterReload = -1;
 
@@ -75,6 +77,8 @@ namespace FPSKit.EditorTools
                 _step = _frame = 0;
                 _peak = 0f;
                 _walkAhead = _sprintAhead = _walkSide = _sprintSide = _crouchAhead = -1f;
+                _sprintAlone = -1f;
+                _drivesForward = true;
                 _sprintedStandingStill = _crouched = _leftTheGround = _aimedDownSights = false;
                 _ammoBefore = _ammoAfterFiring = _ammoAfterReload = -1;
                 _startedAt = EditorApplication.timeSinceStartup;
@@ -422,6 +426,18 @@ namespace FPSKit.EditorTools
                 case 1: _sprintAhead = speed; break;
                 case 2: _walkSide = speed; break;
                 case 3: _sprintSide = speed; break;
+
+                // The one burst measured at its end rather than at its peak. It begins
+                // at whatever the sideways sprint before it left behind, and friction
+                // sheds that in about ten frames, so the peak would report the previous
+                // burst either way. What is being asked here is whether the player is
+                // still moving two thirds of a second after the only key down was
+                // sprint.
+                case 4:
+                    _sprintAlone = motor.PlanarSpeed01 * motor.sprintSpeed;
+                    _drivesForward = motor.controls == null || motor.controls.sprintDrivesForward;
+                    break;
+
                 case 5: _crouchAhead = speed; break;
                 case 9: if (weapon != null) _ammoAfterReload = weapon.CurrentAmmo; break;
             }
@@ -453,6 +469,7 @@ namespace FPSKit.EditorTools
             Notes.Append($"\n  forward: walk {_walkAhead:0.0} m/s, sprint {_sprintAhead:0.0} m/s");
             Notes.Append($"\n  strafing: walk {_walkSide:0.0} m/s, sprint {_sprintSide:0.0} m/s");
             Notes.Append($"\n  crouched: {_crouchAhead:0.0} m/s");
+            Notes.Append($"\n  sprint key alone: {_sprintAlone:0.0} m/s (drives forward: {_drivesForward})");
             Notes.Append($"\n  ammo {_ammoBefore} -> {_ammoAfterFiring} firing -> {_ammoAfterReload} reloaded");
 
             if (_walkAhead < 0.5f)
@@ -474,6 +491,14 @@ namespace FPSKit.EditorTools
             if (!_sprintedStandingStill)
                 problems.Append("\n  - holding sprint while standing still does not engage the sprint, " +
                                 "so the first step out of cover is at walking pace");
+
+            // The sprint key with nothing else held has to be a run. A key that only
+            // does something in combination with another key is one the player reports
+            // as broken, because from the outside it is.
+            if (_drivesForward && _sprintAlone < _walkAhead * 0.9f)
+                problems.Append($"\n  - the sprint key on its own does not run ({_sprintAlone:0.0} m/s " +
+                                $"against a {_walkAhead:0.0} m/s walk): sprint only works while a " +
+                                "direction key is also held");
 
             if (!_crouched)
                 problems.Append("\n  - the crouch key did not crouch");

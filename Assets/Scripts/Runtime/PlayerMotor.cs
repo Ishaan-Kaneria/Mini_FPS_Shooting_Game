@@ -488,6 +488,25 @@ public class PlayerMotor : MonoBehaviour
     public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount));
 
     /// <summary>
+    /// Whether the sprint key itself is down *and* is allowed to carry the player
+    /// forward on its own.
+    ///
+    /// A player who presses sprint with no direction key down means "run", not "stand
+    /// here at the ready": a key that changes a speed you do not currently have is a
+    /// key that does nothing, and the only thing they can tell from the outside is that
+    /// sprint works with the movement keys and not without them. So the key supplies
+    /// the direction when nothing else does.
+    ///
+    /// It asks for the key to be *held* rather than for <see cref="IsSprinting"/>,
+    /// which is why a double-tap-latched sprint (the ArrowsAndSpace preset, where the
+    /// sprint key is also the fire key) does not turn into a permanent auto-run the
+    /// player never asked for and cannot see how to stop.
+    /// </summary>
+    bool SprintDrivesForward =>
+        controls != null && controls.sprintDrivesForward &&
+        (MobileInput.Sprint || ControlSettings.Held(controls.sprintKey));
+
+    /// <summary>
     /// Whether the player is sprinting this frame.
     ///
     /// Two things this deliberately does *not* require, both of which it used to:
@@ -504,12 +523,19 @@ public class PlayerMotor : MonoBehaviour
     ///   between a control that answers when you press it and one that seems dead
     ///   until you happen to also be moving.
     ///
+    /// And one thing it now supplies rather than requires: with
+    /// <see cref="ControlSettings.sprintDrivesForward"/> on, the key held with no
+    /// direction key down *is* the direction -- see <see cref="SprintDrivesForward"/>.
+    /// So "moving" here is true whenever that key is down, because the key is about to
+    /// produce the movement itself; without that the double-tap scheme drops its latch
+    /// on the same frame it takes it.
+    ///
     /// The double-tap scheme exists so the sprint key can double as the fire key; the
     /// first tap still fires, which is unavoidable when one key carries both jobs.
     /// </summary>
     bool EvaluateSprint(Vector2 moveInput)
     {
-        bool moving = moveInput.sqrMagnitude > 0.01f;
+        bool moving = moveInput.sqrMagnitude > 0.01f || SprintDrivesForward;
         bool allowed = moving || !controls.sprintNeedsMovement;
 
         if (MobileInput.Sprint) return allowed;
@@ -599,6 +625,13 @@ public class PlayerMotor : MonoBehaviour
         if (input.sqrMagnitude > 1f) input.Normalize();
 
         IsSprinting = EvaluateSprint(input) && IsGrounded && !IsCrouching;
+
+        // The sprint key on its own is a run. A direction key always wins -- this only
+        // ever fills in for no direction at all -- so nothing a player steers with is
+        // overridden, and the substitution happens after the sprint is decided so that
+        // it cannot talk itself into a sprint the controls did not grant.
+        if (IsSprinting && input.sqrMagnitude < 0.01f && SprintDrivesForward)
+            input = new Vector2(0f, 1f);
 
         float targetSpeed = IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed);
         targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier);

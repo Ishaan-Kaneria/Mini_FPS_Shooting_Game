@@ -86,10 +86,30 @@ sprinting is a sprint.
 `moveInput.y > 0.1f`, so the sprint key did nothing at all while strafing or backing up,
 and nothing while standing still. Both are now gone: any direction sprints, and holding
 the key while stationary engages it so the first step out of cover is already at full
-speed (`ControlSettings.sprintNeedsMovement` restores the old requirement). Standing
-still at a sprint costs nothing -- there is no speed to apply and `PlanarSpeed01` stays
-at zero -- but `Weapon` keys its sprint FOV widen off actual speed rather than off
-`IsSprinting`, or the view would pull out while the player had not moved.
+speed (`ControlSettings.sprintNeedsMovement` restores the old requirement).
+
+**And the sprint key on its own runs forward.** Engaging a sprint with no direction key
+down used to cost nothing and do nothing visible: `IsSprinting` went true, there was no
+speed to apply, `PlanarSpeed01` stayed at zero, and what the player saw was a key that
+works with the movement keys and is dead without them -- which reads as sprint being
+broken, because from the outside it is. `PlayerMotor.SprintDrivesForward` now supplies
+`(0, 1)` when the key is held and nothing else is, so the key *is* a run
+(`ControlSettings.sprintDrivesForward` turns it off). Three details hold it together: a
+direction key always wins, since the substitution only ever fills in for no direction at
+all; it happens *after* `EvaluateSprint`, so it cannot talk itself into a sprint the
+controls did not grant; and it asks for the key to be **held** rather than for
+`IsSprinting`, or a double-tap-latched sprint -- the `ArrowsAndSpace` preset, where the
+sprint key is also the fire key -- would become a permanent auto-run with no visible way
+to stop it. The same reason `EvaluateSprint` counts a held sprint key as "moving": the
+key is about to produce the movement itself, and without that the latch drops on the
+frame it was taken. `VerifyControls` step 4 is the regression test, and it is the one
+burst measured at the *end* of its frames rather than at its peak, because it starts at
+whatever the sideways sprint before it left behind and friction sheds that in ten
+frames.
+
+`Weapon` keys its sprint FOV widen off actual speed rather than off `IsSprinting`, which
+is what kept the view from pulling out while the player had not moved -- still the right
+way round now that the key does move them.
 
 **Three generators, three reset entry points, one trap.** `FPSKitBatch.ResetEnemyArchetypes`, `ResetLevelSets` and `ResetStore` exist because the roster, the level ladders and the store are all generated once and then left alone. Retuning a number in `FPSKitEnemyRoster.Configure`, `FPSKitLevels.Configure` or `FPSKitStore.Configure` does **not** reach the assets the game reads until the matching reset is run. A price or a level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
 

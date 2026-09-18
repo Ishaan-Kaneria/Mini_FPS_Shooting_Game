@@ -73,6 +73,15 @@ public class ControlSettings : ScriptableObject
              "reason they can see.")]
     public bool sprintNeedsMovement;
 
+    [Tooltip("The sprint key on its own runs forward. On, which is what a player means " +
+             "when they press it: the key is a run, and holding it with no direction " +
+             "key down carries the player forward at sprint speed.\n\n" +
+             "Off, the key only changes how fast the movement keys move you, so " +
+             "pressing it alone does nothing visible and reads as a dead key. A " +
+             "direction key always wins while one is held, so this only ever fills in " +
+             "for no direction at all.")]
+    public bool sprintDrivesForward = true;
+
     [Header("Keyboard Look (optional, leave None for mouse-only)")]
     public KeyCode lookLeft = KeyCode.None;
     public KeyCode lookRight = KeyCode.None;
@@ -122,6 +131,7 @@ public class ControlSettings : ScriptableObject
         useItem = KeyCode.F;
         sprintEndsWhenNotAdvancing = true;
         sprintNeedsMovement = false;
+        sprintDrivesForward = true;
         lookLeft = lookRight = lookUp = lookDown = KeyCode.None;
 
         switch (preset)

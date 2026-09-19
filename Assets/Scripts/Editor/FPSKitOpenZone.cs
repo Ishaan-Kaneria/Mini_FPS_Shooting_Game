@@ -1,14 +1,13 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
-using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEngine;
 
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// The open-zone arena: ground that runs to a horizon, a gorge cut across it with
-    /// deadly water in the bottom, bridges over the gorge, and content placed because of
+    /// The open-zone arena: ground that runs to a horizon, a river cut across it with
+    /// deadly water in the bottom, bridges over the river, and content placed because of
     /// all three rather than sprinkled on top of them.
     ///
     /// This is the other half of <see cref="FPSKitSceneBuilder"/>, used when a
@@ -20,22 +19,34 @@ namespace FPSKit.EditorTools
     ///
     /// The rule here is that every piece is placed *because of* a piece already down:
     ///
-    ///   the gorge        decides where the banks are
-    ///   the banks        decide where the bridges can land
-    ///   the bridges      decide where the compounds go, because a crossing is worth
-    ///                    holding and a crossing nobody holds is not a crossing
-    ///   the compounds    decide where the vantages go, because height is only worth
-    ///                    taking if it overlooks something
-    ///   all of the above decide where the cover goes, because cover is a route between
-    ///                    two places and not a decoration between them
+    ///   the river         decides where the banks are
+    ///   the banks         decide where the bridges can land
+    ///   the bridges       decide where the compounds go, because a crossing is worth
+    ///                     holding and a crossing nobody holds is not a crossing
+    ///   the compounds     decide where the vantages go, because height is only worth
+    ///                     taking if it overlooks something
+    ///   all of the above  decide where the cover goes, because cover is a route between
+    ///                     two places and not a decoration between them
     ///
     /// That ordering is the whole design. It is also why this file is a sequence of
     /// passes that hand their results to each other rather than a list of independent
     /// spawners.
+    ///
+    /// <para>
+    /// <b>Planning comes before ground.</b> The arena is built in two halves: every pass
+    /// that needs level ground picks its site first and says so, then
+    /// <see cref="BuildDuneField"/> generates the terrain with those sites already flat
+    /// in it, and only then is anything actually built. That order is forced by the
+    /// terrain -- a compound cannot be dropped on a dune after the fact without either
+    /// re-meshing the collider under it or leaving one of its walls three metres in the
+    /// air -- and it is why <c>PlanOutposts</c> and <c>BuildOutposts</c> are two
+    /// functions rather than one. They have to stay in the same order as each other,
+    /// because the second reads the list the first wrote.
+    /// </para>
     /// </summary>
     public static partial class FPSKitSceneBuilder
     {
-        /// <summary>The gorge's centre line, sampled along z. Everything is placed against it.</summary>
+        /// <summary>The river's centre line, sampled along z. Everything is placed against it.</summary>
         private static float GorgeCentreAt(float z)
             => _theme.hazardOffset
              + Mathf.Sin(z / 90f) * _theme.hazardMeander
@@ -48,11 +59,43 @@ namespace FPSKit.EditorTools
         private static readonly List<Vector3> _anchors = new List<Vector3>();
 
         // ==================================================================
+        // The plans
+        // ==================================================================
+        private struct LandmarkPlan
+        {
+            public Vector2 Point;
+            public float Width, Height, Yaw;
+            public int Seed;
+        }
+
+        private struct OutpostPlan
+        {
+            public Vector2 Point;
+            public float Width, Depth, Yaw;
+        }
+
+        private struct VantagePlan
+        {
+            public Vector2 Point;
+            public float Width, Depth, Height, Yaw;
+        }
+
+        private static readonly List<LandmarkPlan> _landmarkPlans = new List<LandmarkPlan>();
+        private static readonly List<OutpostPlan> _outpostPlans = new List<OutpostPlan>();
+        private static readonly List<VantagePlan> _vantagePlans = new List<VantagePlan>();
+
+        // ==================================================================
         private static void BuildOpenZone()
         {
             _claimed.Clear();
             _crossings.Clear();
             _anchors.Clear();
+            _landmarkPlans.Clear();
+            _outpostPlans.Clear();
+            _vantagePlans.Clear();
+
+            ClearMeshPool();
+            ResetTerrain();
 
             var root = new GameObject("Arena").transform;
             int layer = LayerMask.NameToLayer("Environment");
@@ -63,8 +106,10 @@ namespace FPSKit.EditorTools
             float half = _theme.arenaSize * 0.5f;
 
             ResolveSurfaceMaterials();
+            BuildSurfaceTextures();
+            ResolveOutdoorMaterials();
 
-            // The player's start, and then the gorge, before anything can be placed on
+            // The player's start, and then the river, before anything can be placed on
             // either. TryClaim only knows what has already been claimed.
             // Wide enough that the first thing the player sees is the level rather than
             // the side of a rock somebody dropped on the spawn.
@@ -77,20 +122,39 @@ namespace FPSKit.EditorTools
             // which is sixty metres of empty ground as the first thing anybody sees.
             _anchors.Add(Vector3.zero);
 
+            // Level ground to stand up in, held at whatever height the dunes are at
+            // here rather than at zero. Pinned to zero it was a twelve-metre crater in
+            // the middle of the map -- the steepest ground in the arena was its rim, and
+            // the first thing the player ever saw was the inside of a bowl. BuildPlayer
+            // asks the terrain where to put them instead.
+            FlattenPad(0f, 0f, 22f, 34f);
+
+            // ---- planning ----
+            PlanCrossings(half);
+            PlanLandmarks(rng, half);
+            PlanOutposts(rng, half);
+            PlanVantages(rng, half);
+
+            // ---- ground ----
+            if (_theme.duneHeight > 0f) BuildDuneField(root, layer, half);
+            else BuildGround(root, layer, half);
+
             BuildApron(root, backdrop, half);
-            BuildGround(root, layer, half);
-            BuildGroundPatches(root, backdrop, rng, half);
+            if (_theme.duneHeight <= 0f) BuildGroundPatches(root, backdrop, rng, half);
+
             BuildGorge(root, layer, half);
             BuildCrossings(root, layer, half);
-            BuildRimFences(root, layer, half);
+            BuildRiverFence(root, layer, half);
             BuildBoundary(root, layer, half);
             BuildBackdrop(root, backdrop, rng, half);
 
-            BuildLandmarks(root, layer, rng, half);
-            BuildOutposts(root, layer, rng, half);
-            BuildVantages(root, layer, rng, half);
+            // ---- content ----
+            BuildLandmarks(root, layer, rng);
+            BuildOutposts(root, layer, rng);
+            BuildVantages(root, layer, rng);
             BuildCoverLines(root, layer, rng, half);
             BuildScatter(root, layer, rng, half);
+            BuildVegetation(root, layer, rng, half);
             BuildProps(root, layer, rng, half);
             BuildAccentLights(root, rng);
         }
@@ -103,12 +167,19 @@ namespace FPSKit.EditorTools
         /// exists so that the edge of the level is not the edge of the world, which is
         /// the single biggest reason the walled arenas read as a box.
         ///
-        /// Split around the gorge exactly as the banks are, and the river runs out
+        /// Split around the river exactly as the banks are, and the river runs out
         /// through it. One slab across the whole thing was the first version, and it
         /// filled the canyon in from below: from the rim the gorge was a strip of ground
         /// a shade paler than the ground beside it, with a bridge over nothing and a
         /// railing guarding nothing. The river has to leave the level for the level to
         /// look like it is somewhere the river came through.
+        ///
+        /// <para>
+        /// It stops at the boundary rather than running under the arena, which it used
+        /// to. Under a flat floor that was invisible and saved a seam; under a dune field
+        /// it is a sheet of flat sand at y=0 cutting through every hollow that dips below
+        /// zero, which from inside the level looks like water without the water.
+        /// </para>
         /// </summary>
         private static void BuildApron(Transform root, int layer, float half)
         {
@@ -118,37 +189,92 @@ namespace FPSKit.EditorTools
             group.SetParent(root, false);
 
             float reach = half + _theme.apronSize;
-            int steps = 48;
+
+            // Starts exactly where the terrain stops. Overlapped, the two fight: the
+            // heightfield fades towards zero over the overhang rather than arriving at
+            // it, so a flat sheet at y=0 cuts up through every hollow in the last forty
+            // metres of ground and leaves a ring of hard edges all the way round the
+            // arena.
+            float inner = half + TerrainOverhang;
+
+            int steps = 72;
             float span = reach * 2f / steps;
 
             float edge = _theme.hazardWidth * 0.5f;
             float depth = _theme.hazardDepth;
             bool dry = _theme.hazard == LevelTheme.Hazard.Chasm;
 
-            var ground = MakeMaterial("Apron", Shade(_theme.floorColor, 0.94f),
-                                      _theme.floorSmoothness * 0.5f, 0f);
-            var bed = MakeMaterial("ApronBed", Shade(_theme.bankColor, 0.55f), 0.1f, 0f);
-            var river = MakeMaterial("ApronWater", _theme.hazardColor, 0.92f, 0.1f);
+            // World-space UVs, so the apron's sand is at the same scale as the arena's
+            // and the join between them is invisible. A scaled cube cannot do this --
+            // its UVs run nought to one across whichever face, so a kilometre-wide slab
+            // stretches one tile of texture across the whole kilometre, which is what
+            // made the horizon read as smeared streaks.
+            var ground = new MeshBuild { UVScale = 1f };
+            var bed = new MeshBuild { UVScale = 0.25f };
+            var river = new MeshBuild { UVScale = 0.06f };
+
+            void Strip(MeshBuild build, float from, float to, float z0, float z1, float y)
+            {
+                if (to - from <= 0.2f) return;
+
+                build.Quad(new Vector3(from, y, z0), new Vector3(from, y, z1),
+                           new Vector3(to, y, z1), new Vector3(to, y, z0));
+            }
 
             for (int i = 0; i < steps; i++)
             {
-                float z = -reach + span * (i + 0.5f);
+                float z0 = -reach + span * i;
+                float z1 = z0 + span + 0.4f;
+                float z = (z0 + z1) * 0.5f;
+
                 float centre = GorgeCentreAt(z);
-                float slice = span + 0.8f;
 
-                Decor(group, layer, "Apron", new Vector3((-reach + centre - edge) * 0.5f, -3f, z),
-                      new Vector3(centre - edge + reach, 6f, slice), ground);
+                // Inside the arena's own latitudes the ground belongs to the terrain, so
+                // the apron is two strips outside it rather than one slab underneath.
+                bool beside = Mathf.Abs(z) <= inner;
 
-                Decor(group, layer, "Apron", new Vector3((centre + edge + reach) * 0.5f, -3f, z),
-                      new Vector3(reach - centre - edge, 6f, slice), ground);
+                float westTo = beside ? -inner : centre - edge;
+                float eastFrom = beside ? inner : centre + edge;
 
-                Decor(group, layer, "ApronBed", new Vector3(centre, -depth - 1f, z),
-                      new Vector3(_theme.hazardWidth + 8f, 3f, slice), bed);
+                Strip(ground, -reach, westTo, z0, z1, 0f);
+                Strip(ground, eastFrom, reach, z0, z1, 0f);
+
+                // The river only has to be drawn where the canyon mesh stops.
+                if (Mathf.Abs(z) < half + CanyonOverrun - span) continue;
+
+                Strip(bed, centre - edge - 4f, centre + edge + 4f, z0, z1, -depth - 1f);
 
                 if (!dry)
-                    Decor(group, layer, "ApronWater", new Vector3(centre, -depth + 1.4f, z),
-                          new Vector3(_theme.hazardWidth - 1f, 1.2f, slice), river);
+                    Strip(river, centre - edge + 2f, centre + edge - 2f, z0, z1, WaterSurfaceY);
             }
+
+            var sand = _sandMat != null
+                ? _sandMat
+                : MakeMaterial("Apron", Shade(_theme.floorColor, 0.94f),
+                               _theme.floorSmoothness * 0.5f, 0f);
+
+            Backdrop(group, layer, "Apron", ground, sand);
+            Backdrop(group, layer, "ApronBed", bed,
+                     _rockDarkMat ?? MakeMaterial("ApronBed", Shade(_theme.bankColor, 0.55f), 0.1f, 0f));
+
+            if (!dry)
+                Backdrop(group, layer, "ApronWater", river,
+                         _waterMat ?? MakeMaterial("ApronWater", _theme.hazardColor, 0.92f, 0.1f));
+        }
+
+        /// <summary>
+        /// Puts a mesh past the boundary: no collider, on the layer the navigation bake
+        /// ignores, and off the minimap.
+        /// </summary>
+        private static void Backdrop(Transform parent, int layer, string name, MeshBuild build,
+                                     Material material)
+        {
+            if (build.Triangles.Count == 0) return;
+
+            var go = MeshObject(parent, name, build.ToMesh(name), material, Vector3.zero,
+                                Quaternion.identity, Vector3.one, layer, "Untagged", collider: false);
+
+            Hide(go);
         }
 
         /// <summary>
@@ -176,11 +302,11 @@ namespace FPSKit.EditorTools
         /// <summary>
         /// Broad, barely-there patches of a slightly different tone laid on the ground.
         ///
-        /// Flat desert lit by one directional light is one colour everywhere, and one
-        /// colour everywhere reads as a texture-less plane whatever is standing on it --
-        /// it is most of why the open ground looked like a backdrop rather than a place.
-        /// These are decoration, so they have no collider and sit on the layer the bake
-        /// and the map both ignore.
+        /// Only used by the flat version of this arena. Flat ground lit by one
+        /// directional light is one colour everywhere, and one colour everywhere reads as
+        /// a texture-less plane whatever is standing on it. A dune field does not have
+        /// that problem -- it is shaded by its own shape -- and these are flat quads, so
+        /// laid over dunes they cut through every crest they cross.
         /// </summary>
         private static void BuildGroundPatches(Transform root, int layer, System.Random rng, float half)
         {
@@ -229,11 +355,14 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The two banks. Built as a pair of slabs with the gorge between them rather
-        /// than as one floor with a hole cut in it, because the hole is what the
-        /// navigation bake reads: no floor means no NavMesh, which means nothing can
-        /// path across the water without being told, and the bridges become the only
+        /// The two banks, for a theme with no dunes: a pair of slabs with the river
+        /// between them rather than one floor with a hole cut in it, because the hole is
+        /// what the navigation bake reads. No floor means no NavMesh, which means nothing
+        /// can path across the water without being told, and the bridges become the only
         /// crossings for free.
+        ///
+        /// <see cref="BuildDuneField"/> is the same idea done as a heightfield, and cuts
+        /// the same hole for the same reason.
         /// </summary>
         private static void BuildGround(Transform root, int layer, float half)
         {
@@ -244,23 +373,20 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Ground").transform;
             group.SetParent(root, false);
 
-            // Sliced along z so the banks can follow a gorge that wanders. One slab per
+            // Sliced along z so the banks can follow a river that wanders. One slab per
             // slice, each ending where that slice's rim is.
             for (int i = 0; i < steps; i++)
             {
                 float z = -half + span * (i + 0.5f);
                 float centre = GorgeCentreAt(z);
-                float edge = _theme.hazardWidth * 0.5f;
-
-                float westEdge = centre - edge;
-                float eastEdge = centre + edge;
+                float edge = _theme.hazardWidth * 0.5f + GorgeLipOverlap;
 
                 // A hair of overlap at each seam, or the slices show as cracks of
                 // skybox when the camera is low.
                 float slice = span + 0.4f;
 
-                Bank(group, layer, "BankWest", z, slice, -half, westEdge, depth);
-                Bank(group, layer, "BankEast", z, slice, eastEdge, half, depth);
+                Bank(group, layer, "BankWest", z, slice, -half, centre - edge, depth);
+                Bank(group, layer, "BankEast", z, slice, centre + edge, half, depth);
             }
         }
 
@@ -276,118 +402,70 @@ namespace FPSKit.EditorTools
         }
 
         // ==================================================================
-        // The gorge
-        // ==================================================================
         private static void ClaimGorge(float half)
         {
             float edge = _theme.hazardWidth * 0.5f;
 
-            // Claimed generously -- the extra is the rim, and a compound built with one
-            // wall overhanging the water is a compound with a wall nobody can stand at.
-            float radius = edge + 16f;
+            // Claimed out past the fence line -- the extra is the rim, and a compound
+            // built with one wall overhanging the water is a compound with a wall nobody
+            // can stand at.
+            float radius = edge + RimBandWidth + 10f;
 
-            for (float z = -half; z <= half; z += edge)
+            for (float z = -half - 20f; z <= half + 20f; z += edge * 0.5f)
                 Claim(GorgeCentreAt(z), z, radius);
-        }
-
-        /// <summary>
-        /// The cut itself: sloped rock down both sides, a bed at the bottom, the water on
-        /// top of the bed, and the trigger that makes falling in mean something.
-        /// </summary>
-        private static void BuildGorge(Transform root, int layer, float half)
-        {
-            var group = new GameObject("Gorge").transform;
-            group.SetParent(root, false);
-
-            float depth = _theme.hazardDepth;
-            float edge = _theme.hazardWidth * 0.5f;
-            int steps = 24;
-            float span = _theme.arenaSize / steps;
-
-            bool dry = _theme.hazard == LevelTheme.Hazard.Chasm;
-            var surface = dry ? _theme.bankColor : _theme.hazardColor;
-
-            for (int i = 0; i < steps; i++)
-            {
-                float z = -half + span * (i + 0.5f);
-                float centre = GorgeCentreAt(z);
-                float slice = span + 0.4f;
-
-                // Bed.
-                Drowned(CreateBlock(group, new Vector3(centre, -depth - 1f, z),
-                                    new Vector3(_theme.hazardWidth + 6f, 3f, slice), 0f, layer,
-                                    _theme.floorTag, Shade(_theme.bankColor, 0.6f), 0.1f, 0f, "Bed"));
-
-                // Two courses of rock stepping in as they go down, so the wall of the
-                // gorge is not one flat face.
-                for (int k = 0; k < 2; k++)
-                {
-                    float y = -depth * (0.3f + k * 0.38f);
-                    float inset = 1.5f + k * 2.2f;
-                    float thickness = depth * 0.34f;
-
-                    Drowned(CreateBlock(group, new Vector3(centre - edge - 1.4f + inset, y, z),
-                                        new Vector3(4.5f, thickness, slice), 0f, layer, _theme.floorTag,
-                                        Shade(_theme.bankColor, 0.78f - k * 0.08f), 0.1f, 0f, "Ledge"));
-
-                    Drowned(CreateBlock(group, new Vector3(centre + edge + 1.4f - inset, y, z),
-                                        new Vector3(4.5f, thickness, slice), 0f, layer, _theme.floorTag,
-                                        Shade(_theme.bankColor, 0.78f - k * 0.08f), 0.1f, 0f, "Ledge"));
-                }
-
-                if (dry) continue;
-
-                // The water. Tagged so footsteps and bullet impacts know what they hit,
-                // and marked so the map draws it as water rather than as one more grey
-                // shape lying in a gap.
-                var water = CreateBlock(group, new Vector3(centre, -depth + 1.4f, z),
-                                        new Vector3(_theme.hazardWidth - 1f, 1.2f, slice), 0f,
-                                        layer, "Water", surface, 0.92f, 0.1f, "Water");
-
-                Object.DestroyImmediate(water.GetComponent<Collider>());
-                Drowned(water);
-                Mark(water, surface, order: 1);
-            }
-
-            BuildKillVolume(group, half, depth);
-        }
-
-        /// <summary>
-        /// One trigger down the whole gorge, its top set below the rim rather than at it.
-        ///
-        /// At the rim it would kill somebody standing safely on the edge looking down,
-        /// which is the one place the level most wants them to stand -- the whole point
-        /// of a drop is being able to see it. Below the rim, you die when you are past
-        /// saving and not before.
-        /// </summary>
-        private static void BuildKillVolume(Transform parent, float half, float depth)
-        {
-            var go = new GameObject("KillVolume");
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(_theme.hazardOffset, -depth * 0.5f - 2f, 0f);
-
-            var box = go.AddComponent<BoxCollider>();
-            box.isTrigger = true;
-            box.size = new Vector3(_theme.hazardWidth + _theme.hazardMeander * 2.5f,
-                                   depth, _theme.arenaSize + 40f);
-
-            var kill = go.AddComponent<KillVolume>();
-            kill.instantKill = _theme.hazard != LevelTheme.Hazard.Electrified;
-            kill.damagePerSecond = 70f;
-
-            // No splash in the audio library yet, and a wrong sound is worse than none:
-            // Tools/generate-placeholder-audio.py is where one would be authored, and it
-            // has to go at the end of that script or every clip below it is re-rolled.
-            kill.enterClip = null;
         }
 
         // ==================================================================
         // Crossings
         // ==================================================================
         /// <summary>
+        /// Where the bridges go, and the flat ground their landings need.
+        ///
+        /// Split out of <see cref="BuildCrossings"/> because it has to run before the
+        /// terrain: the deck is a straight, level thing forty-six metres longer than the
+        /// river is wide, so both its ends stand well outside the flat rim band and land
+        /// wherever the dunes happen to be. Unflattened, that is a bridge whose far end
+        /// is buried in a dune -- which does not read as a bug, it reads as a bridge to
+        /// nowhere, and the player simply stops using that crossing.
+        /// </summary>
+        private static void PlanCrossings(float half)
+        {
+            int count = Mathf.Clamp(_theme.bridgeCount, 1, 3);
+
+            for (int i = 0; i < count; i++)
+            {
+                // Spread across the middle two thirds. Against the boundary a bridge is
+                // a corner nobody goes to.
+                float t = count == 1 ? 0.5f : i / (float)(count - 1);
+                float z = Mathf.Lerp(-half * 0.62f, half * 0.62f, t);
+
+                float centre = GorgeCentreAt(z);
+                float length = _theme.hazardWidth + BridgeOverhang * 2f;
+
+                _crossings.Add(new Vector3(centre, 0f, z));
+
+                // Both landings, so the passes below know the two bits of ground worth
+                // fighting over and can put something there.
+                _anchors.Add(new Vector3(centre - _theme.hazardWidth * 0.5f - 18f, 0f, z));
+                _anchors.Add(new Vector3(centre + _theme.hazardWidth * 0.5f + 18f, 0f, z));
+
+                // Held at zero, because the deck is: the rim of the canyon is the level's
+                // datum and a bridge is flat. The blend is deliberately more than twice
+                // the pad, since out here the dunes are at full height and the step down
+                // to the deck can be ten metres -- spread over twenty it is a wall, and
+                // over fifty it is an approach.
+                for (int e = -1; e <= 1; e += 2)
+                    FlattenPad(centre + e * length * 0.5f, z, 17f, 40f, 0f);
+            }
+        }
+
+        /// <summary>Metres of deck past the rim at each end, so a bridge has an approach.</summary>
+        private const float BridgeOverhang = 23f;
+
+        /// <summary>
         /// The bridges, and the reason the level has a shape.
         ///
-        /// Spread down the gorge rather than clustered, and each one deliberately long:
+        /// Spread down the river rather than clustered, and each one deliberately long:
         /// the deck is the most exposed ground in the level and the whole tension of an
         /// open map is the walk across it. Railings both sides, which are cover as well
         /// as a fence -- crouching behind a rail halfway over is the fight this level is
@@ -398,122 +476,21 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Crossings").transform;
             group.SetParent(root, false);
 
-            int count = Mathf.Clamp(_theme.bridgeCount, 1, 3);
             float depth = _theme.hazardDepth;
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < _crossings.Count; i++)
             {
-                // Spread across the middle two thirds. Against the boundary a bridge is
-                // a corner nobody goes to.
-                float t = count == 1 ? 0.5f : i / (float)(count - 1);
-                float z = Mathf.Lerp(-half * 0.62f, half * 0.62f, t);
+                var crossing = _crossings[i];
 
-                float centre = GorgeCentreAt(z);
-                float length = _theme.hazardWidth + 46f;
+                float length = _theme.hazardWidth + BridgeOverhang * 2f;
                 float w = _theme.bridgeWidth;
 
                 var bridge = new GameObject($"Bridge_{i}").transform;
                 bridge.SetParent(group, false);
-                bridge.localPosition = new Vector3(centre, 0f, z);
+                bridge.localPosition = new Vector3(crossing.x, DeckLift, crossing.z);
 
-                // Deck, its top flush with the banks so there is no step at either end.
-                var deck = CreateBlock(bridge, new Vector3(0f, -0.4f, 0f),
-                                       new Vector3(length, 0.8f, w), 0f, layer, _theme.coverTag,
-                                       _theme.bridgeColor, 0.2f, 0f, "Deck");
-                Mark(deck, _theme.bridgeColor, order: 4);
-
-                // Railings. Chest high, so they stop a fall and can be fired over.
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    CreateBlock(bridge, new Vector3(0f, 0.55f, side * (w * 0.5f - 0.2f)),
-                                new Vector3(length, 1.1f, 0.4f), 0f, layer, _theme.coverTag,
-                                Shade(_theme.bridgeColor, 1.1f), 0.2f, 0f, "Rail");
-
-                    // Posts, for the silhouette. Thin enough not to block a shot.
-                    for (float p = -length * 0.5f + 3f; p <= length * 0.5f - 3f; p += 7f)
-                        CreateBlock(bridge, new Vector3(p, 1.35f, side * (w * 0.5f - 0.2f)),
-                                    new Vector3(0.45f, 2.7f, 0.45f), 0f, layer, _theme.coverTag,
-                                    Shade(_theme.bridgeColor, 0.85f), 0.2f, 0f, "Post");
-                }
-
-                // Pylons down to the bed, which is what makes it read as a bridge from
-                // below and from the rim rather than as a plank lying across a hole.
-                for (int p = -1; p <= 1; p += 2)
-                    CreateBlock(bridge, new Vector3(p * _theme.hazardWidth * 0.25f, -depth * 0.5f, 0f),
-                                new Vector3(3.2f, depth, w * 0.7f), 0f, layer, _theme.coverTag,
-                                Shade(_theme.bridgeColor, 0.7f), 0.2f, 0f, "Pylon");
-
-                // Towers at both ends: a landmark visible from across the map, which is
-                // how a player finds a crossing without a map telling them.
-                for (int e = -1; e <= 1; e += 2)
-                {
-                    float x = e * (length * 0.5f - 2f);
-
-                    for (int side = -1; side <= 1; side += 2)
-                        CreateBlock(bridge, new Vector3(x, 4f, side * (w * 0.5f + 0.6f)),
-                                    new Vector3(2.2f, 9f, 2.2f), 0f, layer, _theme.wallTag,
-                                    _theme.wallColor, _theme.wallSmoothness, 0f, "Tower", _perimeterMat);
-                }
-
-                _crossings.Add(new Vector3(centre, 0f, z));
-
-                // Both landings, so the passes below know the two bits of ground worth
-                // fighting over and can put something there.
-                _anchors.Add(new Vector3(centre - _theme.hazardWidth * 0.5f - 18f, 0f, z));
-                _anchors.Add(new Vector3(centre + _theme.hazardWidth * 0.5f + 18f, 0f, z));
+                BuildTrestleBridge(bridge, layer, length, w, depth, i);
             }
-        }
-
-        /// <summary>
-        /// Railing down both rims, with the bridge approaches left open.
-        ///
-        /// It is a guard rail and it is also the level telling the truth: the edge is
-        /// lethal, and an edge that looks like ordinary ground until you are past it is
-        /// a level killing the player for something it never showed them. The gaps are
-        /// the other half of the same sentence -- the only places the rail stops are the
-        /// places you are meant to cross.
-        /// </summary>
-        private static void BuildRimFences(Transform root, int layer, float half)
-        {
-            var group = new GameObject("RimFence").transform;
-            group.SetParent(root, false);
-
-            float edge = _theme.hazardWidth * 0.5f;
-            const float step = 6f;
-
-            for (float z = -half + 3f; z <= half - 3f; z += step)
-            {
-                if (NearCrossing(z, _theme.bridgeWidth * 0.5f + 7f)) continue;
-
-                float centre = GorgeCentreAt(z);
-
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    float x = centre + side * (edge + 1.6f);
-
-                    // The rail runs along z, so it is built as one short length per step
-                    // and follows the gorge's wander for free.
-                    CreateBlock(group, new Vector3(x, 0.95f, z + step * 0.5f),
-                                new Vector3(0.18f, 0.16f, step + 0.3f), 0f, layer, _theme.coverTag,
-                                Shade(_theme.bridgeColor, 1.15f), 0.3f, 0.4f, "Rail");
-
-                    CreateBlock(group, new Vector3(x, 0.55f, z + step * 0.5f),
-                                new Vector3(0.14f, 0.14f, step + 0.3f), 0f, layer, _theme.coverTag,
-                                Shade(_theme.bridgeColor, 1.05f), 0.3f, 0.4f, "Rail");
-
-                    CreateBlock(group, new Vector3(x, 0.5f, z),
-                                new Vector3(0.28f, 1.05f, 0.28f), 0f, layer, _theme.coverTag,
-                                Shade(_theme.bridgeColor, 0.9f), 0.3f, 0.4f, "FencePost");
-                }
-            }
-        }
-
-        private static bool NearCrossing(float z, float reach)
-        {
-            foreach (var crossing in _crossings)
-                if (Mathf.Abs(crossing.z - z) < reach) return true;
-
-            return false;
         }
 
         // ==================================================================
@@ -523,10 +500,10 @@ namespace FPSKit.EditorTools
         /// The boundary, as broken ground rather than as a wall.
         ///
         /// A flat perimeter wall is exactly the thing this arena shape exists to stop
-        /// being. So the visible edge is a jumbled ridge -- blocks of varying height,
-        /// width and angle, sunk into the ground -- and the thing that actually holds
-        /// the player in is an invisible box behind it. The ridge can then be as ragged
-        /// as it likes without leaving a gap to walk through.
+        /// being. So the visible edge is a jumbled ridge of rock -- varying height, width
+        /// and angle, sunk into the ground -- and the thing that actually holds the
+        /// player in is an invisible box behind it. The ridge can then be as ragged as it
+        /// likes without leaving a gap to walk through.
         /// </summary>
         private static void BuildBoundary(Transform root, int layer, float half)
         {
@@ -540,24 +517,35 @@ namespace FPSKit.EditorTools
                 bool alongZ = side >= 2;
                 float sign = side % 2 == 0 ? 1f : -1f;
 
-                for (float t = -half; t <= half; t += Rand(rng, 14f, 26f))
+                for (float t = -half; t <= half; t += Rand(rng, 11f, 20f))
                 {
                     float w = Rand(rng, 18f, 34f);
                     float h = Rand(rng, 14f, 32f);
-                    float lean = Rand(rng, -14f, 14f);
                     float out0 = Rand(rng, -3f, 6f);
 
-                    var pos = alongZ
-                        ? new Vector3(sign * (half + out0), h * 0.35f - 3f, t)
-                        : new Vector3(t, h * 0.35f - 3f, sign * (half + out0));
+                    float x = alongZ ? sign * (half + out0) : t;
+                    float z = alongZ ? t : sign * (half + out0);
 
-                    var scale = alongZ
-                        ? new Vector3(Rand(rng, 12f, 22f), h, w)
-                        : new Vector3(w, h, Rand(rng, 12f, 22f));
+                    // Sunk into whatever the ground is doing here. Placed at a fixed
+                    // height instead, half the ridge floats over a hollow and the other
+                    // half is swallowed by a dune -- and a gap under the boundary is a
+                    // hole through which the player can see the skybox from inside.
+                    float ground = GroundHeightAt(x, z);
 
-                    CreateBlock(group, pos, scale, lean, layer, _theme.wallTag,
-                                Shade(_theme.bankColor, Rand(rng, 0.7f, 1.05f)),
-                                _theme.wallSmoothness, 0f, "Ridge", _perimeterMat);
+                    var butte = ButteMesh(rng.Next(1, 999), sides: rng.Next(6, 9),
+                                          levels: rng.Next(4, 7));
+
+                    var rock = MeshObject(group, "Ridge", butte, _rockMat,
+                                          new Vector3(x, ground - h * 0.16f, z),
+                                          Quaternion.Euler(Rand(rng, -5f, 5f), Rand(rng, 0f, 360f),
+                                                           Rand(rng, -5f, 5f)),
+                                          new Vector3(w * 0.55f, h, Rand(rng, 0.6f, 1.15f) * w * 0.55f),
+                                          layer, _theme.wallTag);
+
+                    // Same reason as the landmarks: a flat top thirty metres up is an
+                    // island of navmesh, and this one is right on the boundary where a
+                    // player will never be able to see what is standing on it.
+                    NoStanding(rock);
                 }
 
                 // The seal. Invisible, tall, and inside the ridge, so the player is
@@ -571,8 +559,8 @@ namespace FPSKit.EditorTools
 
                 var box = wall.AddComponent<BoxCollider>();
                 box.size = alongZ
-                    ? new Vector3(2f, 60f, _theme.arenaSize + 60f)
-                    : new Vector3(_theme.arenaSize + 60f, 60f, 2f);
+                    ? new Vector3(2f, 90f, _theme.arenaSize + 60f)
+                    : new Vector3(_theme.arenaSize + 60f, 90f, 2f);
             }
         }
 
@@ -597,7 +585,7 @@ namespace FPSKit.EditorTools
                 float h = Rand(rng, _theme.backdropHeight.x, _theme.backdropHeight.y);
                 float w = Rand(rng, _theme.backdropWidth.x, _theme.backdropWidth.y);
 
-                var pos = new Vector3(Mathf.Cos(angle) * distance, h * 0.35f - 8f,
+                var pos = new Vector3(Mathf.Cos(angle) * distance, -h * 0.1f,
                                       Mathf.Sin(angle) * distance);
 
                 // Further is hazier, which is the whole of aerial perspective and most
@@ -606,28 +594,30 @@ namespace FPSKit.EditorTools
                                                _theme.backdropDistance.y, distance);
                 var tint = Color.Lerp(_theme.backdropColor, _theme.fogColor, haze * 0.45f);
 
-                var block = CreateBlock(group, pos,
-                                        new Vector3(w, h, w * Rand(rng, 0.5f, 1.1f)),
-                                        Rand(rng, 0f, 360f), layer, "Untagged",
-                                        tint, 0.05f, 0f, "Mesa");
+                var mesa = ButteMesh(rng.Next(1, 999), sides: rng.Next(7, 11), levels: rng.Next(5, 9));
 
-                Object.DestroyImmediate(block.GetComponent<Collider>());
+                MeshObject(group, "Mesa", mesa,
+                           MakeMaterial($"Mesa_{ColorKey(tint)}", tint, 0.05f, 0f),
+                           pos, Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f),
+                           new Vector3(w * 0.5f, h, w * 0.5f * Rand(rng, 0.5f, 1.1f)),
+                           layer, "Untagged", collider: false);
             }
         }
 
         // ==================================================================
-        // Content
+        // Content: planning
         // ==================================================================
         /// <summary>
         /// Big solid rock inside the level. These are what the player navigates by --
         /// "go left of the tall one" is a route, and a level with nothing to say that
         /// about is a level where every direction looks the same.
+        ///
+        /// Deliberately given no flat pad. A boulder half-buried in the side of a dune is
+        /// exactly right; a boulder standing on a mown circle of level sand is a prop on
+        /// a table.
         /// </summary>
-        private static void BuildLandmarks(Transform root, int layer, System.Random rng, float half)
+        private static void PlanLandmarks(System.Random rng, float half)
         {
-            var group = new GameObject("Landmarks").transform;
-            group.SetParent(root, false);
-
             for (int i = 0; i < _theme.landmarkCount; i++)
             {
                 float w = Rand(rng, 16f, 34f);
@@ -635,55 +625,21 @@ namespace FPSKit.EditorTools
 
                 if (!TryClaim(rng, half * 0.94f, w * 0.75f, out Vector2 p)) continue;
 
-                var stack = new GameObject($"Landmark_{i}").transform;
-                stack.SetParent(group, false);
-                stack.localPosition = new Vector3(p.x, 0f, p.y);
-                stack.localRotation = Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f);
-
-                // Four slabs, each turned and shoved off centre by a good fraction of
-                // its own width. Stacked concentrically they came out as step pyramids --
-                // regular enough that a dozen of them read as architecture, which is the
-                // opposite of a landmark somebody can describe to themselves as "the big
-                // rock". The irregularity is the entire point of the pass.
-                int slabs = rng.Next(3, 5);
-
-                for (int k = 0; k < slabs; k++)
+                _landmarkPlans.Add(new LandmarkPlan
                 {
-                    float shrink = Rand(rng, 0.94f, 1.05f) - k * Rand(rng, 0.16f, 0.3f);
-                    if (shrink < 0.25f) break;
-
-                    float lift = h * (0.22f + k * Rand(rng, 0.22f, 0.34f)) - 2.5f;
-                    float wander = w * 0.22f;
-
-                    CreateBlock(stack, new Vector3(Rand(rng, -wander, wander), lift,
-                                                   Rand(rng, -wander, wander)),
-                                new Vector3(w * shrink, h * Rand(rng, 0.4f, 0.75f),
-                                            w * shrink * Rand(rng, 0.6f, 1.25f)),
-                                Rand(rng, 0f, 360f), layer, _theme.wallTag,
-                                Shade(_theme.bankColor, Rand(rng, 0.68f, 1.06f)),
-                                _theme.wallSmoothness, 0f, "Rock", _perimeterMat);
-                }
+                    Point = p,
+                    Width = w,
+                    Height = h,
+                    Yaw = Rand(rng, 0f, 360f),
+                    Seed = rng.Next(1, 9999)
+                });
 
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
             }
         }
 
-        /// <summary>
-        /// Walled compounds: the strongpoints.
-        ///
-        /// The first ones go on the bridge landings, because that is the ground worth
-        /// holding and a crossing with nothing at either end is a crossing with no
-        /// reason to be crossed. The rest fill the banks.
-        ///
-        /// Each has a way in, a wall to fight from behind, and supplies inside -- so it
-        /// is somewhere to go rather than something to look at.
-        /// </summary>
-        private static void BuildOutposts(Transform root, int layer, System.Random rng, float half)
+        private static void PlanOutposts(System.Random rng, float half)
         {
-            var group = new GameObject("Outposts").transform;
-            group.SetParent(root, false);
-
-            int placed = 0;
             var landings = new List<Vector3>(_anchors);
 
             for (int i = 0; i < _theme.outpostCount; i++)
@@ -708,63 +664,29 @@ namespace FPSKit.EditorTools
                     continue;
                 }
 
-                BuildOutpost(group, layer, rng, new Vector3(p.x, 0f, p.y), w, d,
-                             Rand(rng, 0f, 360f), placed++);
+                _outpostPlans.Add(new OutpostPlan
+                {
+                    Point = p,
+                    Width = w,
+                    Depth = d,
+                    Yaw = Rand(rng, 0f, 360f)
+                });
+
+                // A compound is four straight walls meeting at right angles, and there is
+                // no version of that which follows a hill. The blend is deliberately
+                // longer than the pad is wide: it is the only thing standing between a
+                // flat thirty-metre platform and the dunes around it, and short, it is a
+                // plateau with a cut edge -- both to look at and, more to the point, to
+                // drive off.
+                FlattenPad(p.x, p.y, Mathf.Max(w, d) * 0.62f, 26f);
 
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
             }
         }
 
-        private static void BuildOutpost(Transform parent, int layer, System.Random rng,
-                                         Vector3 position, float w, float d, float yaw, int index)
+        private static void PlanVantages(System.Random rng, float half)
         {
-            var compound = new GameObject($"Outpost_{index}").transform;
-            compound.SetParent(parent, false);
-            compound.localPosition = position;
-            compound.localRotation = Quaternion.Euler(0f, yaw, 0f);
-
-            float h = Rand(rng, 3.2f, 4.4f);
-            float thickness = Rand(rng, 0.5f, 0.8f);
-            float door = Rand(rng, 4.5f, 6.5f);
-
-            // Two ways in, on opposite sides, and two solid walls. Four solid walls is a
-            // room nobody can enter; one way in is a trap rather than a strongpoint. Two
-            // means it can be taken, held, and flanked, which is the only version worth
-            // putting on a map.
-            BuildWall(compound, layer, new Vector3(0f, h * 0.5f, d * 0.5f), w, h, thickness,
-                      alongX: true, hasDoor: true, door);
-            BuildWall(compound, layer, new Vector3(0f, h * 0.5f, -d * 0.5f), w, h, thickness,
-                      alongX: true, hasDoor: true, door);
-            BuildWall(compound, layer, new Vector3(-w * 0.5f, h * 0.5f, 0f), d, h, thickness,
-                      alongX: false, hasDoor: rng.NextDouble() < 0.4, door);
-            BuildWall(compound, layer, new Vector3(w * 0.5f, h * 0.5f, 0f), d, h, thickness,
-                      alongX: false, hasDoor: false, door);
-
-            // Something to fight over inside, and something to fight from behind.
-            BuildCrateCluster(compound, layer, rng, new Vector3(Rand(rng, -4f, 4f), 0f, Rand(rng, -3f, 3f)));
-
-            CreateBlock(compound, new Vector3(Rand(rng, -w * 0.3f, w * 0.3f), 0.65f, Rand(rng, -2f, 4f)),
-                        new Vector3(Rand(rng, 4f, 7f), 1.3f, 0.7f), Rand(rng, 0f, 180f), layer,
-                        _theme.coverTag, _theme.RandomCoverColor(rng), 0.3f, _theme.coverMetallic,
-                        "Barricade", _coverMat);
-        }
-
-        /// <summary>
-        /// The raised decks: a ramp up, a deck, and a lip to shoot over.
-        ///
-        /// Every one of them is aimed at something -- a crossing first, then a compound
-        /// -- because height that overlooks nothing is a climb with no payoff, and that
-        /// is what the scattered version of this was. It is also the piece of the old
-        /// arenas worth keeping: it is the only place you get to look at the level from
-        /// above, and the lip means arriving there is not the same as being exposed.
-        /// </summary>
-        private static void BuildVantages(Transform root, int layer, System.Random rng, float half)
-        {
-            var group = new GameObject("Vantages").transform;
-            group.SetParent(root, false);
-
             const float rampAngle = 22f;
-            float sin = Mathf.Sin(rampAngle * Mathf.Deg2Rad);
             float tan = Mathf.Tan(rampAngle * Mathf.Deg2Rad);
 
             var targets = new List<Vector3>(_crossings);
@@ -777,7 +699,6 @@ namespace FPSKit.EditorTools
                 float h = Rand(rng, 3.4f, 5.2f);
 
                 float run = h / tan;
-                float length = h / sin;
                 float radius = Mathf.Max(w, d) * 0.5f + run + 3f;
 
                 Vector2 p;
@@ -807,10 +728,6 @@ namespace FPSKit.EditorTools
                     look = Vector3.zero;
                 }
 
-                var deck = new GameObject($"Vantage_{i}").transform;
-                deck.SetParent(group, false);
-                deck.localPosition = new Vector3(p.x, 0f, p.y);
-
                 // The lip faces what the deck was put here to watch, so the cover is on
                 // the side the shooting comes from.
                 var toTarget = new Vector3(look.x - p.x, 0f, look.z - p.y);
@@ -818,31 +735,135 @@ namespace FPSKit.EditorTools
                     ? Mathf.Atan2(toTarget.x, toTarget.z) * Mathf.Rad2Deg
                     : Rand(rng, 0f, 360f);
 
-                deck.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                _vantagePlans.Add(new VantagePlan
+                {
+                    Point = p, Width = w, Depth = d, Height = h, Yaw = yaw
+                });
 
-                var tone = _theme.RandomCoverColor(rng);
+                // The pad has to take the ramp as well as the deck, or the ramp's foot
+                // lands on a slope and the climb starts with a step the player has to
+                // jump. Reached along -z of the deck's own facing.
+                var foot = p + new Vector2(Mathf.Sin((yaw + 180f) * Mathf.Deg2Rad),
+                                           Mathf.Cos((yaw + 180f) * Mathf.Deg2Rad)) * (d * 0.5f + run);
 
-                CreateBlock(deck, new Vector3(0f, (h - 0.3f) * 0.5f, 0f),
-                            new Vector3(w - 0.6f, h - 0.3f, d - 0.6f), 0f, layer, _theme.coverTag,
-                            Shade(tone, 0.82f), 0.25f, _theme.coverMetallic, "Support", _coverMat);
+                // Both held at the *deck's* height, not each at its own. The ramp is one
+                // rigid plank from the deck down to the sand, so the sand it lands on has
+                // to be level with the sand the deck stands on -- and pinning the two
+                // discs to whatever the dunes happened to be doing under each of them put
+                // a metres-high step in the few metres between them, which was the
+                // steepest ground in the whole arena and the one place relaxation could
+                // not touch, since both sides of it were held.
+                float level = NaturalHeightAt(p.x, p.y);
 
-                CreateBlock(deck, new Vector3(0f, h - 0.15f, 0f), new Vector3(w, 0.3f, d), 0f,
-                            layer, _theme.coverTag, tone, 0.3f, _theme.coverMetallic, "Deck", _coverMat);
+                FlattenPad(p.x, p.y, Mathf.Max(w, d) * 0.55f, 24f, level);
+                FlattenPad(foot.x, foot.y, 5f, 22f, level);
+            }
+        }
 
-                var ramp = CreateBlock(deck, new Vector3(0f, h * 0.5f, -(d * 0.5f + run * 0.5f)),
-                                       new Vector3(4.5f, 0.35f, length), 0f, layer, _theme.coverTag,
-                                       Shade(tone, 0.9f), 0.25f, _theme.coverMetallic, "Ramp", _coverMat);
-                ramp.transform.localRotation = Quaternion.Euler(-rampAngle, 0f, 0f);
+        // ==================================================================
+        // Content: building
+        // ==================================================================
+        private static void BuildLandmarks(Transform root, int layer, System.Random rng)
+        {
+            var group = new GameObject("Landmarks").transform;
+            group.SetParent(root, false);
 
-                CreateBlock(deck, new Vector3(0f, h + 0.5f, d * 0.5f - 0.2f),
-                            new Vector3(w, 1f, 0.4f), 0f, layer, _theme.coverTag, tone, 0.3f,
-                            _theme.coverMetallic, "Lip", _coverMat);
+            foreach (var plan in _landmarkPlans)
+            {
+                float ground = GroundHeightAt(plan.Point.x, plan.Point.y);
+
+                var stack = new GameObject("Landmark").transform;
+                stack.SetParent(group, false);
+                stack.localPosition = new Vector3(plan.Point.x, ground, plan.Point.y);
+
+                // The butte itself, sunk enough that its base is never a hard line where
+                // it meets the sand.
+                var butte = MeshObject(stack, "Butte", ButteMesh(plan.Seed, sides: rng.Next(7, 11)),
+                                       _rockPaleMat, new Vector3(0f, -plan.Height * 0.06f, 0f),
+                                       Quaternion.Euler(0f, plan.Yaw, 0f),
+                                       new Vector3(plan.Width * 0.5f, plan.Height,
+                                                   plan.Width * 0.5f * Rand(rng, 0.7f, 1.2f)),
+                                       layer, _theme.wallTag);
+
+                // A butte has a flat cap on top of it, twenty metres up, and the bake
+                // reads a flat cap as walkable ground -- so every landmark on the map
+                // grows an island of navmesh nothing can reach. Harmless right up until
+                // the spawner samples near a player standing at the foot of one and puts
+                // an enemy on the summit, where it stands still for the rest of the level
+                // and the player is scored against a kill they cannot make.
+                NoStanding(butte);
+
+                // Talus: the rock that has already fallen off it. This is the detail that
+                // stops a butte reading as something placed -- weathering puts a skirt of
+                // its own debris around anything that has stood in a desert for long.
+                int fallen = rng.Next(4, 8);
+
+                for (int k = 0; k < fallen; k++)
+                {
+                    float angle = Rand(rng, 0f, Mathf.PI * 2f);
+                    float away = plan.Width * Rand(rng, 0.42f, 0.78f);
+                    float size = Rand(rng, 1.6f, 4.6f);
+
+                    float bx = plan.Point.x + Mathf.Cos(angle) * away;
+                    float bz = plan.Point.y + Mathf.Sin(angle) * away;
+
+                    // Parented to the group rather than to the butte, so its position is
+                    // world space and the ground height it was sampled at is the one it
+                    // is placed at.
+                    Boulder(group, layer, rng, new Vector3(bx, GroundHeightAt(bx, bz), bz), size);
+                }
             }
         }
 
         /// <summary>
-        /// Cover strung between two places that matter, laid across the line between
-        /// them rather than along it.
+        /// Walled compounds: the strongpoints.
+        ///
+        /// The first ones go on the bridge landings, because that is the ground worth
+        /// holding and a crossing with nothing at either end is a crossing with no reason
+        /// to be crossed. The rest fill the banks.
+        ///
+        /// Each has a way in, a wall to fight from behind, and supplies inside -- so it
+        /// is somewhere to go rather than something to look at.
+        /// </summary>
+        private static void BuildOutposts(Transform root, int layer, System.Random rng)
+        {
+            var group = new GameObject("Outposts").transform;
+            group.SetParent(root, false);
+
+            for (int i = 0; i < _outpostPlans.Count; i++)
+            {
+                var plan = _outpostPlans[i];
+
+                BuildOutpost(group, layer, rng,
+                             new Vector3(plan.Point.x, GroundHeightAt(plan.Point.x, plan.Point.y),
+                                         plan.Point.y),
+                             plan.Width, plan.Depth, plan.Yaw, i);
+            }
+        }
+
+        private static void BuildVantages(Transform root, int layer, System.Random rng)
+        {
+            var group = new GameObject("Vantages").transform;
+            group.SetParent(root, false);
+
+            for (int i = 0; i < _vantagePlans.Count; i++)
+            {
+                var plan = _vantagePlans[i];
+
+                var deck = new GameObject($"Vantage_{i}").transform;
+                deck.SetParent(group, false);
+                deck.localPosition = new Vector3(plan.Point.x,
+                                                 GroundHeightAt(plan.Point.x, plan.Point.y),
+                                                 plan.Point.y);
+                deck.localRotation = Quaternion.Euler(0f, plan.Yaw, 0f);
+
+                BuildScaffold(deck, layer, rng, plan.Width, plan.Depth, plan.Height);
+            }
+        }
+
+        /// <summary>
+        /// Cover strung between two places that matter, laid across the line between them
+        /// rather than along it.
         ///
         /// This is the pass that makes open ground crossable. A barrier facing the wrong
         /// way is scenery; a row of them across an approach is a route, and the
@@ -876,6 +897,11 @@ namespace FPSKit.EditorTools
                 int pieces = rng.Next(2, 5);
                 float spread = Rand(rng, 4f, 7f);
 
+                // One kind of cover per line. Mixed piece by piece it reads as a rubbish
+                // heap; all of a kind it reads as something somebody put there, which is
+                // what a defensive line is.
+                int kind = rng.Next(3);
+
                 // Across the line of travel, with a gap in it. A solid row is a wall and
                 // a wall is a detour; a broken row is cover you move between.
                 int gap = rng.Next(pieces);
@@ -891,20 +917,22 @@ namespace FPSKit.EditorTools
                     if (!Free(new Vector2(pos.x, pos.z), 3.4f)) continue;
                     Claim(pos.x, pos.z, 3.4f);
 
-                    float h = Rand(rng, _theme.coverHeightRange.x, _theme.coverHeightRange.y);
+                    float yaw = facing + 90f + Rand(rng, -12f, 12f);
+                    var at = new Vector3(pos.x, GroundHeightAt(pos.x, pos.z), pos.z);
 
-                    CreateBlock(group, new Vector3(pos.x, h * 0.5f, pos.z),
-                                new Vector3(Rand(rng, 3.5f, 5.5f), h, 0.8f),
-                                facing + 90f + Rand(rng, -12f, 12f), layer, _theme.coverTag,
-                                _theme.RandomCoverColor(rng), 0.3f, _theme.coverMetallic,
-                                "Barrier", _coverMat);
+                    switch (kind)
+                    {
+                        case 0: BuildSandbagWall(group, layer, rng, at, yaw); break;
+                        case 1: BuildTimberBarricade(group, layer, rng, at, yaw); break;
+                        default: BuildRockSpine(group, layer, rng, at, yaw); break;
+                    }
                 }
             }
         }
 
         /// <summary>
-        /// The filler: small clusters of rock and rubble everywhere else, so that the
-        /// ground between two things that matter is never a flat killing field.
+        /// The filler: rock, rubble and scrub everywhere else, so that the ground between
+        /// two things that matter is never a flat killing field.
         /// </summary>
         private static void BuildScatter(Transform root, int layer, System.Random rng, float half)
         {
@@ -919,14 +947,11 @@ namespace FPSKit.EditorTools
 
                 for (int k = 0; k < rocks; k++)
                 {
-                    float size = Rand(rng, 1.8f, 4.2f);
+                    float x = p.x + Rand(rng, -4.5f, 4.5f);
+                    float z = p.y + Rand(rng, -4.5f, 4.5f);
 
-                    CreateBlock(group, new Vector3(p.x + Rand(rng, -4f, 4f), size * 0.35f,
-                                                   p.y + Rand(rng, -4f, 4f)),
-                                new Vector3(size, size * Rand(rng, 0.6f, 1.2f), size * Rand(rng, 0.7f, 1.3f)),
-                                Rand(rng, 0f, 360f), layer, _theme.coverTag,
-                                Shade(_theme.bankColor, Rand(rng, 0.75f, 1.08f)),
-                                0.15f, 0f, "Rock", _coverMat);
+                    Boulder(group, layer, rng, new Vector3(x, GroundHeightAt(x, z), z),
+                            Rand(rng, 1.8f, 4.2f));
                 }
             }
         }
@@ -952,7 +977,7 @@ namespace FPSKit.EditorTools
             var list = new List<Transform>();
 
             float half = _theme.arenaSize * 0.5f;
-            float clear = _theme.hazardWidth * 0.5f + 16f;
+            float clear = _theme.hazardWidth * 0.5f + RimBandWidth + 6f;
 
             const int count = 12;
 
@@ -975,7 +1000,12 @@ namespace FPSKit.EditorTools
 
                 var point = new GameObject("Spawn_" + i).transform;
                 point.SetParent(root);
-                point.position = new Vector3(x, 0.1f, z);
+
+                // On the sand rather than at sea level. SnapSpawnPointsToNavMesh would
+                // pull it down afterwards anyway, but only if it lands within its search
+                // radius -- and a point eight metres under a dune is inside the collider,
+                // which is not somewhere NavMesh.SamplePosition looks first.
+                point.position = new Vector3(x, GroundHeightAt(x, z) + 0.1f, z);
                 list.Add(point);
             }
 
@@ -994,33 +1024,6 @@ namespace FPSKit.EditorTools
             return true;
         }
 
-        /// <summary>
-        /// Marks a surface at the bottom of the gorge as somewhere nothing may walk.
-        ///
-        /// A NavMeshSurface collects render meshes, not colliders, so taking the collider
-        /// off the water was not enough: the top of the water was baked as ground, twenty
-        /// metres down, with the ledges and the bed under it. It came out as an island
-        /// nothing could path onto, so every route still went over a bridge and the map
-        /// looked correct -- but the spawner samples the navmesh near the player, and a
-        /// player standing on the rim could put an enemy on that island, inside the
-        /// trigger, to drown on the frame it arrived and pay out a kill nobody made.
-        /// </summary>
-        private static void Drowned(GameObject go)
-        {
-            if (go == null) return;
-
-            var modifier = go.AddComponent<NavMeshModifier>();
-            modifier.overrideArea = true;
-            modifier.area = 1;   // Not Walkable
-        }
-
-        /// <summary>Tells the minimap what something is, since the geometry cannot.</summary>
-        private static void Mark(GameObject go, Color color, int order)
-        {
-            var marker = go.AddComponent<MinimapMarker>();
-            marker.color = color;
-            marker.order = order;
-        }
     }
 }
 #endif

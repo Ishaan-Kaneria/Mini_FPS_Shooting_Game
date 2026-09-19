@@ -38,6 +38,18 @@ namespace FPSKit.EditorTools
 
         private static LevelTheme _theme;
 
+        /// <summary>
+        /// The surface tag for open ground in an outdoor arena.
+        ///
+        /// Separate from Concrete because it is the one a player hears and sees most:
+        /// every footstep across a dune field and most bullet impacts land on it, and a
+        /// round cracking off a stone slab where it should have thrown up a puff of dust
+        /// is wrong in a way nobody can name but everybody notices. Provisioned in
+        /// <see cref="EnsureProjectTagsAndLayers"/> with the rest, so assigning it can
+        /// never throw on a project that has not seen it before.
+        /// </summary>
+        private const string SandTag = "Sand";
+
         // ==================================================================
         // Menu entries -- one per built-in theme.
         // ==================================================================
@@ -1421,7 +1433,14 @@ namespace FPSKit.EditorTools
                 Impact("Concrete", new Color(1f, 0.92f, 0.75f), 0.09f, "SFX/impact_concrete.wav", 0.7f),
                 Impact("Metal", new Color(1f, 0.85f, 0.5f), 0.1f, "SFX/impact_metal.wav", 0.75f),
                 Impact("Wood", new Color(0.9f, 0.65f, 0.35f), 0.09f, "SFX/impact_wood.wav", 0.7f),
-                Impact("Flesh", new Color(0.85f, 0.12f, 0.12f), 0.11f, "SFX/impact_flesh.wav", 0.85f)
+                Impact("Flesh", new Color(0.85f, 0.12f, 0.12f), 0.11f, "SFX/impact_flesh.wav", 0.85f),
+
+                // Sand throws a puff rather than a spark: bigger, dimmer, and the colour
+                // of the ground rather than of a hot fragment. It reuses the concrete
+                // sound at low volume because the kit has no sand impact authored --
+                // Tools/generate-placeholder-audio.py is where one would go, and it has
+                // to be added at the end of that file or every clip below it re-rolls.
+                Impact(SandTag, new Color(0.82f, 0.72f, 0.54f), 0.16f, "SFX/impact_concrete.wav", 0.4f)
             };
 
             // Anything untagged still sparks and still ticks, so a shot into imported
@@ -1537,7 +1556,13 @@ namespace FPSKit.EditorTools
             var player = new GameObject("Player");
             player.tag = "Player";
             player.layer = LayerMask.NameToLayer("Player");
-            player.transform.position = new Vector3(0f, 1f, 0f);
+
+            // On the ground rather than at a fixed metre above the origin. An arena with
+            // a heightfield has no reason for the sand at (0,0) to be at y=0, and the
+            // alternative -- flattening a pad there and pinning it to zero so this line
+            // stays true -- put a crater in the middle of the map whose rim was the
+            // steepest ground in the level.
+            player.transform.position = new Vector3(0f, GroundHeightAt(0f, 0f) + 1f, 0f);
 
             var cc = player.AddComponent<CharacterController>();
             cc.height = 1.8f;
@@ -2149,6 +2174,23 @@ namespace FPSKit.EditorTools
             // so that a prop with no collider inside the level still blocks.
             int backdrop = LayerMask.NameToLayer("Backdrop");
             if (backdrop >= 0) surface.layerMask = ~(1 << backdrop);
+
+            // Throw away navmesh too small to be anywhere.
+            //
+            // An outdoor arena is full of places where a couple of square metres of
+            // ground end up walled off from everything else: the gap in the middle of a
+            // cluster of boulders, the sand under a raised deck's bracing, a ledge behind
+            // a rock. None of them is reachable and all of them bake, because the bake
+            // asks only whether an agent fits, never whether one could get there.
+            //
+            // They are not cosmetic. LevelManager places a spawn by sampling the navmesh
+            // near the player, and a sample can land on any of them -- so an enemy
+            // arrives inside a ring of rocks, cannot path out, cannot be reached, and the
+            // level cannot be cleared. The clock ends it and the player is scored against
+            // a kill that was never available. Twelve square metres is comfortably
+            // smaller than any real pocket of ground in these arenas and comfortably
+            // bigger than every one of those scraps.
+            surface.minRegionArea = 12f;
 
             surface.BuildNavMesh();
         }
@@ -3545,7 +3587,7 @@ namespace FPSKit.EditorTools
         /// <summary>Public so the other FPSKit tools can guarantee these exist before they run.</summary>
         public static void EnsureProjectTagsAndLayers()
         {
-            EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh", "Water");
+            EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh", "Water", SandTag);
             EnsureLayers("Player", "Enemy", "Environment", "Backdrop");
         }
 

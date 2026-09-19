@@ -182,9 +182,24 @@ namespace FPSKit.EditorTools
                           float toOffset, float z, List<string> problems, StringBuilder notes)
         {
             float centre = GorgeCentre(theme, z);
+            float half = theme.arenaSize * 0.5f;
 
-            var from = new Vector3(centre + fromOffset, 1f, z);
-            var to = new Vector3(centre + toOffset, 1f, z);
+            // Kept inside the arena, because the offsets are measured from the river and
+            // the river is not down the middle of the map.
+            //
+            // With hazardOffset at 92 and the meander swinging another 30 east, the east
+            // bank is barely eighty metres wide at some latitudes -- so a probe placed a
+            // fixed ninety-four metres out from the water lands past the boundary ridge
+            // and inside the rock. What that reports is "the far bank cannot be reached
+            // and half the level is unreachable", which is the loudest thing this file
+            // can say and, there, entirely an artefact of where the probe was put. The
+            // margin clears the ridge, whose blocks reach about eighteen metres inboard
+            // of the arena edge.
+            float Bank(float offset)
+                => Mathf.Clamp(centre + offset, -half * 0.82f, half * 0.82f);
+
+            var from = OnGround(new Vector3(Bank(fromOffset), 1f, z));
+            var to = OnGround(new Vector3(Bank(toOffset), 1f, z));
 
             if (!NavMesh.SamplePosition(from, out var a, 14f, NavMesh.AllAreas) ||
                 !NavMesh.SamplePosition(to, out var b, 14f, NavMesh.AllAreas))
@@ -198,8 +213,18 @@ namespace FPSKit.EditorTools
 
             if (path.status != NavMeshPathStatus.PathComplete)
             {
-                problems.Add($"{name}: no complete path {label} ({path.status}), so the far bank " +
-                             "cannot be reached and half the level is unreachable");
+                // Where it gave up, not just that it did. A partial path is the navmesh
+                // saying "this far and no further", and the corner it stops at is the
+                // obstacle -- without it the only way to find out which of four hundred
+                // generated objects is in the way is to guess.
+                var stopped = path.corners.Length > 0
+                    ? path.corners[path.corners.Length - 1].ToString()
+                    : "nowhere at all";
+
+                problems.Add($"{name}: no complete path {label} ({path.status}): from {a.position} " +
+                             $"({Standing(a.position)}) towards {b.position} ({Standing(b.position)}), " +
+                             $"the route runs out at {stopped} after {path.corners.Length} corners " +
+                             "-- so the far bank cannot be reached and half the level is unreachable");
                 return -1f;
             }
 
@@ -211,6 +236,66 @@ namespace FPSKit.EditorTools
                          $"{Vector3.Distance(a.position, b.position):0} m of gap");
 
             return length;
+        }
+
+        /// <summary>
+        /// Drops a probe point onto whatever is under it.
+        ///
+        /// These probes used to be taken at a flat <c>y = 1</c>, which is correct in an
+        /// arena whose ground is a floor and wrong the moment it is a heightfield:
+        /// <c>NavMesh.SamplePosition</c> searches a radius in three dimensions, and a
+        /// dune field with thirty metres of relief in it puts the sand seventeen metres
+        /// below the probe in the basins. The search then fails not because the bank is
+        /// unreachable but because the test was looking for it in the sky -- which is
+        /// reported as the far half of the level being cut off, and is the most alarming
+        /// message this file can produce.
+        ///
+        /// Falls back to the point it was given when nothing is under it, so a genuinely
+        /// missing bank still fails.
+        /// </summary>
+        /// <summary>
+        /// Names whatever is standing over a point, root object first.
+        ///
+        /// A partial path says a point is walled in and says nothing about what by, and
+        /// an open-zone arena has several hundred generated objects in it. This turns
+        /// four hundred candidates into one name.
+        /// </summary>
+        static string Standing(Vector3 at)
+        {
+            var hits = Physics.RaycastAll(new Vector3(at.x, 400f, at.z), Vector3.down, 800f);
+            if (hits.Length == 0) return "nothing above it";
+
+            var names = new List<string>();
+
+            foreach (var hit in hits)
+            {
+                if (hit.collider == null) continue;
+
+                var root = hit.collider.transform.root;
+                string label = root == hit.collider.transform
+                    ? hit.collider.name
+                    : $"{root.name}/{hit.collider.name}";
+
+                if (!names.Contains(label)) names.Add(label);
+            }
+
+            return names.Count == 0 ? "nothing above it" : "under " + string.Join(", ", names);
+        }
+
+        static Vector3 OnGround(Vector3 probe)
+        {
+            var hits = Physics.RaycastAll(new Vector3(probe.x, 400f, probe.z), Vector3.down, 800f);
+            if (hits.Length == 0) return probe;
+
+            // The *lowest* hit, not the first. The first is whatever is standing on the
+            // ground here -- the cap of a rock, the deck of a vantage, the top of a
+            // compound wall -- and a probe put a metre above that is a probe testing
+            // whether you can walk across the map from the summit of a boulder. The
+            // bottom of the stack is the sand.
+            var lowest = hits[0].point;
+            foreach (var hit in hits) if (hit.point.y < lowest.y) lowest = hit.point;
+
+            return lowest + Vector3.up;
         }
 
         /// <summary>

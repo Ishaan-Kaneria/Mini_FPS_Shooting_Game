@@ -185,7 +185,16 @@ namespace FPSKit.EditorTools
                     t.skyExposure = 1.35f;
                     t.sunColor = new Color(1f, 0.94f, 0.78f);
                     t.sunIntensity = 1.45f;
-                    t.sunAngles = new Vector2(68f, 140f);
+                    // Mid-afternoon rather than noon, and this is a terrain decision more
+                    // than a lighting one. A dune is read entirely through the shading
+                    // across its own slope, and a sun sixty-eight degrees up puts almost
+                    // the same amount of light on the windward face, the crest and the
+                    // slipface -- so a field of eleven-metre dunes came back looking like
+                    // a flat plane with a texture on it. Dropped to forty-two the slopes
+                    // separate, the crests throw a shadow down their lee side, and the
+                    // shape of the ground becomes something the player can actually see
+                    // from a distance and navigate by.
+                    t.sunAngles = new Vector2(42f, 140f);
                     t.fogColor = new Color(0.78f, 0.71f, 0.56f);
                     t.fogDensity = 0.004f;
                     // Lifted for the open zone. One hard sun over a map with
@@ -222,11 +231,36 @@ namespace FPSKit.EditorTools
                     t.hazardDepth = 22f;
                     t.hazardOffset = 92f;
                     t.hazardMeander = 30f;
-                    t.hazardColor = new Color(0.22f, 0.44f, 0.46f);
+                    // Silt, not lagoon. A river that has crossed a desert to get here is
+                    // carrying the desert with it, and the blue it started at read as
+                    // tropical water in a canyon.
+                    t.hazardColor = new Color(0.25f, 0.42f, 0.38f);
                     t.bankColor = new Color(0.52f, 0.44f, 0.31f);
                     t.bridgeColor = new Color(0.50f, 0.45f, 0.38f);
                     t.bridgeWidth = 9f;
                     t.bridgeCount = 2;
+
+                    // Dunes. The wavelength is deliberately short enough that the primary
+                    // train overshoots the angle of repose and gets cut back to it by the
+                    // relaxation pass, because that is what a slipface *is* -- sand piled
+                    // until it slides. Long enough not to overshoot and the field comes
+                    // back as smooth swells with no crest anywhere in it, which is a
+                    // landscape but not a dune field.
+                    //
+                    // The height is the amplitude of the *primary* train only,
+                    // and the basin and hill octaves are scaled off it, so eleven metres
+                    // of dune sits on twenty-five-odd metres of broad relief across the
+                    // whole map. A crest has to hide a standing enemy from a standing
+                    // player or it changes nothing about how the level is fought; a
+                    // hundred and twenty metres of wavelength is what keeps that height
+                    // drivable, since a dune's slope is the one over the other. Together
+                    // they put about four ranges of dune across the arena -- enough that
+                    // there is always one between you and somewhere, and few enough that
+                    // the map still reads as open ground rather than as a maze with sand
+                    // walls.
+                    t.duneHeight = 11f;
+                    t.duneWavelength = 95f;
+                    t.duneWindAngle = 34f;
 
                     t.backdropCount = 38;
                     t.backdropDistance = new Vector2(640f, 1180f);

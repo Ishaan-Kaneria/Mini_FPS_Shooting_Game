@@ -262,6 +262,23 @@ namespace FPSKit.EditorTools
         public static void VerifyZone() => FPSKitZoneTest.VerifyZone();
 
         /// <summary>
+        /// Renders a built arena from a few fixed viewpoints, for looking at what the
+        /// builder actually produced. Needs a real graphics device:
+        ///
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.CaptureViews \
+        ///       -fpskitTheme "Desert Outpost" -fpskitOut Build/Views
+        /// </summary>
+        public static void CaptureViews() => FPSKitViews.Capture();
+
+        /// <summary>
+        /// Checks that a dune arena's ground has a shape, that the shape is drivable, and
+        /// that it is smooth at the scale a wheel feels.
+        ///
+        ///   Tools/unity-batch.sh FPSKitBatch.VerifyTerrain
+        /// </summary>
+        public static void VerifyTerrain() => FPSKitTerrainTest.VerifyTerrain();
+
+        /// <summary>
         /// Plays the economy end to end: coins earned by killing, spent in the store, and
         /// carried into a level as a better gun and a bomb that goes off where it was
         /// aimed.

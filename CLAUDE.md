@@ -21,7 +21,7 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | Levels   | `LevelManager.cs` — runs one level: a fixed roster, a strict clock, golden-angle ring spawns that avoid the player's view, an enemy leash that replaces what it discards, and a weighted score cut into stars. `LevelSet.cs` (ScriptableObject, one ladder per arena), `LevelResult.cs` (how a level ended), `LevelProgress.cs` (stars and unlocks in PlayerPrefs) |
 | Run state | `GameDirector.cs` — score, combo, pause, end of level, return-to-dashboard, PlayerPrefs records; `GameSession.cs` (what survives a scene change), `PlayerProfile.cs` (PlayerPrefs stats) |
 | Dashboard | `MainMenuController.cs`, `ArenaCard.cs`, `ArenaCatalog.cs` (ScriptableObject), `LevelSelectPanel.cs`, `LevelButton.cs` |
-| Feedback | `HUDController.cs`, `LevelResultsUI.cs` (the stars screen), `Minimap.cs` (the map in the corner), `MinimapMarker.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots) |
+| Feedback | `HUDController.cs`, `LevelResultsUI.cs` (the stars screen), `Minimap.cs` (the map in the corner), `MinimapMarker.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots), `ScrollingWater.cs` (drags the river's texture along it) |
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
@@ -84,9 +84,20 @@ Generated Materials**, or `FPSKitBatch.PruneMaterials`, which reports and only d
 with `-fpskitApply`) is how that is cleared; anything the builder still wants, it
 recreates on the next build.
 
+`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`Mark` bookkeeping every generated object needs) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
+
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the eight checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the eight checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+
+`FPSKitViews.cs` (`FPSKitBatch.CaptureViews`) is not a test -- it renders a built arena from fixed viewpoints to PNGs, because a generated scene is otherwise write-only from the command line: it is saved in binary so it cannot be read, its geometry is procedural so the code is not a description of the result, and every check here answers whether a level *works* rather than what it looks like. `VerifyZone` would pass just as happily on an arena whose cliffs were inside out. It needs a real graphics device:
+
+```
+UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.CaptureViews \
+    -fpskitTheme "Desert Outpost" -fpskitOut Build/Views
+```
+
+Render through `RenderPipeline.SubmitRenderRequest` and submit twice, for the same two reasons the dashboard's arena previews do.
 
 **A play-mode test that measures speed must set `Time.captureDeltaTime`.** Under
 `-batchmode -nographics` the game's delta time is very nearly zero, so anything that
@@ -377,6 +388,152 @@ Four things about that screen are worth not re-deriving:
 TMP has no closing `</alpha>` tag — `<alpha=#99>` applies from where it appears. Writing
 one prints those eight characters on screen, which is what the instruction strip and the
 dashboard hint both did. Use `<color=…></color>`; `VerifyFlow` checks for it.
+
+## The desert has ground, not a floor
+
+The open zone's ground is a heightfield, not a slab. `LevelTheme.duneHeight` is the
+switch: zero leaves the flat banks the walled arenas use, and anything above it builds
+`FPSKitTerrain.BuildDuneField` -- a dune field of crossed asymmetric ridge trains over
+broad basins, meshed as chunks with the river cut out of it as a true hole so the
+navigation bake still gets no floor over the water.
+
+Five things about it are worth not re-deriving:
+
+- **The angle of repose is enforced, not hoped for.** Summed sine waves overshoot
+  wherever two slipfaces land on top of each other. Three separate limits care: sand
+  stands at about 33 degrees, the NavMesh will not bake past `agentSlope` (45), and the
+  player's `CharacterController` stops at its `slopeLimit` (50) -- and **a wheeled
+  vehicle gives up long before any of them**, which is why `ReposeDegrees` is 26 and not
+  a compromise with the other three. `RelaxToRepose` is thermal erosion run as thirty
+  Gauss-Seidel sweeps, and a sweep moves sand one cell, so the count is a *distance*: at
+  ten, the steepest ground in the arena was still on the lip of a flattened pad, because
+  the relaxation had not reached that far before it stopped. That it also rounds crests
+  and piles a toe at the bottom of each slipface -- which is most of what makes the field
+  read as sand rather than as mathematics -- is the bonus.
+- **The dune wavelength is what sets the slope, and it is deliberately short enough to
+  overshoot.** A dune's gradient is its height over its length, so `duneWavelength` is
+  the knob that decides whether the field survives the relaxation intact. Set long enough
+  not to overshoot, it comes back as smooth swells with no crest in it. Set short, the
+  primary train is cut back to exactly the repose angle -- which is what a slipface *is*,
+  sand piled until it slides.
+- **There are no ripples in the heightfield.** A wind ripple is a couple of metres crest
+  to crest and the grid is three, so putting one in the field samples it below its own
+  Nyquist rate: what comes out is not ripples but a field of hard kinks at the grid
+  spacing. Invisible on foot, and under a wheel it is a surface that chatters everywhere.
+  The ripples live in the sand normal map instead. `SmoothField` then takes the creases
+  out of what the relaxation leaves behind -- erosion stops the instant nothing is too
+  steep, so it hands back planes meeting at the limiting angle, and smooth vertex normals
+  hide those creases from the eye completely but not from a collider.
+- **Everything asks the terrain where the ground is.** `GroundHeightAt` is the single
+  answer and every pass that places anything calls it. A rock placed at y=0 on a dune
+  field is buried or hovering, and which one changes per rebuild. `BuildPlayer` asks it
+  too, rather than starting the player at a fixed `y = 1`.
+- **Flat ground is reserved before the terrain exists, not carved after.** A compound is
+  four straight walls at right angles and there is no version of that which follows a
+  hill; a boulder needs no such thing and looks better half-buried. So `BuildOpenZone`
+  runs in two halves -- `PlanCrossings`/`PlanLandmarks`/`PlanOutposts`/`PlanVantages`
+  choose sites and call `FlattenPad`, then the terrain is generated with those sites
+  already flat in it, and only then is anything built. `PlanX` and `BuildX` have to stay
+  in the same order as each other, because the second reads the list the first wrote.
+
+**Two pads that must agree have to be pinned to one height, and the nearest pad wins.**
+Both of those are bugs that were written first and found by `VerifyTerrain`:
+
+- A raised deck and the foot of its own ramp were each pinned to whatever the dunes were
+  doing under them. The ramp is one rigid plank between the two, so they have to be
+  level; pinned separately they were two flat discs metres apart in height with a couple
+  of metres of sand between them, and that sand was the steepest ground in the arena and
+  the one place relaxation could not touch, because both sides of the step were held.
+- Overlapping pads were applied **in turn**, each lerping the height it was handed
+  towards its own target -- so the *last* pad to mention a point decided it, however far
+  away that pad was. A vantage sixty metres from a bridge, planned after it and therefore
+  applied after it, reached the end of the deck through the tail of its own blend and
+  pulled the sand there most of the way down to deck height. The bridge then ended at a
+  step no agent could climb: the navmesh stopped at the water, the far half of the level
+  became unreachable, and the bridge was still standing there looking exactly right. The
+  pad with the smallest `t` now wins outright.
+
+`Tools/unity-batch.sh FPSKitBatch.VerifyTerrain` is the regression test, and it makes
+three assertions that pull against each other on purpose: **relief** (the ground has to
+rise and fall by enough to hide a person, or the dunes are decoration), **gradient**
+(and never by more than a vehicle can climb, measured at 1.5m -- about a wheelbase), and
+**chatter** (and the gradient must not jump between adjacent steps, which is the thing
+smooth normals hide completely and a collider does not). It raycasts the built scene
+rather than re-running the generator, so what is checked is the collider the game
+actually uses. **It filters on the `Sand` tag, not on the surface normal** -- the top of
+a boulder is as near-level as a dune is, so a normal test kept half the rocks in the
+arena and each one contributed two enormous steps.
+
+## Surfaces are textured, and the textures are generated
+
+`FPSKitTextures.cs` renders tiling albedo and normal maps for sand, rock, timber, adobe
+and water into `FPSKit_Generated/Textures/`. Every generated arena was flat-shaded before
+this -- one solid colour per material -- which is readable and completely scaleless: a
+dune the size of a house and one the size of a stadium are the same wash of orange, and a
+player walking over the second cannot tell they are moving.
+
+- **The maps are grayscale and the colour stays on the material.** Tinting a grey detail
+  map with `_BaseColor` keeps `LevelTheme` in charge of what colour an arena is, which is
+  the whole point of the theme being an asset. A coloured texture would quietly override
+  it and a theme retune would then do nothing.
+- **They are regenerated on every build rather than cached.** The generator is a pure
+  function of constants, so the PNG bytes are identical every time and git sees no change
+  -- which means there is no "reset the textures" step to forget, unlike the theme,
+  roster, level and store generators.
+- **They are written as PNGs and imported, not created as `Texture2D` assets.** A normal
+  map has to go through the importer to be encoded the way the shader unpacks it.
+  `MakeDetailMaterial` must also `EnableKeyword("_NORMALMAP")`: URP's Lit shader only
+  samples the map when that keyword is on, and setting the texture does not set it -- the
+  map is then assigned, visible in the inspector, and doing nothing.
+- **Noise for a texture has to wrap.** `TileNoise` wraps its lattice at the period. A
+  texture tiled across four hundred metres shows its seam as a hard line every few
+  metres, and a hard line repeated in a grid is more visible than having no texture.
+- **Each surface needs its own map.** Adobe borrowed sand's, and sand's detail is wind
+  ripples -- parallel, evenly spaced, all the same size -- which on a vertical wall is
+  not mud brick, it is corrugated iron.
+
+`Sand` is a surface tag, provisioned in `EnsureProjectTagsAndLayers` with the rest and
+carrying its own `ImpactLibrary` entry. It is the tag a player sees and hears most: every
+footstep across a dune field and most bullet impacts land on it, and a round cracking off
+stone where it should throw up dust is wrong in a way nobody can name and everybody
+notices.
+
+## The river is a canyon, and the fence is a fence
+
+`FPSKitDesert.cs` owns what the open zone is made of. Three pieces of it have traps in
+them:
+
+- **The canyon's top shelf must stay on the navmesh.** The wall is built as three
+  stratified bands from one shared grid of points, and `CanyonBands` splits them at row
+  two rather than anywhere prettier: the bridge decks are flush with that top shelf, and
+  a lip laid unwalkable over the end of a bridge cuts the crossing in half -- silently,
+  because the bridge is still visibly there and the path around it still completes.
+  Everything below row two is held off the bake by `NoStanding`, because the bench and
+  the talus are both shallower than the agent slope and would otherwise bake as islands
+  twenty metres down, inside the kill volume, for the spawner to find.
+- **The lip has to sit on top of the sand it overlaps.** A heightfield can only end on a
+  cell boundary and the river does not, so the terrain's edge is a staircase; the first
+  two rows of the canyon profile are nearly flat, six metres wide and *above* the rim to
+  cover it. Get the sign wrong and the terrain pokes back through the rock.
+- **The river is sliced, and the cliffs are hidden.** The minimap draws the footprint of
+  what it is given, so one four-hundred-metre cliff mesh comes back as an axis-aligned
+  rectangle over a third of the map with the meander nowhere in it. The cliffs, the bed,
+  the fence runs and the bridge gates are all `Hide`-den; the water is cut into slices
+  that follow the bend and each one is `Mark`-ed, which is what actually tells the player
+  where the river is.
+
+**The apron stops where the terrain stops.** It used to run under the whole arena, which
+was invisible under a flat floor; under a heightfield it is a sheet at y=0 cutting up
+through every hollow that dips below zero. It is also built as meshes with world-space
+UVs rather than as scaled cubes -- a cube's UVs run nought to one across whichever face,
+so a kilometre-wide slab stretches one tile of texture across the whole kilometre, which
+reads as smeared streaks all along the horizon.
+
+**A boulder needs `NoStanding` too.** A NavMeshSurface reads any surface shallower than
+the agent slope as walkable, so the dome on top of every rock, the crown of every palm
+and the sheet of every tarpaulin bakes as an island nothing can path to -- harmless until
+`LevelManager` samples the mesh near the player to place a spawn, finds one, and puts an
+enemy on a tree.
 
 ## The industrial zone is a plant, not a yard with crates in it
 

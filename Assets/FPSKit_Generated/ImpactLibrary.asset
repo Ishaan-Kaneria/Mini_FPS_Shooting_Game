@@ -37,6 +37,12 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 9dd9832a82fb22f2980451606f72787e, type: 3}
     volume: 0.85
     effectLifetime: 1
+  - surfaceTag: Sand
+    effectPrefab: {fileID: 6889975037063242141, guid: f2069ff8307a3bf9c917abb13f0c70b2, type: 3}
+    clips:
+    - {fileID: 8300000, guid: 6340a5107191f5571acef76d92c52937, type: 3}
+    volume: 0.4
+    effectLifetime: 1
   fallback:
     surfaceTag: Default
     effectPrefab: {fileID: 1238077029557984431, guid: e17a124f7dd870283b34e43bfa3d165f, type: 3}

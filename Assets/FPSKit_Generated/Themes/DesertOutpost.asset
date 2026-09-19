@@ -21,7 +21,7 @@ MonoBehaviour:
   skyExposure: 1.35
   sunColor: {r: 1, g: 0.94, b: 0.78, a: 1}
   sunIntensity: 1.45
-  sunAngles: {x: 68, y: 140}
+  sunAngles: {x: 42, y: 140}
   shadowStrength: 0.85
   fogEnabled: 1
   fogColor: {r: 0.78, g: 0.71, b: 0.56, a: 1}
@@ -41,11 +41,14 @@ MonoBehaviour:
   hazardDepth: 22
   hazardOffset: 92
   hazardMeander: 30
-  hazardColor: {r: 0.22, g: 0.44, b: 0.46, a: 1}
+  hazardColor: {r: 0.25, g: 0.42, b: 0.38, a: 1}
   bankColor: {r: 0.52, g: 0.44, b: 0.31, a: 1}
   bridgeWidth: 9
   bridgeCount: 2
   bridgeColor: {r: 0.5, g: 0.45, b: 0.38, a: 1}
+  duneHeight: 11
+  duneWavelength: 95
+  duneWindAngle: 34
   backdropCount: 38
   backdropDistance: {x: 640, y: 1180}
   backdropHeight: {x: 60, y: 210}
@@ -56,6 +59,10 @@ MonoBehaviour:
   vantageCount: 10
   coverLineCount: 18
   scatterClusterCount: 40
+  industrialZone: 0
+  zoneWorksCount: 3
+  zoneTankFarmCount: 2
+  zoneContainerYardCount: 3
   roomCount: 2
   platformCount: 3
   coverWallCount: 6

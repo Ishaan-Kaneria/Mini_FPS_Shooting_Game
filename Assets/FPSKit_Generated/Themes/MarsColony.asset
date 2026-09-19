@@ -46,6 +46,9 @@ MonoBehaviour:
   bridgeWidth: 9
   bridgeCount: 2
   bridgeColor: {r: 0.46, g: 0.42, b: 0.36, a: 1}
+  duneHeight: 0
+  duneWavelength: 95
+  duneWindAngle: 34
   backdropCount: 34
   backdropDistance: {x: 620, y: 1150}
   backdropHeight: {x: 55, y: 190}
@@ -56,6 +59,10 @@ MonoBehaviour:
   vantageCount: 8
   coverLineCount: 14
   scatterClusterCount: 26
+  industrialZone: 0
+  zoneWorksCount: 3
+  zoneTankFarmCount: 2
+  zoneContainerYardCount: 3
   roomCount: 3
   platformCount: 3
   coverWallCount: 7

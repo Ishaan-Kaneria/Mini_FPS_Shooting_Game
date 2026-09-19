@@ -126,6 +126,25 @@ public class LevelTheme : ScriptableObject
 
     public Color bridgeColor = new Color(0.46f, 0.42f, 0.36f);
 
+    [Header("Open Zone: Terrain")]
+    [Tooltip("Height of the dunes, in metres, crest to trough. Zero leaves the ground " +
+             "as the flat slab it used to be, which is still right for an arena whose " +
+             "ground is meant to be a floor -- a yard, a depot, a road. Anywhere the " +
+             "ground is the landscape, this is the single number that decides whether " +
+             "the level has a shape or is a plane with objects on it.")]
+    [Min(0f)] public float duneHeight;
+
+    [Tooltip("Metres from one dune crest to the next. This is the knob that sets how " +
+             "steep the field can get, because a dune's slope is its height over its " +
+             "length -- shorten it without shortening the height and the whole field " +
+             "hits the angle of repose and is flattened back by the relaxation pass.")]
+    [Min(20f)] public float duneWavelength = 95f;
+
+    [Tooltip("Which way the wind blew, in degrees. The dune crests run across it, so " +
+             "this is the direction the long shallow slopes face -- and therefore which " +
+             "approaches to the level are ramps and which are walls.")]
+    public float duneWindAngle = 34f;
+
     [Header("Open Zone: Backdrop")]
     [Tooltip("Silhouettes ringed around the level far past the boundary -- mesas, " +
              "ridges, a skyline. No colliders, and off the navigation bake.")]

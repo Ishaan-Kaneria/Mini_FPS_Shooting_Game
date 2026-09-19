@@ -552,6 +552,9 @@ namespace FPSKit.EditorTools
 
         private static void BuildArena()
         {
+            // The industrial zone is asked about first: a theme that sets both is asking
+            // for a factory, and a factory cannot also be a river valley.
+            if (_theme.industrialZone) { BuildIndustrialZone(); return; }
             if (_theme.openZone) { BuildOpenZone(); return; }
 
             _claimed.Clear();
@@ -1591,7 +1594,7 @@ namespace FPSKit.EditorTools
             // clipped away one by one as the player walks, which looks like the world
             // dissolving. Only raised for the arenas that need it: a far plane is depth
             // precision spent, and a walled box has nothing out there to see.
-            cam.farClipPlane = _theme != null && _theme.openZone
+            cam.farClipPlane = WideArena
                 ? Mathf.Max(1200f, _theme.backdropDistance.y * 1.7f)
                 : 1000f;
 
@@ -2048,6 +2051,7 @@ namespace FPSKit.EditorTools
         // ==================================================================
         private static Transform[] BuildSpawnPoints()
         {
+            if (_theme.industrialZone) return BuildZoneSpawnPoints();
             if (_theme.openZone) return BuildOpenZoneSpawnPoints();
 
             var root = new GameObject("SpawnPoints").transform;
@@ -2197,7 +2201,7 @@ namespace FPSKit.EditorTools
             // clock -- an empty map and a timer running down, with nothing in the log to
             // say why. Past a point the ring has to be a distance rather than a
             // proportion, because what it is really setting is how long the player waits.
-            manager.maxSpawnDistanceFromPlayer = _theme.openZone
+            manager.maxSpawnDistanceFromPlayer = WideArena
                 ? Mathf.Clamp(_theme.arenaSize * 0.16f, 45f, 80f)
                 : Mathf.Max(30f, _theme.arenaSize * 0.55f);
 
@@ -2205,7 +2209,7 @@ namespace FPSKit.EditorTools
             // and wider still on an open zone -- crossing a bridge with a crowd behind
             // you is the fight that map exists for, and a leash tight to the ring would
             // quietly delete them halfway over.
-            manager.despawnDistance = _theme.openZone
+            manager.despawnDistance = WideArena
                 ? Mathf.Max(150f, manager.maxSpawnDistanceFromPlayer * 2.2f)
                 : Mathf.Max(95f, manager.maxSpawnDistanceFromPlayer * 1.6f);
             manager.despawnGraceTime = 4f;

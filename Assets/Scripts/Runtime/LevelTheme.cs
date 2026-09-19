@@ -160,6 +160,30 @@ public class LevelTheme : ScriptableObject
              "that stops the ground between two compounds being a killing field.")]
     [Min(0)] public int scatterClusterCount = 26;
 
+    // ==================================================================
+    // Industrial zone
+    // ==================================================================
+    [Header("Industrial Zone")]
+    [Tooltip("Build this arena as a working plant laid out on a road grid: streets, " +
+             "blocks, enterable sheds, a tank farm, a container yard, perimeter fencing " +
+             "and gates. Takes precedence over the open zone when both are on, because " +
+             "the two are different answers to the same question and a site cannot be " +
+             "both a river valley and a factory.")]
+    public bool industrialZone;
+
+    [Tooltip("Blocks given over to the big sheds. These are the only buildings the " +
+             "player can go inside, so this is really the count of interior fights the " +
+             "level offers.")]
+    [Min(0)] public int zoneWorksCount = 3;
+
+    [Tooltip("Tank farms: tanks inside a chest-high bund wall, with a pipe run and a " +
+             "catwalk leaving the compound.")]
+    [Min(0)] public int zoneTankFarmCount = 2;
+
+    [Tooltip("Container yards. The close-quarters districts -- rows of stacked boxes " +
+             "with lanes between them and walk-through containers as the flank.")]
+    [Min(0)] public int zoneContainerYardCount = 3;
+
     [Header("Arena Layout")]
     [Tooltip("Roofless buildings with doorways. The backbone of the level.")]
     public int roomCount = 3;

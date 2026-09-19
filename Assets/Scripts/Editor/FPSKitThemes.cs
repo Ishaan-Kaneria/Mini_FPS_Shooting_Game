@@ -118,7 +118,15 @@ namespace FPSKit.EditorTools
                     t.sunIntensity = 1.15f;
                     t.sunAngles = new Vector2(48f, 32f);
                     t.fogColor = new Color(0.50f, 0.53f, 0.58f);
-                    t.fogDensity = 0.009f;
+
+                    // Thinned for the bigger site, and this is not a taste decision.
+                    // Fog is exponential-squared, so 0.009 -- which was right for a
+                    // 110m box -- is all but opaque by 250m. On a 500m plant that put
+                    // a grey wall across the middle of the map: the far half simply was
+                    // not there, and the arena read as empty precisely because you
+                    // could not see what was in it.
+                    t.fogDensity = 0.0032f;
+
                     t.ambientSky = new Color(0.45f, 0.50f, 0.60f);
                     t.ambientEquator = new Color(0.30f, 0.30f, 0.33f);
                     t.ambientGround = new Color(0.15f, 0.14f, 0.13f);
@@ -131,12 +139,39 @@ namespace FPSKit.EditorTools
                         new Color(0.30f, 0.33f, 0.36f)
                     };
                     t.coverTag = "Metal";
-                    t.arenaSize = 110f;
-                    t.roomCount = 3;
-                    t.platformCount = 2;
-                    t.coverWallCount = 8;
-                    t.crateStackCount = 8;
-                    t.pillarCount = 5;
+
+                    // A working plant on a street grid, not a walled yard. 500m square
+                    // is about nine times the old 110x150 box, which is the point: the
+                    // complaint it answers was "I am in a box with objects in it", and
+                    // that is not fixed by adding objects. It is built at 500 rather
+                    // than at a 400x500 rectangle because every other system here --
+                    // the spawn ring, the leash, the minimap, the boundary -- is written
+                    // against one arenaSize, and a rectangle is four more places for the
+                    // two numbers to disagree for no gain the player can see.
+                    t.industrialZone = true;
+                    t.openZone = false;
+                    t.arenaSize = 500f;
+                    t.apronSize = 900f;
+
+                    t.zoneWorksCount = 5;
+                    t.zoneTankFarmCount = 3;
+                    t.zoneContainerYardCount = 4;
+
+                    // The horizon. A plant that stops at its own fence is a diorama, so
+                    // the skyline past it is most of what sells the scale.
+                    t.backdropCount = 30;
+                    t.backdropDistance = new Vector2(700f, 1300f);
+
+                    // The greybox layout is off: every one of these would now be dropped
+                    // on top of a road or through a shed wall. The districts place their
+                    // own cover.
+                    t.roomCount = 0;
+                    t.platformCount = 0;
+                    t.coverWallCount = 0;
+                    t.crateStackCount = 0;
+                    t.pillarCount = 0;
+                    t.propCount = 0;
+
                     t.accentLightCount = 0;
                     t.contrast = 6f;
                     break;

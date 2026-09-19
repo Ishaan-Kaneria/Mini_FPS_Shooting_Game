@@ -25,11 +25,11 @@ MonoBehaviour:
   shadowStrength: 0.85
   fogEnabled: 1
   fogColor: {r: 0.5, g: 0.53, b: 0.58, a: 1}
-  fogDensity: 0.009
+  fogDensity: 0.0032
   ambientSky: {r: 0.45, g: 0.5, b: 0.6, a: 1}
   ambientEquator: {r: 0.3, g: 0.3, b: 0.33, a: 1}
   ambientGround: {r: 0.15, g: 0.14, b: 0.13, a: 1}
-  arenaSize: 110
+  arenaSize: 500
   wallHeight: 4
   randomSeed: 7
   scaleLayoutWithArea: 1
@@ -46,8 +46,11 @@ MonoBehaviour:
   bridgeWidth: 9
   bridgeCount: 2
   bridgeColor: {r: 0.46, g: 0.42, b: 0.36, a: 1}
-  backdropCount: 34
-  backdropDistance: {x: 620, y: 1150}
+  duneHeight: 0
+  duneWavelength: 95
+  duneWindAngle: 34
+  backdropCount: 30
+  backdropDistance: {x: 700, y: 1300}
   backdropHeight: {x: 55, y: 190}
   backdropWidth: {x: 70, y: 260}
   backdropColor: {r: 0.44, g: 0.36, b: 0.28, a: 1}
@@ -56,11 +59,15 @@ MonoBehaviour:
   vantageCount: 8
   coverLineCount: 14
   scatterClusterCount: 26
-  roomCount: 3
-  platformCount: 2
-  coverWallCount: 8
-  crateStackCount: 8
-  pillarCount: 5
+  industrialZone: 1
+  zoneWorksCount: 5
+  zoneTankFarmCount: 3
+  zoneContainerYardCount: 4
+  roomCount: 0
+  platformCount: 0
+  coverWallCount: 0
+  crateStackCount: 0
+  pillarCount: 0
   coverHeightRange: {x: 1.2, y: 3.4}
   coverWidthRange: {x: 2, y: 5}
   floorColor: {r: 0.33, g: 0.33, b: 0.35, a: 1}
@@ -140,7 +147,7 @@ MonoBehaviour:
   - {fileID: 1000013497408264, guid: 55096903922d4314698414d961ceac0c, type: 3}
   - {fileID: 1000010005835110, guid: 845bb3e01ad4efe44adb29f965b2150b, type: 3}
   - {fileID: 1000010396969842, guid: c81b1a60bcf0cb64fa403060ac10ed0d, type: 3}
-  propCount: 60
+  propCount: 0
   weatherPrefab: {fileID: 0}
   ambienceLoop: {fileID: 0}
   ambienceVolume: 0.35

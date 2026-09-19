@@ -378,6 +378,63 @@ TMP has no closing `</alpha>` tag — `<alpha=#99>` applies from where it appear
 one prints those eight characters on screen, which is what the instruction strip and the
 dashboard hint both did. Use `<color=…></color>`; `VerifyFlow` checks for it.
 
+## The industrial zone is a plant, not a yard with crates in it
+
+`LevelTheme.industrialZone` is the third layout mode beside the walled box and the open
+zone, and Industrial Warehouse is built with it at 500x500m. `FPSKitIndustrial.cs` is
+the plan; `FPSKitIndustrialParts.cs` is everything the art pack does not contain --
+stairs, catwalks, railings, signage.
+
+A ring road, two avenues and three cross streets cut the site into 16 blocks, and each
+block gets a district **by its shape** rather than at random: *works* (2-3 hollow sheds
+sharing a yard, with a stair tower onto the roof), *tank farm* (tanks inside a
+chest-high bund, with a pipe run and catwalk leaving it), *container yard* (stacked rows
+making lanes, walk-through containers as the flank) and *depot* (the low-rise filler).
+The catwalks are the intended killing ground: one stair up, a rail to shoot over,
+overlooking the lanes.
+
+Two facts out of the pack decided the whole design, and **`Map_v1.unity` is binary, so
+they came from `AssetDatabase` and not from grepping it**: `Hangar_v2` and `Hangar_v3`
+carry non-convex mesh colliders, so they are hollow and the player can walk inside them;
+and the road set is modelled on a **20m tile grid**, so a street network is a matter of
+laying tiles. `Hangar_v4` is a solid box -- a silo, not a shed.
+
+Four things about it each cost a rebuild, and all four are the same failure: the change
+compiled, the build reported success, and nothing happened.
+
+- **`FPSKitThemes.Configure` does not reach the asset without `ResetThemes`.** The first
+  build of this rebuilt the old 110x150 box and said it had succeeded. Same trap as the
+  roster, the ladders and the store; it was caught only because the zone's own log line
+  was missing from the output.
+- **Fog is exponential-squared, and 0.009 was calibrated for a 110m box.** By 250m it is
+  all but opaque, so on a 500m site the far half of the map is simply not there -- and
+  what that reads as is an *empty* arena rather than a foggy one. 0.0032 here; the
+  desert is at 0.0011.
+- **The yard and the roads must not be the same surface.** Both started as the pack's
+  dark asphalt, and from the air the street grid the entire layout is organised around
+  was invisible: one black field with sheds round the edge. The yard is the same asphalt
+  tinted pale. Do **not** floor it in the pack's concrete instead -- that asset is a
+  *wall* panel with strong horizontal banding, and tiled across 500m it reads as
+  corrugated iron laid flat.
+- **A base colour multiplies the albedo, so it cannot brighten a dark texture.** The
+  first pale yard was tinted light grey, which on asphalt at 0.15 came out at 0.10 --
+  darker than it started. Brightening needs a tint above 1.
+
+**Anything with a flat or gently curved top and no way up is kept off the bake**
+(`NoStanding`): bund caps, the boundary wall, pipe runs, the upper tier of stacked
+containers, and the tanks and silos. A `NavMeshSurface` takes any surface shallower than
+the agent slope, which includes the top third of a cylinder -- fifteen tanks is fifteen
+perches the spawner can choose and nothing can path to. The catwalk decks stay bakeable
+on purpose, because they are reached by a stair and are meant to be stood on.
+
+**Every art-pack lookup is allowed to fail.** `Pack` returns null and warns once, and
+every caller falls back to a built shape or skips that dressing, because the pack is
+third-party and a project without it must still build a playable arena.
+
+The level ladder is deliberately not retuned for the larger site: it is shared by all
+six arenas, and `maxSpawnDistanceFromPlayer` already clamps to 80m on a wide arena, so
+the fight stays local to the player however big the map is.
+
 ## The map reads the level, it does not have one
 
 `Minimap` is the square in the top-left of the HUD: the level from above, turning under

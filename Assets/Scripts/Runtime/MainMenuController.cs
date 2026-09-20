@@ -164,6 +164,11 @@ public class MainMenuController : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
+        // Before anything is measured. Shrinking the canvas's reference grows every unit
+        // on it, so the grid has to be fitted against the new size rather than the
+        // authored one -- and FitGrid below is the first thing that measures.
+        PhoneUI.Apply(GetComponentInParent<Canvas>());
+
         // Before anything is drawn, because a star earned in the level just finished may
         // have opened something and the dashboard is where the player is told. The call
         // is idempotent, so arriving here by any route -- booting, finishing a level,

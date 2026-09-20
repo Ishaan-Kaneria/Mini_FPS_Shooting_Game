@@ -273,6 +273,13 @@ public class HUDController : MonoBehaviour
 
     void Start()
     {
+        // The HUD is authored against the same 1920x1080 reference as the menus, so the
+        // ammo counter and the score read at about 1.6mm on a phone -- unreadable at the
+        // exact moment the player has no attention to spare for them. The touch cluster
+        // is unaffected: it sizes itself in millimetres and does not care what the canvas
+        // is measured against.
+        PhoneUI.Apply(GetComponentInParent<Canvas>());
+
         WriteKeyHints();
         WireButtons();
 

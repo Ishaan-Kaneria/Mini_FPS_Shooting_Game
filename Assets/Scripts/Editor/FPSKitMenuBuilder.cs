@@ -904,6 +904,12 @@ namespace FPSKit.EditorTools
             Autosize(description, 9f, 16f);
             card.descriptionText = description;
 
+            // The smallest type on the busiest screen. On a monitor it is what tells the
+            // arenas apart; on a handset it is four lines of 1.6mm text under a thumbnail
+            // the player has already recognised, and dropping it is most of what turns
+            // this grid from a page to read into a row of things to press.
+            description.gameObject.AddComponent<HideOnPhone>();
+
             var best = Label(inner, "Best", "8 LEVELS", 16,
                              TextAlignmentOptions.BottomLeft, Accent);
             Span(best.rectTransform, 0.015f, 0.115f, 14f, 14f);
@@ -956,6 +962,13 @@ namespace FPSKit.EditorTools
             menu.bestScoreText = Stat(rows, "BestScore", "BEST SCORE", 2, 5);
             menu.runsText = Stat(rows, "Runs", "RUNS PLAYED", 3, 5);
             menu.killsText = Stat(rows, "Kills", "TOTAL KILLS", 4, 5);
+
+            // The whole career panel goes on a handset. Not because the numbers stop
+            // mattering, but because it is a column of five two-line rows competing with
+            // the arena grid for a 147mm screen, and the wallet -- the one figure a
+            // player checks before opening the store -- is already in the header. What
+            // it frees is width, which the grid spends making every card bigger.
+            panel.gameObject.AddComponent<HideOnPhone>();
 
             // The key hints that used to sit under these are gone. They were duplicated
             // from the strip that is on screen during the whole run, and this is the

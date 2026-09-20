@@ -39,8 +39,44 @@ public class ArenaCard : HoverCard
     /// there is left to do here and how well it has been done, which one best-ever
     /// number never could.
     /// </summary>
+    /// <summary>
+    /// Vertical bands of the card, as fractions of its height: where the name sits on a
+    /// desktop, and where it sits on a phone once the description below it is gone.
+    /// </summary>
+    const float NameBottom = 0.335f, NameTop = 0.448f, DescriptionBottom = 0.115f;
+
+    /// <summary>
+    /// Hands the name the space the description gave up.
+    ///
+    /// <b>Hiding the description does not, on its own, make anything else bigger.</b>
+    /// Every band on this card is a fraction of the card, and the name's band is 11% of
+    /// it whether or not there is anything underneath. The name auto-sizes to the box it
+    /// is given, so the box is the thing that has to change -- leave it alone and the
+    /// phone gets the same small title with a gap under it, which is the worst of both.
+    ///
+    /// Tripling the band is what actually turns the title into something readable at
+    /// arm's length, and it is why the description is hidden rather than merely made
+    /// shorter: the space is worth more spent on the one word that says where you are
+    /// going.
+    /// </summary>
+    void ApplyPhoneLayout()
+    {
+        if (nameText == null || !PhoneUI.Active) return;
+
+        var rect = nameText.rectTransform;
+        rect.anchorMin = new Vector2(rect.anchorMin.x, DescriptionBottom);
+        rect.anchorMax = new Vector2(rect.anchorMax.x, NameTop);
+
+        // The ceiling has to come up with the box, or auto-sizing stops at the number
+        // that was chosen for a band a third the height.
+        nameText.fontSizeMax = nameText.fontSizeMax * ((NameTop - DescriptionBottom) /
+                                                       (NameTop - NameBottom));
+    }
+
     public void Bind(ArenaCatalog.Entry entry, UnityEngine.Events.UnityAction onChosen)
     {
+        ApplyPhoneLayout();
+
         Entry = entry;
         if (entry == null) return;
 

@@ -1321,6 +1321,24 @@ namespace FPSKit.EditorTools
         /// because a bomb asset created before the prefabs existed would otherwise stay
         /// unable to spawn anything forever.
         /// </summary>
+        /// <summary>
+        /// Stamps the prefabs, clips and impact library onto the store's own assets,
+        /// outside a scene build.
+        ///
+        /// This exists because <see cref="FPSKitStore.ResetAll"/> rewrites every
+        /// WeaponData and BombData from its defaults, and the defaults carry no prefab,
+        /// no audio and no impact library -- those are stamped on during a scene build.
+        /// So resetting the store used to leave the game with a silent bomb that spawned
+        /// nothing, and put it back only when somebody next rebuilt an arena. Nothing
+        /// logged, and the failure surfaces as a bomb that makes no sound: a symptom
+        /// nobody traces back to a store reset.
+        /// </summary>
+        public static void StampStore()
+        {
+            StampStoreContent(FPSKitStore.GetOrCreate(), CreateImpactLibrary());
+            AssetDatabase.SaveAssets();
+        }
+
         private static void StampStoreContent(StoreCatalog catalog, ImpactLibrary impacts)
         {
             if (catalog == null) return;

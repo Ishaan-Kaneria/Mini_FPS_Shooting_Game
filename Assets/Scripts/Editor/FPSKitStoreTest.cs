@@ -96,7 +96,15 @@ namespace FPSKit.EditorTools
             "FPSKit.Upgrade.Health", "FPSKit.Stock." + ItemId,
             "FPSKit.Runs", "FPSKit.TotalKills", "FPSKit.BestScore",
             "FPSKit.Level.IndustrialWarehouse.0.Stars",
-            "FPSKit.Level.IndustrialWarehouse.0.Score"
+            "FPSKit.Level.IndustrialWarehouse.0.Score",
+
+            // The campaign's bomb unlock. This test throws a real bomb, and the player no
+            // longer starts with one -- it is the story's first reward now -- so the test
+            // has to grant it the way the campaign would. Backed up with everything else,
+            // because a check that leaves a power switched on in the developer's own
+            // profile has changed the game to pass.
+            "FPSKit.Campaign.Power." + Campaign.BombPower,
+            "FPSKit.Own.Bomb.frag"
         };
 
         static readonly string[] StringKeys =
@@ -164,6 +172,21 @@ namespace FPSKit.EditorTools
         {
             var catalog = AssetDatabase.LoadAssetAtPath<StoreCatalog>(FPSKitStore.CatalogPath);
             if (catalog != null) Loadout.Clear(catalog);
+
+            // "From nothing" means owning nothing that was bought -- not being earlier in
+            // the story than this test is about. The player no longer starts with a bomb,
+            // it is the campaign's first reward, and this test throws a real one; so the
+            // power is granted back here, after the wipe, where nothing clears it again.
+            // Granting it directly rather than awarding eighteen stars keeps this a store
+            // test rather than a progression one.
+            Campaign.GrantPower(Campaign.BombPower);
+
+            var storyBomb = catalog != null ? catalog.StoryBomb : null;
+            if (storyBomb != null)
+            {
+                Loadout.GrantBomb(storyBomb.id);
+                Loadout.SelectBomb(storyBomb.id);
+            }
 
             Wallet.SetBalance(TestFunds);
             PlayerPrefs.Save();

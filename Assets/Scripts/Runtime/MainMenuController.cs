@@ -136,6 +136,22 @@ public class MainMenuController : MonoBehaviour
     bool[] _dashboardWasShown;
 
     // ======================================================================
+    /// <summary>
+    /// The power the campaign handed over on the way into this screen, or null. Held so
+    /// that the announcement can be made once, by whatever is built to make it -- the
+    /// grant itself already happened and is recorded, so losing this only costs the
+    /// fanfare and never the power.
+    /// </summary>
+    string _granted;
+
+    /// <summary>What was unlocked arriving here, or null. Cleared once it is shown.</summary>
+    public string TakeGrantedPower()
+    {
+        var id = _granted;
+        _granted = null;
+        return id;
+    }
+
     void Start()
     {
         // A run that ended left these set for its own reasons. The dashboard is a menu:
@@ -147,6 +163,12 @@ public class MainMenuController : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        // Before anything is drawn, because a star earned in the level just finished may
+        // have opened something and the dashboard is where the player is told. The call
+        // is idempotent, so arriving here by any route -- booting, finishing a level,
+        // walking out of one -- asks the same question and gets the same answer.
+        _granted = Campaign.RefreshUnlocks(catalog, store != null ? store.catalog : null);
 
         BuildGrid();
         ShowProfile();
@@ -336,37 +358,18 @@ public class MainMenuController : MonoBehaviour
         if (coinsEarnedText != null) coinsEarnedText.text = Wallet.Format(Wallet.LifetimeEarned);
     }
 
-    /// <summary>Stars taken across every arena the catalog offers.</summary>
-    public int TotalStars()
-    {
-        int total = 0;
-
-        if (catalog == null || catalog.arenas == null) return 0;
-
-        foreach (var entry in catalog.arenas)
-        {
-            if (entry == null) continue;
-            total += LevelProgress.StarsInArena(entry.ProgressKey, entry.LevelCount);
-        }
-
-        return total;
-    }
+    /// <summary>
+    /// Stars taken across every arena the catalog offers.
+    ///
+    /// Handed to <see cref="Campaign"/> rather than counted here, because the campaign
+    /// gates its rewards on the same number and two routines that both add up the stars
+    /// are two routines that can disagree about how many the player has -- which would
+    /// show up as a card promising a power the gate does not think is earned.
+    /// </summary>
+    public int TotalStars() => Campaign.TotalStars(catalog);
 
     /// <summary>And how many there are to take, so the number has a denominator.</summary>
-    public int PossibleStars()
-    {
-        int total = 0;
-
-        if (catalog == null || catalog.arenas == null) return 0;
-
-        foreach (var entry in catalog.arenas)
-        {
-            if (entry == null) continue;
-            total += entry.LevelCount * 3;
-        }
-
-        return total;
-    }
+    public int PossibleStars() => Campaign.MaxStars(catalog);
 
     void ShowLastRun()
     {

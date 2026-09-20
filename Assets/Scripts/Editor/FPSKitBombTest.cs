@@ -73,6 +73,13 @@ namespace FPSKit.EditorTools
         static LevelSet.Level _tunedLevel;
         static float _clockBackup = -1f;
 
+        /// <summary>The bomb this test arms, and the prefs it borrows to do it.</summary>
+        const string BombId = "frag";
+        const string BombOwnedKey = "FPSKit.Own.Bomb." + BombId;
+
+        static bool _bombPowerBackup;
+        static int _bombOwnedBackup;
+
         // ---- what the aim did ----
         static float _sweptMin = float.MaxValue, _sweptMax = float.MinValue;
         static float _worstJump;
@@ -157,6 +164,20 @@ namespace FPSKit.EditorTools
                     _resolveLanding == null)
                     throw new Exception("BombThrower no longer has BeginAiming/UpdateAim/ResolveLanding; " +
                                         "this test drives them directly because batch mode cannot press a key");
+
+                // The player no longer starts with a bomb -- it is the campaign's first
+                // reward -- and an arena wires the store catalogue into PlayerLoadout, so
+                // without this the thrower is equipped with nothing and every assertion
+                // below fails on "the player has no bomb to throw". Granting the power
+                // directly is what the campaign would have done by the time anyone has a
+                // bomb to test; it is put back in Detach like every other borrowed piece
+                // of state, because leaving it on would be a test that unlocked a power
+                // in the developer's own profile.
+                _bombPowerBackup = Campaign.HasPower(Campaign.BombPower);
+                _bombOwnedBackup = PlayerPrefs.GetInt(BombOwnedKey, 0);
+
+                Campaign.GrantPower(Campaign.BombPower);
+                Loadout.GrantBomb(BombId);
 
                 FPSKitPlayMode.SuspendStartScene();
                 EditorApplication.update += Tick;
@@ -871,6 +892,11 @@ namespace FPSKit.EditorTools
             if (_tunedLevel != null && _clockBackup > 0f) _tunedLevel.timeLimit = _clockBackup;
             _tunedLevel = null;
             _clockBackup = -1f;
+
+            if (!_bombPowerBackup) PlayerPrefs.DeleteKey("FPSKit.Campaign.Power." + Campaign.BombPower);
+            if (_bombOwnedBackup == 0) PlayerPrefs.DeleteKey(BombOwnedKey);
+            else PlayerPrefs.SetInt(BombOwnedKey, _bombOwnedBackup);
+            PlayerPrefs.Save();
 
             FPSKitPlayMode.RestoreStartScene();
             EditorApplication.update -= Tick;

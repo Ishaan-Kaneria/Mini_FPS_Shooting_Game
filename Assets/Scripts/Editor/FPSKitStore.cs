@@ -73,6 +73,13 @@ namespace FPSKit.EditorTools
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
 
+            // Configure writes the numbers; it does not know about prefabs, audio clips
+            // or the impact library, which the scene builder owns and stamps on. Without
+            // this the reset hands back a catalogue whose bombs spawn nothing and whose
+            // every sound is missing, and the game stays that way until somebody happens
+            // to rebuild an arena.
+            FPSKitSceneBuilder.StampStore();
+
             Debug.Log($"<color=lime>[FPSKit]</color> Store reset: {catalog.guns.Count} guns, " +
                       $"{catalog.bombs.Count} explosives, {catalog.consumables.Count} supplies.");
         }
@@ -300,10 +307,17 @@ namespace FPSKit.EditorTools
 
             // ---- explosives ----------------------------------------------
             //
-            // The frag is owned from the start, for the same reason the rifle is: the
-            // aiming ring is the most interesting control in the game, and a player who
-            // has to save four hundred coins before they ever see one is a player who
-            // does not know it exists.
+            // The frag is not owned from the start and is not for sale either: it is the
+            // campaign's first reward, handed over at `Campaign.BombStarGate`. That is a
+            // change of mind and the reason is worth keeping. It used to be owned from
+            // the start, for the same reason the rifle is -- the aiming ring is the most
+            // interesting control in the game, and a player who has to save four hundred
+            // coins before they ever see one is a player who does not know it exists.
+            // Both of those stay true; what the story adds is a better answer than the
+            // shop to "how did I get this", and a first power whose arrival is an event.
+            //
+            // `grantedByStory` rather than a hard-coded id, so which explosive the story
+            // gives is a decision made here, in the content, and not in `Campaign`.
             catalog.bombs.Add(new StoreCatalog.BombEntry
             {
                 id = "frag",
@@ -320,7 +334,8 @@ namespace FPSKit.EditorTools
                     b.blastColor = new Color(1f, 0.55f, 0.15f);
                 }),
                 price = 0,
-                ownedFromStart = true,
+                ownedFromStart = false,
+                grantedByStory = true,
                 upgrades = Curve(350, 1.6f),
                 damagePerLevel = 0.15f,
                 radiusPerLevel = 0.7f,

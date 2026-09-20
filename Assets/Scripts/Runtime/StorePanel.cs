@@ -167,7 +167,11 @@ public class StorePanel : MonoBehaviour
 
     public void ShowTab(Tab tab)
     {
-        _tab = tab;
+        // A shelf the campaign has not opened yet falls back rather than showing empty.
+        // This is belt and braces -- its button is hidden below -- but the tab is also
+        // reachable from Open and from anything that remembers the last shelf, and an
+        // empty EXPLOSIVES page reads as a broken store rather than as a locked one.
+        _tab = TabAvailable(tab) ? tab : Tab.Guns;
 
         Report("");
         Rebuild();
@@ -176,6 +180,17 @@ public class StorePanel : MonoBehaviour
         _fittedWidth = _fittedHeight = -1f;
     }
 
+    /// <summary>
+    /// Whether this shelf is open to the player yet.
+    ///
+    /// Explosives are the campaign's first reward, so before that gate there is no bomb
+    /// to own and nothing on the shelf but upgrades for something the player has never
+    /// held. Hiding the tab is the honest version: the store sells better bombs, and the
+    /// story is what gives you a bomb in the first place.
+    /// </summary>
+    public static bool TabAvailable(Tab tab)
+        => tab != Tab.Bombs || Campaign.HasPower(Campaign.BombPower);
+
     void PaintTabs()
     {
         if (tabButtons == null) return;
@@ -183,6 +198,10 @@ public class StorePanel : MonoBehaviour
         for (int i = 0; i < tabButtons.Length; i++)
         {
             if (tabButtons[i] == null) continue;
+
+            bool open = TabAvailable((Tab)i);
+            tabButtons[i].gameObject.SetActive(open);
+            if (!open) continue;
 
             var colors = tabButtons[i].colors;
             colors.normalColor = (Tab)i == _tab ? tabActiveColor : tabIdleColor;

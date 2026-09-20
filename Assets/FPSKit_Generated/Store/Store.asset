@@ -103,7 +103,8 @@ MonoBehaviour:
     description: The standard charge. The ring is what it hurts.
     data: {fileID: 11400000, guid: 31a5b2fbf01bba49d9b39731690b10c7, type: 2}
     price: 0
-    ownedFromStart: 1
+    ownedFromStart: 0
+    grantedByStory: 1
     upgrades:
       basePrice: 350
       growth: 1.6
@@ -117,6 +118,7 @@ MonoBehaviour:
     data: {fileID: 11400000, guid: eca3caae23d32d0a6b839283fe1c2c2e, type: 2}
     price: 1800
     ownedFromStart: 0
+    grantedByStory: 0
     upgrades:
       basePrice: 380
       growth: 1.6
@@ -130,6 +132,7 @@ MonoBehaviour:
     data: {fileID: 11400000, guid: c396e04ce06f845888cd8f9a487bd065, type: 2}
     price: 3200
     ownedFromStart: 0
+    grantedByStory: 0
     upgrades:
       basePrice: 500
       growth: 1.7

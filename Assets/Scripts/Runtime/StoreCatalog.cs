@@ -111,6 +111,13 @@ public class StoreCatalog : ScriptableObject
 
         public bool ownedFromStart;
 
+        [Tooltip("The explosive the story hands over when the campaign unlocks bombs. " +
+                 "Exactly one bomb should carry this. It is not the same as owned from " +
+                 "the start: the player begins with no bomb at all and is given this one " +
+                 "on reaching the star gate, so that the first bomb is something the " +
+                 "story grants rather than something the shop sells.")]
+        public bool grantedByStory;
+
         public UpgradeCurve upgrades = new UpgradeCurve();
 
         [Header("What one upgrade does")]
@@ -233,6 +240,22 @@ public class StoreCatalog : ScriptableObject
         {
             foreach (var bomb in bombs)
                 if (bomb != null && bomb.ownedFromStart && bomb.data != null) return bomb;
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The bomb the campaign hands over at its star gate, or null when none is marked.
+    /// <see cref="Campaign.RefreshUnlocks"/> reads this rather than naming an id, so
+    /// which explosive the story gives stays a decision made in the catalogue.
+    /// </summary>
+    public BombEntry StoryBomb
+    {
+        get
+        {
+            foreach (var bomb in bombs)
+                if (bomb != null && bomb.grantedByStory && bomb.data != null) return bomb;
 
             return null;
         }

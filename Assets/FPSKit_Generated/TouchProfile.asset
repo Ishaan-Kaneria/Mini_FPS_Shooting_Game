@@ -22,5 +22,5 @@ MonoBehaviour:
   sprintLatches: 1
   dragFire: 1
   tapToFire: 0
-  minButtonMm: 9
+  minButtonMm: 10
   buttonOpacity: 1

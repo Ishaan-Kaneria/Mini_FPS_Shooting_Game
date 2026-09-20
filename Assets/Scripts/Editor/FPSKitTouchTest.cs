@@ -120,12 +120,54 @@ namespace FPSKit.EditorTools
                                  "cannot enforce a minimum touch size");
             }
 
+            // Whatever profile the layer was built against. Taken from the parts rather
+            // than loaded from disk, because what matters is what this scene is wired to.
+            TouchProfile profile = look != null ? look.profile : null;
+            foreach (var button in buttons)
+                if (button.profile != null) { profile = button.profile; break; }
+
+            // Sprint and crouch are the two the cluster does not draw by default: the
+            // stick sprints when pushed to its edge, and crouch is the least used action
+            // on a phone. Every button in a cluster makes its neighbours harder to hit,
+            // so neither earns its place twice. They are required only when the profile
+            // asks for them -- and still checked for duplicates, because two controls
+            // answering for one action is a bug either way.
+            var optional = new HashSet<TouchButton.ActionKind>();
+            if (profile == null || !profile.showSprintButton)
+                optional.Add(TouchButton.ActionKind.Sprint);
+            if (profile == null || !profile.showCrouchButton)
+                optional.Add(TouchButton.ActionKind.Crouch);
+
             foreach (TouchButton.ActionKind kind in Enum.GetValues(typeof(TouchButton.ActionKind)))
             {
                 if (!seen.ContainsKey(kind))
-                    problems.Add($"no {kind} button");
+                {
+                    if (!optional.Contains(kind)) problems.Add($"no {kind} button");
+                }
                 else if (seen[kind] > 1)
+                {
                     problems.Add($"{seen[kind]} {kind} buttons, so two controls answer for one action");
+                }
+            }
+
+            // With no sprint button, the stick is the only thing that can sprint, so the
+            // thing that makes that work has to be present and configured. Dropping the
+            // button and the stick's push threshold together would leave a build that
+            // simply cannot run.
+            if (optional.Contains(TouchButton.ActionKind.Sprint))
+            {
+                var sprintStick = UnityEngine.Object.FindAnyObjectByType<VirtualJoystick>();
+
+                if (sprintStick == null)
+                    problems.Add("no sprint button and no joystick either, so nothing in " +
+                                 "the build can sprint");
+                else if (sprintStick.profile == null)
+                    problems.Add("the joystick has no TouchProfile, so pushing it to the " +
+                                 "edge cannot sprint -- and there is no sprint button to " +
+                                 "fall back on");
+                else if (sprintStick.profile.sprintPush >= 0.999f)
+                    problems.Add($"the joystick's sprintPush is {sprintStick.profile.sprintPush:0.00}, " +
+                                 "which cannot be reached, and there is no sprint button");
             }
 
             // ---- fire must be able to aim at the same time ----
@@ -220,36 +262,71 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// Fails when two buttons overlap.
+        /// Fails when two buttons are closer together than a thumb.
         ///
-        /// A thumb is a contact patch, not a point, so two buttons sharing screen space
-        /// are two actions that fire together -- and the one the player wanted is not
-        /// reliably the one on top. It is invisible in the editor, where a mouse presses
-        /// exactly one pixel.
+        /// <b>This used to ask whether two rects intersect, and that is the wrong
+        /// question.</b> Intersection is a test for zero clearance. A thumb is a contact
+        /// patch about 20mm across, so two buttons that merely fail to overlap are still
+        /// one button as far as the player is concerned -- and the shipped layout sat
+        /// 2.4mm apart on every phone measured, passed this check, and produced exactly
+        /// the complaint you would expect: the controls do the wrong thing.
+        ///
+        /// So the clearance is measured in millimetres on a reference phone, and it is
+        /// measured edge to edge. It is deliberately less than a whole thumb -- the
+        /// centres carry most of the reliability and a full 20mm of dead space between
+        /// every pair would not fit on a phone -- but it is far enough that the patch
+        /// has somewhere to land.
         /// </summary>
+        const float RequiredGapMm = 4f;
+
         static void CheckOverlaps(TouchButton[] buttons, List<string> problems)
         {
+            // What the layout is authored against. The cluster converts millimetres to
+            // canvas units with the live canvas scale, so the test asks the same
+            // question in the same units rather than re-deriving it and drifting.
+            float unit = TouchMetrics.MillimetresToPixels(1f) / Mathf.Max(0.0001f, CanvasScale(buttons));
+            float required = RequiredGapMm * unit;
+
             for (int i = 0; i < buttons.Length; i++)
             {
                 var a = buttons[i].transform as RectTransform;
-                if (a == null) continue;
+                if (a == null || !buttons[i].gameObject.activeInHierarchy) continue;
 
                 for (int j = i + 1; j < buttons.Length; j++)
                 {
                     var b = buttons[j].transform as RectTransform;
-                    if (b == null) continue;
+                    if (b == null || !buttons[j].gameObject.activeInHierarchy) continue;
 
-                    // Same anchor and same corner, so anchoredPosition is comparable.
                     if (a.anchorMin != b.anchorMin || a.anchorMax != b.anchorMax) continue;
 
-                    Vector2 gap = a.anchoredPosition - b.anchoredPosition;
-                    float clearance = (a.sizeDelta.x + b.sizeDelta.x) * 0.5f;
+                    Vector2 delta = a.anchoredPosition - b.anchoredPosition;
 
-                    if (Mathf.Abs(gap.x) < clearance && Mathf.Abs(gap.y) < clearance)
-                        problems.Add($"the {buttons[i].action} and {buttons[j].action} buttons " +
-                                     "overlap, so one thumb presses both");
+                    // Separated if either axis separates them, which is what a gap
+                    // between two axis-aligned squares means.
+                    float gapX = Mathf.Abs(delta.x) - (a.sizeDelta.x + b.sizeDelta.x) * 0.5f;
+                    float gapY = Mathf.Abs(delta.y) - (a.sizeDelta.y + b.sizeDelta.y) * 0.5f;
+                    float gap = Mathf.Max(gapX, gapY);
+
+                    if (gap < required)
+                        problems.Add($"the {buttons[i].action} and {buttons[j].action} buttons are " +
+                                     $"{gap / unit:0.0}mm apart, under the {RequiredGapMm:0.0}mm a thumb " +
+                                     "needs -- one press lands on both");
                 }
             }
+        }
+
+        /// <summary>The scale the buttons' own canvas is drawn at.</summary>
+        static float CanvasScale(TouchButton[] buttons)
+        {
+            foreach (var button in buttons)
+            {
+                if (button == null) continue;
+
+                var canvas = button.GetComponentInParent<Canvas>();
+                if (canvas != null) return canvas.scaleFactor;
+            }
+
+            return 1f;
         }
     }
 }

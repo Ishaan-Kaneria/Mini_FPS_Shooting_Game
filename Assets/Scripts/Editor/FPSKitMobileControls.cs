@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -298,67 +299,151 @@ namespace FPSKit.EditorTools
         private const float LeftRegion = 0.38f;
 
         // ==================================================================
+        /// <summary>
+        /// Builds the right-thumb cluster as a set of logical slots and lets
+        /// <see cref="TouchCluster"/> work out the geometry on the real device.
+        ///
+        /// <b>Nothing here is positioned in pixels any more, and that is the fix.</b>
+        /// The old layout hand-placed eight buttons against the 1920x1080 reference with
+        /// 35 to 60 units between them, which reads like clearance and measures 2.4mm on
+        /// every phone tried. A thumb is about 20mm wide. Every check passed because
+        /// nothing technically overlapped.
+        ///
+        /// It is also four buttons rather than eight at rest. Sprint and crouch are gone
+        /// by default -- the stick already sprints when pushed to its edge, and crouch is
+        /// the least used action on a phone -- and the bomb and the drink appear only
+        /// while they are being carried, the same rule the HUD's key strip follows. What
+        /// is left is what a thumb uses in a fight.
+        /// </summary>
         private static void BuildButtons(Transform parent, TouchProfile profile)
         {
-            // A right-thumb cluster, laid out so nothing overlaps and the two pressed
-            // most sit lowest and largest. Positions are bottom-right anchored at the
-            // canvas's 1920x1080 reference, and the gaps between them are deliberate:
-            // a thumb is about 120 reference-pixels wide, so buttons that touch each
-            // other are buttons that get pressed together.
+            var clusterGo = new GameObject("ButtonCluster", typeof(RectTransform));
+            clusterGo.transform.SetParent(parent, false);
+
+            var clusterRect = (RectTransform)clusterGo.transform;
+            clusterRect.anchorMin = Vector2.zero;
+            clusterRect.anchorMax = Vector2.one;
+            clusterRect.offsetMin = clusterRect.offsetMax = Vector2.zero;
+
+            var cluster = clusterGo.AddComponent<TouchCluster>();
+            cluster.profile = profile;
+            cluster.slots = new List<TouchCluster.Slot>();
+
+            // Column 0 is nearest the thumb, row 0 is lowest. The sizes and the gaps are
+            // millimetres and live on the cluster, not here.
+            //
             // FIRE is drag-fire: press it and keep dragging, and the trigger stays down
             // while the same gesture turns the view. Without that the right thumb cannot
             // shoot and aim at once, and every fight becomes a choice between firing at
             // where the enemy was and tracking them without firing.
             var fire = MakeButton(parent, "FireButton", "FIRE", TouchButton.ActionKind.Fire,
-                                  false, new Vector2(-230f, 230f), 240f,
-                                  new Color(1f, 0.42f, 0.35f, 0.32f), profile);
+                                  false, Accent, profile);
 
             fire.GetComponent<TouchButton>().dragFire = profile == null || profile.dragFire;
+            Slot(cluster, fire, column: 0, row: 0, primary: true);
 
-            MakeButton(parent, "AimButton", "ADS", TouchButton.ActionKind.Aim, true,
-                       new Vector2(-470f, 330f), 160f, new Color(1f, 1f, 1f, 0.20f), profile);
+            var jump = MakeButton(parent, "JumpButton", "JUMP", TouchButton.ActionKind.Jump,
+                                  false, Neutral, profile);
+            Slot(cluster, jump, column: 0, row: 1);
 
-            MakeButton(parent, "JumpButton", "JUMP", TouchButton.ActionKind.Jump, false,
-                       new Vector2(-230f, 490f), 160f, new Color(1f, 1f, 1f, 0.20f), profile);
+            var ads = MakeButton(parent, "AimButton", "ADS", TouchButton.ActionKind.Aim,
+                                 true, Neutral, profile);
+            Slot(cluster, ads, column: 1, row: 0);
 
-            MakeButton(parent, "SprintButton", "RUN", TouchButton.ActionKind.Sprint, true,
-                       new Vector2(-450f, 560f), 150f, new Color(0.5f, 0.85f, 1f, 0.22f), profile);
-
-            MakeButton(parent, "CrouchButton", "CROUCH", TouchButton.ActionKind.Crouch, true,
-                       new Vector2(-660f, 400f), 150f, new Color(1f, 1f, 1f, 0.20f), profile);
-
-            MakeButton(parent, "ReloadButton", "RELOAD", TouchButton.ActionKind.Reload, false,
-                       new Vector2(-660f, 200f), 150f, new Color(1f, 0.85f, 0.4f, 0.22f), profile);
+            var reload = MakeButton(parent, "ReloadButton", "RELOAD", TouchButton.ActionKind.Reload,
+                                    false, Neutral, profile);
+            Slot(cluster, reload, column: 1, row: 1);
 
             // The bomb is a hold: press to bring the ring up, slide the look around to
-            // place it, release to throw. It sits above the fire button because those
-            // two are the only controls a thumb uses in the middle of a fight, and it is
-            // the larger of the pair the thumb has to find without looking.
-            MakeButton(parent, "BombButton", "BOMB", TouchButton.ActionKind.Bomb, false,
-                       new Vector2(-450f, 760f), 170f, new Color(1f, 0.6f, 0.2f, 0.26f), profile);
+            // place it, release to throw.
+            var bomb = MakeButton(parent, "BombButton", "BOMB", TouchButton.ActionKind.Bomb,
+                                  false, BombTint, profile);
+            Slot(cluster, bomb, column: 2, row: 0, situational: true);
 
-            MakeButton(parent, "ItemButton", "DRINK", TouchButton.ActionKind.UseItem, false,
-                       new Vector2(-660f, 600f), 150f, new Color(0.4f, 0.9f, 1f, 0.24f), profile);
+            var drink = MakeButton(parent, "ItemButton", "DRINK", TouchButton.ActionKind.UseItem,
+                                   false, DrinkTint, profile);
+            Slot(cluster, drink, column: 2, row: 1, situational: true);
+
+            // Both off by default. They are still built so that flipping the profile is
+            // the whole change, rather than a code edit and a rebuild.
+            if (profile != null && profile.showSprintButton)
+            {
+                var run = MakeButton(parent, "SprintButton", "RUN", TouchButton.ActionKind.Sprint,
+                                     true, Neutral, profile);
+                Slot(cluster, run, column: 1, row: 2);
+            }
+
+            if (profile != null && profile.showCrouchButton)
+            {
+                var crouch = MakeButton(parent, "CrouchButton", "CROUCH", TouchButton.ActionKind.Crouch,
+                                        true, Neutral, profile);
+                Slot(cluster, crouch, column: 0, row: 2);
+            }
 
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no
             // Escape key, so without it a touch player cannot pause, cannot quit and
-            // cannot get back to the dashboard.
+            // cannot get back to the dashboard. Outside the cluster because it is the
+            // only control that is not under a thumb, and TouchButton floors it at the
+            // profile's minimum size on its own.
             var pause = MakeButton(parent, "PauseButton", "II", TouchButton.ActionKind.Pause,
-                                   false, Vector2.zero, 110f, new Color(1f, 1f, 1f, 0.18f), profile);
+                                   false, Neutral, profile);
 
             var pauseRect = (RectTransform)pause.transform;
             pauseRect.anchorMin = pauseRect.anchorMax = new Vector2(1f, 1f);
-            pauseRect.anchoredPosition = new Vector2(-90f, -90f);
+            pauseRect.sizeDelta = new Vector2(130f, 130f);
+            pauseRect.anchoredPosition = new Vector2(-110f, -110f);
+
+            // Lay it out once now, so the scene that gets saved is a real arrangement
+            // rather than nine buttons stacked on the origin waiting for Start. The
+            // device does it again at runtime with its own density -- but a scene is
+            // also read by the editor, by the build, and by anything that inspects it
+            // without entering play mode, and all three deserve to see the truth.
+            cluster.Rebuild();
         }
 
-        private static GameObject MakeButton(Transform parent, string name, string label,
-                                            TouchButton.ActionKind action, bool toggle,
-                                            Vector2 anchoredPosition, float size, Color color,
-                                            TouchProfile profile)
+        static void Slot(TouchCluster cluster, GameObject button, int column, int row,
+                         bool primary = false, bool situational = false)
         {
-            if (profile != null)
-                color = new Color(color.r, color.g, color.b, color.a * profile.buttonOpacity);
+            cluster.slots.Add(new TouchCluster.Slot
+            {
+                button = button.GetComponent<TouchButton>(),
+                column = column,
+                row = row,
+                primary = primary,
+                situational = situational
+            });
+        }
+
+        // ------------------------------------------------------------------
+        // One shape for every button: a dark disc with a bright ring and a bright label.
+        //
+        // What it replaces was five hues at five alphas between 0.18 and 0.32, which is
+        // most of what "the controls look noisy" means -- at that opacity a button has no
+        // edge, so it is a smudge whose boundary the player has to guess, and five
+        // different smudges read as five unrelated things. A ring is a boundary, and one
+        // boundary drawn the same way everywhere is what makes a control panel look
+        // deliberate. Colour is then free to mean something: the accent is the primary,
+        // and the two situational buttons keep a tint so they are recognisable in the
+        // corner of the eye.
+        // ------------------------------------------------------------------
+        private static readonly Color Accent = new Color(1f, 0.73f, 0.25f);
+        private static readonly Color Neutral = new Color(0.82f, 0.88f, 0.95f);
+        private static readonly Color BombTint = new Color(1f, 0.62f, 0.25f);
+        private static readonly Color DrinkTint = new Color(0.45f, 0.9f, 1f);
+
+        /// <summary>
+        /// One button: a dark disc, a bright ring around it, and a bright label.
+        ///
+        /// Size and position are deliberately not set here -- <see cref="TouchCluster"/>
+        /// owns both, in millimetres, at runtime. Anything set here would be in reference
+        /// units, which is how the cluster came to be 2.4mm apart in the first place.
+        /// </summary>
+        private static GameObject MakeButton(Transform parent, string name, string label,
+                                             TouchButton.ActionKind action, bool toggle,
+                                             Color tint, TouchProfile profile)
+        {
+            float opacity = profile != null ? profile.buttonOpacity : 1f;
 
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(TouchButton));
             go.transform.SetParent(parent, false);
@@ -366,34 +451,64 @@ namespace FPSKit.EditorTools
             var rect = (RectTransform)go.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(1f, 0f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(size, size);
-            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(160f, 160f);
 
-            var image = go.GetComponent<Image>();
-            image.sprite = Knob();
-            image.color = color;
+            // The ring. This is the graphic that gets hit, so it stays the raycast target.
+            var ring = go.GetComponent<Image>();
+            ring.sprite = Knob();
+            ring.color = new Color(tint.r, tint.g, tint.b, 0.85f * opacity);
+
+            // The fill, inset to leave the ring showing. Dark rather than tinted, because
+            // a button sits over whatever the arena happens to be -- bright sand, dark
+            // subway -- and a dark disc is the one fill a bright label reads on
+            // everywhere. It is not a raycast target: the ring above already is, and two
+            // targets on one button is two ways for a press to be attributed.
+            var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+            fillGo.transform.SetParent(go.transform, false);
+
+            var fillRect = (RectTransform)fillGo.transform;
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(7f, 7f);
+            fillRect.offsetMax = new Vector2(-7f, -7f);
+
+            var fill = fillGo.GetComponent<Image>();
+            fill.sprite = Knob();
+            fill.color = new Color(0.03f, 0.05f, 0.07f, 0.62f * opacity);
+            fill.raycastTarget = false;
 
             var button = go.GetComponent<TouchButton>();
             button.action = action;
             button.toggle = toggle;
-            button.target = image;
+            button.target = fill;
             button.profile = profile;
-            button.activeColor = new Color(color.r, color.g, color.b, Mathf.Min(1f, color.a + 0.45f));
 
-            // Label
+            // Pressed brightens the fill towards the button's own colour, so the feedback
+            // is on the thing the thumb is covering rather than on the ring around it.
+            button.activeColor = new Color(tint.r * 0.55f, tint.g * 0.55f, tint.b * 0.55f,
+                                           Mathf.Min(1f, 0.85f * opacity));
+
             var textGo = new GameObject("Label", typeof(RectTransform));
             textGo.transform.SetParent(go.transform, false);
 
             var textRect = (RectTransform)textGo.transform;
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = textRect.offsetMax = Vector2.zero;
+            textRect.offsetMin = new Vector2(10f, 10f);
+            textRect.offsetMax = new Vector2(-10f, -10f);
 
             var text = textGo.AddComponent<TextMeshProUGUI>();
             text.text = label;
-            text.fontSize = size * 0.20f;
             text.alignment = TextAlignmentOptions.Center;
-            text.color = new Color(1f, 1f, 1f, 0.85f);
+
+            // Auto-sized, because the cluster decides how big the button is and a fixed
+            // point size would either overflow "RELOAD" or waste half of "II". The floor
+            // is what keeps it legible on a small phone.
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 14f;
+            text.fontSizeMax = 40f;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.color = new Color(1f, 1f, 1f, 0.96f);
             text.raycastTarget = false;
 
             return go;

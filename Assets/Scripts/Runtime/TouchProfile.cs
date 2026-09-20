@@ -84,11 +84,25 @@ public class TouchProfile : ScriptableObject
     [Tooltip("The smallest a touch target may be on the real screen, in millimetres. " +
              "Below about 9mm the miss rate climbs sharply, and a missed FIRE button " +
              "in a firefight is indistinguishable from the game ignoring the player.")]
-    [Range(6f, 14f)] public float minButtonMm = 9f;
+    [Range(6f, 14f)] public float minButtonMm = 10f;
 
     [Tooltip("How visible the buttons are at rest. Low enough to see the game through " +
              "them, high enough to find without hunting.")]
     [Range(0.05f, 1f)] public float buttonOpacity = 1f;
+
+    [Tooltip("Show a sprint button in the thumb cluster.\n\n" +
+             "Off, because pushing the stick to its edge already sprints, and that is " +
+             "the better control: the sprint button and the look surface want the same " +
+             "thumb, so a sprint bought with a button press is a sprint taken while " +
+             "unable to aim. A second way to do it cost a thumb's width of screen and " +
+             "bought nothing.")]
+    public bool showSprintButton;
+
+    [Tooltip("Show a crouch button in the thumb cluster.\n\n" +
+             "Off. It is the least used action on a phone by a wide margin, and every " +
+             "button in the cluster makes the ones beside it harder to hit. Turn it on " +
+             "if a level is ever built around cover that needs it.")]
+    public bool showCrouchButton;
 
     // ==================================================================
     [Header("Aim assist")]

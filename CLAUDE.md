@@ -84,11 +84,11 @@ Generated Materials**, or `FPSKitBatch.PruneMaterials`, which reports and only d
 with `-fpskitApply`) is how that is cleared; anything the builder still wants, it
 recreates on the next build.
 
-`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`Mark` bookkeeping every generated object needs) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
+`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the eight checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the ten checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below), `FPSKitReachTest.cs` (`VerifyReach`, below -- the one that asks whether the navmesh an arena bakes is navmesh anything can get to) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
 
 `FPSKitViews.cs` (`FPSKitBatch.CaptureViews`) is not a test -- it renders a built arena from fixed viewpoints to PNGs, because a generated scene is otherwise write-only from the command line: it is saved in binary so it cannot be read, its geometry is procedural so the code is not a description of the result, and every check here answers whether a level *works* rather than what it looks like. `VerifyZone` would pass just as happily on an arena whose cliffs were inside out. It needs a real graphics device:
 
@@ -535,20 +535,90 @@ and the sheet of every tarpaulin bakes as an island nothing can path to -- harml
 `LevelManager` samples the mesh near the player to place a spawn, finds one, and puts an
 enemy on a tree.
 
+**The kill volume is the river, not the corridor the river wanders about in.** It is a
+chain of boxes following `GorgeCentreAt`, each as wide as the bed plus the foot of the
+talus, with its lid two and a half metres over the water. Written as one axis-aligned box
+as wide as `hazardWidth + hazardMeander * 2.5` with its lid five metres under *zero*, it
+described a hundred-and-thirty-metre band of the arena rather than the water -- which was
+survivable on a flat floor and lethal the moment the floor became a dune field, because a
+dune field has basins in it. The sand on the western approach bottoms out thirteen metres
+down, eight metres inside that lid, so four thousand square metres of ordinary walkable
+sand nowhere near the river killed the player outright the instant they stepped on it.
+From inside the game that is "I walked towards the river and died", with no water, no
+edge and no fall anywhere in sight. `VerifyZone` now raycasts the built arena and fails if
+any ground the level says is standable -- tagged `Sand`, or covered by navmesh -- is
+inside the trigger.
+
+**The map's edge is a sand hill, not a row of rocks.** `BuildBoundary` builds one
+continuous dune ridge wrapped round the arena as a square annulus: a profile that rises
+out of the sand six metres inside the boundary, crests twenty metres outside it and lies
+back down, so the four sides are the same function of `max(|x|, |z|)` and meet exactly
+along the diagonal with no corner to get wrong. What it replaces was a row of the same
+stepped butte mesh the horizon is made of, each squashed onto a footprint half as wide as
+it was tall -- and a butte steps *out* every third band, which at mesa proportions is a
+weathered bench and at those proportions is a flange sticking out sideways. Forty of them
+in a row came out as black spikes with a head-height pocket under every flange: a hill
+you cannot see, that you walk into and cannot walk back out of. **The seal moved too, and
+that is half the fix** -- it used to sit a metre inside the arena boundary while the rocks
+were placed on or outside it, so the player was stopped by an invisible wall standing in
+open sand with the thing meant to stop them either twenty metres behind them or seven
+metres out of reach. It is now at the toe of the hill: the sand is what stops you, and it
+carries on rising in front of you. The outcrops on it are boulders rather than buttes,
+because a boulder is round and has nothing to get caught under.
+
 ## The industrial zone is a plant, not a yard with crates in it
 
 `LevelTheme.industrialZone` is the third layout mode beside the walled box and the open
 zone, and Industrial Warehouse is built with it at 500x500m. `FPSKitIndustrial.cs` is
-the plan; `FPSKitIndustrialParts.cs` is everything the art pack does not contain --
-stairs, catwalks, railings, signage.
+the plan; `FPSKitIndustrialParts.cs` is the small fittings the art pack does not contain
+-- stairs, catwalks, railings, signage; `FPSKitFactory.cs` is the big structures it does
+not contain either.
 
 A ring road, two avenues and three cross streets cut the site into 16 blocks, and each
-block gets a district **by its shape** rather than at random: *works* (2-3 hollow sheds
-sharing a yard, with a stair tower onto the roof), *tank farm* (tanks inside a
-chest-high bund, with a pipe run and catwalk leaving it), *container yard* (stacked rows
-making lanes, walk-through containers as the flank) and *depot* (the low-rise filler).
-The catwalks are the intended killing ground: one stair up, a rail to shoot over,
-overlooking the lanes.
+block gets a district **by its shape** rather than at random: *power house* (a cooling
+tower, its boiler hall, two stacks and a transformer compound), *works* (a production
+hall with a stack and a silo bank), *tank farm* (tanks inside a chest-high bund, with a
+pipe run and catwalk leaving it), *container yard* (stacked rows making lanes, a gantry
+crane across them, walk-through containers as the flank) and *depot* (the low-rise
+filler). Pipe bridges cross the streets between neighbouring districts.
+
+**Mass is what an industrial site is made of, and it cannot be added as scatter.** The
+pack's biggest building is a hangar about twenty-five metres long and seven high; the
+site is five hundred metres square. Built from those alone -- which is what the first
+version of this was -- nothing on the map is taller than a lamp post: from the ground the
+whole arena is one flat horizon with small sheds dotted over it, and from the air it is a
+car park with a grid painted on it. No amount of barrels and pallets fixes that, because
+the problem is the silhouette. So `FPSKitFactory.cs` builds a sixty-metre production hall
+with a walkable roof, forty-metre brick stacks, banks of silos, a cooling tower, gantry
+cranes and pipe bridges, and the pack's sheds are demoted to the outbuildings they are
+the right size for. Three rules hold that file together:
+
+- **a hall's roof is reached by its own stairs and is meant to be fought over**, which is
+  why it is flat with a parapet rather than pitched -- a pitched roof has to be held off
+  the bake and can never be stood on, and a deck with chest-high cover on four sides and
+  two stairs to it is the best position in the district;
+- **the stairs run *along* the wall, not out from it.** A twelve-metre climb at a
+  walkable pitch is nineteen metres of flight; straight out from the wall that reaches
+  past the edge of the block and through whatever the district put there;
+- **anything a player can walk into has two ways out.** The hall has a roller door at
+  each end and a personnel door in each side wall.
+
+**The ground is wearing something.** A uniform surface is the loudest artificial thing in
+an outdoor level and the hardest to name: a quarter of a million square metres of one
+tint of one texture has no near detail at all, so the eye cannot judge distance and the
+site reads as a car park however many sheds are on it. `BuildYardDetail` lays kerbs
+(which draw the street plan at eye level rather than only from the air), worn patches,
+spills and markings. All of it is faded and close in value to what it sits on -- the
+first cut was saturated yellow hatching at full opacity across every junction, which was
+the loudest thing in the arena from every angle, and the job of ground detail is to be
+noticed without being looked at.
+
+**None of it is a NavMeshModifier.** Flat ground detail is kept off the bake by *layer*
+-- the backdrop layer, which the NavMeshSurface already excludes and which the apron
+already uses. A modifier does not exclude geometry, it marks it *Not Walkable*, so a kerb
+round every road tile is an unwalkable line drawn between every carriageway and every
+block: two thirds of the site came back severed from the rest, and the only symptom was a
+level that quietly never ended.
 
 Two facts out of the pack decided the whole design, and **`Map_v1.unity` is binary, so
 they came from `AssetDatabase` and not from grepping it**: `Hangar_v2` and `Hangar_v3`
@@ -578,11 +648,25 @@ compiled, the build reported success, and nothing happened.
   darker than it started. Brightening needs a tint above 1.
 
 **Anything with a flat or gently curved top and no way up is kept off the bake**
-(`NoStanding`): bund caps, the boundary wall, pipe runs, the upper tier of stacked
-containers, and the tanks and silos. A `NavMeshSurface` takes any surface shallower than
-the agent slope, which includes the top third of a cylinder -- fifteen tanks is fifteen
-perches the spawner can choose and nothing can path to. The catwalk decks stay bakeable
-on purpose, because they are reached by a stair and are meant to be stood on.
+(`NoStanding`): bund caps, the boundary wall, pipe runs, roof plant, **every** container
+rather than only the stacked ones, and the tanks and silos. A `NavMeshSurface` takes any
+surface shallower than the agent slope, which includes the top third of a cylinder --
+fifteen tanks is fifteen perches the spawner can choose and nothing can path to. The
+catwalk decks and the hall roofs stay bakeable on purpose, because they are reached by
+stairs and are meant to be stood on.
+
+**`NoStanding` is not enough for anything with an inside; that needs `NoEntry`.** A
+modifier marks the geometry it is on, and the floor inside one of the pack's sheds is not
+the shed -- it is the site's own yard slab running underneath it. So `NoStanding` takes
+the roof off the bake and leaves the room: a slab of navmesh the size of a shed, walled
+in on four sides, joined to nothing. `NoEntry` puts a `NavMeshModifierVolume` over the
+whole footprint instead, which asks the right question -- nothing in this box is
+walkable, whatever it is made of. **Every pack shed gets one, including the hollow ones**,
+and that is a measurement rather than a precaution: `Hangar_v2` and `Hangar_v3` carry
+non-convex colliders so a *player* can walk inside them, but their door openings do not
+admit a half-metre agent. Sixteen of those were sixteen rooms the spawner could stand an
+enemy in for a whole level. The interior fight belongs to the hall, whose doorways are
+eleven metres wide and are checked.
 
 **Every art-pack lookup is allowed to fail.** `Pack` returns null and warns once, and
 every caller falls back to a built shape or skips that dressing, because the pack is
@@ -591,6 +675,64 @@ third-party and a project without it must still build a playable arena.
 The level ladder is deliberately not retuned for the larger site: it is shared by all
 six arenas, and `maxSpawnDistanceFromPlayer` already clamps to 80m on a wide arena, so
 the fight stays local to the player however big the map is.
+
+## Baked is not the same question as reachable
+
+A `NavMeshSurface` bakes wherever an agent fits. It never asks whether one could arrive.
+So every arena is full of walkable ground joined to nothing -- the floor inside a sealed
+shed, the roof of a container, the cap of a bund, the four metres of yard outside the
+fence, the deck of a walkway whose stair faces the wrong way, a hollow between three
+boulders.
+
+**What that costs is a level that quietly does not end.** `LevelManager` places a spawn
+by sampling the navmesh near the player; `NavMesh.SamplePosition` answers "is there
+walkable ground near here", and every one of those islands says yes. The enemy arrives,
+stands in a room for the rest of the round, and nothing is logged, nothing errors and
+nothing moves. The player hunts an arena that sounds occupied and is not, the clock runs
+out, and they are scored against kills that were never available. When the check below
+was first written, **two thirds of the industrial site could not reach the player**, and
+every other build check in the repo was green.
+
+Three things answer it, at three different levels:
+
+- **The spawner refuses it.** `LevelManager.requireReachableSpawns` makes every spawn --
+  the ring around the player and the authored points both -- demand a *complete*
+  `NavMesh.CalculatePath` to the player, not merely a sample. The player is snapped onto
+  the mesh first, because they spend a good deal of a level off it (mid-jump, on a crate,
+  on a catwalk) and a destination off the mesh would make every route incomplete and
+  refuse every spawn in the level.
+- **The leash discards it.** `IsWalledIn` is a fourth condition on `IsLost`, beside the
+  distance, the fall and the off-mesh tests, and it catches the one none of those can:
+  an enemy sealed inside a shed forty metres away is inside every other limit and will
+  stand there forever. Rationed at `reachCheckInterval` with the first check offset per
+  enemy, because a *failing* path query is the expensive one -- it searches the whole
+  island the agent is on before it can say no.
+- **The builder does not make it.** `NoStanding` for anything with a flat top and no way
+  up, `NoEntry` for anything with an inside, and `SealNavMeshOutside` for the ring of
+  ground beyond whatever holds the player in -- the dune field runs forty metres past the
+  boundary before it fades, and the plant's yard slab runs out to the boundary wall
+  behind its fence.
+
+`Tools/unity-batch.sh FPSKitBatch.VerifyReach` is the regression test. It samples the
+navmesh across every built arena and fails if more than 2% of it cannot path to the
+player. Not zero, deliberately: a dead end behind a chimney and the inside of a ring of
+crates are real places a real arena has, they are a few square metres each, and the
+spawner already refuses them. What the threshold is for is the other kind -- a building,
+a district, or everything outside a fence, which is percent rather than fractions of one.
+
+Two things it will not catch if written casually, both of which cost a run here:
+
+- **Sample from just above the ground, not from the sky.** The search radius is measured
+  from the point given, so a probe dropped from sixty metres up finds nothing anywhere
+  and the whole test passes on an empty set.
+- **`NavMeshPath` must be created on demand, never in a field initialiser.** A field
+  initialiser runs inside the MonoBehaviour's constructor, and Unity refuses to build one
+  there: it throws `InitializeNavMeshPath is not allowed to be called from a MonoBehaviour
+  constructor`, leaves the field null, and the exception is filed against the construction
+  of the object rather than against anything you wrote. Every route query then throws a
+  `NullReferenceException` inside the spawn coroutine, every spawn fails, and the arena
+  stays empty until the clock ends it. Same rule and same symptom as `EnemyAI.Block` --
+  a private property with a null check, and nothing in `Awake`.
 
 ## The map reads the level, it does not have one
 
@@ -955,7 +1097,8 @@ requirement is a guaranteed softlock.
 Two independent safety nets, both in `LevelManager`:
 
 - **The leash** (`SweepEnemies` / `IsLost`) discards an enemy that is too far, has
-  fallen too far below the player, or whose agent has left the NavMesh. Discarding
+  fallen too far below the player, whose agent has left the NavMesh, or that has no
+  route to the player at all -- see *Baked is not the same question as reachable*. Discarding
   deliberately awards no score, no combo and no drop — it is not a kill. It *does* put
   a fresh enemy in the queue, bounded at one replacement per enemy in the level, which
   is new and is the point: a level asks for a fixed number of kills and scores the

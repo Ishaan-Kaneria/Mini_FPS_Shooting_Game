@@ -156,6 +156,7 @@ namespace FPSKit.EditorTools
                     t.zoneWorksCount = 5;
                     t.zoneTankFarmCount = 3;
                     t.zoneContainerYardCount = 4;
+                    t.zonePowerHouseCount = 1;
 
                     // The horizon. A plant that stops at its own fence is a diorama, so
                     // the skyline past it is most of what sells the scale.

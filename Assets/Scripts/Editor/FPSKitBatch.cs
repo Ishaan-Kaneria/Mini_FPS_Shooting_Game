@@ -279,6 +279,18 @@ namespace FPSKit.EditorTools
         public static void VerifyTerrain() => FPSKitTerrainTest.VerifyTerrain();
 
         /// <summary>
+        /// Checks that the navmesh every arena bakes is joined to where the player
+        /// starts, so an enemy placed on it can actually arrive.
+        ///
+        /// This is the only check that catches a sealed building, a container roof or a
+        /// walkway whose stair faces the wrong way -- all of which bake, none of which
+        /// errors, and every one of which is an enemy standing still for a whole level.
+        ///
+        ///   Tools/unity-batch.sh FPSKitBatch.VerifyReach
+        /// </summary>
+        public static void VerifyReach() => FPSKitReachTest.VerifyReach();
+
+        /// <summary>
         /// Plays the economy end to end: coins earned by killing, spent in the store, and
         /// carried into a level as a better gun and a bomb that goes off where it was
         /// aimed.

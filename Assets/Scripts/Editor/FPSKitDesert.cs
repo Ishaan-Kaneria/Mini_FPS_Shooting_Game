@@ -398,29 +398,92 @@ namespace FPSKit.EditorTools
             group.gameObject.AddComponent<ScrollingWater>().scrollSpeed = new Vector2(0.012f, 0.05f);
         }
 
+        /// <summary>The trigger is cut into slices of this many metres of z.</summary>
+        /// <remarks>
+        /// Short enough that the meander cannot outrun a box: the centre line moves by
+        /// up to 0.62 m per metre of z, so ten metres of slice is six of drift, and the
+        /// slice is sized to cover every centre line inside it rather than the one at
+        /// its middle.
+        /// </remarks>
+        private const float KillSliceLength = 10f;
+
         /// <summary>
-        /// One trigger down the whole canyon, its top set well below the rim rather than
-        /// at it.
+        /// The trigger that makes falling in mean something: a chain of boxes following
+        /// the water, with its lid just above the surface.
         ///
-        /// At the rim it would kill somebody standing safely on the edge looking down,
-        /// which is the one place the level most wants them to stand -- the whole point
-        /// of a drop is being able to see it. Five metres down is past the shelf at the
-        /// top of the cliff, which is walkable and is meant to be: the rim rolls over
-        /// rather than ending, the shelf wanders by a metre either way with the rock
-        /// noise, and a trigger two metres down would occasionally be sitting on ground
-        /// an enemy had every right to be standing on. You die when you are past saving
-        /// and not before.
+        /// <b>Both of those are a fix and the same bug in two halves.</b> What was here
+        /// was one box, axis aligned, as wide as the river plus two and a half times the
+        /// meander and with its lid five metres under the rim. Written that way it does
+        /// not describe the river at all -- it describes a hundred-and-thirty-metre
+        /// corridor of the arena that the river happens to wander about inside, and the
+        /// lid is five metres below <i>zero</i> rather than five metres below the ground.
+        ///
+        /// <para>
+        /// That was survivable on a flat floor and lethal the moment the floor became a
+        /// dune field, because a dune field has basins in it. The sand on the western
+        /// approach bottoms out thirteen metres down -- eight metres inside a lid set at
+        /// minus five -- so four thousand square metres of perfectly ordinary walkable
+        /// sand, nowhere near the water, killed the player outright the instant they
+        /// stepped onto it. What that reads as from inside the game is "I walked towards
+        /// the river and died", which is exactly what it is, and nothing about it looks
+        /// like a trigger: there is no water, no edge and no fall.
+        /// </para>
+        ///
+        /// <para>
+        /// So the volume is cut to the shape of the thing it represents. Each slice
+        /// spans the bed plus the foot of the talus at that latitude, and the lid sits
+        /// two and a half metres over the water -- below every walkable surface in the
+        /// canyon by a wide margin, since the top shelf is a metre and a half down and
+        /// the bench below it is unwalkably steep on both sides. You die by reaching the
+        /// water, which is what the fence and the bridge railings have been saying all
+        /// along, and you can stand on the rim and look at it.
+        /// </para>
+        ///
+        /// <para>
+        /// Several colliders on one object rather than one object each: they are a
+        /// compound collider, a trigger message arrives for whichever of them was
+        /// entered, and one <see cref="KillVolume"/> answers for all of them.
+        /// </para>
         /// </summary>
         private static void BuildKillVolume(Transform parent, float half, float depth)
         {
             var go = new GameObject("KillVolume");
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(_theme.hazardOffset, -depth * 0.5f - 5f, 0f);
+            go.transform.localPosition = Vector3.zero;
 
-            var box = go.AddComponent<BoxCollider>();
-            box.isTrigger = true;
-            box.size = new Vector3(_theme.hazardWidth + _theme.hazardMeander * 2.5f,
-                                   depth, _theme.arenaSize + 40f);
+            // The same arithmetic BuildGorge uses for the floor of the cut, so the
+            // trigger cannot disagree with the canyon about how wide the bottom is.
+            float outer = _theme.hazardWidth * 0.5f + RimLipReach;
+            float reach = outer - CanyonInsets[CanyonInsets.Length - 1] + 7f;
+
+            float lid = WaterSurfaceY + 2.5f;
+            float floor = -depth - 10f;
+
+            float from = -half - CanyonOverrun;
+            float to = half + CanyonOverrun;
+            int slices = Mathf.CeilToInt((to - from) / KillSliceLength);
+
+            for (int i = 0; i < slices; i++)
+            {
+                float z0 = from + i * KillSliceLength;
+                float z1 = Mathf.Min(z0 + KillSliceLength, to);
+
+                float west = float.MaxValue, east = float.MinValue;
+
+                for (int s = 0; s <= 4; s++)
+                {
+                    float centre = GorgeCentreAt(Mathf.Lerp(z0, z1, s / 4f));
+                    west = Mathf.Min(west, centre);
+                    east = Mathf.Max(east, centre);
+                }
+
+                var box = go.AddComponent<BoxCollider>();
+                box.isTrigger = true;
+                box.center = new Vector3((west + east) * 0.5f, (lid + floor) * 0.5f,
+                                         (z0 + z1) * 0.5f);
+                box.size = new Vector3(east - west + reach * 2f, lid - floor,
+                                       z1 - z0 + 0.5f);
+            }
 
             var kill = go.AddComponent<KillVolume>();
             kill.instantKill = _theme.hazard != LevelTheme.Hazard.Electrified;

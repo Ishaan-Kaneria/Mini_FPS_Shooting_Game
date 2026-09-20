@@ -169,6 +169,19 @@ namespace FPSKit.EditorTools
         private static Material _zoneYard, _zoneApron, _zoneConcrete, _zoneSteel,
                                 _zoneRust, _zoneGrate, _zoneHazard, _zoneSign;
 
+        /// <summary>
+        /// The surfaces the big built structures wear.
+        ///
+        /// Separate from the four above rather than reusing them, and for one reason:
+        /// those carry a tiling chosen for the thing they were made for -- the perimeter
+        /// wall's concrete repeats sixty times across five hundred metres, which on a
+        /// sixty-metre shed wall is a grey blur. These are all tiled one-to-one so that
+        /// the scale comes from <c>MeshBuild.UVScale</c> at the point of use, where the
+        /// size of the surface is actually known.
+        /// </summary>
+        private static Material _zoneCladding, _zonePlate, _zoneBrick,
+                                _zoneLine, _zoneStain, _zoneDirt;
+
         // ==================================================================
         /// <summary>
         /// Builds the whole plant. Order matters: the roads are laid first because every
@@ -208,7 +221,18 @@ namespace FPSKit.EditorTools
             BuildStreetFurniture(root, layer, rng);
             BuildBlocks(root, layer, rng, half);
 
+            // Last of the ground passes, because the kerbs follow the road tiles and
+            // the bay markings follow the blocks, and neither exists until both of those
+            // have been laid out.
+            BuildYardDetail(root, layer, rng, half);
+
             BuildPerimeterFence(root, layer, half);
+
+            // The four-metre strip between the fence and the boundary wall is yard slab
+            // like everywhere else, so it bakes -- and it is sealed off by the fence, so
+            // nothing on it can reach anything. A kilometre of navmesh nobody can use.
+            SealNavMeshOutside(root, half - 5f, half + Mathf.Max(_theme.apronSize, 400f));
+
             BuildZoneBackdrop(root, backdrop, rng, half);
             BuildAccentLights(root, rng);
         }
@@ -295,7 +319,7 @@ namespace FPSKit.EditorTools
             // round the edge. Light concrete hardstanding against dark carriageways is
             // also simply what a real works looks like.
             _zoneYard = TintedTile(asphalt, "ZoneYard", new Vector2(size / 7f, size / 7f),
-                                   new Color(2.6f, 2.55f, 2.35f))
+                                   new Color(1.95f, 1.92f, 1.80f))
                         ?? MakeMaterial("ZoneYard", new Color(0.52f, 0.51f, 0.48f), 0.10f, 0f);
 
 
@@ -322,6 +346,38 @@ namespace FPSKit.EditorTools
             // yellow is exactly right for one.
             _zoneHazard = MakeMaterial("ZoneHazard", new Color(0.85f, 0.62f, 0.06f), 0.25f, 0.10f);
             _zoneSign   = MakeMaterial("ZoneSign",   new Color(0.88f, 0.76f, 0.10f), 0.20f, 0.05f);
+
+            // ---- the built structures ----
+            //
+            // Tiled one-to-one, because a hall wall, a silo and a chimney are three very
+            // different sizes and each one sets its own scale where it is built. The
+            // pack's concrete wall panel has strong horizontal banding in it, which is
+            // wrong laid flat over a yard and exactly right standing up as profiled
+            // steel cladding on the side of a shed.
+            _zoneCladding = TiledCopy(concrete, "ZoneCladding", Vector2.one)
+                            ?? MakeMaterial("ZoneCladding", new Color(0.55f, 0.56f, 0.57f), 0.22f, 0.15f);
+
+            _zonePlate = TiledCopy(steel, "ZonePlate", Vector2.one)
+                         ?? MakeMaterial("ZonePlate", new Color(0.50f, 0.51f, 0.53f), 0.30f, 0.45f);
+
+            // Brick, for the stacks. Tinted off the rusted steel map, which has the right
+            // mottling in it and none of the banding concrete has -- a chimney with a
+            // horizontal stripe every metre reads as a stack of tyres.
+            _zoneBrick = TintedTile(rust, "ZoneBrick", Vector2.one,
+                                    new Color(1.25f, 1.05f, 0.95f))
+                         ?? MakeMaterial("ZoneBrick", new Color(0.44f, 0.30f, 0.24f), 0.12f, 0f);
+
+            // ---- what is painted and spilled on the ground ----
+            //
+            // All three are deliberately close in value to what they sit on. Paint on a
+            // working yard is faded, thin and half worn away, and the first cut of these
+            // was none of those: saturated yellow hatching at full opacity read as fresh
+            // road marking on a new car park, and it was the loudest thing in the arena
+            // from every angle -- which is the opposite of the job, since the whole
+            // point of ground detail is to be noticed without being looked at.
+            _zoneLine  = MakeMaterial("ZoneLine",  new Color(0.60f, 0.58f, 0.47f), 0.06f, 0f);
+            _zoneStain = MakeMaterial("ZoneStain", new Color(0.17f, 0.165f, 0.16f), 0.20f, 0f);
+            _zoneDirt  = MakeMaterial("ZoneDirt",  new Color(0.43f, 0.40f, 0.35f), 0.03f, 0f);
         }
 
         // ==================================================================
@@ -525,7 +581,12 @@ namespace FPSKit.EditorTools
             var districts = new GameObject("Districts").transform;
             districts.SetParent(root, false);
 
-            int works = 0, farms = 0, yards = 0, depots = 0;
+            int works = 0, farms = 0, yards = 0, depots = 0, power = 0;
+
+            // Where each district ended up, so the passes that cross the site afterwards
+            // have somewhere to run between. A pipe bridge has to join two things that
+            // exist, and nothing knows where they are until they are built.
+            var built = new List<Vector3>();
 
             for (int i = 0; i < _blocks.Count; i++)
             {
@@ -543,8 +604,19 @@ namespace FPSKit.EditorTools
                 }
 
                 bool longThin = Mathf.Max(size.x, size.y) > Mathf.Min(size.x, size.y) * 1.6f;
+                bool roomy = Mathf.Min(size.x, size.y) >= 55f;
 
-                if (works < _theme.zoneWorksCount && Mathf.Min(size.x, size.y) >= 55f)
+                // The power house takes the first block big enough, which -- because the
+                // blocks are sorted biggest first -- is the biggest square one on the
+                // site. It wants the room: a cooling tower is thirteen metres across
+                // before its legs, and the whole reason it is here is to be seen over
+                // everything else from the far fence.
+                if (power < _theme.zonePowerHouseCount && roomy && !longThin)
+                {
+                    BuildPowerHouse(districts, layer, rng, centre, size);
+                    power++;
+                }
+                else if (works < _theme.zoneWorksCount && roomy)
                 {
                     BuildWorks(districts, layer, rng, centre, size);
                     works++;
@@ -564,10 +636,60 @@ namespace FPSKit.EditorTools
                     BuildDepot(districts, layer, rng, centre, size);
                     depots++;
                 }
+
+                built.Add(centre);
             }
 
-            Debug.Log($"[FPSKit] industrial zone: {works} works, {farms} tank farm(s), " +
-                      $"{yards} container yard(s), {depots} depot(s) over {_blocks.Count} blocks.");
+            BuildCrossSiteBridges(districts, layer, rng, built);
+
+            Debug.Log($"[FPSKit] industrial zone: {power} power house(s), {works} works, " +
+                      $"{farms} tank farm(s), {yards} container yard(s), {depots} depot(s) " +
+                      $"over {_blocks.Count} blocks.");
+        }
+
+        /// <summary>
+        /// Pipe bridges from one district to the next, carried over the streets between
+        /// them.
+        ///
+        /// <b>The streets are the emptiest thing on the site and they are a third of it.</b>
+        /// Every one is a hundred metres of open carriageway with the sky directly above
+        /// it, and a player walking down one is looking at nothing from the kerb to the
+        /// horizon. Something crossing overhead is the cheapest possible fix -- it puts a
+        /// ceiling on the view, throws a shadow across the road, and turns a corridor
+        /// between two blocks into a gateway.
+        ///
+        /// Run only between districts that are neighbours on the grid, because a pipe
+        /// bridge cutting diagonally across four blocks is a shape no plant has.
+        /// </summary>
+        private static void BuildCrossSiteBridges(Transform parent, int layer, System.Random rng,
+                                                  List<Vector3> districts)
+        {
+            var group = new GameObject("PipeBridges").transform;
+            group.SetParent(parent, false);
+
+            int built = 0;
+
+            for (int i = 0; i < districts.Count && built < 5; i++)
+                for (int j = i + 1; j < districts.Count && built < 5; j++)
+                {
+                    Vector3 a = districts[i], b = districts[j];
+
+                    float dx = Mathf.Abs(a.x - b.x), dz = Mathf.Abs(a.z - b.z);
+
+                    // Neighbours along one axis and level on the other: one street apart.
+                    bool alongX = dz < Tile && dx > Tile * 2f && dx < Tile * 7f;
+                    bool alongZ = dx < Tile && dz > Tile * 2f && dz < Tile * 7f;
+                    if (!alongX && !alongZ) continue;
+                    if (rng.NextDouble() > 0.55) continue;
+
+                    // Offset off the centre line of both blocks, so a bridge crosses the
+                    // street beside the district rather than through the middle of it.
+                    float shift = Rand(rng, -Tile, Tile);
+                    Vector3 offset = alongX ? new Vector3(0f, 0f, shift) : new Vector3(shift, 0f, 0f);
+
+                    BuildPipeBridge(group, layer, a + offset, b + offset, Rand(rng, 9f, 13f));
+                    built++;
+                }
         }
 
         /// <summary>
@@ -598,13 +720,24 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// A works: two or three big sheds sharing a yard, doors onto the street.
+        /// A works: one big production hall with a stack, a silo bank and a yard full of
+        /// the traffic that serves them.
         ///
-        /// The sheds are the reason to come here. <c>Hangar_v2</c> and <c>Hangar_v3</c>
-        /// are hollow, so each one is an interior fight with two ways in, and the crates
-        /// inside are what stop that interior being an empty shoebox. A stair tower on
-        /// one flank puts a firing position on the roof looking down the street, which is
-        /// the best killing ground on the site and is meant to be contested.
+        /// <b>This used to be two or three of the art pack's hangars and that was the
+        /// single biggest reason the site read as artificial.</b> The pack's largest
+        /// building is about twenty-five metres long and seven high; three of them spread
+        /// over a hundred-metre block is three small sheds a long way apart, with nothing
+        /// between them and nothing above them, and no amount of barrels and pallets
+        /// changes that -- from the ground the entire arena was a flat horizon. Mass is
+        /// what an industrial site is made of, and mass is the one thing that cannot be
+        /// added as scatter.
+        ///
+        /// So the works is now built around a sixty-metre hall with a walkable roof, a
+        /// forty-metre stack beside it and a bank of silos behind, and the pack's sheds
+        /// are demoted to the outbuildings they are the right size for. The hall is set
+        /// on the block's frontage rather than in the middle of it, because a building
+        /// centred in its own plot is a model on a table -- a real one has its doors on
+        /// the road and its yard behind.
         /// </summary>
         private static void BuildWorks(Transform parent, int layer, System.Random rng,
                                        Vector3 centre, Vector2 size)
@@ -614,53 +747,197 @@ namespace FPSKit.EditorTools
             works.localPosition = centre;
 
             bool alongX = size.x >= size.y;
-            float run = alongX ? size.x : size.y;
-            int sheds = Mathf.Clamp(Mathf.FloorToInt(run / 30f), 1, 3);
-            float step = run / sheds;
+            float across = Mathf.Min(size.x, size.y);
 
-            for (int i = 0; i < sheds; i++)
+            float width = Mathf.Clamp(Mathf.Max(size.x, size.y) * 0.62f, 40f, 64f);
+            float depth = Mathf.Clamp(across * 0.40f, 24f, 36f);
+
+            // Pushed to the street frontage, with the yard behind it. A building centred
+            // in its own plot is a model on a table -- a real one has its doors on the
+            // road and its yard behind.
+            float set = across * 0.5f - depth * 0.5f - 4f;
+            float front = rng.Next(2) == 0 ? set : -set;
+            float back = front > 0f ? -1f : 1f;
+
+            // Everything is placed in (along the frontage, into the yard) and turned into
+            // world axes here, so the layout reads as a plan once rather than as a pair
+            // of branches at every position.
+            Vector3 At(float along, float into)
+                => alongX ? new Vector3(along, 0f, into) : new Vector3(into, 0f, along);
+
+            float run = Mathf.Max(size.x, size.y);
+            float yard = Mathf.Min(size.x, size.y);
+
+            Vector3 hallAt = At(Rand(rng, -4f, 4f), front);
+
+            BuildFactoryHall(works, layer, rng, hallAt, width, depth, alongX ? 0f : 90f);
+
+            // Claimed by the diagonal, not by the long side: the stairs stand three and a
+            // half metres off each long wall, so a claim measured on the hall alone
+            // leaves them outside it.
+            Claim(centre.x + hallAt.x, centre.z + hallAt.z,
+                  new Vector2(width, depth + 9f).magnitude * 0.5f);
+
+            // Cover inside, so the interior is a fight rather than a shed with a roof.
+            int inside = Mathf.Clamp(Mathf.RoundToInt(width / 8f), 4, 8);
+            for (int c = 0; c < inside; c++)
             {
-                float offset = -run * 0.5f + step * (i + 0.5f);
-                Vector3 at = alongX ? new Vector3(offset, 0f, 0f) : new Vector3(0f, 0f, offset);
-                float yaw = alongX ? 0f : 90f;
+                Vector3 local = At(Rand(rng, -width * 0.38f, width * 0.38f),
+                                   Rand(rng, -depth * 0.3f, depth * 0.3f));
 
-                string prefab = i % 2 == 0 ? ShedWide : ShedLong;
-                var shed = Place(works, prefab, at, yaw);
-                if (shed == null) continue;
-
-                Claim(centre.x + at.x, centre.z + at.z, 15f);
-
-                // Cover inside, so the interior is a fight rather than a corridor.
-                for (int c = 0; c < 4; c++)
-                {
-                    Vector3 inside = at + new Vector3(
-                        ((float)rng.NextDouble() - 0.5f) * 14f, 0f,
-                        ((float)rng.NextDouble() - 0.5f) * 12f);
-                    Place(works, c % 2 == 0 ? CrateBig : Pallets, inside,
-                          (float)rng.NextDouble() * 360f);
-                }
-
-                // The stair tower and roof position, on the street side.
-                if (i == 0)
-                {
-                    Vector3 stairAt = at + (alongX ? new Vector3(-14f, 0f, 11f)
-                                                   : new Vector3(11f, 0f, -14f));
-                    BuildStairTower(works, layer, stairAt, 9f, alongX ? 0f : 90f);
-                }
+                Place(works, c % 3 == 0 ? Pallets : c % 3 == 1 ? CrateBig : BagsPallet,
+                      hallAt + local, (float)rng.NextDouble() * 360f);
             }
 
-            // Service clutter against the shed walls: the stuff that says the building
-            // is used rather than modelled.
-            int clutter = ForArea(size, 420f, 6, 22);
+            // ---- the yard behind it ----
+            //
+            // <b>Everything out here is kept a clear span from everything else, and that
+            // is a navigation requirement rather than a taste.</b> The first cut of this
+            // yard packed the stack nine metres off the end of the hall with the silos
+            // and an outbuilding closing the other sides, which left a sealed pocket of
+            // yard fifteen metres across in every works on the site -- ground that baked,
+            // that nothing could path to, and that the spawner would happily put an enemy
+            // in. Nothing about a courtyard looks wrong, which is what made it expensive
+            // to find.
+            Vector3 stackAt = At(-run * 0.24f, back * yard * 0.12f);
+
+            BuildChimney(works, layer, stackAt, Rand(rng, 34f, 48f), Rand(rng, 2.1f, 2.9f),
+                         Mathf.Atan2(hallAt.x - stackAt.x, hallAt.z - stackAt.z) * Mathf.Rad2Deg);
+            Claim(centre.x + stackAt.x, centre.z + stackAt.z, 9f);
+
+            Vector3 siloAt = At(run * 0.22f, back * yard * 0.14f);
+
+            BuildSiloBank(works, layer, siloAt, rng.Next(4, 7), Rand(rng, 2.8f, 3.6f),
+                          Rand(rng, 15f, 22f), alongX ? 0f : 90f);
+            Claim(centre.x + siloAt.x, centre.z + siloAt.z, 14f);
+
+            // The pack's own sheds, at the size they are right for: the outbuildings
+            // along the back of a works yard.
+            //
+            // <b>Every one of them is held off the navigation bake, including the hollow
+            // ones, and that is a measurement rather than a precaution.</b> Hangar_v2 and
+            // Hangar_v3 carry non-convex mesh colliders, so a player can walk inside
+            // them -- but their door openings do not admit a 0.5 m agent, and what the
+            // bake makes of that is a room-sized slab of walkable navmesh with no way in
+            // or out of it. Sixteen of those on the site were sixteen places the spawner
+            // could stand an enemy for the whole level. Their roofs are the same story
+            // one storey up: three metres of flat steel with no stair to it.
+            //
+            // So the sheds are scenery an agent walks round and a player walks into, and
+            // the interior fight belongs to the hall, whose doorways are eleven metres
+            // wide and are checked.
+            NoEntry(Place(works, ShedLong, At(-run * 0.3f, back * yard * 0.36f),
+                          alongX ? 0f : 90f));
+
+            NoEntry(Place(works, ShedSmall, At(run * 0.3f, back * yard * 0.36f),
+                          alongX ? 0f : 90f));
+
+            NoEntry(Place(works, OutBuild, At(run * 0.02f, back * yard * 0.42f),
+                          alongX ? 180f : 270f));
+
+            // Service clutter -- and it asks first.
+            //
+            // <b>Scatter that ignores the claims is scatter that lands on a staircase.</b>
+            // A dumpster dropped halfway up an external flight does not read as a bug
+            // from anywhere: it is a dumpster in a works yard. What it does is cut the
+            // flight in two as far as the bake is concerned, so the roof above it is a
+            // firing position the level's enemies can never reach, and the only symptom
+            // is that nobody ever comes up after you.
+            int clutter = ForArea(size, 380f, 8, 26);
             for (int i = 0; i < clutter; i++)
             {
-                Vector3 at = new Vector3(((float)rng.NextDouble() - 0.5f) * size.x * 0.8f, 0f,
-                                         ((float)rng.NextDouble() - 0.5f) * size.y * 0.8f);
-                Place(works, i % 2 == 0 ? Dumpster : BarrelSet, at, (float)rng.NextDouble() * 360f);
+                var at = new Vector2(centre.x + Rand(rng, -size.x * 0.44f, size.x * 0.44f),
+                                     centre.z + Rand(rng, -size.y * 0.44f, size.y * 0.44f));
+
+                if (!Free(at, 2.5f)) continue;
+
+                string[] kit = { Dumpster, BarrelSet, Pallets, PalletOne, CrateFlat, ElecBox };
+                Place(works, kit[rng.Next(kit.Length)],
+                      new Vector3(at.x - centre.x, 0f, at.y - centre.z),
+                      (float)rng.NextDouble() * 360f);
+
+                Claim(at.x, at.y, 2f);
             }
 
-            Place(works, OutBuild, new Vector3(size.x * 0.34f, 0f, size.y * 0.32f), 180f);
             BuildSign(works, layer, new Vector3(size.x * 0.4f, 0f, 0f), 90f, SignKind.Hardhat);
+        }
+
+        /// <summary>
+        /// The power house: a cooling tower, the boiler hall that feeds it, two stacks
+        /// and a transformer compound.
+        ///
+        /// <b>Every arena needs one thing you can see from everywhere, and this is it.</b>
+        /// A five-hundred-metre site with nothing over twenty metres tall has no
+        /// landmarks in it, so a player who turns round twice has no idea which way they
+        /// came from and the map reads as the same block repeated -- which is exactly
+        /// what this one did. A cooling tower is forty metres of unmistakable silhouette:
+        /// it is a compass, it is a place ("behind the tower"), and it is the single
+        /// cheapest thing that makes a plant look like a plant rather than a distribution
+        /// park.
+        /// </summary>
+        private static void BuildPowerHouse(Transform parent, int layer, System.Random rng,
+                                            Vector3 centre, Vector2 size)
+        {
+            var house = new GameObject("PowerHouse").transform;
+            house.SetParent(parent, false);
+            house.localPosition = centre;
+
+            float radius = Mathf.Clamp(Mathf.Min(size.x, size.y) * 0.16f, 10f, 15f);
+            var towerAt = new Vector3(-size.x * 0.26f, 0f, size.y * 0.24f);
+
+            BuildCoolingTower(house, layer, towerAt, radius * 3.1f, radius);
+            Claim(centre.x + towerAt.x, centre.z + towerAt.z, radius * 1.5f);
+
+            // The boiler hall, which is what the tower is attached to. Smaller than a
+            // works hall and turned across it, so the two do not read as a pair of sheds.
+            var hallAt = new Vector3(size.x * 0.2f, 0f, -size.y * 0.16f);
+            BuildFactoryHall(house, layer, rng, hallAt,
+                             Mathf.Clamp(size.x * 0.44f, 32f, 46f),
+                             Mathf.Clamp(size.y * 0.3f, 22f, 30f), 90f);
+            Claim(centre.x + hallAt.x, centre.z + hallAt.z, 24f);
+
+            // Two stacks, deliberately unequal: a matched pair reads as decoration.
+            BuildChimney(house, layer, new Vector3(-size.x * 0.06f, 0f, -size.y * 0.34f),
+                         Rand(rng, 44f, 56f), 2.8f, 90f);
+            BuildChimney(house, layer, new Vector3(-size.x * 0.06f + 11f, 0f, -size.y * 0.34f),
+                         Rand(rng, 30f, 38f), 2.1f, 90f);
+
+            // The transformer compound: a bund of its own, full of switchgear, with the
+            // pipe run leaving it.
+            var yardAt = new Vector3(-size.x * 0.3f, 0f, -size.y * 0.16f);
+
+            var pen = new GameObject("Transformers").transform;
+            pen.SetParent(house, false);
+            pen.localPosition = yardAt;
+
+            BuildBund(pen, layer, 11f, 8f);
+
+            for (int i = 0; i < 4; i++)
+                Place(pen, i % 2 == 0 ? Generator : ElecBox,
+                      new Vector3(-7f + i * 4.6f, 0f, Rand(rng, -3f, 3f)), i * 37f);
+
+            Claim(centre.x + yardAt.x, centre.z + yardAt.z, 13f);
+
+            // Offset away from the stacks, and shorter than the block.
+            //
+            // <b>A pipe run is really three objects -- the pipes, the catwalk over them
+            // and the stair up to the catwalk -- and the stair reaches seven metres
+            // beyond the end of the run.</b> Laid down the middle of the block it put
+            // that stair through the flue duct at the foot of a chimney, which is at
+            // exactly catwalk height: the flight was still there, still climbable to
+            // look at, and cut in half as far as the bake was concerned, so the walkway
+            // over the whole compound was a strip of navmesh joined to nothing.
+            BuildPipeRun(house, layer, rng, new Vector3(size.x * 0.02f, 0f, size.y * 0.12f),
+                         size.y * 0.5f);
+
+            int clutter = ForArea(size, 520f, 6, 18);
+            for (int i = 0; i < clutter; i++)
+                Place(house, i % 2 == 0 ? BarrelSet : PipeVent,
+                      new Vector3(Rand(rng, -size.x * 0.42f, size.x * 0.42f), 0f,
+                                  Rand(rng, -size.y * 0.42f, size.y * 0.42f)),
+                      (float)rng.NextDouble() * 360f);
+
+            BuildSign(house, layer, new Vector3(0f, 0f, -size.y * 0.42f), 0f, SignKind.Warning);
         }
 
         /// <summary>
@@ -745,20 +1022,30 @@ namespace FPSKit.EditorTools
                     string prefab = (r + c) % 3 == 0 ? BoxThrough
                                   : (r + c) % 5 == 0 ? BoxOpen : BoxClosed;
 
-                    Place(yard, prefab, at, alongX ? 0f : 90f);
+                    // <b>Held off the bake, and the ground-level ones as much as the
+                    // stacked ones.</b> Only the upper tier used to be, on the reasoning
+                    // that its roof is six metres up with no ladder -- but the roof of a
+                    // container standing on the ground is flat, walkable and two and a
+                    // half metres up, which is just as unreachable and there are four
+                    // times as many of them. They were the largest single source of
+                    // orphan navmesh left on the site. The walk-through boxes keep their
+                    // insides, because the floor in there is the yard slab and not the
+                    // container.
+                    NoStanding(Place(yard, prefab, at, alongX ? 0f : 90f));
 
                     // A second tier on some of them, for the height the yard needs.
-                    //
-                    // The roof of a stacked container is 6m of flat walkable surface
-                    // with no ladder to it, and there are dozens of them -- easily the
-                    // biggest source of orphan navmesh on the site, and each island is
-                    // well over the 12 square metres minRegionArea culls. An enemy
-                    // spawned on one stands there for the whole level.
                     if ((r + c) % 4 == 1)
                         NoStanding(Place(yard, BoxClosed, at + Vector3.up * 3.02f,
                                          alongX ? 0f : 90f));
                 }
             }
+
+            // The crane that put the stacks there. Spanning the rows rather than along
+            // them, so it crosses every lane and gives the yard a top edge -- without it
+            // a container yard from the ground is a maze of six-metre boxes with the sky
+            // on top, and the fight in it has no third dimension at all.
+            BuildGantryCrane(yard, layer, rng, Vector3.zero,
+                             Mathf.Min(across * 0.92f, 58f), 12.5f, alongX ? 90f : 0f);
 
             Claim(centre.x, centre.z, Mathf.Min(size.x, size.y) * 0.4f);
             BuildSign(yard, layer, new Vector3(0f, 0f, size.y * 0.42f), 0f, SignKind.Warning);
@@ -777,9 +1064,12 @@ namespace FPSKit.EditorTools
             depot.SetParent(parent, false);
             depot.localPosition = centre;
 
-            NoStanding(Place(depot, Silo, new Vector3(-size.x * 0.28f, 0f, size.y * 0.24f),
-                             (float)rng.NextDouble() * 360f));
-            Place(depot, ShedSmall, new Vector3(size.x * 0.26f, 0f, -size.y * 0.22f), 90f);
+            // Turned in right angles rather than freely, because NoEntry's volume is
+            // axis aligned: a box spun 45 degrees has a bounding box half again as wide
+            // as it is, and the carve would take the ground round it with it.
+            NoEntry(Place(depot, Silo, new Vector3(-size.x * 0.28f, 0f, size.y * 0.24f),
+                          rng.Next(4) * 90f));
+            NoEntry(Place(depot, ShedSmall, new Vector3(size.x * 0.26f, 0f, -size.y * 0.22f), 90f));
             Place(depot, Generator, new Vector3(size.x * 0.3f, 0f, size.y * 0.3f));
 
             int items = ForArea(size, 260f, 10, 34);

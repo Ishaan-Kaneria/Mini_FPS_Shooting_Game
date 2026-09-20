@@ -63,6 +63,7 @@ MonoBehaviour:
   zoneWorksCount: 3
   zoneTankFarmCount: 2
   zoneContainerYardCount: 3
+  zonePowerHouseCount: 1
   roomCount: 4
   platformCount: 2
   coverWallCount: 9

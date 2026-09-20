@@ -122,6 +122,20 @@ public class LevelManager : MonoBehaviour
              "way to catch a fall, long before it is far enough away to trip the distance check.")]
     public bool despawnOffNavMesh = true;
 
+    [Tooltip("Refuse to spawn anywhere the NavMesh cannot actually walk from to you, and " +
+             "discard an enemy that ends up somewhere it cannot. A sealed shed, the inside " +
+             "of a bund, the roof of a container stack -- all of them bake walkable ground " +
+             "that is joined to nothing, and an enemy put on one stands there for the whole " +
+             "level while the clock runs out. Off, only the distance leash catches it, and " +
+             "only if it happens to be far away.")]
+    public bool requireReachableSpawns = true;
+
+    [Tooltip("Seconds between the route checks behind the setting above. A path query is " +
+             "the most expensive thing per enemy here -- an unreachable one costs a search " +
+             "of its whole island before it can fail -- so it is rationed and the answer is " +
+             "held in between, the same way the enemy's line of sight is.")]
+    public float reachCheckInterval = 1.5f;
+
     [Tooltip("Put a fresh enemy in the queue for every one the leash discards. This is " +
              "what keeps three stars honest: the level asks for a fixed number of kills, " +
              "and a body that fell through a gap in the floor is not the player's mistake " +
@@ -208,9 +222,34 @@ public class LevelManager : MonoBehaviour
 
         /// <summary>When it was first judged lost, or -1 while it is behaving.</summary>
         public float strandedSince = -1f;
+
+        /// <summary>The last route answer, and when it is worth asking again.</summary>
+        public bool routeBlocked;
+        public float nextReachCheck;
     }
 
     readonly List<Tracked> _alive = new List<Tracked>();
+
+    NavMeshPath _routeScratch;
+
+    /// <summary>
+    /// Scratch for every route question asked here. One instance rather than one per
+    /// call: <see cref="NavMeshPath"/> owns native memory, and a fresh one per spawn
+    /// attempt is a few hundred allocations a level for an answer read immediately and
+    /// never kept.
+    ///
+    /// <b>Made on demand, never in a field initialiser.</b> A field initialiser runs
+    /// inside the MonoBehaviour's constructor, and Unity refuses to build a NavMeshPath
+    /// there -- it throws <c>InitializeNavMeshPath is not allowed to be called from a
+    /// MonoBehaviour constructor</c>, leaves the field null, and the exception is
+    /// swallowed into the construction of the object rather than reported against
+    /// anything you wrote. What that looks like from the game is a level that spawns
+    /// nothing at all: every route query throws a NullReferenceException inside the
+    /// spawn coroutine, every spawn attempt fails, and the arena stays empty until the
+    /// clock ends it. Same rule, and the same symptom, as <c>EnemyAI.Block</c> -- a
+    /// private property with a null check, and nothing in Awake.
+    /// </summary>
+    NavMeshPath Route => _routeScratch ??= new NavMeshPath();
 
     int _pendingSpawns;
     int _replacements;
@@ -613,7 +652,30 @@ public class LevelManager : MonoBehaviour
             !tracked.agent.isOnNavMesh)
             return true;
 
-        return false;
+        // And an agent on a scrap of NavMesh joined to nothing cannot reach you either,
+        // however close it is standing. The distance leash never catches this one --
+        // an enemy sealed inside a shed forty metres away is well inside every other
+        // limit here and will stand in it until the clock ends the level.
+        return IsWalledIn(tracked);
+    }
+
+    /// <summary>
+    /// Whether this enemy currently has no route to the player, cached between checks.
+    ///
+    /// Rationed, because a failing path query is the expensive one: a complete route is
+    /// found and returned, while an impossible one costs a search of the whole island
+    /// the agent is standing on before it can say so. The first check is offset per
+    /// enemy so a level's worth of them does not all ask on the same frame.
+    /// </summary>
+    bool IsWalledIn(Tracked tracked)
+    {
+        if (!requireReachableSpawns || tracked.go == null) return false;
+        if (Time.time < tracked.nextReachCheck) return tracked.routeBlocked;
+
+        tracked.nextReachCheck = Time.time + Mathf.Max(0.25f, reachCheckInterval);
+        tracked.routeBlocked = !CanReachPlayerFrom(tracked.go.transform.position);
+
+        return tracked.routeBlocked;
     }
 
     /// <summary>
@@ -751,7 +813,13 @@ public class LevelManager : MonoBehaviour
             go = enemy,
             health = health,
             agent = enemy.GetComponent<NavMeshAgent>(),
-            isBoss = boss
+            isBoss = boss,
+
+            // Spread over one interval, so forty enemies do not all ask for a route on
+            // the same frame and turn a rationed check back into a stutter. Seeded in
+            // the future rather than at zero because the spawner has just proved this
+            // one can reach the player.
+            nextReachCheck = Time.time + UnityEngine.Random.Range(0.5f, 1f) * reachCheckInterval
         });
 
         return enemy;
@@ -873,6 +941,11 @@ public class LevelManager : MonoBehaviour
 
                 if (requireHidden && IsVisibleToPlayer(hit.position)) continue;
 
+                // Being on the mesh is not the same question as being able to get here
+                // from there. Asked last because it is much the most expensive of the
+                // three, and because the two cheap filters throw most candidates out.
+                if (!CanReachPlayerFrom(hit.position)) continue;
+
                 position = hit.position;
                 return true;
             }
@@ -920,6 +993,49 @@ public class LevelManager : MonoBehaviour
         return !Physics.Linecast(eye, target, spawnSightBlockers, QueryTriggerInteraction.Ignore);
     }
 
+    /// <summary>
+    /// Whether an agent standing at a fixed spawn point could walk to the player, with
+    /// the point pulled onto the mesh first the way the spawner itself pulls it.
+    /// </summary>
+    bool Reachable(Vector3 point)
+        => !requireReachableSpawns
+        || (NavMesh.SamplePosition(point, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas)
+            && CanReachPlayerFrom(hit.position));
+
+    /// <summary>
+    /// Whether there is a complete NavMesh route from a point to the player.
+    ///
+    /// This is the whole of the fix for enemies arriving inside somewhere they cannot
+    /// leave. <see cref="NavMesh.SamplePosition"/> answers "is there walkable ground
+    /// near here", and a sealed shed, the floor inside a bund and the roof of a
+    /// container stack all say yes -- they are walkable ground, joined to nothing. An
+    /// enemy put on one is not merely useless: the level asks for a fixed number of
+    /// kills and scores the player against it, so every trapped body is a star the
+    /// geometry took away, and the only thing the player sees is a clock running out
+    /// with the arena apparently empty.
+    ///
+    /// <para>
+    /// The player is snapped onto the mesh rather than used raw, because they spend a
+    /// good deal of the level off it -- mid-jump, on a crate, on a catwalk -- and a
+    /// destination off the mesh makes every route incomplete, which would refuse every
+    /// spawn in the level. A player genuinely nowhere near the mesh returns true, since
+    /// refusing on an unanswerable question spawns nothing at all.
+    /// </para>
+    /// </summary>
+    bool CanReachPlayerFrom(Vector3 from)
+    {
+        if (!requireReachableSpawns || player == null) return true;
+
+        if (!NavMesh.SamplePosition(player.position, out NavMeshHit target,
+                                    Mathf.Max(navMeshSampleRadius, 8f), NavMesh.AllAreas))
+            return true;
+
+        var route = Route;
+
+        return NavMesh.CalculatePath(from, target.position, NavMesh.AllAreas, route)
+            && route.status == NavMeshPathStatus.PathComplete;
+    }
+
     bool TryUseFixedSpawnPoint(out Vector3 position)
     {
         position = Vector3.zero;
@@ -937,7 +1053,8 @@ public class LevelManager : MonoBehaviour
                 ? Vector3.Distance(point.position, player.position)
                 : float.MaxValue;
 
-            if (distance >= minSpawnDistanceFromPlayer) candidates.Add(point);
+            if (distance >= minSpawnDistanceFromPlayer && Reachable(point.position))
+                candidates.Add(point);
 
             if (distance > farthestDistance)
             {

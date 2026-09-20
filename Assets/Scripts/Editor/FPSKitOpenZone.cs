@@ -148,6 +148,10 @@ namespace FPSKit.EditorTools
             BuildBoundary(root, layer, half);
             BuildBackdrop(root, backdrop, rng, half);
 
+            // Nothing outside the seal is anybody's to stand on, however much sand
+            // there is out there.
+            SealNavMeshOutside(root, half - BermToe + 1f, half + _theme.apronSize);
+
             // ---- content ----
             BuildLandmarks(root, layer, rng);
             BuildOutposts(root, layer, rng);
@@ -496,14 +500,53 @@ namespace FPSKit.EditorTools
         // ==================================================================
         // The edge of the world
         // ==================================================================
+        /// <summary>How far inside the arena the sand hill's toe begins.</summary>
+        private const float BermToe = 6f;
+
+        /// <summary>How far outside the arena its crest stands.</summary>
+        private const float BermCrest = 20f;
+
+        /// <summary>And how far out it has come back down to the ground again.</summary>
+        private const float BermBack = 56f;
+
+        /// <summary>Metres of crest, before the noise along the run varies it.</summary>
+        private const float BermHeight = 23f;
+
         /// <summary>
-        /// The boundary, as broken ground rather than as a wall.
+        /// The boundary, as one continuous hill of sand rather than as a line of rocks.
         ///
-        /// A flat perimeter wall is exactly the thing this arena shape exists to stop
-        /// being. So the visible edge is a jumbled ridge of rock -- varying height, width
-        /// and angle, sunk into the ground -- and the thing that actually holds the
-        /// player in is an invisible box behind it. The ridge can then be as ragged as it
-        /// likes without leaving a gap to walk through.
+        /// <b>This is a rewrite, and what it replaces was the worst-looking thing in the
+        /// arena.</b> The edge used to be a row of buttes -- the same stepped mesa shape
+        /// the horizon is made of -- each given its own random width, height and rotation
+        /// and then squashed onto a footprint half as wide as it was tall. A butte has a
+        /// ledge that steps *out* every third band, which at mesa proportions is a
+        /// weathered bench and at these proportions is a flange sticking out sideways;
+        /// six of them round a shape stretched two to one came out as black spikes.
+        /// Forty of those in a row, interpenetrating, is not a ridge. The whole edge of
+        /// the map read as shattered glass, and underneath every one of those flanges was
+        /// a pocket at head height that a player could walk into and then not walk back
+        /// out of -- a hill you cannot see, that you get stuck inside.
+        ///
+        /// <para>
+        /// So the edge is now what a desert's edge should have been from the start: a
+        /// dune ridge. It is one heightfield in its own right, wrapped round the arena as
+        /// a square annulus -- a profile that rises out of the sand a few metres inside
+        /// the boundary, crests twenty metres outside it and lies back down again -- so
+        /// there is no overhang anywhere on it, no pocket to be caught in, and no join
+        /// between one piece and the next to fall down. The corners come out right for
+        /// free because the four sides are the same function of
+        /// <c>max(|x|, |z|)</c> and meet exactly along the diagonal.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>The seal moved, and that is half the fix.</b> It used to sit a metre inside
+        /// the arena boundary while the rocks were placed on or outside it -- so the
+        /// player was stopped by an invisible wall standing in open sand, with the thing
+        /// that was supposed to be stopping them either twenty metres behind them or
+        /// seven metres out of reach. Now it is at the toe of the hill: you walk up to
+        /// the sand, the sand is what stops you, and the hill you can see carries on
+        /// rising in front of you.
+        /// </para>
         /// </summary>
         private static void BuildBoundary(Transform root, int layer, float half)
         {
@@ -512,55 +555,211 @@ namespace FPSKit.EditorTools
 
             var rng = new System.Random(_theme.randomSeed * 31 + 7);
 
+            float toe = half - BermToe;
+            float back = half + BermBack;
+
+            var sand = MakeDetailMaterial("Sand", _theme.floorColor, "Sand", 0.09f,
+                                          _theme.floorSmoothness * 0.4f, 0f, 1.15f);
+
+            for (int side = 0; side < 4; side++)
+                BuildBoundaryRun(group, layer, sand, side, toe, back);
+
+            BuildBoundaryOutcrops(group, layer, rng, half);
+
+            // The seal, at the foot of the slope rather than out in the open sand.
+            // Still invisible, because a collider is, but it is now flush with the face
+            // of something twenty metres tall: what the player runs into and what they
+            // can see are in the same place.
+            for (int side = 0; side < 4; side++)
+            {
+                bool alongZ = side >= 2;
+                float sign = side % 2 == 0 ? 1f : -1f;
+                float at = toe + 2f;
+
+                var wall = new GameObject($"Seal_{side}");
+                wall.transform.SetParent(group, false);
+                wall.layer = layer;
+                wall.transform.localPosition = alongZ
+                    ? new Vector3(sign * at, 30f, 0f)
+                    : new Vector3(0f, 30f, sign * at);
+
+                var box = wall.AddComponent<BoxCollider>();
+                box.size = alongZ
+                    ? new Vector3(2f, 120f, _theme.arenaSize + 140f)
+                    : new Vector3(_theme.arenaSize + 140f, 120f, 2f);
+            }
+        }
+
+        /// <summary>
+        /// One side of the ridge, as a shared-vertex heightfield strip.
+        ///
+        /// Laid out as a trapezoid rather than a rectangle: every vertex is placed at
+        /// <c>|along| &lt;= out</c>, so the four sides tile the square annulus exactly
+        /// and meet along its diagonals without overlapping. Overlapping them was the
+        /// obvious build and puts a double-height lump on each corner.
+        ///
+        /// Vertices are shared and the normals come from the triangles, because a
+        /// flat-shaded dune is a heap of gravel -- the whole reason the ground reads as
+        /// sand at all is that it has no facets in it.
+        /// </summary>
+        private static void BuildBoundaryRun(Transform parent, int layer, Material sand,
+                                             int side, float toe, float back)
+        {
+            const int across = 18;
+            const int along = 150;
+
+            bool alongZ = side >= 2;
+            float sign = side % 2 == 0 ? 1f : -1f;
+
+            var vertices = new Vector3[(across + 1) * (along + 1)];
+            var uvs = new Vector2[vertices.Length];
+            var triangles = new List<int>(across * along * 6);
+
+            for (int a = 0; a <= across; a++)
+            {
+                float u = a / (float)across;
+                float outward = Mathf.Lerp(toe, back, u);
+
+                for (int b = 0; b <= along; b++)
+                {
+                    float t = (b / (float)along) * 2f - 1f;          // -1 .. 1 of this row
+                    float lateral = t * outward;
+
+                    float x = alongZ ? sign * outward : lateral;
+                    float z = alongZ ? lateral : sign * outward;
+
+                    vertices[a * (along + 1) + b] = new Vector3(x, BermHeightAt(x, z, u), z);
+                    uvs[a * (along + 1) + b] = new Vector2(x, z);
+                }
+            }
+
+            for (int a = 0; a < across; a++)
+                for (int b = 0; b < along; b++)
+                {
+                    int v00 = a * (along + 1) + b;
+                    int v01 = v00 + 1;
+                    int v10 = (a + 1) * (along + 1) + b;
+                    int v11 = v10 + 1;
+
+                    // Wound so the face is up whichever side of the arena this is: the
+                    // outward axis flips sign on two of the four, and a strip wound for
+                    // one of them is inside out on the other -- which is invisible from
+                    // above and is a hill you can see straight through from the ground.
+                    if (sign > 0f)
+                    {
+                        triangles.Add(v00); triangles.Add(v01); triangles.Add(v11);
+                        triangles.Add(v00); triangles.Add(v11); triangles.Add(v10);
+                    }
+                    else
+                    {
+                        triangles.Add(v00); triangles.Add(v11); triangles.Add(v01);
+                        triangles.Add(v00); triangles.Add(v10); triangles.Add(v11);
+                    }
+                }
+
+            var mesh = new Mesh { name = $"Berm_{side}" };
+            mesh.SetVertices(vertices);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
+
+            var run = MeshObject(parent, "SandRidge", mesh, sand, Vector3.zero,
+                                 Quaternion.identity, Vector3.one, layer, SandTag);
+
+            // Off the bake. The outer face lies back at well under the agent slope, so
+            // left in it would be a kilometre of walkable navmesh outside the level for
+            // the spawner to find, joined to the arena over the seal.
+            NoStanding(run);
+
+            // The map draws it as the edge of the world, which is what it is, and the
+            // footprint of a straight run is honestly a rectangle -- unlike the river,
+            // whose bend is the whole point and which is hidden and sliced instead.
+            Mark(run, Shade(_theme.bankColor, 0.8f), order: -6);
+        }
+
+        /// <summary>
+        /// Which sandstone an outcrop is cut from. Mostly the ordinary rock, some of it
+        /// bleached, and only a minority of the iron-stained dark -- a boundary made
+        /// entirely of the dark stone reads as a burnt ring round the arena, and it is
+        /// the one colour on this map that is not a shade of the two the theme names.
+        /// </summary>
+        private static Material PickOutcropRock(System.Random rng)
+        {
+            float roll = Rand(rng, 0f, 1f);
+            return roll < 0.16f ? _rockDarkMat : roll < 0.42f ? _rockPaleMat : _rockMat;
+        }
+
+        /// <summary>
+        /// The ridge's own height at a point: the ground under it, plus a crest that
+        /// rises and falls along the run.
+        ///
+        /// Taken from world position rather than from the run's own parameter, so the
+        /// four sides agree with each other at the corners without being told to. The
+        /// toe is sunk half a metre so the join with the dune field it grows out of is
+        /// hidden under the sand rather than showing as a ring of coincident surfaces
+        /// fighting for the same pixels all the way round the arena.
+        /// </summary>
+        private static float BermHeightAt(float x, float z, float u)
+        {
+            const float crestAt = 0.42f;
+
+            float profile = u < crestAt
+                ? Mathf.SmoothStep(0f, 1f, u / crestAt)
+                : Mathf.SmoothStep(1f, 0f, (u - crestAt) / (1f - crestAt));
+
+            // Two scales of variation along the run: a long swell so the ridge has high
+            // stretches and low saddles, and a shorter one so no two hundred metres of
+            // it are the same shape. Neither is allowed to bring the crest below about
+            // half height -- a saddle you can see the skybox through is a hole.
+            float swell = 1f + Fbm2(x * 0.0045f, z * 0.0045f, _theme.randomSeed * 53 + 11, 2) * 0.42f
+                             + Fbm2(x * 0.014f, z * 0.014f, _theme.randomSeed * 71 + 3, 3) * 0.2f;
+
+            return GroundHeightAt(x, z) - 0.5f + BermHeight * Mathf.Max(0.5f, swell) * profile;
+        }
+
+        /// <summary>
+        /// Rock standing out of the ridge: weathered sandstone the wind has not buried.
+        ///
+        /// These are what give the hill a size -- a smooth slope of sand a hundred and
+        /// fifty metres away could be three metres tall or thirty, and there is nothing
+        /// in the shading to say which. They are boulders rather than buttes, so they are
+        /// round and have nothing to get caught under, and every one is placed outside
+        /// the seal where the player can look at it and not reach it.
+        /// </summary>
+        private static void BuildBoundaryOutcrops(Transform parent, int layer,
+                                                  System.Random rng, float half)
+        {
             for (int side = 0; side < 4; side++)
             {
                 bool alongZ = side >= 2;
                 float sign = side % 2 == 0 ? 1f : -1f;
 
-                for (float t = -half; t <= half; t += Rand(rng, 11f, 20f))
+                for (float t = -half; t <= half; t += Rand(rng, 26f, 54f))
                 {
-                    float w = Rand(rng, 18f, 34f);
-                    float h = Rand(rng, 14f, 32f);
-                    float out0 = Rand(rng, -3f, 6f);
+                    float outward = half + Rand(rng, 4f, 26f);
+                    float size = Rand(rng, 7f, 17f);
 
-                    float x = alongZ ? sign * (half + out0) : t;
-                    float z = alongZ ? t : sign * (half + out0);
+                    float x = alongZ ? sign * outward : t;
+                    float z = alongZ ? t : sign * outward;
 
-                    // Sunk into whatever the ground is doing here. Placed at a fixed
-                    // height instead, half the ridge floats over a hollow and the other
-                    // half is swallowed by a dune -- and a gap under the boundary is a
-                    // hole through which the player can see the skybox from inside.
-                    float ground = GroundHeightAt(x, z);
+                    float u = Mathf.InverseLerp(half - BermToe, half + BermBack,
+                                                Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)));
 
-                    var butte = ButteMesh(rng.Next(1, 999), sides: rng.Next(6, 9),
-                                          levels: rng.Next(4, 7));
-
-                    var rock = MeshObject(group, "Ridge", butte, _rockMat,
-                                          new Vector3(x, ground - h * 0.16f, z),
-                                          Quaternion.Euler(Rand(rng, -5f, 5f), Rand(rng, 0f, 360f),
-                                                           Rand(rng, -5f, 5f)),
-                                          new Vector3(w * 0.55f, h, Rand(rng, 0.6f, 1.15f) * w * 0.55f),
+                    var rock = MeshObject(parent, "Outcrop",
+                                          BoulderMesh(rng.Next(1, 999), 0.42f, 0.78f),
+                                          PickOutcropRock(rng),
+                                          new Vector3(x, BermHeightAt(x, z, u) - size * 0.3f, z),
+                                          Quaternion.Euler(Rand(rng, -12f, 12f), Rand(rng, 0f, 360f),
+                                                           Rand(rng, -12f, 12f)),
+                                          new Vector3(size, size * Rand(rng, 0.7f, 1.3f),
+                                                      size * Rand(rng, 0.7f, 1.2f)),
                                           layer, _theme.wallTag);
 
-                    // Same reason as the landmarks: a flat top thirty metres up is an
-                    // island of navmesh, and this one is right on the boundary where a
-                    // player will never be able to see what is standing on it.
                     NoStanding(rock);
+                    Hide(rock);
                 }
-
-                // The seal. Invisible, tall, and inside the ridge, so the player is
-                // stopped by the thing they can see rather than by a gap in it.
-                var wall = new GameObject($"Seal_{side}");
-                wall.transform.SetParent(group, false);
-                wall.layer = layer;
-                wall.transform.localPosition = alongZ
-                    ? new Vector3(sign * (half - 1f), 20f, 0f)
-                    : new Vector3(0f, 20f, sign * (half - 1f));
-
-                var box = wall.AddComponent<BoxCollider>();
-                box.size = alongZ
-                    ? new Vector3(2f, 90f, _theme.arenaSize + 60f)
-                    : new Vector3(_theme.arenaSize + 60f, 90f, 2f);
             }
         }
 

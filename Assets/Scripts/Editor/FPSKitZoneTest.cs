@@ -152,25 +152,127 @@ namespace FPSKit.EditorTools
                     notes.Append($"\n  {name}: going round costs {ratio:0.00}x going over");
             }
 
-            // ---- falling in has to mean something ----
+            // ---- falling in has to mean something, and only falling in ----
+            CheckKillVolume(theme, name, waterY, problems, notes);
+
+            notes.Append($"\n  {name}: {onMesh}/{total} spawn points on the navmesh");
+        }
+
+        /// <summary>
+        /// The river has to be lethal everywhere along its length, and lethal nowhere
+        /// else.
+        ///
+        /// Both halves are load-bearing and the second half is the one that was wrong.
+        /// The trigger used to be a single axis-aligned box spanning the river plus its
+        /// whole meander, with its lid at a fixed depth below zero -- which on a dune
+        /// field, whose basins go thirteen metres under datum, put four thousand square
+        /// metres of ordinary walkable sand inside an instant-kill volume. Nothing about
+        /// that is visible: there is no water there, no edge and no fall, and the player
+        /// simply dies on open ground on their way to the river.
+        ///
+        /// So this raycasts the built arena and fails if anything a player could stand
+        /// on is inside the trigger. Measured against the collider rather than against
+        /// the generator's arithmetic, because the question is about the volume the game
+        /// actually runs, and a repeat of the maths would repeat the mistake with it.
+        /// </summary>
+        static void CheckKillVolume(LevelTheme theme, string name, float waterY,
+                                    List<string> problems, StringBuilder notes)
+        {
             var kill = UnityEngine.Object.FindAnyObjectByType<KillVolume>();
 
             if (kill == null)
             {
                 problems.Add($"{name}: nothing in the gorge kills anything, so the drop is a shortcut");
+                return;
             }
-            else
+
+            var boxes = kill.GetComponents<Collider>();
+
+            if (boxes.Length == 0)
             {
-                var box = kill.GetComponent<Collider>();
-
-                if (box == null || !box.isTrigger)
-                    problems.Add($"{name}: the kill volume's collider is missing or is not a trigger");
-                else if (!box.bounds.Contains(new Vector3(GorgeCentre(theme, 0f), waterY, 0f)))
-                    problems.Add($"{name}: the kill volume does not cover the water at z=0 " +
-                                 $"(it spans {box.bounds})");
+                problems.Add($"{name}: the kill volume has no collider at all");
+                return;
             }
 
-            notes.Append($"\n  {name}: {onMesh}/{total} spawn points on the navmesh");
+            foreach (var box in boxes)
+                if (!box.isTrigger)
+                {
+                    problems.Add($"{name}: one of the kill volume's {boxes.Length} colliders is " +
+                                 "solid rather than a trigger, so it is a wall in the river");
+                    break;
+                }
+
+            // ---- lethal all the way along ----
+            float half = theme.arenaSize * 0.5f;
+            int uncovered = 0;
+            float firstGap = 0f;
+
+            for (float z = -half; z <= half; z += 12f)
+            {
+                var at = new Vector3(GorgeCentre(theme, z), waterY, z);
+
+                bool covered = false;
+                foreach (var box in boxes) if (box.bounds.Contains(at)) { covered = true; break; }
+
+                if (covered) continue;
+                if (uncovered == 0) firstGap = z;
+                uncovered++;
+            }
+
+            if (uncovered > 0)
+                problems.Add($"{name}: the water is not lethal at {uncovered} latitudes -- the first " +
+                             $"at z={firstGap:0} -- so the river can be waded at those points");
+
+            // ---- and lethal nowhere anybody is meant to be ----
+            //
+            // "Meant to be" is the navmesh, plus the sand. The floor of the canyon is
+            // ground too and it is inside the trigger on purpose -- that is what the
+            // trigger is for -- so the question cannot be "is there anything under this
+            // ray". It is whether the level itself says somebody may stand here: the bed,
+            // the talus and the bench are all held off the bake by NoStanding for
+            // exactly this reason, and the sand is checked as well because a patch of
+            // dune nobody happened to bake is still somewhere a player will walk.
+            int lethalGround = 0;
+            var worst = Vector3.zero;
+            float deepest = 0f;
+
+            for (float x = -half; x <= half; x += 4f)
+            for (float z = -half; z <= half; z += 4f)
+            {
+                if (!Physics.Raycast(new Vector3(x, 400f, z), Vector3.down, out var hit, 900f,
+                                     ~0, QueryTriggerInteraction.Ignore)) continue;
+
+                bool standable = hit.collider != null && hit.collider.CompareTag("Sand");
+
+                if (!standable)
+                    standable = NavMesh.SamplePosition(hit.point, out var onMesh, 1.5f, NavMesh.AllAreas)
+                             && Mathf.Abs(onMesh.position.y - hit.point.y) < 1.5f;
+
+                if (!standable) continue;
+
+                // Where a player standing here would have their chest. Feet alone would
+                // miss somebody wading in a trigger whose lid is above their knees.
+                var chest = hit.point + Vector3.up * 0.9f;
+
+                foreach (var box in boxes)
+                {
+                    if (!box.bounds.Contains(chest)) continue;
+
+                    lethalGround++;
+
+                    float inside = box.bounds.max.y - hit.point.y;
+                    if (inside > deepest) { deepest = inside; worst = hit.point; }
+                    break;
+                }
+            }
+
+            if (lethalGround > 0)
+                problems.Add($"{name}: {lethalGround} sampled patches of standable ground are inside " +
+                             $"the kill volume (worst {deepest:0.0} m under its lid, at {worst}), so " +
+                             "the level kills the player on ground that looks like anywhere else");
+            else
+                notes.Append($"\n  {name}: kill volume is {boxes.Length} slices, and no standable " +
+                             "ground is inside any of them");
         }
 
         /// <summary>

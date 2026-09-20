@@ -303,6 +303,103 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Carves a building out of the navigation mesh entirely, rather than merely
+        /// marking its own surfaces unwalkable.
+        ///
+        /// <b><see cref="NoStanding"/> is not enough for anything with an inside.</b> A
+        /// modifier marks the geometry it is on, and the floor inside one of the art
+        /// pack's sheds is not the shed -- it is the site's own yard slab, running
+        /// underneath it. So the shed's roof stops being walkable and the room inside it
+        /// carries on baking: a slab of navmesh the size of a shed, walled in on four
+        /// sides, joined to nothing. The pack's hangars carry non-convex colliders, so a
+        /// player can walk into them; their door openings do not admit a half-metre
+        /// agent, so nothing else can. Sixteen of those on the industrial site were
+        /// sixteen rooms the spawner could stand an enemy in for the whole level, and the
+        /// only thing the player ever saw was a clock running out on an arena that
+        /// sounded empty.
+        ///
+        /// <para>
+        /// A volume over the whole footprint asks the right question: nothing in this box
+        /// is walkable, whatever it is made of or which object it belongs to. Pulled in
+        /// half a metre on each side so it eats the room and not the ground against the
+        /// outside of the walls.
+        /// </para>
+        /// </summary>
+        private static void NoEntry(GameObject go)
+        {
+            if (go == null) return;
+
+            var renderers = go.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
+
+            var bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+            var volume = new GameObject("NoEntry");
+            volume.transform.SetParent(go.transform, worldPositionStays: false);
+            volume.transform.position = bounds.center;
+            volume.transform.rotation = Quaternion.identity;
+
+            var modifier = volume.AddComponent<Unity.AI.Navigation.NavMeshModifierVolume>();
+            modifier.size = new Vector3(Mathf.Max(0.5f, bounds.size.x - 1.2f),
+                                        bounds.size.y + 4f,
+                                        Mathf.Max(0.5f, bounds.size.z - 1.2f));
+            modifier.area = 1;   // Not Walkable
+        }
+
+        /// <summary>
+        /// Marks everything outside the playable boundary as unwalkable, as four volumes
+        /// rather than as geometry.
+        ///
+        /// <b>Every arena here has ground outside the thing that stops the player.</b> The
+        /// open zone's dune field runs forty metres past the boundary before it fades,
+        /// the plant's yard slab runs out to the boundary wall behind its fence, and both
+        /// of those bake perfectly good navmesh -- joined to nothing, because the seal or
+        /// the fence is in the way. It is the most invisible failure in the kit: the
+        /// spawner samples the mesh, finds a point out there, puts an enemy on it, and
+        /// the enemy stands outside the level for the rest of the round while the player
+        /// waits for a fight that is never coming.
+        ///
+        /// <para>
+        /// A volume rather than a flat piece of <see cref="NoStanding"/> geometry,
+        /// because a modifier marks geometry and does not remove it -- and a strip of
+        /// unwalkable geometry laid on top of walkable ground is a wall through the
+        /// navmesh rather than an edge to it. A volume asks the question the right way
+        /// round: nothing inside this box is walkable, whatever it is made of.
+        /// </para>
+        /// </summary>
+        private static void SealNavMeshOutside(Transform root, float inner, float reach,
+                                               float floor = -80f, float ceiling = 140f)
+        {
+            if (reach <= inner) return;
+
+            var group = new GameObject("NavMeshBounds").transform;
+            group.SetParent(root, false);
+
+            float mid = (inner + reach) * 0.5f;
+            float span = reach - inner;
+            float height = ceiling - floor;
+            float across = reach * 2f;
+
+            for (int side = 0; side < 4; side++)
+            {
+                bool alongZ = side >= 2;
+                float sign = side % 2 == 0 ? 1f : -1f;
+
+                var go = new GameObject($"NavMeshBound_{side}");
+                go.transform.SetParent(group, false);
+                go.transform.localPosition = alongZ
+                    ? new Vector3(sign * mid, (floor + ceiling) * 0.5f, 0f)
+                    : new Vector3(0f, (floor + ceiling) * 0.5f, sign * mid);
+
+                var volume = go.AddComponent<Unity.AI.Navigation.NavMeshModifierVolume>();
+                volume.size = alongZ ? new Vector3(span, height, across)
+                                     : new Vector3(across, height, span);
+                volume.area = 1;   // Not Walkable
+            }
+        }
+
+        /// <summary>
         /// Keeps something off the minimap.
         ///
         /// The map draws the footprint of anything solid and tones it by height, which is

@@ -39,13 +39,26 @@ namespace FPSKit.EditorTools
         /// Modelled as real treads rather than a tilted slab because a tilted slab is
         /// what the old platforms were and it reads as a skate ramp in a factory.
         /// </summary>
+        /// <summary>Tread depth, rise and landing depth. Shared so callers can place a flight by its top.</summary>
+        private const float StairTread = 0.30f;
+        private const float StairRise = 0.22f;
+        private const float StairLanding = 2.4f;
+
+        /// <summary>
+        /// How far in front of a flight's origin its landing lands, which is what a
+        /// caller placing it by the thing it has to meet needs to know.
+        /// </summary>
+        private static float StairRun(float height)
+            => Mathf.Max(2, Mathf.RoundToInt(height / StairRise)) * StairTread * 0.5f
+             + StairLanding * 0.5f;
+
         private static void BuildStairTower(Transform parent, int layer, Vector3 at,
                                             float height, float yaw)
         {
             var build = new MeshBuild { UVScale = 0.5f };
 
-            const float tread = 0.30f;
-            const float rise = 0.22f;
+            const float tread = StairTread;
+            const float rise = StairRise;
             const float wide = 2.2f;
 
             int steps = Mathf.Max(2, Mathf.RoundToInt(height / rise));
@@ -61,8 +74,8 @@ namespace FPSKit.EditorTools
 
             // The landing at the top, and the two railings up the flight.
             float top = steps * rise;
-            build.Box(new Vector3(0f, top - 0.08f, run * 0.5f + 1.2f),
-                      new Vector3(wide, 0.16f, 2.4f), Quaternion.identity);
+            build.Box(new Vector3(0f, top - 0.08f, run * 0.5f + StairLanding * 0.5f),
+                      new Vector3(wide, 0.16f, StairLanding), Quaternion.identity);
 
             for (int side = -1; side <= 1; side += 2)
             {
@@ -80,8 +93,8 @@ namespace FPSKit.EditorTools
                               Quaternion.identity);
                 }
 
-                build.Box(new Vector3(x, top + 0.5f, run * 0.5f + 1.2f),
-                          new Vector3(0.07f, 1.0f, 2.4f), Quaternion.identity);
+                build.Box(new Vector3(x, top + 0.5f, run * 0.5f + StairLanding * 0.5f),
+                          new Vector3(0.07f, 1.0f, StairLanding), Quaternion.identity);
             }
 
             // The pool is keyed by shape, not by name: two flights of different heights
@@ -158,8 +171,20 @@ namespace FPSKit.EditorTools
             // container lane is a different place from the lane and the map has to say so.
             if (deck != null) Mark(deck, new Color(0.70f, 0.68f, 0.60f), 6);
 
-            BuildStairTower(parent, layer, from - delta.normalized * 2.0f, height,
-                            yaw + 180f);
+            // The stair, placed so that its landing arrives at the deck.
+            //
+            // <b>It used to be turned through 180 degrees and dropped two metres short,
+            // and that is a walkway nothing can get onto.</b> BuildStairTower climbs
+            // towards its own local +Z, so facing it away from the catwalk put the foot
+            // of the flight underneath the deck and the landing six metres out in the air
+            // behind it -- a staircase to nowhere, with the deck it was built for a clear
+            // gap away. Nothing about that reads as broken from the ground: the catwalk
+            // is there, the stair is there, they are a few metres apart at head height
+            // and they look connected from every angle a player will ever see them from.
+            // What it cost was a scrap of navmesh on every walkway on the site, joined to
+            // nothing, for the spawner to find.
+            BuildStairTower(parent, layer, from - delta.normalized * StairRun(height),
+                            height, yaw);
         }
 
         /// <summary>
@@ -177,7 +202,12 @@ namespace FPSKit.EditorTools
 
             // The fourth side is left with a gap in it: a compound with no way in is a
             // compound the level has to route round rather than fight over.
-            float gap = 5f;
+            //
+            // Wide, because the gap is the only way in and everything else in the
+            // compound is placed without knowing where it is -- a transformer parked
+            // across a five-metre opening turns the whole bund into a sealed room, which
+            // looks like a tank farm and bakes like a trap.
+            float gap = 9f;
             float side = (halfZ * 2f - gap) * 0.5f;
             build.Box(new Vector3(-halfX, h * 0.5f, halfZ - side * 0.5f),
                       new Vector3(t, h, side), Quaternion.identity);

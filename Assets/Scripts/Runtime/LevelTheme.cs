@@ -203,6 +203,12 @@ public class LevelTheme : ScriptableObject
              "with lanes between them and walk-through containers as the flank.")]
     [Min(0)] public int zoneContainerYardCount = 3;
 
+    [Tooltip("Power houses: a cooling tower, the boiler hall feeding it, a pair of " +
+             "stacks and a transformer compound. Really a count of landmarks -- this is " +
+             "the only thing on the site that can be seen from every corner of it, so a " +
+             "plant with none is a plant where every block looks like every other one.")]
+    [Min(0)] public int zonePowerHouseCount = 1;
+
     [Header("Arena Layout")]
     [Tooltip("Roofless buildings with doorways. The backbone of the level.")]
     public int roomCount = 3;

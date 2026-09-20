@@ -895,6 +895,37 @@ That asymmetry is what makes it dangerous: a method guarded on the fields that s
 
 So: **anything whose type Unity cannot serialize must be created on demand, not assigned once in `Awake`.** `EnemyAI.Block` and `EnemyHealthBar.Block` are the pattern — a private property with a null check, and `Awake` left out of it entirely so the property is the only thing that can create it.
 
+### The editor sibling: a builder static leaking from one arena into the next
+
+The same rule applies one layer up, and it is easier to miss because no play session
+is involved. `FPSKitBatch.BuildAllThemes` builds six arenas in a single editor process,
+so every static in the builder carries whatever the *previous* arena left in it.
+
+The heightfield is the one that bit. `_ground` is cleared by `ResetTerrain`, and the two
+layout modes that build terrain — the open zone and the industrial zone — both call it on
+their way in. A walled box calls neither, because it has no terrain to build. But it does
+read one: `BuildPlayer` asks `GroundHeightAt(0, 0)` where to stand the player, and with
+the desert's dunes still loaded that answer is the desert's spawn hollow, twelve metres
+below a floor that is at zero. **Four of the six arenas shipped with the player buried
+under them**, in exactly the order `BuildAllThemes` runs.
+
+Every check in the repo passed. The scene builds, the navmesh bakes, `VerifyReach` found
+navmesh within its twenty-metre tolerance and was satisfied. The only symptom anywhere
+was that the dashboard's card for those four arenas came back as a band of bare sky —
+which is what you see from under a floor, and reads as a preview camera that needs
+tuning rather than as a level with its player inside the ground.
+
+So `BuildFromTheme` calls `ResetTerrain` itself, where **every** arena passes, rather
+than leaving it to the two that use it. That is the general shape: clear a builder static
+at the top of the per-arena build, not in the branch that happens to write it.
+
+`VerifyReach` now asks the question directly before it asks any navigation one — it
+raycasts down from the spawn and fails if there is no collider within 3.5 m, and prints
+what the player is standing on for each arena, so "Floor", "Dune" and
+"Road_set_v1_b_floor" are visible in a passing run rather than only in a failing one.
+A tolerance is the wrong instrument for this: thirteen metres of error sat comfortably
+inside the old one.
+
 ## Enemies fight back, and the fight is legible
 
 Three rules hold the combat model together. They are cheap to break by retuning one

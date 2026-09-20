@@ -111,6 +111,25 @@ namespace FPSKit.EditorTools
                 return;
             }
 
+            // <b>Standing on something, before anything else.</b>
+            //
+            // This is not a navigation question and it is here because nothing else asks
+            // it. The builder places the player by asking the terrain how high the ground
+            // is, and the terrain is a static that only the two arenas which build one
+            // ever clear -- so a walled arena built after the desert in the same editor
+            // session took the desert's spawn height and put the player twelve metres
+            // under its own floor. Four of the six arenas shipped that way. The scene
+            // builds, the navmesh bakes, and the check below still passed, because
+            // thirteen metres is inside its twenty-metre tolerance.
+            if (!Physics.Raycast(player.transform.position + Vector3.up * 0.5f, Vector3.down,
+                                 out var floor, 3.5f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                problems.Add($"{name}: the player starts at {player.transform.position} with nothing " +
+                             "under them within 3.5 m -- they are not standing on the arena, they are " +
+                             "under it or above it, and the first thing the level does is drop them");
+                return;
+            }
+
             if (!NavMesh.SamplePosition(player.transform.position, out var home, 20f, NavMesh.AllAreas))
             {
                 problems.Add($"{name}: the player starts more than 20 m from any navmesh, so the " +
@@ -176,7 +195,8 @@ namespace FPSKit.EditorTools
             }
             else
             {
-                notes.Append($"\n  {name}: {on} navmesh samples, {stranded} stranded ({share:P1})");
+                notes.Append($"\n  {name}: {on} navmesh samples, {stranded} stranded ({share:P1}), " +
+                             $"player standing on \"{floor.collider.name}\"");
             }
         }
     }

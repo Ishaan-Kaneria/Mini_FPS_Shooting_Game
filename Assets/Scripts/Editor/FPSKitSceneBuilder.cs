@@ -418,6 +418,26 @@ namespace FPSKit.EditorTools
         {
             _theme = theme;
 
+            // <b>The heightfield is a static, and the editor never resets statics either.</b>
+            //
+            // Both arenas that build terrain clear it on their way in, which is fine
+            // until a third kind of arena does not: a walled box never touches
+            // `_ground`, so built in the same editor session after the desert it
+            // inherits the desert's dunes. Nothing in a walled arena reads the terrain
+            // except `BuildPlayer`, which asks `GroundHeightAt(0, 0)` where to stand the
+            // player -- so the player was placed at the height of the *desert's* spawn
+            // hollow, twelve metres under the floor of a level whose floor is at zero.
+            //
+            // That is `FPSKitBatch.BuildAllThemes` in its normal order, so four of the
+            // six arenas shipped with the player buried under them. It is invisible from
+            // everywhere the kit looks: the scene builds, the navmesh bakes, every check
+            // passes, and the only symptom is that the dashboard's preview of those four
+            // came back as bare sky -- which is what you see from under a floor.
+            //
+            // The same rule as the play-mode hooks, one layer up: clear it where every
+            // arena passes, not where the two that use it do.
+            ResetTerrain();
+
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
             BuildLighting();

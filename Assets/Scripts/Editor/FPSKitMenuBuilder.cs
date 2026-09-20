@@ -272,17 +272,41 @@ namespace FPSKit.EditorTools
                     : Vector3.up * 1.75f;
 
                 // Backed off the spawn a little so the player's own arena furniture is
-                // in frame rather than in the lens, and pitched down just enough to keep
-                // the floor in shot.
+                // in frame rather than in the lens, and lifted to about first-floor
+                // height.
+                //
+                // <b>The lift scales with the arena, and that is the whole of it.</b>
+                //
+                // Taken from eye height and pitched seven degrees down, two thirds of the
+                // card is the ground at the player's feet. That is a fair picture of a
+                // hundred-metre box with cover all round the spawn, and a picture of
+                // nothing at all on a four-hundred-and-fifty-metre one, where the spawn
+                // is deliberately the clearest ground on the map: the desert came back as
+                // a card of empty sand and the plant as a card of empty tarmac.
+                //
+                // A flat four-metre lift fixes those two and ruins the other four. The
+                // walled arenas are five metres to the top of the wall, so a camera four
+                // metres over the player's head is looking out over it -- Abandoned
+                // Subway came back as a black rectangle under a strip of night sky, which
+                // is what is outside a walled box at night. So the lift and the pitch are
+                // both taken from <c>arenaSize</c>: the boxes keep the shot they had, and
+                // only the arenas that outgrew it get the new one.
+                //
+                // It stays a view from inside the level either way. An aerial was the
+                // first version of this and every theme came back as the same grey plain
+                // seen through fog.
+                float lift = Mathf.Clamp(size * 0.012f, 1.2f, 4.5f);
+                float pitch = Mathf.Lerp(7f, 3.5f, Mathf.InverseLerp(150f, 420f, size));
+
                 Vector3 bearing = Quaternion.Euler(0f, 34f, 0f) * Vector3.forward;
 
-                rig.transform.position = eye - bearing * Mathf.Min(6f, size * 0.06f)
-                                             + Vector3.up * 1.2f;
+                rig.transform.position = eye - bearing * Mathf.Clamp(size * 0.04f, 6f, 9f)
+                                             + Vector3.up * lift;
 
                 rig.transform.rotation = Quaternion.LookRotation(
-                    Quaternion.Euler(7f, 34f, 0f) * Vector3.forward, Vector3.up);
+                    Quaternion.Euler(pitch, 34f, 0f) * Vector3.forward, Vector3.up);
 
-                camera.fieldOfView = 68f;
+                camera.fieldOfView = Mathf.Lerp(68f, 66f, Mathf.InverseLerp(150f, 420f, size));
                 camera.nearClipPlane = 0.1f;
                 camera.farClipPlane = Mathf.Max(400f, size * 4f);
                 camera.clearFlags = CameraClearFlags.Skybox;

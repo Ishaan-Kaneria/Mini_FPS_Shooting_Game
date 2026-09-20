@@ -172,6 +172,63 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// The lowest the ground gets anywhere under a footprint.
+        ///
+        /// <b>This is the height a flat-bottomed rock has to be sunk to, and asking
+        /// <see cref="GroundHeightAt"/> at its centre instead is the bug that made the
+        /// desert's big rocks hollow.</b> Every rock in the kit is a closed shell cut off
+        /// flat underneath, which is exactly right on a plane: put the cut a little below
+        /// the ground and it is buried all the way round. On a dune field the ground
+        /// under a fifty-metre butte or a ten-metre boulder varies by several metres, so
+        /// a cut placed a metre below the *centre* is metres <i>above</i> the sand on the
+        /// downhill side. What that leaves is a hole into the inside of the rock -- and
+        /// the inside of a closed mesh is invisible, because every face of it is a
+        /// backface, so the player walks through a gap they can see, into a space with no
+        /// visible walls, and is then wedged in geometry they cannot see or climb.
+        ///
+        /// Sampled on two rings rather than at the rim alone, because a dune's crest can
+        /// run under the middle of a footprint as easily as under its edge.
+        /// </summary>
+        private static float LowestGroundIn(float x, float z, float radius)
+        {
+            float low = GroundHeightAt(x, z);
+            if (!_groundReady || radius <= 0.01f) return low;
+
+            // Every grid cell the footprint covers, not a ring of spokes through it.
+            //
+            // Spokes were the first version and they are not good enough: ten of them at
+            // half a forty-metre radius are eight metres apart, and a dune drops several
+            // metres in eight. A butte sunk to the lowest of *those* was still seven
+            // metres clear of the sand in the hollow between two of them -- which is the
+            // same hole, found by the same test, one iteration later. The grid is three
+            // metres, so scanning it is exact by definition and costs a few hundred
+            // lookups on the biggest rock in the arena.
+            int lo = Mathf.Max(0, Mathf.FloorToInt((x - radius - _groundMin) / _groundStep));
+            int hi = Mathf.Min(_groundN - 1, Mathf.CeilToInt((x + radius - _groundMin) / _groundStep));
+            int lz = Mathf.Max(0, Mathf.FloorToInt((z - radius - _groundMin) / _groundStep));
+            int hz = Mathf.Min(_groundN - 1, Mathf.CeilToInt((z + radius - _groundMin) / _groundStep));
+
+            float squared = radius * radius;
+
+            for (int i = lo; i <= hi; i++)
+            {
+                float px = _groundMin + i * _groundStep;
+
+                for (int j = lz; j <= hz; j++)
+                {
+                    float pz = _groundMin + j * _groundStep;
+
+                    float dx = px - x, dz = pz - z;
+                    if (dx * dx + dz * dz > squared) continue;
+
+                    low = Mathf.Min(low, _ground[i, j]);
+                }
+            }
+
+            return low;
+        }
+
+        /// <summary>
         /// The ground's normal under a point, so a thing lying on the sand can lie along
         /// it. Used by the flat pieces -- a slab of rock or a plank bridge over a hollow
         /// -- and deliberately not by anything upright: a fence post leaning with the

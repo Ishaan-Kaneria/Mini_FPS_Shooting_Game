@@ -57,8 +57,8 @@ MonoBehaviour:
   landmarkCount: 12
   outpostCount: 10
   vantageCount: 10
-  coverLineCount: 18
-  scatterClusterCount: 40
+  coverLineCount: 22
+  scatterClusterCount: 58
   industrialZone: 0
   zoneWorksCount: 3
   zoneTankFarmCount: 2

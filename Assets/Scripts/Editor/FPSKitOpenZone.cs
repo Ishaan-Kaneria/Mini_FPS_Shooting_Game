@@ -641,11 +641,21 @@ namespace FPSKit.EditorTools
                     int v10 = (a + 1) * (along + 1) + b;
                     int v11 = v10 + 1;
 
-                    // Wound so the face is up whichever side of the arena this is: the
-                    // outward axis flips sign on two of the four, and a strip wound for
-                    // one of them is inside out on the other -- which is invisible from
-                    // above and is a hill you can see straight through from the ground.
-                    if (sign > 0f)
+                    // Wound so the face is up whichever side of the arena this is.
+                    //
+                    // <b>Two things flip here, not one, and getting it half right is
+                    // worse than getting it wrong.</b> The grid's two axes are "outward"
+                    // and "along", and which world axis each of those is depends on
+                    // <c>alongZ</c>, while which way outward points depends on
+                    // <c>sign</c> -- so the face is up when
+                    // <c>cross(alongStep, outwardStep).y</c> is positive, which is
+                    // <c>sign &gt; 0</c> on the sides that run in x and <c>sign &lt; 0</c>
+                    // on the sides that run in z. Keyed on <c>sign</c> alone, the north
+                    // and south runs came out inside out: a twenty-metre hill that is
+                    // not drawn from any angle above it and that a raycast passes
+                    // straight through, with the rocks that were sunk into it left
+                    // hanging in the air over the dunes.
+                    if (alongZ ? sign > 0f : sign < 0f)
                     {
                         triangles.Add(v00); triangles.Add(v01); triangles.Add(v11);
                         triangles.Add(v00); triangles.Add(v11); triangles.Add(v10);
@@ -738,23 +748,37 @@ namespace FPSKit.EditorTools
 
                 for (float t = -half; t <= half; t += Rand(rng, 26f, 54f))
                 {
-                    float outward = half + Rand(rng, 4f, 26f);
-                    float size = Rand(rng, 7f, 17f);
+                    float outward = half + Rand(rng, 6f, 26f);
+                    float width = Rand(rng, 6f, 14f);
+                    float scale = width / BoulderSpread;
 
                     float x = alongZ ? sign * outward : t;
                     float z = alongZ ? t : sign * outward;
 
-                    float u = Mathf.InverseLerp(half - BermToe, half + BermBack,
-                                                Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)));
+                    // Buried against the lowest the ridge gets under the rock's own
+                    // footprint. The ridge is a slope, so a flat base pinned to the
+                    // height at its centre stands clear of the sand downhill of it.
+                    float floor = float.MaxValue;
+
+                    for (int s = 0; s < 8; s++)
+                    {
+                        float angle = s * Mathf.PI * 2f / 8f;
+                        float px = x + Mathf.Cos(angle) * width * 0.55f;
+                        float pz = z + Mathf.Sin(angle) * width * 0.55f;
+                        float pu = Mathf.InverseLerp(half - BermToe, half + BermBack,
+                                                     Mathf.Max(Mathf.Abs(px), Mathf.Abs(pz)));
+
+                        floor = Mathf.Min(floor, BermHeightAt(px, pz, pu));
+                    }
 
                     var rock = MeshObject(parent, "Outcrop",
                                           BoulderMesh(rng.Next(1, 999), 0.42f, 0.78f),
                                           PickOutcropRock(rng),
-                                          new Vector3(x, BermHeightAt(x, z, u) - size * 0.3f, z),
-                                          Quaternion.Euler(Rand(rng, -12f, 12f), Rand(rng, 0f, 360f),
-                                                           Rand(rng, -12f, 12f)),
-                                          new Vector3(size, size * Rand(rng, 0.7f, 1.3f),
-                                                      size * Rand(rng, 0.7f, 1.2f)),
+                                          new Vector3(x, floor - scale * 0.15f, z),
+                                          Quaternion.Euler(Rand(rng, -8f, 8f), Rand(rng, 0f, 360f),
+                                                           Rand(rng, -8f, 8f)),
+                                          new Vector3(scale, scale * Rand(rng, 0.7f, 1.3f),
+                                                      scale * Rand(rng, 0.7f, 1.2f)),
                                           layer, _theme.wallTag);
 
                     NoStanding(rock);
@@ -883,6 +907,22 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>
+        /// Where the raised decks go: the positions the level is meant to be fought from.
+        ///
+        /// <b>This used to place one deck in ten and the arena was poorer for it in a way
+        /// nothing reported.</b> Two things conspired. The claim was a single circle big
+        /// enough to hold the deck <i>and</i> the whole run of its ramp -- about
+        /// twenty-three metres -- when the ramp only ever leaves in one direction, so it
+        /// reserved four times the ground it needed. And each vantage got exactly one
+        /// attempt, thrown thirty-six to sixty metres from a landmark that had already
+        /// claimed twenty-five of those metres for itself: the arithmetic almost never
+        /// came out, so nine of ten were silently dropped and the map ended up with a
+        /// single raised position on four hundred and fifty metres of ground.
+        ///
+        /// Now the deck claims the deck, the ramp foot claims the ramp foot, and each
+        /// vantage gets a handful of throws before it gives up.
+        /// </summary>
         private static void PlanVantages(System.Random rng, float half)
         {
             const float rampAngle = 22f;
@@ -898,34 +938,42 @@ namespace FPSKit.EditorTools
                 float h = Rand(rng, 3.4f, 5.2f);
 
                 float run = h / tan;
-                float radius = Mathf.Max(w, d) * 0.5f + run + 3f;
+                float radius = Mathf.Max(w, d) * 0.5f + 4f;
 
-                Vector2 p;
-                Vector3 look;
+                Vector2 p = Vector2.zero;
+                Vector3 look = Vector3.zero;
+                bool placed = false;
 
-                if (i < targets.Count)
+                for (int attempt = 0; attempt < 10 && !placed; attempt++)
                 {
-                    // Placed at a distance from what it overlooks: on top of a bridge it
-                    // would be part of the bridge, and too far and it is a sniper's nest
-                    // with nothing to answer it.
-                    var target = targets[i];
-                    float angle = Rand(rng, 0f, 360f) * Mathf.Deg2Rad;
-                    float away = Rand(rng, 36f, 60f);
+                    if (i < targets.Count)
+                    {
+                        // Placed at a distance from what it overlooks: on top of a bridge
+                        // it would be part of the bridge, and too far and it is a
+                        // sniper's nest with nothing to answer it.
+                        var target = targets[i];
+                        float angle = Rand(rng, 0f, 360f) * Mathf.Deg2Rad;
+                        float away = Rand(rng, 40f, 78f);
 
-                    p = new Vector2(target.x + Mathf.Cos(angle) * away,
-                                    target.z + Mathf.Sin(angle) * away);
+                        p = new Vector2(target.x + Mathf.Cos(angle) * away,
+                                        target.z + Mathf.Sin(angle) * away);
 
-                    if (Mathf.Abs(p.x) > half * 0.92f || Mathf.Abs(p.y) > half * 0.92f) continue;
-                    if (!Free(p, radius)) continue;
+                        if (Mathf.Abs(p.x) > half * 0.92f || Mathf.Abs(p.y) > half * 0.92f) continue;
+                        if (!Free(p, radius)) continue;
 
-                    Claim(p.x, p.y, radius);
-                    look = target;
+                        Claim(p.x, p.y, radius);
+                        look = target;
+                    }
+                    else
+                    {
+                        if (!TryClaim(rng, half * 0.9f, radius, out p)) continue;
+                        look = Vector3.zero;
+                    }
+
+                    placed = true;
                 }
-                else
-                {
-                    if (!TryClaim(rng, half * 0.9f, radius, out p)) continue;
-                    look = Vector3.zero;
-                }
+
+                if (!placed) continue;
 
                 // The lip faces what the deck was put here to watch, so the cover is on
                 // the side the shooting comes from.
@@ -944,6 +992,12 @@ namespace FPSKit.EditorTools
                 // jump. Reached along -z of the deck's own facing.
                 var foot = p + new Vector2(Mathf.Sin((yaw + 180f) * Mathf.Deg2Rad),
                                            Mathf.Cos((yaw + 180f) * Mathf.Deg2Rad)) * (d * 0.5f + run);
+
+                // The ramp's own ground, claimed separately. This is the half of the old
+                // circle that was actually needed, and claiming it here rather than
+                // reserving a ring around the whole deck is what lets ten of these fit on
+                // a map that previously took one.
+                Claim(foot.x, foot.y, 6f);
 
                 // Both held at the *deck's* height, not each at its own. The ramp is one
                 // rigid plank from the deck down to the sand, so the sand it lands on has
@@ -969,16 +1023,29 @@ namespace FPSKit.EditorTools
 
             foreach (var plan in _landmarkPlans)
             {
-                float ground = GroundHeightAt(plan.Point.x, plan.Point.y);
+                float spread = plan.Width * 0.75f;
+
+                // <b>The lowest sand anywhere under it, not the sand at its middle.</b>
+                // A butte is a closed shell with a flat floor, and this one is fifty
+                // metres across on ground that rises and falls by ten -- pinned to its
+                // centre and sunk six per cent of its height, the floor came out metres
+                // above the sand on the downhill side. That is a doorway into the inside
+                // of a closed mesh, and the inside of a closed mesh has no visible walls
+                // at all, because every face of it is a backface. The player walks in
+                // through a gap they can see, the view fills with rock they cannot place,
+                // and they are wedged in geometry that is not drawn. It was the worst
+                // thing in the arena and nothing about it reads as a bug from outside.
+                float ground = LowestGroundIn(plan.Point.x, plan.Point.y, spread);
 
                 var stack = new GameObject("Landmark").transform;
                 stack.SetParent(group, false);
                 stack.localPosition = new Vector3(plan.Point.x, ground, plan.Point.y);
 
-                // The butte itself, sunk enough that its base is never a hard line where
-                // it meets the sand.
+                // Sunk by a fixed depth as well as a fraction, so a short butte is buried
+                // as surely as a tall one.
                 var butte = MeshObject(stack, "Butte", ButteMesh(plan.Seed, sides: rng.Next(7, 11)),
-                                       _rockPaleMat, new Vector3(0f, -plan.Height * 0.06f, 0f),
+                                       _rockPaleMat,
+                                       new Vector3(0f, -1.5f - plan.Height * 0.06f, 0f),
                                        Quaternion.Euler(0f, plan.Yaw, 0f),
                                        new Vector3(plan.Width * 0.5f, plan.Height,
                                                    plan.Width * 0.5f * Rand(rng, 0.7f, 1.2f)),
@@ -1009,7 +1076,7 @@ namespace FPSKit.EditorTools
                     // Parented to the group rather than to the butte, so its position is
                     // world space and the ground height it was sampled at is the one it
                     // is placed at.
-                    Boulder(group, layer, rng, new Vector3(bx, GroundHeightAt(bx, bz), bz), size);
+                    Boulder(group, layer, rng, new Vector3(bx, 0f, bz), size);
                 }
             }
         }
@@ -1149,8 +1216,10 @@ namespace FPSKit.EditorTools
                     float x = p.x + Rand(rng, -4.5f, 4.5f);
                     float z = p.y + Rand(rng, -4.5f, 4.5f);
 
-                    Boulder(group, layer, rng, new Vector3(x, GroundHeightAt(x, z), z),
-                            Rand(rng, 1.8f, 4.2f));
+                    // A width now, not a scale -- see BoulderSpread. These are pieces of
+                    // cover a player crouches behind, which is what the numbers always
+                    // meant and not what they were producing.
+                    Boulder(group, layer, rng, new Vector3(x, 0f, z), Rand(rng, 2.2f, 6f));
                 }
             }
         }

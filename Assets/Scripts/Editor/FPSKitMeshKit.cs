@@ -532,7 +532,13 @@ namespace FPSKit.EditorTools
 
                     // Every third level steps out. A butte is banded, and the bands are
                     // what tell you how tall it is from across the map.
-                    float ledge = (l % 3 == 1) ? 1.12f : 1f;
+                    //
+                    // Never on the lowest band, though. A step out at the foot of a
+                    // fifty-metre butte is a three-metre overhang at head height with an
+                    // alcove under it -- the player walks in, the rock closes over them,
+                    // and what they are standing in reads as a cave that is not one. The
+                    // bands above eye level say everything the bottom one did.
+                    float ledge = (l % 3 == 1 && l > 1) ? 1.12f : 1f;
 
                     rings[l] = new Vector3[sides];
 

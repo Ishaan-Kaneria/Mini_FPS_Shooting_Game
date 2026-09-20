@@ -272,8 +272,14 @@ namespace FPSKit.EditorTools
 
                     t.outpostCount = 10;
                     t.vantageCount = 10;
-                    t.coverLineCount = 18;
-                    t.scatterClusterCount = 40;
+                    t.coverLineCount = 22;
+
+                    // Raised with the rocks shrunk, not instead of it. A scatter cluster
+                    // used to be two to four boulders eleven metres across, which is one
+                    // landmark pretending to be cover; it is now four rocks a player can
+                    // crouch behind, and it takes more of them to keep the ground between
+                    // two places from being a field.
+                    t.scatterClusterCount = 58;
 
                     // Unused while openZone is on -- kept tuned so that turning it off
                     // gives back the arena this used to be rather than an empty field.

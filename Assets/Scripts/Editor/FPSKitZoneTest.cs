@@ -155,7 +155,106 @@ namespace FPSKit.EditorTools
             // ---- falling in has to mean something, and only falling in ----
             CheckKillVolume(theme, name, waterY, problems, notes);
 
+            // ---- and nothing standing on the sand may be hollow underneath ----
+            CheckRocksAreBuried(name, problems, notes);
+
             notes.Append($"\n  {name}: {onMesh}/{total} spawn points on the navmesh");
+        }
+
+        /// <summary>The names of the things in an open zone that are cut off flat underneath.</summary>
+        static readonly string[] RockNames = { "Rock", "Butte", "Outcrop", "RockSpine", "Rubble" };
+
+        /// <summary>
+        /// Every rock has to be buried, and the reason is that every rock is hollow.
+        ///
+        /// <b>This is the worst-feeling bug this arena has had.</b> A boulder and a butte
+        /// are both closed shells cut off flat underneath, which is exactly right on a
+        /// plane -- put the cut a little below the ground and it is buried all the way
+        /// round. On a dune field the ground under a forty-metre butte varies by ten
+        /// metres, and the builder was pinning the cut to the height at the rock's
+        /// <i>centre</i>. Downhill of that, the floor of the shell stands clear of the
+        /// sand.
+        ///
+        /// What that leaves is a doorway into the inside of a closed mesh, and the inside
+        /// of a closed mesh is not drawn at all -- every face of it is a backface. So the
+        /// player walks in through a gap they can see, the view fills with rock at angles
+        /// that correspond to nothing, and they are wedged inside geometry that is not
+        /// rendered and cannot be climbed. Ishaan's report was "domes are half opened and
+        /// when I go in it I get trapped instantly", which is an exact description of it
+        /// and matches nothing in any log.
+        ///
+        /// <para>
+        /// Measured against <c>bounds.min.y</c> -- the flat cut itself -- and not by
+        /// raycasting upwards from the sand, which was the first attempt and measures the
+        /// wrong thing: a ray up from inside a properly buried butte leaves through the
+        /// underside of a weathering ledge seven metres above, and reports seven metres
+        /// of air under a rock that is buried six metres deep.
+        /// </para>
+        /// </summary>
+        static void CheckRocksAreBuried(string name, List<string> problems, StringBuilder notes)
+        {
+            /// <summary>Metres of the flat cut allowed to stand clear of the sand.</summary>
+            const float Hole = 0.5f;
+
+            int rocks = 0, hollow = 0;
+            float worst = float.NegativeInfinity;
+            var worstAt = Vector3.zero;
+            string worstName = null;
+
+            foreach (var collider in UnityEngine.Object.FindObjectsByType<MeshCollider>(
+                         FindObjectsSortMode.None))
+            {
+                bool interesting = false;
+                foreach (var n in RockNames) if (collider.name == n) { interesting = true; break; }
+                if (!interesting) continue;
+
+                var bounds = collider.bounds;
+                rocks++;
+                bool open = false;
+
+                for (int s = 0; s < 16 && !open; s++)
+                {
+                    float angle = s * Mathf.PI * 2f / 16f;
+
+                    // Well inside the rim: a rock lying on a slope legitimately undercuts
+                    // at its very edge, and that is not a way in.
+                    float x = bounds.center.x + Mathf.Cos(angle) * bounds.extents.x * 0.55f;
+                    float z = bounds.center.z + Mathf.Sin(angle) * bounds.extents.z * 0.55f;
+
+                    float sand = float.NegativeInfinity;
+
+                    foreach (var hit in Physics.RaycastAll(new Vector3(x, 400f, z), Vector3.down,
+                                                           900f, ~0, QueryTriggerInteraction.Ignore))
+                        if (hit.collider != null && hit.collider.CompareTag("Sand") &&
+                            hit.point.y > sand)
+                            sand = hit.point.y;
+
+                    if (float.IsInfinity(sand)) continue;
+
+                    float gap = bounds.min.y - sand;
+
+                    if (gap > worst)
+                    {
+                        worst = gap;
+                        worstAt = new Vector3(x, sand, z);
+                        worstName = $"{collider.name}\" centred at {bounds.center} size {bounds.size}, " +
+                                    $"its flat cut at {bounds.min.y:0.0} over sand at {sand:0.0}";
+                    }
+
+                    if (gap > Hole) { hollow++; open = true; }
+                }
+            }
+
+            if (rocks == 0) return;
+
+            if (hollow > 0)
+                problems.Add($"{name}: {hollow} of {rocks} rocks are cut off above the sand somewhere " +
+                             $"under them (worst: a \"{worstName}). Every one of these is hollow, so " +
+                             "that gap is a doorway into a shell with no visible walls and no way back " +
+                             $"out. First one at {worstAt}");
+            else
+                notes.Append($"\n  {name}: {rocks} rocks, every flat cut buried " +
+                             $"(the shallowest by {-worst:0.0} m)");
         }
 
         /// <summary>

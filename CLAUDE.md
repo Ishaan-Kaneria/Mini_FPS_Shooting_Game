@@ -549,6 +549,46 @@ edge and no fall anywhere in sight. `VerifyZone` now raycasts the built arena an
 any ground the level says is standable -- tagged `Sand`, or covered by navmesh -- is
 inside the trigger.
 
+**Every rock in the arena is hollow, so every rock has to be buried.** A boulder and a
+butte are both closed shells cut off flat underneath, which is exactly right on a plane:
+put the cut a little below the ground and it is buried all the way round. On a dune field
+the ground under a forty-metre butte varies by ten metres, so a cut pinned to the height
+at the rock's *centre* stands clear of the sand downhill of it -- and the gap that leaves
+is a doorway into the inside of a closed mesh. The inside of a closed mesh is not drawn at
+all, because every face of it is a backface, so the player walks in through a gap they can
+see, the view fills with rock at angles that correspond to nothing, and they are wedged
+inside geometry that is invisible and cannot be climbed. `LowestGroundIn` is the fix:
+every rock is sunk to the lowest the heightfield gets anywhere under its own footprint,
+scanned cell by cell rather than round a ring of spokes -- ten spokes at half a
+twenty-metre radius are eight metres apart, and a dune drops several metres in eight.
+`VerifyZone` measures `bounds.min.y` against the sand at sixteen points under every rock
+and fails on a gap. **Not by raycasting upwards from the sand**, which was the first
+attempt and measures the wrong thing: a ray up from inside a properly buried butte leaves
+through the underside of a weathering ledge seven metres up and reports seven metres of
+air under a rock that is buried six metres deep.
+
+**`BoulderMesh` is a unit icosphere, so it comes out about 2.6x whatever scale it is
+given.** `BoulderSpread` is that number, and `Boulder` takes a *width* in metres because
+every call site was already writing one -- a "four metre boulder" was arriving eleven
+metres across, which is not cover, it is a dome, and a field of them was most of what made
+this arena's rock read as lumpy blobs. A butte is the landmark; a boulder is something to
+crouch behind.
+
+**A butte's lowest weathering ledge is suppressed.** `ButteMesh` steps its rings out every
+third band, which is what tells you how tall it is from across the map -- but at the foot
+of a forty-metre butte that is a three-metre overhang at head height with an alcove under
+it, and the player walks into what reads as a cave and is not one. The bands above eye
+level say everything the bottom one did.
+
+**The raised decks are the positions the level is meant to be fought from, and there used
+to be one of them.** `PlanVantages` claimed a single circle big enough for the deck *and*
+the whole run of its ramp -- about twenty-three metres, when the ramp only ever leaves in
+one direction -- and gave each vantage exactly one attempt, thrown thirty-six to sixty
+metres from a landmark that had already claimed twenty-five of those metres. The
+arithmetic almost never came out, so nine in ten were silently dropped. The deck claims
+the deck, the ramp foot claims the ramp foot, and each vantage gets ten throws; seven to
+ten now land.
+
 **The map's edge is a sand hill, not a row of rocks.** `BuildBoundary` builds one
 continuous dune ridge wrapped round the arena as a square annulus: a profile that rises
 out of the sand six metres inside the boundary, crests twenty metres outside it and lies
@@ -565,6 +605,17 @@ open sand with the thing meant to stop them either twenty metres behind them or 
 metres out of reach. It is now at the toe of the hill: the sand is what stops you, and it
 carries on rising in front of you. The outcrops on it are boulders rather than buttes,
 because a boulder is round and has nothing to get caught under.
+
+**Two things flip in that ridge's winding, not one.** The grid's axes are "outward" and
+"along"; which world axis each of those is depends on which side is being built, and which
+way outward points depends on the side's sign -- so a face is up when
+`cross(alongStep, outwardStep).y` is positive, which is `sign > 0` on the runs that go in
+x and `sign < 0` on the runs that go in z. Keyed on the sign alone, the north and south
+runs came out inside out: a twenty-metre hill drawn from no angle above it, that a raycast
+passes straight through, with the rocks sunk into it left hanging in the air over the
+dunes. It was found by the buried-rock check above reporting nineteen metres of air under
+an outcrop, not by looking at the arena -- the one side that had been photographed was one
+of the two that were right.
 
 ## The industrial zone is a plant, not a yard with crates in it
 

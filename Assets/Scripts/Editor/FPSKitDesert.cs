@@ -289,7 +289,7 @@ namespace FPSKit.EditorTools
                 {
                     float centre = GorgeCentreAt(z);
                     float offset = bedHalf * Rand(rubble, 0.62f, 1.05f);
-                    float size = Rand(rubble, 1.4f, 4.4f);
+                    float size = Rand(rubble, 1.4f, 4.4f) / BoulderSpread;
 
                     var boulder = MeshObject(group, "Rubble", BoulderMesh(rubble.Next(1, 999), 0.4f, 0.8f),
                                              Rand(rubble, 0f, 1f) < 0.5f ? _rockWetMat : _rockDarkMat,
@@ -1269,34 +1269,64 @@ namespace FPSKit.EditorTools
             for (int i = 0; i < rocks; i++)
             {
                 float along = (i - (rocks - 1) * 0.5f) * (span / rocks);
-                float size = Rand(rng, 1.3f, 2.3f);
+                float width = Rand(rng, 1.6f, 3.2f);
+                float scale = width / BoulderSpread;
 
-                // Sunk by a third. A boulder resting exactly on the ground line is the
-                // single most common tell that a rock was placed by a script.
-                var local = new Vector3(along, size * Rand(rng, 0.18f, 0.36f), Rand(rng, -0.5f, 0.5f));
+                var local = new Vector3(along, 0f, Rand(rng, -0.5f, 0.5f));
+                var world = at + turn * local;
+
+                // Each rock buried against the lowest sand under its own footprint, not
+                // against the spine's origin: a run of five metres of dune can drop a
+                // metre, and a rock at the low end of it would otherwise stand clear of
+                // the ground with its hollow underside open.
+                float floor = LowestGroundIn(world.x, world.z, width * 0.55f)
+                            - scale * Rand(rng, 0.2f, 0.4f);
 
                 AppendMesh(build, BoulderMesh(rng.Next(1, 999), 0.38f, 0.66f),
-                           at + turn * local,
-                           Quaternion.Euler(Rand(rng, -14f, 14f), Rand(rng, 0f, 360f), Rand(rng, -14f, 14f)),
-                           new Vector3(size, size * Rand(rng, 0.55f, 0.8f), size * Rand(rng, 0.7f, 1.1f)));
+                           new Vector3(world.x, floor + scale * 0.3f, world.z),
+                           Quaternion.Euler(Rand(rng, -10f, 10f), Rand(rng, 0f, 360f), Rand(rng, -10f, 10f)),
+                           new Vector3(scale, scale * Rand(rng, 0.55f, 0.8f), scale * Rand(rng, 0.7f, 1.1f)));
             }
 
             MeshObject(parent, "RockSpine", build.ToMesh("RockSpine"), _rockMat, Vector3.zero,
                        Quaternion.identity, Vector3.one, layer, _theme.coverTag);
         }
 
-        /// <summary>One boulder, sunk into the ground it was given and kept off the navmesh.</summary>
-        private static void Boulder(Transform parent, int layer, System.Random rng, Vector3 at, float size)
+        /// <summary>
+        /// How much wider than its nominal size <see cref="BoulderMesh"/> comes out.
+        ///
+        /// It is a unit icosphere pushed around by noise, so its radius is about 1.3 and
+        /// its width therefore about 2.6 times whatever scale it is given. That is worth
+        /// a named constant because every caller here writes a size in metres meaning the
+        /// rock's <i>width</i>, and without it a "four metre boulder" is eleven metres
+        /// across -- which is not a piece of cover, it is a dome, and a field of them was
+        /// most of what made this arena's rock read as lumpy blobs rather than as stone.
+        /// </summary>
+        private const float BoulderSpread = 2.6f;
+
+        /// <summary>One boulder, buried in the ground it was given and kept off the navmesh.</summary>
+        /// <param name="width">How far across the rock should be, in metres.</param>
+        private static void Boulder(Transform parent, int layer, System.Random rng, Vector3 at,
+                                    float width)
         {
+            float scale = width / BoulderSpread;
+            float tall = Rand(rng, 0.6f, 1.1f);
+
+            // Sunk to the lowest sand anywhere under it, not to the sand at its middle.
+            // A flat-bottomed shell pinned to its centre floats on the downhill side of
+            // any slope, and the gap that leaves is a way inside a closed mesh -- see
+            // LowestGroundIn.
+            float floor = LowestGroundIn(at.x, at.z, width * 0.55f)
+                        - scale * Rand(rng, 0.12f, 0.3f);
+
             var rock = MeshObject(parent, "Rock", BoulderMesh(rng.Next(1, 999),
                                                               Rand(rng, 0.26f, 0.44f),
                                                               Rand(rng, 0.6f, 0.85f)),
                                   Rand(rng, 0f, 1f) < 0.3f ? _rockDarkMat : _rockMat,
-                                  at + Vector3.up * size * Rand(rng, 0.1f, 0.3f),
-                                  Quaternion.Euler(Rand(rng, -12f, 12f), Rand(rng, 0f, 360f),
-                                                   Rand(rng, -12f, 12f)),
-                                  new Vector3(size, size * Rand(rng, 0.6f, 1.1f),
-                                              size * Rand(rng, 0.75f, 1.25f)),
+                                  new Vector3(at.x, floor + scale * tall * 0.42f, at.z),
+                                  Quaternion.Euler(Rand(rng, -9f, 9f), Rand(rng, 0f, 360f),
+                                                   Rand(rng, -9f, 9f)),
+                                  new Vector3(scale, scale * tall, scale * Rand(rng, 0.75f, 1.25f)),
                                   layer, _theme.coverTag);
 
             // A boulder's top is a smooth dome, and a NavMeshSurface reads any of it
@@ -1304,7 +1334,7 @@ namespace FPSKit.EditorTools
             // on the map grows a little island of navmesh on top that nothing can reach
             // -- and the spawner samples near the player, so it will happily put an enemy
             // up there to stand still for the rest of the level.
-            if (size > 2.2f) NoStanding(rock);
+            if (width > 4.5f) NoStanding(rock);
         }
 
         /// <summary>Bakes an already-built mesh into a builder at a transform, so runs of shapes weld into one object.</summary>

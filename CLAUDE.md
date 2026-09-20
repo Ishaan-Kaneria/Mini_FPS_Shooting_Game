@@ -549,6 +549,26 @@ edge and no fall anywhere in sight. `VerifyZone` now raycasts the built arena an
 any ground the level says is standable -- tagged `Sand`, or covered by navmesh -- is
 inside the trigger.
 
+**A mesh wound inside out does not look like a hole, and that is what makes it
+expensive.** `ButteMesh` took its wall quads *around* each ring rather than *up* the wall,
+so every face of every butte and every backdrop mesa pointed at its own axis. A butte is a
+big closed solid, so with the near wall culled away the eye is shown the **inside of the
+far wall** -- a perfectly convincing silhouette, lit backwards. What that produces is a
+hill with no lit face anywhere on it, in shadow from every direction and at every time of
+day, which reads as a rock in the shade and not as a rendering fault. The collider is
+unaffected, so the player walks at the hillside, passes through a surface that is not
+drawn, and stops dead against nothing: from inside the game they are standing in the
+middle of a hill, trapped by something invisible. Ishaan's report was "this hill is the
+bug, I get inside and get trapped", with a screenshot of a uniformly dark brown mound,
+and that screenshot is the whole diagnosis.
+
+`VerifyZone` measures it now rather than looking at it: for a closed shape that contains
+its own centroid every face normal points away from that centroid, so counting how many do
+is a direct read of the winding that needs no camera, no lighting and no opinion. Only the
+genuinely closed star-shaped pieces are checked -- a fence run, a cliff band, a welded run
+of boulders or a flat sheet of water has a centroid the test means nothing about, and each
+of those sits somewhere between 34% and 84% while a correct butte is at 100%.
+
 **Every rock in the arena is hollow, so every rock has to be buried.** A boulder and a
 butte are both closed shells cut off flat underneath, which is exactly right on a plane:
 put the cut a little below the ground and it is buried all the way round. On a dune field

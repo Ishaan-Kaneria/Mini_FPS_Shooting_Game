@@ -554,18 +554,30 @@ namespace FPSKit.EditorTools
                     }
                 }
 
+                // <b>Wound up the wall, not around it -- and that is a fix, not a style.</b>
+                // Taken round the ring first, every face of this mesh points at its own
+                // axis: the butte is inside out. What that looks like is not a hole. A
+                // butte is a big closed solid, so with the near wall culled away the eye
+                // is shown the *inside of the far wall*, which is a perfectly convincing
+                // silhouette lit backwards -- a hill with no lit face anywhere on it, in
+                // shadow from every direction and at every time of day. The collider is
+                // unaffected, so what the player does is walk at a hillside, pass through
+                // the surface they can see nothing of, and stop dead against nothing.
+                // Ishaan's report was "this hill is the bug, I get inside and get
+                // trapped", and a screenshot of a mound that is uniformly dark brown is
+                // the whole diagnosis.
                 for (int l = 0; l < levels; l++)
                     for (int s = 0; s < sides; s++)
                     {
                         int n = (s + 1) % sides;
-                        build.Quad(rings[l][s], rings[l][n], rings[l + 1][n], rings[l + 1][s]);
+                        build.Quad(rings[l][s], rings[l + 1][s], rings[l + 1][n], rings[l][n]);
                     }
 
                 // Cap and floor, so it is closed from above and from below the horizon.
                 for (int s = 1; s < sides - 1; s++)
                 {
-                    build.Tri(rings[levels][0], rings[levels][s], rings[levels][s + 1]);
-                    build.Tri(rings[0][0], rings[0][s + 1], rings[0][s]);
+                    build.Tri(rings[levels][0], rings[levels][s + 1], rings[levels][s]);
+                    build.Tri(rings[0][0], rings[0][s], rings[0][s + 1]);
                 }
 
                 return build.ToMesh($"Butte_{seed}");

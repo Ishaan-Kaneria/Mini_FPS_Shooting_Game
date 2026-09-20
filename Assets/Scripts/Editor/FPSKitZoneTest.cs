@@ -158,7 +158,92 @@ namespace FPSKit.EditorTools
             // ---- and nothing standing on the sand may be hollow underneath ----
             CheckRocksAreBuried(name, problems, notes);
 
+            // ---- nor inside out ----
+            CheckRocksFaceOutward(name, problems, notes);
+
             notes.Append($"\n  {name}: {onMesh}/{total} spawn points on the navmesh");
+        }
+
+        /// <summary>
+        /// Every closed rock has to be wound with its faces pointing out of it.
+        ///
+        /// <b>Inside out does not look like a hole, which is why this needs a test.</b> A
+        /// butte is a big closed solid, so with its near wall culled away the eye is shown
+        /// the <i>inside of the far wall</i> -- a perfectly convincing silhouette, lit
+        /// backwards. What that produces is a hill with no lit face anywhere on it, in
+        /// shadow from every direction and at every time of day, which reads as a rock in
+        /// the shade rather than as a rendering fault. The collider is unaffected, so the
+        /// player walks at the hillside, passes through a surface that is not drawn, and
+        /// stops dead against nothing: from inside the game they are standing in the
+        /// middle of a hill, trapped by something invisible.
+        ///
+        /// <para>
+        /// Measured, not looked at. For a closed shape that contains its own centroid,
+        /// every face normal points away from that centroid; counting how many do is a
+        /// direct read of the winding that needs no camera, no lighting and no opinion.
+        /// Only the shapes that really are closed and star-shaped are checked -- a fence
+        /// run, a cliff band or a flat sheet of water has a centroid the test means
+        /// nothing about.
+        /// </para>
+        /// </summary>
+        static void CheckRocksFaceOutward(string name, List<string> problems, StringBuilder notes)
+        {
+            int checkedMeshes = 0, inverted = 0;
+            float worstShare = 1f;
+            string worstName = null;
+
+            foreach (var filter in UnityEngine.Object.FindObjectsByType<MeshFilter>(
+                         FindObjectsSortMode.None))
+            {
+                bool interesting = false;
+                foreach (var n in RockNames) if (filter.name == n) { interesting = true; break; }
+                if (!interesting || filter.name == "RockSpine") continue;   // a welded run, not one shape
+
+                var mesh = filter.sharedMesh;
+                if (mesh == null || !mesh.isReadable) continue;
+
+                var vertices = mesh.vertices;
+                var triangles = mesh.triangles;
+                if (triangles.Length < 9) continue;
+
+                var centre = mesh.bounds.center;
+                int outward = 0, total = 0;
+
+                for (int i = 0; i + 2 < triangles.Length; i += 3)
+                {
+                    Vector3 a = vertices[triangles[i]];
+                    Vector3 b = vertices[triangles[i + 1]];
+                    Vector3 c = vertices[triangles[i + 2]];
+
+                    var normal = Vector3.Cross(b - a, c - a);
+                    if (normal.sqrMagnitude < 1e-12f) continue;
+
+                    var fromCentre = (a + b + c) / 3f - centre;
+                    if (fromCentre.sqrMagnitude < 1e-8f) continue;
+
+                    total++;
+                    if (Vector3.Dot(normal.normalized, fromCentre.normalized) > 0f) outward++;
+                }
+
+                if (total == 0) continue;
+
+                checkedMeshes++;
+                float share = outward / (float)total;
+
+                if (share < worstShare) { worstShare = share; worstName = filter.name; }
+                if (share < 0.7f) inverted++;
+            }
+
+            if (checkedMeshes == 0) return;
+
+            if (inverted > 0)
+                problems.Add($"{name}: {inverted} of {checkedMeshes} rocks are wound inside out " +
+                             $"(worst a \"{worstName}\" with only {worstShare:P0} of its faces pointing " +
+                             "outward). The near wall of one of these is not drawn at all, so the " +
+                             "player walks through the surface they can see and stops against nothing");
+            else
+                notes.Append($"\n  {name}: {checkedMeshes} rocks, all wound outward " +
+                             $"(worst {worstShare:P0})");
         }
 
         /// <summary>The names of the things in an open zone that are cut off flat underneath.</summary>

@@ -71,7 +71,7 @@ public class ArenaCard : HoverCard
                 preview.sprite = null;
                 _previewBase = entry.theme != null
                     ? entry.theme.floorColor
-                    : new Color(0.15f, 0.16f, 0.18f);
+                    : new Color(0.110f, 0.133f, 0.169f);
             }
 
             ApplyHover(0f);

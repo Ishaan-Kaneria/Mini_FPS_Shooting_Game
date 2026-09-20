@@ -39,18 +39,32 @@ namespace FPSKit.EditorTools
         // ------------------------------------------------------------------
         // Palette. Small on purpose: six colours is what keeps a generated screen
         // looking designed rather than assembled.
+        //
+        // <b>Deeper surfaces, brighter ink.</b> Every pairing below is measured rather
+        // than chosen by eye, against the WCAG contrast ratio -- 4.5:1 for text, 3:1 for
+        // an edge that has to be seen. Body text now sits at 17.5:1 and the dimmed
+        // secondary at 7.8:1, where it used to be 5.1:1 and was the first thing to
+        // disappear on a laptop screen at an angle.
+        //
+        // The surfaces went down rather than the text merely going up, because the thing
+        // that makes a dark interface look flat is not the darkness, it is three greys
+        // close enough together that nothing reads as sitting on anything. Backdrop,
+        // panel and card are now further apart, and <see cref="Border"/> carries the
+        // separation the greys cannot: at 3.3:1 against a panel it draws the edge of
+        // every box on its own, which is what lets the fills go this dark without the
+        // layout dissolving.
         // ------------------------------------------------------------------
-        static readonly Color Backdrop = new Color32(0x0B, 0x0D, 0x10, 0xFF);
-        static readonly Color Panel = new Color32(0x15, 0x19, 0x1F, 0xFF);
-        static readonly Color PanelLift = new Color32(0x1E, 0x24, 0x2C, 0xFF);
-        static readonly Color Border = new Color32(0x2C, 0x34, 0x3F, 0xFF);
-        static readonly Color Accent = new Color32(0xF0, 0xA8, 0x30, 0xFF);
-        static readonly Color Ink = new Color32(0xE8, 0xE6, 0xE3, 0xFF);
-        static readonly Color InkDim = new Color32(0x8B, 0x94, 0x9E, 0xFF);
+        static readonly Color Backdrop = new Color32(0x04, 0x06, 0x0A, 0xFF);
+        static readonly Color Panel = new Color32(0x0F, 0x13, 0x18, 0xFF);
+        static readonly Color PanelLift = new Color32(0x1C, 0x22, 0x2B, 0xFF);
+        static readonly Color Border = new Color32(0x5C, 0x69, 0x7A, 0xFF);
+        static readonly Color Accent = new Color32(0xFF, 0xBA, 0x3F, 0xFF);
+        static readonly Color Ink = new Color32(0xF5, 0xF8, 0xFB, 0xFF);
+        static readonly Color InkDim = new Color32(0xAB, 0xB6, 0xC2, 0xFF);
 
         /// <summary>Leaving is the one destructive thing on this screen, so it is the one red.</summary>
-        static readonly Color Danger = new Color32(0xC0, 0x39, 0x2B, 0xFF);
-        static readonly Color DangerLift = new Color32(0xE0, 0x4B, 0x3A, 0xFF);
+        static readonly Color Danger = new Color32(0xA8, 0x2A, 0x1B, 0xFF);
+        static readonly Color DangerLift = new Color32(0xE8, 0x50, 0x3C, 0xFF);
 
         static Sprite _flat;
 
@@ -1576,7 +1590,21 @@ namespace FPSKit.EditorTools
         {
             var outer = Block(parent, name, Border);
 
-            var face = Block(outer.rectTransform, "Face", Color.white);
+            // <b>The hover lights the edge, not the face.</b>
+            //
+            // This used to tint the face, and the face went amber on hover while the
+            // label stayed off-white -- 1.6:1, which is a caption that vanishes at the
+            // exact moment the pointer is on the thing it names. The label cannot follow
+            // the fill, because Unity's ColorBlock tints one graphic and the label is a
+            // different one; so the fill is the thing that has to hold still.
+            //
+            // Keeping the face at a constant dark and tinting the border instead means
+            // one label colour is correct in every state -- normal, hover, pressed and
+            // disabled -- and it costs nothing, because the border is already a separate
+            // Image sitting behind a three-pixel inset. It also reads better: an edge
+            // that lights up is a cleaner signal on a dark interface than a slab that
+            // changes colour.
+            var face = Block(outer.rectTransform, "Face", normal);
             face.rectTransform.anchorMin = Vector2.zero;
             face.rectTransform.anchorMax = Vector2.one;
             face.rectTransform.offsetMin = new Vector2(3f, 3f);
@@ -1584,14 +1612,18 @@ namespace FPSKit.EditorTools
             face.raycastTarget = true;
 
             var button = outer.gameObject.AddComponent<Button>();
-            button.targetGraphic = face;
+
+            // The border is what gets tinted. Only the face is a raycast target, and it
+            // is a child of this object, so the pointer still reaches the Button exactly
+            // as before -- targetGraphic decides what changes colour, never what is hit.
+            button.targetGraphic = outer;
 
             var colors = button.colors;
-            colors.normalColor = normal;
+            colors.normalColor = Border;
             colors.highlightedColor = hover;
-            colors.selectedColor = normal;
+            colors.selectedColor = Border;
             colors.pressedColor = hover * 0.8f;
-            colors.disabledColor = normal * 0.6f;
+            colors.disabledColor = Border * 0.6f;
             colors.fadeDuration = 0.08f;
             button.colors = colors;
 

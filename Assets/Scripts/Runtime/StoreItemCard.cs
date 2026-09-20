@@ -77,16 +77,16 @@ public class StoreItemCard : HoverCard
 
     [Header("Feel")]
     [Tooltip("Lit when the pip has been bought.")]
-    public Color pipFilledColor = new Color(1f, 0.82f, 0.25f);
+    public Color pipFilledColor = new Color(1f, 0.729f, 0.247f);
 
-    public Color pipEmptyColor = new Color(1f, 1f, 1f, 0.12f);
+    public Color pipEmptyColor = new Color(1f, 1f, 1f, 0.18f);
 
     [Tooltip("A price the player cannot meet. Red rather than merely dim, because " +
              "\"you cannot afford this\" and \"this is not for sale\" are different " +
              "answers and a store that greys out both is a store that explains neither.")]
-    public Color unaffordableColor = new Color(0.95f, 0.42f, 0.36f);
+    public Color unaffordableColor = new Color(1f, 0.478f, 0.416f);
 
-    public Color affordableColor = new Color(0.92f, 0.91f, 0.89f);
+    public Color affordableColor = new Color(0.961f, 0.973f, 0.984f);
 
     public void Bind(Content content)
     {

@@ -48,8 +48,20 @@ public class StorePanel : MonoBehaviour
     [Tooltip("In the order of the Tab enum: guns, bombs, items, health.")]
     public Button[] tabButtons;
 
-    public Color tabActiveColor = new Color(0.94f, 0.66f, 0.19f);
-    public Color tabIdleColor = new Color(0.12f, 0.14f, 0.17f);
+    [Tooltip("The edge of the tab that is open. This tints the button's border rather " +
+             "than its face -- the face stays dark so the caption on it stays legible, " +
+             "which it was not when the open tab went amber under off-white text.")]
+    public Color tabActiveColor = new Color(1f, 0.729f, 0.247f);
+
+    [Tooltip("The edge of a tab that is not open.")]
+    public Color tabIdleColor = new Color(0.361f, 0.412f, 0.478f);
+
+    [Tooltip("The caption of the open tab. Carries the accent, because the face beneath " +
+             "it no longer can.")]
+    public Color tabActiveInk = new Color(1f, 0.729f, 0.247f);
+
+    [Tooltip("The caption of a tab that is not open.")]
+    public Color tabIdleInk = new Color(0.671f, 0.714f, 0.761f);
 
     [Header("Text")]
     public TMP_Text balanceText;
@@ -203,10 +215,17 @@ public class StorePanel : MonoBehaviour
             tabButtons[i].gameObject.SetActive(open);
             if (!open) continue;
 
+            bool active = (Tab)i == _tab;
+
             var colors = tabButtons[i].colors;
-            colors.normalColor = (Tab)i == _tab ? tabActiveColor : tabIdleColor;
+            colors.normalColor = active ? tabActiveColor : tabIdleColor;
             colors.selectedColor = colors.normalColor;
             tabButtons[i].colors = colors;
+
+            // The caption too, because the border alone is a thin line and which shelf is
+            // open is the one thing this row exists to say.
+            var caption = tabButtons[i].GetComponentInChildren<TMP_Text>(true);
+            if (caption != null) caption.color = active ? tabActiveInk : tabIdleInk;
         }
     }
 

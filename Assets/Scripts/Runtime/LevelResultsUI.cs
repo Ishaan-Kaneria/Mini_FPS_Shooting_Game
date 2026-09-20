@@ -35,8 +35,8 @@ public class LevelResultsUI : MonoBehaviour
     [Tooltip("Three of them, left to right. Filled one at a time as the result is read out.")]
     public Image[] stars;
 
-    public Color starEarnedColor = new Color(1f, 0.82f, 0.25f);
-    public Color starMissedColor = new Color(1f, 1f, 1f, 0.12f);
+    public Color starEarnedColor = new Color(1f, 0.729f, 0.247f);
+    public Color starMissedColor = new Color(1f, 1f, 1f, 0.18f);
 
     [Tooltip("Seconds before the first star lands, so the panel is on screen and read " +
              "before anything starts moving on it.")]

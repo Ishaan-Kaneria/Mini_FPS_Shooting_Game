@@ -33,15 +33,15 @@ public class LevelButton : HoverCard
     [Header("Feel")]
     [Tooltip("The face of a level that is open, and of one that is not. A locked tile " +
              "has to read as locked without anybody having to find the small text.")]
-    public Color unlockedColor = new Color(0.12f, 0.14f, 0.17f, 1f);
+    public Color unlockedColor = new Color(0.110f, 0.133f, 0.169f, 1f);
 
-    public Color lockedColor = new Color(0.07f, 0.08f, 0.09f, 1f);
+    public Color lockedColor = new Color(0.047f, 0.059f, 0.075f, 1f);
 
-    public Color starEarnedColor = new Color(1f, 0.82f, 0.25f);
-    public Color starMissedColor = new Color(1f, 1f, 1f, 0.10f);
+    public Color starEarnedColor = new Color(1f, 0.729f, 0.247f);
+    public Color starMissedColor = new Color(1f, 1f, 1f, 0.16f);
 
-    public Color inkColor = new Color(0.91f, 0.90f, 0.89f, 1f);
-    public Color inkLockedColor = new Color(0.45f, 0.47f, 0.50f, 1f);
+    public Color inkColor = new Color(0.961f, 0.973f, 0.984f, 1f);
+    public Color inkLockedColor = new Color(0.502f, 0.545f, 0.596f, 1f);
 
     /// <summary>Zero-based position in the set. What gets handed to the session.</summary>
     public int Index { get; private set; } = -1;

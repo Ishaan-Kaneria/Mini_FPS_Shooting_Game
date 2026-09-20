@@ -45,8 +45,8 @@ public abstract class HoverCard : MonoBehaviour, IPointerEnterHandler, IPointerE
              "per second.")]
     [Min(0.1f)] public float hoverSpeed = 14f;
 
-    public Color frameColor = new Color(0.18f, 0.20f, 0.24f, 1f);
-    public Color frameHoverColor = new Color(0.95f, 0.75f, 0.35f, 1f);
+    public Color frameColor = new Color(0.361f, 0.412f, 0.478f, 1f);
+    public Color frameHoverColor = new Color(1f, 0.729f, 0.247f, 1f);
 
     protected bool _hovered;
     protected float _hover;

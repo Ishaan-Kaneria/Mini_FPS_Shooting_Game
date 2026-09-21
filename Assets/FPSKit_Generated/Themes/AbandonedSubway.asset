@@ -82,6 +82,10 @@ MonoBehaviour:
   coverMetallic: 0
   floorTag: Concrete
   wallTag: Concrete
+  floorDetail: Tile
+  wallDetail: Tile
+  floorDetailSize: 2.4
+  wallDetailSize: 2
   coverTag: Concrete
   accentLightCount: 14
   accentLightColor: {r: 0.75, g: 0.85, b: 0.75, a: 1}

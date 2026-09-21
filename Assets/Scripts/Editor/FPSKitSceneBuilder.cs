@@ -580,7 +580,48 @@ namespace FPSKit.EditorTools
             var coverSource = _theme.coverMaterial != null ? _theme.coverMaterial : _theme.wallMaterial;
             _coverMat = TiledCopy(coverSource, "Cover", new Vector2(2f, 1f));
             _crateMat = TiledCopy(_theme.crateMaterial, "Crate", Vector2.one);
+
+            // Where the theme supplies no material of its own -- which is every arena that
+            // is not the industrial one, because only that has an art pack behind it -- a
+            // generated detail map stands in. Without this the walled arenas are one solid
+            // colour per surface: perfectly readable, and completely scaleless. A player
+            // walking across a room that large cannot tell they are moving, because nothing
+            // on the floor passes them.
+            //
+            // The tiling is given in metres on the theme and converted here, so a knob
+            // means the same thing on a 110m box and a 500m site.
+            if (_floorMat == null && !string.IsNullOrEmpty(_theme.floorDetail))
+                _floorMat = MakeDetailMaterial("Floor", _theme.floorColor, _theme.floorDetail,
+                                               Metres(_theme.floorDetailSize),
+                                               _theme.floorSmoothness, 0f);
+
+            if (_perimeterMat == null && !string.IsNullOrEmpty(_theme.wallDetail))
+                _perimeterMat = MakeDetailMaterial("Perimeter", _theme.wallColor, _theme.wallDetail,
+                                                   Metres(_theme.wallDetailSize),
+                                                   _theme.wallSmoothness, 0f);
+
+            if (_roomWallMat == null && !string.IsNullOrEmpty(_theme.wallDetail))
+                _roomWallMat = MakeDetailMaterial("RoomWall", _theme.wallColor, _theme.wallDetail,
+                                                  Metres(_theme.wallDetailSize),
+                                                  _theme.wallSmoothness, 0f);
+
+            // Cover and crates are deliberately left alone. They take a colour each from
+            // the theme's coverColors, so one shared detail material would trade a field of
+            // individually coloured blocks for a field of identical ones -- and they are
+            // small, close objects where flat colour reads perfectly well. What makes a
+            // space feel scaleless is the floor and the walls, which are large, far away,
+            // and the only things in view long enough for the eye to look for detail in.
         }
+
+        /// <summary>
+        /// Detail tiling expressed as "one tile per this many metres".
+        ///
+        /// MakeDetailMaterial takes a tiling multiplier, which is only meaningful against
+        /// the size of the thing it is on -- so every call site would otherwise have to do
+        /// this conversion, and they would not all do it the same way.
+        /// </summary>
+        private static float Metres(float metresPerTile)
+            => 1f / Mathf.Max(0.25f, metresPerTile);
 
         private static void BuildArena()
         {

@@ -239,6 +239,24 @@ public class LevelTheme : ScriptableObject
     [Tooltip("Surface tag applied to cover blocks. Drives impact effects.")]
     public string floorTag = "Concrete";
     public string wallTag = "Concrete";
+
+    [Header("Surface detail")]
+    [Tooltip("Which generated detail map this arena's floor wears: Concrete, Metal, Snow, " +
+             "Tile, Sand, Rock, Timber or Adobe. Empty means flat colour, which is what " +
+             "every walled arena had and is completely scaleless -- a room the size of a " +
+             "garage and one the size of a hangar look identical without it.")]
+    public string floorDetail = "Concrete";
+
+    [Tooltip("The same, for the perimeter and room walls.")]
+    public string wallDetail = "Concrete";
+
+    [Tooltip("How many metres one tile of the floor's detail covers. Smaller repeats more " +
+             "often, which reads as finer material and gives the eye more to judge " +
+             "distance by; too small and the repeat itself becomes visible.")]
+    [Min(0.25f)] public float floorDetailSize = 4f;
+
+    [Tooltip("The same, for walls.")]
+    [Min(0.25f)] public float wallDetailSize = 3f;
     public string coverTag = "Metal";
 
     [Header("Accent Lights")]

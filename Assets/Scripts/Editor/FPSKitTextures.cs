@@ -108,7 +108,110 @@ namespace FPSKit.EditorTools
             WriteHeightPair("Adobe", AdobeHeight, albedoContrast: 0.34f, normalStrength: 2.4f);
             WriteHeightPair("Water", WaterHeight, albedoContrast: 0.12f, normalStrength: 1.4f);
 
+            // The four walled-box arenas are built out of these. Until they existed those
+            // arenas were flat colour on every surface -- readable and completely
+            // scaleless, which is the whole reason a dune field the size of a house and one
+            // the size of a stadium look identical without detail.
+            WriteHeightPair("Concrete", ConcreteHeight, albedoContrast: 0.30f, normalStrength: 2.0f);
+            WriteHeightPair("Metal", MetalHeight, albedoContrast: 0.26f, normalStrength: 1.8f);
+            WriteHeightPair("Snow", SnowHeight, albedoContrast: 0.18f, normalStrength: 1.6f);
+            WriteHeightPair("Tile", TileHeight, albedoContrast: 0.46f, normalStrength: 3.0f);
+
             AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Poured concrete: aggregate under a floated surface, with shrinkage cracks.
+        ///
+        /// The pinholes matter more than the cracks. A concrete slab reads as concrete
+        /// because of a fine, dense pitting that never repeats visibly; cracks are the
+        /// thing the eye notices and the thing that tiles badly, so they are kept sparse.
+        /// </summary>
+        private static float ConcreteHeight(float u, float v)
+        {
+            float aggregate = TileFbm(u, v, 28, 3, 4401);
+            float float_ = TileFbm(u, v, 5, 3, 4402);
+
+            // Pinholes: sharp, small, and only where the noise peaks, so they scatter
+            // rather than covering the surface evenly.
+            float pits = TileFbm(u, v, 96, 1, 4403);
+            pits = Mathf.Max(0f, pits - 0.62f) * 2.6f;
+
+            // One faint crack network, cut rather than added -- a crack is a groove.
+            float crack = Mathf.Abs(TileFbm(u, v, 4, 3, 4404) - 0.5f);
+            crack = Mathf.Max(0f, 0.06f - crack) * 8f;
+
+            return Mathf.Clamp01(float_ * 0.5f + aggregate * 0.32f - pits * 0.22f - crack * 0.3f + 0.2f);
+        }
+
+        /// <summary>
+        /// Rolled steel plate: a faint directional grain, dents, and streaked corrosion.
+        ///
+        /// Anisotropic on purpose. Plate is rolled, so its grain runs one way, and a metal
+        /// surface with isotropic noise on it reads as stone painted grey.
+        /// </summary>
+        private static float MetalHeight(float u, float v)
+        {
+            // Stretched along u so the grain runs across the plate rather than swirling.
+            float grain = TileFbm(u * 0.18f, v * 6f, 8, 3, 5501);
+
+            float dents = TileFbm(u, v, 6, 2, 5502);
+            dents = Mathf.Max(0f, dents - 0.58f) * 1.8f;
+
+            float corrosion = TileFbm(u, v, 20, 4, 5503);
+            corrosion = Mathf.Max(0f, corrosion - 0.55f) * 1.6f;
+
+            return Mathf.Clamp01(0.55f + grain * 0.18f - dents * 0.16f - corrosion * 0.22f);
+        }
+
+        /// <summary>
+        /// Wind-packed snow: broad drift relief with a crust, and no sharp detail at all.
+        ///
+        /// Deliberately the softest map here. Snow has almost no high-frequency structure
+        /// -- what reads as snow is the *absence* of it against broad soft relief -- so
+        /// sharpening this is what makes generated snow look like pale sand.
+        /// </summary>
+        private static float SnowHeight(float u, float v)
+        {
+            float drift = TileFbm(u, v, 2, 4, 6601);
+            float sastrugi = TileFbm(u * 1.4f, v * 0.5f, 6, 3, 6602);
+
+            // A crust breaks in plates rather than crumbling, so the few hard edges there
+            // are come from a thresholded band, not from noise.
+            float crust = TileFbm(u, v, 9, 2, 6603);
+            crust = Mathf.Max(0f, crust - 0.68f) * 1.4f;
+
+            return Mathf.Clamp01(drift * 0.6f + sastrugi * 0.28f + crust * 0.12f);
+        }
+
+        /// <summary>
+        /// Station tiling: a hard grid of grouted tiles, each one faintly uneven.
+        ///
+        /// The grid is the point -- it is the one surface here with a man-made rhythm, and
+        /// that rhythm is what tells a player how far away a subway wall is. The tiles are
+        /// given individual height so the grid does not read as a printed pattern.
+        /// </summary>
+        private static float TileHeight(float u, float v)
+        {
+            const float Across = 8f;
+
+            float tu = u * Across;
+            float tv = v * Across;
+
+            float fu = tu - Mathf.Floor(tu);
+            float fv = tv - Mathf.Floor(tv);
+
+            // Distance to the nearest grout line, in tile units.
+            float edge = Mathf.Min(Mathf.Min(fu, 1f - fu), Mathf.Min(fv, 1f - fv));
+            float grout = Mathf.Clamp01(edge / 0.06f);
+
+            // Per-tile variation, keyed off the tile's own index so it is constant across
+            // that tile and different from its neighbours.
+            float key = TileFbm(Mathf.Floor(tu) / Across, Mathf.Floor(tv) / Across, 4, 1, 7701);
+
+            float grime = TileFbm(u, v, 24, 3, 7702);
+
+            return Mathf.Clamp01(grout * (0.62f + key * 0.22f) + grime * 0.16f);
         }
 
         /// <summary>Wind ripples over soft dune relief, with grains on top.</summary>

@@ -299,6 +299,14 @@ namespace FPSKit.EditorTools
                 // ----------------------------------------------------------
                 case "Snowbound Station":
                     t.description = "Low winter sun, thick fog, short engagements.";
+
+                    // Snow underfoot, concrete for the station. Snow's map is the softest
+                    // of the set on purpose -- what reads as snow is the absence of fine
+                    // detail, so sharpening it turns it into pale sand.
+                    t.floorDetail = "Snow";
+                    t.wallDetail = "Concrete";
+                    t.floorDetailSize = 6f;
+                    t.wallDetailSize = 3f;
                     t.skyTint = new Color(0.62f, 0.68f, 0.78f);
                     t.skyGroundColor = new Color(0.72f, 0.76f, 0.82f);
                     t.atmosphereThickness = 2.2f;
@@ -335,6 +343,14 @@ namespace FPSKit.EditorTools
                 // ----------------------------------------------------------
                 case "Night Rooftop":
                     t.description = "City night. Dark sky, warm practicals, heavy bloom.";
+
+                    // Poured roof deck and rendered parapets. Tiled tighter than the others
+                    // because a rooftop is looked at from standing height and nothing is
+                    // far away.
+                    t.floorDetail = "Concrete";
+                    t.wallDetail = "Concrete";
+                    t.floorDetailSize = 3f;
+                    t.wallDetailSize = 2.5f;
                     t.skyTint = new Color(0.10f, 0.13f, 0.22f);
                     t.skyGroundColor = new Color(0.06f, 0.07f, 0.10f);
                     t.atmosphereThickness = 0.4f;
@@ -378,6 +394,14 @@ namespace FPSKit.EditorTools
                 // ----------------------------------------------------------
                 case "Abandoned Subway":
                     t.description = "Tight, dark, claustrophobic. Flickering service lights.";
+
+                    // Tiled throughout, which is the one surface here with a man-made
+                    // rhythm -- and that rhythm is what tells a player how far down a
+                    // platform they are looking.
+                    t.floorDetail = "Tile";
+                    t.wallDetail = "Tile";
+                    t.floorDetailSize = 2.4f;
+                    t.wallDetailSize = 2f;
                     t.skyTint = new Color(0.05f, 0.05f, 0.06f);
                     t.skyGroundColor = new Color(0.03f, 0.03f, 0.03f);
                     t.atmosphereThickness = 0.3f;
@@ -426,6 +450,14 @@ namespace FPSKit.EditorTools
                 // ----------------------------------------------------------
                 case "Mars Colony":
                     t.description = "Rust sky, thin light, drifting dust.";
+
+                    // Regolith and rock, reusing the desert's maps rather than generating a
+                    // near-identical fifth one. Tiled wide, because the thing that sells a
+                    // dust plain is that the detail keeps going rather than that it is fine.
+                    t.floorDetail = "Sand";
+                    t.wallDetail = "Rock";
+                    t.floorDetailSize = 7f;
+                    t.wallDetailSize = 4f;
                     t.skyTint = new Color(0.72f, 0.42f, 0.28f);
                     t.skyGroundColor = new Color(0.42f, 0.22f, 0.14f);
                     t.atmosphereThickness = 1.8f;

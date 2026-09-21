@@ -671,6 +671,12 @@ public class StorePanel : MonoBehaviour
     {
         if (sounds != null) sounds.PlayPurchase();
 
+        // Every buy and every upgrade reaches here and nothing else does, so this is the
+        // one line that can count a purchase -- the same reasoning that puts the coin
+        // payout in GameSession.RecordResult rather than at each of six spend sites, where
+        // a seventh added later would silently count nothing.
+        PlayerStats.RecordPurchase();
+
         Report(message);
         Rebuild();
     }

@@ -370,18 +370,7 @@ public class HUDController : MonoBehaviour
     /// Short, uppercase and readable: "ESC", not "Escape", and "RMB" rather than
     /// "MOUSE1" -- which is what KeyCode.ToString gives and what nobody calls it.
     /// </summary>
-    static string Key(KeyCode key) => key switch
-    {
-        KeyCode.Escape => "ESC",
-        KeyCode.Return => "ENTER",
-        KeyCode.Space => "SPACE",
-        KeyCode.Mouse0 => "LMB",
-        KeyCode.Mouse1 => "RMB",
-        KeyCode.Mouse2 => "MMB",
-        KeyCode.LeftShift => "SHIFT",
-        KeyCode.LeftControl => "CTRL",
-        _ => key.ToString().ToUpperInvariant()
-    };
+    static string Key(KeyCode key) => UIText.KeyLabel(key);
 
     void OnEnable()
     {

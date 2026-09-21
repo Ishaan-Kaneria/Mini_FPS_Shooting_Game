@@ -45,6 +45,18 @@ public class MainMenuController : MonoBehaviour
              "is up, exactly like the level select.")]
     public StorePanel store;
 
+    [Tooltip("What the player has done. Opened by the Career button.")]
+    public AchievementsPanel achievements;
+
+    [Tooltip("How to play, read from the live bindings. Opened by the Help button.")]
+    public InstructionsPanel instructions;
+
+    [Tooltip("Opens the achievements screen.")]
+    public Button achievementsButton;
+
+    [Tooltip("Opens the instructions screen.")]
+    public Button helpButton;
+
     public Button storeButton;
 
     [Tooltip("Coins in hand, shown on the dashboard so the player can see what a level " +
@@ -175,6 +187,12 @@ public class MainMenuController : MonoBehaviour
         // walking out of one -- asks the same question and gets the same answer.
         _granted = Campaign.RefreshUnlocks(catalog, store != null ? store.catalog : null);
 
+        // The two totals that cannot be counted as they happen -- stars are the best of
+        // each level's attempts rather than the sum, and an arena is finished or it is
+        // not. Recomputed here because the dashboard is both the only place that has the
+        // catalogue and the only place these are read.
+        PlayerStats.RefreshFromCatalog(catalog);
+
         BuildGrid();
         ShowProfile();
         ShowLastRun();
@@ -187,8 +205,12 @@ public class MainMenuController : MonoBehaviour
         }
 
         if (store != null) store.Closed += OnStoreClosed;
+        if (achievements != null) achievements.Closed += OnOverlayClosed;
+        if (instructions != null) instructions.Closed += OnOverlayClosed;
 
         Wire(storeButton, OpenStore);
+        Wire(achievementsButton, OpenAchievements);
+        Wire(helpButton, OpenInstructions);
         Wire(exitButton, AskToExit);
         Wire(confirmExitButton, Exit);
         Wire(cancelExitButton, CancelExit);
@@ -205,6 +227,8 @@ public class MainMenuController : MonoBehaviour
         }
 
         if (store != null) store.Closed -= OnStoreClosed;
+        if (achievements != null) achievements.Closed -= OnOverlayClosed;
+        if (instructions != null) instructions.Closed -= OnOverlayClosed;
     }
 
     static void Wire(Button button, UnityEngine.Events.UnityAction action)
@@ -460,6 +484,38 @@ public class MainMenuController : MonoBehaviour
         ShowDashboard(false);
         store.Open();
     }
+
+    /// <summary>Opens the achievements screen. What the Career button does.</summary>
+    public void OpenAchievements()
+    {
+        if (achievements == null)
+        {
+            Report("This dashboard has no achievements screen. Run FPSKit > Build Dashboard.");
+            return;
+        }
+
+        // Recomputed on the way in, not only at Start: a player who cleared a level, came
+        // back and opened this would otherwise be shown the star count from before the run.
+        PlayerStats.RefreshFromCatalog(catalog);
+
+        ShowDashboard(false);
+        achievements.Open();
+    }
+
+    /// <summary>Opens the instructions. What the Help button does.</summary>
+    public void OpenInstructions()
+    {
+        if (instructions == null)
+        {
+            Report("This dashboard has no instructions screen. Run FPSKit > Build Dashboard.");
+            return;
+        }
+
+        ShowDashboard(false);
+        instructions.Open();
+    }
+
+    void OnOverlayClosed() => ShowDashboard(true);
 
     void OnStoreClosed()
     {

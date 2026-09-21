@@ -224,7 +224,10 @@ public class Explosion : MonoBehaviour
                     if (away.sqrMagnitude < 0.0001f) away = Vector3.up;
 
                     var info = new DamageInfo(amount, centre + away.normalized * distance,
-                                              away.normalized, away.normalized, attacker);
+                                              away.normalized, away.normalized, attacker)
+                    {
+                        fromBlast = true,
+                    };
 
                     if (health.ApplyDamage(info) > 0f) count++;
                 }

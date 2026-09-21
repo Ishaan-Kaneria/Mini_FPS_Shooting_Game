@@ -21,6 +21,14 @@ public struct DamageInfo
     public GameObject source;
     public bool isHeadshot;
 
+    /// <summary>
+    /// A blast did this, not a bullet.
+    ///
+    /// Explicit rather than inferred from <see cref="source"/>, which is the *attacker* --
+    /// the player either way -- so there is nothing on it to tell the two apart.
+    /// </summary>
+    public bool fromBlast;
+
     public DamageInfo(float amount, Vector3 point, Vector3 normal, Vector3 direction, GameObject source)
     {
         this.amount = amount;
@@ -29,6 +37,7 @@ public struct DamageInfo
         this.direction = direction;
         this.source = source;
         this.isHeadshot = false;
+        this.fromBlast = false;
     }
 }
 

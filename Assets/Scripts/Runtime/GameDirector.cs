@@ -96,6 +96,21 @@ public class GameDirector : MonoBehaviour
     public int Headshots { get; private set; }
 
     /// <summary>
+    /// The longest chain this run reached, not the chain running now.
+    ///
+    /// Peak rather than current, because a player who chains eight and then lets it lapse
+    /// did chain eight -- reading <see cref="Combo"/> at the end of a level would report
+    /// whatever the last few seconds happened to be, which is usually zero.
+    /// </summary>
+    public int BestCombo { get; private set; }
+
+    /// <summary>Kills the bomb got, so the explosives achievements have something to count.</summary>
+    public int BombKills { get; private set; }
+
+    /// <summary>Damage the player has taken this run. Zero is what a flawless clear means.</summary>
+    public float DamageTaken { get; private set; }
+
+    /// <summary>
     /// Coins earned so far this level, from kills alone -- the level-end bonuses land in
     /// <see cref="ReportLevelFinished"/>. Shown live on the HUD, because a currency the
     /// player only sees on a results screen is one they never connect to what they did.
@@ -259,6 +274,10 @@ public class GameDirector : MonoBehaviour
     /// lands quickly, so the scoreboard rewards staying in the fight.
     /// </summary>
     public int RegisterKill(EnemyArchetype archetype, bool headshot, Vector3 position)
+        => RegisterKill(archetype, headshot, position, false);
+
+    /// <param name="byBomb">The blast killed this one, not the gun.</param>
+    public int RegisterKill(EnemyArchetype archetype, bool headshot, Vector3 position, bool byBomb)
     {
         if (IsGameOver) return 0;
 
@@ -270,12 +289,14 @@ public class GameDirector : MonoBehaviour
         }
 
         Combo++;
+        if (Combo > BestCombo) BestCombo = Combo;
         _comboExpiry = Time.time + comboWindow;
         ComboMultiplier = Mathf.Min(maxComboMultiplier, 1f + comboStep * (Combo - 1));
 
         int awarded = Mathf.RoundToInt(basePoints * ComboMultiplier);
 
         Kills++;
+        if (byBomb) BombKills++;
         Score += awarded;
 
         // Coins are flat per kill and not multiplied by the combo. The combo is the
@@ -290,6 +311,16 @@ public class GameDirector : MonoBehaviour
         Killed?.Invoke(archetype, awarded, position);
 
         return awarded;
+    }
+
+    /// <summary>
+    /// The player was hit. Accumulated rather than read off Health at the end, because a
+    /// player who was hurt and then picked up a medkit still took the damage -- a final
+    /// health reading would call that flawless.
+    /// </summary>
+    public void RegisterPlayerDamage(float amount)
+    {
+        if (amount > 0f) DamageTaken += amount;
     }
 
     /// <summary>Flat points with no combo involvement -- level clear bonuses and the like.</summary>

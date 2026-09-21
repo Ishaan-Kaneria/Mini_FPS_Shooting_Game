@@ -80,6 +80,20 @@ public static class GameSession
         ReturnedFromRun = true;
 
         PlayerProfile.RecordRun(result.score, result.killed);
+
+        // The lifetime counters every achievement is measured against. Here rather than at
+        // the moment of each kill for the reason the coins are here: an ending that pays
+        // is an ending that counts, and a new ending cannot be added later that silently
+        // does neither.
+        //
+        // Flawless and fast are judged here because they are judgements about how the level
+        // was played rather than facts it reports. Untouched means exactly zero damage --
+        // a threshold would make it arguable -- and time to spare means half the clock,
+        // which is generous enough to be reachable on a level the player knows and out of
+        // reach on one they are seeing for the first time.
+        bool flawless = result.damageTaken <= 0f;
+        bool fast = result.timeLimit > 0f && result.TimeRemaining >= result.timeLimit * 0.5f;
+        PlayerStats.RecordRun(result, flawless, fast);
         LevelProgress.Record(result.arena, result.levelIndex, result.stars, result.score);
 
         // The one place coins are ever banked. Every ending routes through here --

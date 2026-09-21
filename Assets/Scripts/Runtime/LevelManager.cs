@@ -569,7 +569,14 @@ public class LevelManager : MonoBehaviour
             timeLimit = TimeLimit,
             score = director != null ? director.Score : 0,
             headshots = director != null ? director.Headshots : 0,
-            coins = director != null ? director.CoinsEarned : 0
+            coins = director != null ? director.CoinsEarned : 0,
+
+            // Everything an achievement needs has to be in the result before it is passed
+            // anywhere, for the same reason the coin bonus is awarded before this is
+            // built: LevelResult is a struct, so every consumer downstream gets a copy.
+            bombKills = director != null ? director.BombKills : 0,
+            bestCombo = director != null ? director.BestCombo : 0,
+            damageTaken = director != null ? director.DamageTaken : 0f
         };
 
         Result = result;
@@ -1107,7 +1114,12 @@ public class LevelManager : MonoBehaviour
         var ai = health.GetComponent<EnemyAI>();
         var archetype = ai != null ? ai.archetype : null;
 
-        Director?.RegisterKill(archetype, health.LastDamage.isHeadshot, health.transform.position);
+        // Asked of the damage that actually killed this one, so a bomb that softened a
+        // target the gun finished is not counted as a bomb kill.
+        bool byBomb = health.LastDamage.fromBlast;
+
+        Director?.RegisterKill(archetype, health.LastDamage.isHeadshot,
+                               health.transform.position, byBomb);
 
         TryDrop(archetype, health.transform.position);
     }
@@ -1139,7 +1151,15 @@ public class LevelManager : MonoBehaviour
         return true;
     }
 
-    void OnPlayerDamaged(Health health, DamageInfo info) => Director?.BreakCombo();
+    void OnPlayerDamaged(Health health, DamageInfo info)
+    {
+        Director?.BreakCombo();
+
+        // Accumulated as it lands rather than read off Health at the end, because a player
+        // who was hurt and then picked up a medkit still took the damage -- a final health
+        // reading would call that run flawless.
+        Director?.RegisterPlayerDamage(info.amount);
+    }
 
     void OnPlayerDied(Health health) => Finish(LevelResult.Ending.Died);
 

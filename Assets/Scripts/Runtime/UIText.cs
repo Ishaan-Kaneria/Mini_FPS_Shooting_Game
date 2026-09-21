@@ -54,4 +54,32 @@ public static class UIText
 
     /// <summary>Metres: <c>7m</c>, or <c>7.5m</c> where the half matters.</summary>
     public static string Metres(float metres) => $"{metres:0.#}m";
+
+    /// <summary>
+    /// What a key is called on screen.
+    ///
+    /// <c>KeyCode.ToString</c> gives "Alpha1", "LeftShift" and "Mouse0" -- none of which
+    /// anybody calls them. Here rather than on any one screen because the instruction
+    /// strip, the pause hint and the instructions panel must not disagree about what the
+    /// fire button is named: a player who reads "LMB" in one place and "Mouse0" in another
+    /// has to work out that they are the same thing.
+    /// </summary>
+    public static string KeyLabel(UnityEngine.KeyCode key) => key switch
+    {
+        UnityEngine.KeyCode.Escape => "ESC",
+        UnityEngine.KeyCode.Return => "ENTER",
+        UnityEngine.KeyCode.Space => "SPACE",
+        UnityEngine.KeyCode.Mouse0 => "LMB",
+        UnityEngine.KeyCode.Mouse1 => "RMB",
+        UnityEngine.KeyCode.Mouse2 => "MMB",
+        UnityEngine.KeyCode.LeftShift => "SHIFT",
+        UnityEngine.KeyCode.RightShift => "SHIFT",
+        UnityEngine.KeyCode.LeftControl => "CTRL",
+        UnityEngine.KeyCode.RightControl => "CTRL",
+        UnityEngine.KeyCode.LeftArrow => "LEFT",
+        UnityEngine.KeyCode.RightArrow => "RIGHT",
+        UnityEngine.KeyCode.UpArrow => "UP",
+        UnityEngine.KeyCode.DownArrow => "DOWN",
+        _ => key.ToString().ToUpperInvariant(),
+    };
 }

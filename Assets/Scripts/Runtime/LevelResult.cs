@@ -57,6 +57,16 @@ public struct LevelResult
     public int score;
     public int headshots;
 
+    /// <summary>Kills the bomb got, so an explosives achievement can exist.</summary>
+    public int bombKills;
+
+    /// <summary>The longest chain reached, not the chain at the end. Peak, so that a
+    /// chain broken by the last kill still counts for what it was.</summary>
+    public int bestCombo;
+
+    /// <summary>Damage the player took. Zero is what a flawless clear means.</summary>
+    public float damageTaken;
+
     /// <summary>Coins this level paid, kills plus stars plus score. Banked by GameSession.</summary>
     public int coins;
 

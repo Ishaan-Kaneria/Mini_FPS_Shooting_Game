@@ -610,6 +610,14 @@ namespace FPSKit.EditorTools
             BuildFooter(root, menu);
             BuildLevelSelect(root, menu);
             BuildStore(root, menu);
+            BuildAchievements(root, menu);
+
+            // The dashboard has no player rig to read bindings off, so the panel is handed
+            // the same asset the arenas use. Loaded rather than left null so the screen
+            // describes the keys the game is actually bound to and not the shipped default.
+            BuildInstructions(root, menu,
+                AssetDatabase.LoadAssetAtPath<ControlSettings>(
+                    "Assets/FPSKit_Generated/Controls.asset"));
 
             // Everything that belongs to the arena picker, so the level select can take
             // the screen rather than being drawn on top of it. Collected after the
@@ -627,6 +635,14 @@ namespace FPSKit.EditorTools
                 menu.lastRunPanel,
                 menu.exitRow,
                 menu.storeButton.gameObject,
+
+                // Every nav button, for the reason Exit Game is here: an overlay is a
+                // full-screen raycast target, so any button left switched on behind one is
+                // drawn and unreachable -- which is the exact failure MakeButton and
+                // VerifyFlow exist to catch.
+                menu.achievementsButton.gameObject,
+                menu.helpButton.gameObject,
+
                 menu.statusText.gameObject
             };
 
@@ -1038,29 +1054,42 @@ namespace FPSKit.EditorTools
             status.textWrappingMode = TextWrappingModes.Normal;
             menu.statusText = status;
 
-            var exit = MakeButton(parent, "ExitButton", "EXIT  GAME", PanelLift, Danger);
-            var exitRect = (RectTransform)exit.transform;
-            exitRect.anchorMin = new Vector2(1f, 0f);
-            exitRect.anchorMax = new Vector2(1f, 0f);
-            exitRect.pivot = new Vector2(1f, 0f);
-            exitRect.sizeDelta = new Vector2(260f, 68f);
-            exitRect.anchoredPosition = new Vector2(-40f, 34f);
+            // The four things a player does that are not playing a level, in one row.
+            //
+            // A layout group rather than four anchored offsets, because the old pair were
+            // placed at fixed pixels from the right edge and a third and fourth would have
+            // reached 1,120px in -- fine at one window width and off the screen at a
+            // narrower one. Same rule the record panel already follows: lay out in a
+            // measured box, not in pixels from an edge.
+            var navGo = new GameObject("NavRow", typeof(RectTransform));
+            navGo.transform.SetParent(parent, false);
+            var navRect = (RectTransform)navGo.transform;
+            navRect.anchorMin = new Vector2(0f, 0f);
+            navRect.anchorMax = new Vector2(1f, 0f);
+            navRect.pivot = new Vector2(1f, 0f);
+            navRect.offsetMin = new Vector2(40f, 28f);
+            navRect.offsetMax = new Vector2(-40f, 96f);
 
+            var nav = navGo.AddComponent<HorizontalLayoutGroup>();
+            nav.childAlignment = TextAnchor.MiddleRight;
+            nav.spacing = 16f;
+            nav.childForceExpandWidth = false;
+            nav.childForceExpandHeight = true;
+            nav.childControlWidth = true;
+            nav.childControlHeight = true;
+
+            // Ordered by how often a player wants them, left to right, with the one that
+            // ends the session furthest from the others.
+            var help = NavButton(navRect, "HelpButton", "HOW  TO  PLAY", Accent);
+            var career = NavButton(navRect, "CareerButton", "ACHIEVEMENTS", UITheme.Good);
+            var store = NavButton(navRect, "StoreButton", "STORE", Accent);
+            var exit = NavButton(navRect, "ExitButton", "EXIT  GAME", Danger);
+
+            menu.helpButton = help;
+            menu.achievementsButton = career;
+            menu.storeButton = store;
             menu.exitButton = exit;
             menu.exitRow = exit.gameObject;
-
-            // The store sits beside Exit rather than up with the arenas, because it is
-            // the other thing a player does *between* levels -- and putting it in the
-            // grid would make it look like somewhere to play.
-            var store = MakeButton(parent, "StoreButton", "STORE", PanelLift, Accent);
-            var storeRect = (RectTransform)store.transform;
-            storeRect.anchorMin = new Vector2(1f, 0f);
-            storeRect.anchorMax = new Vector2(1f, 0f);
-            storeRect.pivot = new Vector2(1f, 0f);
-            storeRect.sizeDelta = new Vector2(260f, 68f);
-            storeRect.anchoredPosition = new Vector2(-320f, 34f);
-
-            menu.storeButton = store;
 
             BuildExitConfirm(parent, menu);
         }
@@ -1268,6 +1297,240 @@ namespace FPSKit.EditorTools
             menu.levelSelect = select;
 
             shade.gameObject.SetActive(false);
+        }
+
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// What the player has done, in four columns.
+        ///
+        /// The component goes on the canvas and points at the shade, never on the shade --
+        /// put it on the object it hides and Awake has not run when the builder leaves it
+        /// off, so the first SetActive(true) is what finally runs it and switches it
+        /// straight back off. OverlayPanel logs that rather than failing silently.
+        /// </summary>
+        static void BuildAchievements(RectTransform parent, MainMenuController menu)
+        {
+            var panel = menu.gameObject.AddComponent<AchievementsPanel>();
+
+            var shade = BuildOverlayShell(parent, "Achievements", "Achievements",
+                                          "", out var tally, out var back, out var body);
+
+            // The subtitle slot carries the tally, because "7 of 20" is the one number
+            // somebody opening this screen is actually looking for.
+            tally.text = "";
+            tally.color = Accent;
+            tally.fontSize = 28f;
+
+            var columns = BuildColumns(body, 4, out var headings);
+
+            panel.panel = shade.gameObject;
+            panel.backButton = back;
+            panel.tallyText = tally;
+            panel.categoryColumns = columns;
+            panel.categoryHeadings = headings;
+            panel.rowTemplate = BuildAchievementRowTemplate(shade.rectTransform);
+
+            menu.achievements = panel;
+            shade.gameObject.SetActive(false);
+        }
+
+        static AchievementRow BuildAchievementRowTemplate(RectTransform parent)
+        {
+            var rowGo = new GameObject("AchievementRowTemplate", typeof(RectTransform));
+            rowGo.transform.SetParent(parent, false);
+            var rect = (RectTransform)rowGo.transform;
+            rect.sizeDelta = new Vector2(0f, 92f);
+
+            var element = rowGo.AddComponent<LayoutElement>();
+            element.preferredHeight = 92f;
+            element.minHeight = 92f;
+
+            var plate = Block(rect, "Plate", PanelLift);
+            Stretch(plate.rectTransform);
+            plate.raycastTarget = false;
+
+            var row = rowGo.AddComponent<AchievementRow>();
+
+            row.titleText = Label(rect, "Title", "TITLE", 22, TextAlignmentOptions.TopLeft, Ink);
+            Span(row.titleText.rectTransform, 0.58f, 0.98f, 14f, 90f);
+
+            row.detailText = Label(rect, "Detail", "detail", 16,
+                                   TextAlignmentOptions.TopLeft, InkDim);
+            Span(row.detailText.rectTransform, 0.26f, 0.58f, 14f, 90f);
+            row.detailText.textWrappingMode = TextWrappingModes.Normal;
+
+            row.readoutText = Label(rect, "Readout", "0 / 0", 16,
+                                    TextAlignmentOptions.TopRight, InkDim);
+            Span(row.readoutText.rectTransform, 0.58f, 0.98f, 14f, 14f);
+
+            var track = Block(rect, "Track", Panel);
+            Span(track.rectTransform, 0.10f, 0.20f, 14f, 14f);
+            track.raycastTarget = false;
+            row.progressTrack = track.gameObject;
+
+            var fill = Block(track.rectTransform, "Fill", Accent);
+            Stretch(fill.rectTransform);
+            fill.raycastTarget = false;
+            row.progressFill = fill;
+
+            var mark = Label(rect, "Mark", "\u2713", 30, TextAlignmentOptions.Midline, UITheme.Good);
+            Span(mark.rectTransform, 0.30f, 0.90f, 0f, 20f);
+            mark.rectTransform.anchorMin = new Vector2(1f, 0.30f);
+            mark.rectTransform.anchorMax = new Vector2(1f, 0.90f);
+            mark.rectTransform.sizeDelta = new Vector2(46f, 0f);
+            row.earnedMark = mark.gameObject;
+
+            rowGo.SetActive(false);
+            return row;
+        }
+
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// How to play, in four columns, written from the live bindings at runtime.
+        /// </summary>
+        static void BuildInstructions(RectTransform parent, MainMenuController menu,
+                                      ControlSettings controls)
+        {
+            var panel = menu.gameObject.AddComponent<InstructionsPanel>();
+
+            var shade = BuildOverlayShell(parent, "Instructions", "How to play",
+                                          "", out var subtitle, out var back, out var body);
+
+            var columns = BuildColumns(body, 4, out var headings);
+
+            panel.panel = shade.gameObject;
+            panel.backButton = back;
+            panel.subtitleText = subtitle;
+            panel.columns = columns;
+            panel.columnHeadings = headings;
+            panel.controls = controls;
+            panel.rowTemplate = BuildInstructionRowTemplate(shade.rectTransform);
+
+            menu.instructions = panel;
+            shade.gameObject.SetActive(false);
+        }
+
+        static InstructionRow BuildInstructionRowTemplate(RectTransform parent)
+        {
+            var rowGo = new GameObject("InstructionRowTemplate", typeof(RectTransform));
+            rowGo.transform.SetParent(parent, false);
+            var rect = (RectTransform)rowGo.transform;
+            rect.sizeDelta = new Vector2(0f, 62f);
+
+            var element = rowGo.AddComponent<LayoutElement>();
+            element.preferredHeight = 62f;
+            element.minHeight = 44f;
+
+            var row = rowGo.AddComponent<InstructionRow>();
+
+            row.controlText = Label(rect, "Control", "KEY", 19,
+                                    TextAlignmentOptions.TopLeft, Accent);
+            Span(row.controlText.rectTransform, 0.52f, 1f, 4f, 4f);
+
+            row.saysText = Label(rect, "Says", "what it does", 16,
+                                 TextAlignmentOptions.TopLeft, Ink);
+            Span(row.saysText.rectTransform, 0f, 0.52f, 4f, 4f);
+            row.saysText.textWrappingMode = TextWrappingModes.Normal;
+
+            rowGo.SetActive(false);
+            return row;
+        }
+
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// The shade, the title and the way out that every overlay shares.
+        ///
+        /// One helper rather than a copy per screen, because the three overlays sit on top
+        /// of each other and one that closes differently from the one it replaced reads as
+        /// the interface being unreliable -- the same argument HoverCard settles for cards.
+        /// </summary>
+        static Image BuildOverlayShell(RectTransform parent, string name, string title,
+                                       string subtitle, out TMP_Text subtitleLabel,
+                                       out Button back, out RectTransform body)
+        {
+            var shade = Block(parent, name, Backdrop);
+            Stretch(shade.rectTransform);
+
+            // The shade eats clicks on purpose: an overlay that lets the dashboard behind
+            // it be clicked is an overlay a player can start a level through.
+            shade.raycastTarget = true;
+
+            var heading = Label(shade.rectTransform, "Title", title.ToUpperInvariant(), 44,
+                                TextAlignmentOptions.MidlineLeft, Ink);
+            Span(heading.rectTransform, 0.88f, 0.97f, 48f, 48f);
+
+            subtitleLabel = Label(shade.rectTransform, "Subtitle", subtitle, 20,
+                                  TextAlignmentOptions.MidlineLeft, InkDim);
+            Span(subtitleLabel.rectTransform, 0.83f, 0.88f, 48f, 48f);
+
+            var rule = Block(shade.rectTransform, "Rule", Accent);
+            Span(rule.rectTransform, 0.822f, 0.827f, 48f, 48f);
+            rule.raycastTarget = false;
+
+            back = MakeButton(shade.rectTransform, "BackButton", "BACK", PanelLift, Border);
+            back.GetComponent<UIButtonSound>().voice = UIButtonSound.Voice.Back;
+            var backRect = (RectTransform)back.transform;
+            backRect.anchorMin = new Vector2(1f, 0f);
+            backRect.anchorMax = new Vector2(1f, 0f);
+            backRect.pivot = new Vector2(1f, 0f);
+            backRect.sizeDelta = new Vector2(260f, 68f);
+            backRect.anchoredPosition = new Vector2(-40f, 34f);
+
+            // Everything between the rule and the back button. Fractions of the screen
+            // rather than pixels from an edge, so it cannot collide at a shorter window.
+            var bodyGo = new GameObject("Body", typeof(RectTransform));
+            bodyGo.transform.SetParent(shade.rectTransform, false);
+            body = (RectTransform)bodyGo.transform;
+            Span(body, 0.10f, 0.80f, 48f, 48f);
+
+            return shade;
+        }
+
+        /// <summary>
+        /// Four columns that divide whatever width they are given.
+        ///
+        /// Used by both new overlays. A layout group rather than four anchored boxes for
+        /// the reason the nav row is one: a fixed column width is right at one window size.
+        /// </summary>
+        static RectTransform[] BuildColumns(RectTransform body, int count,
+                                            out TMP_Text[] headings)
+        {
+            var row = body.gameObject.AddComponent<HorizontalLayoutGroup>();
+            row.spacing = 28f;
+            row.childForceExpandWidth = true;
+            row.childForceExpandHeight = true;
+            row.childControlWidth = true;
+            row.childControlHeight = true;
+
+            var columns = new RectTransform[count];
+            headings = new TMP_Text[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var colGo = new GameObject($"Column{i}", typeof(RectTransform));
+                colGo.transform.SetParent(body, false);
+                var col = (RectTransform)colGo.transform;
+
+                headings[i] = Label(col, "Heading", "", 22,
+                                    TextAlignmentOptions.TopLeft, Accent);
+                Span(headings[i].rectTransform, 0.93f, 1f, 0f, 0f);
+
+                var listGo = new GameObject("Rows", typeof(RectTransform));
+                listGo.transform.SetParent(col, false);
+                var list = (RectTransform)listGo.transform;
+                Span(list, 0f, 0.92f, 0f, 0f);
+
+                var stack = listGo.AddComponent<VerticalLayoutGroup>();
+                stack.spacing = 10f;
+                stack.childForceExpandWidth = true;
+                stack.childForceExpandHeight = false;
+                stack.childControlWidth = true;
+                stack.childControlHeight = true;
+
+                columns[i] = list;
+            }
+
+            return columns;
         }
 
         // ------------------------------------------------------------------
@@ -1608,6 +1871,28 @@ namespace FPSKit.EditorTools
         /// The face is left white so Button's colour tint, which multiplies, produces the
         /// state colours exactly rather than a darkened version of them.
         /// </summary>
+        /// <summary>
+        /// One button in the dashboard's nav row.
+        ///
+        /// Goes through <see cref="MakeButton"/> like everything clickable in this file --
+        /// everything else the builder draws is raycastTarget = false, so a Button built by
+        /// hand is inert *silently*: it highlights nothing, receives nothing, and looks
+        /// exactly like a button whose handler is broken. That is what Exit Game once did.
+        /// </summary>
+        static Button NavButton(RectTransform parent, string name, string caption, Color accent)
+        {
+            var button = MakeButton(parent, name, caption, PanelLift, accent);
+
+            // A layout group sizes its children, so the size goes here rather than on the
+            // rect -- writing sizeDelta on a child of a layout group is the same mistake as
+            // writing anchoredPosition on a child of a grid.
+            var element = button.gameObject.AddComponent<LayoutElement>();
+            element.preferredWidth = 300f;
+            element.minWidth = 180f;
+
+            return button;
+        }
+
         static Button MakeButton(RectTransform parent, string name, string caption,
                                  Color normal, Color hover)
         {

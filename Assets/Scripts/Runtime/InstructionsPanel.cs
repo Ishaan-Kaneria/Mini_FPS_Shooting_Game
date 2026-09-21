@@ -41,6 +41,17 @@ public class InstructionsPanel : OverlayPanel
 
     readonly List<InstructionRow> _rows = new();
 
+    /// <summary>Switches a whole column off. The rows hang off the scroll view's content,
+    /// so the object to switch is its grandparent -- the viewport is in between.</summary>
+    void SetColumnShown(int index, bool shown)
+    {
+        var column = columns[index];
+        var viewport = column.parent as RectTransform;
+        var root = viewport != null ? viewport.parent as RectTransform : null;
+
+        (root != null ? root.gameObject : column.gameObject).SetActive(shown);
+    }
+
     protected override void OnOpened()
     {
         if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
@@ -58,16 +69,53 @@ public class InstructionsPanel : OverlayPanel
 
         var groups = touch ? TouchPages() : KeyPages();
 
+        // Same rule as the achievements screen: a handset gets one column and a tablet two,
+        // because four columns on a 147mm screen are four strips too narrow to hold a
+        // sentence. The pages keep their order, so the screen is the same screen.
+        int wide = DeviceProfile.CurrentForm switch
+        {
+            DeviceProfile.Form.Handset => 1,
+            DeviceProfile.Form.Tablet => 2,
+            _ => groups.Count,
+        };
+
+        bool headingsAbove = wide >= groups.Count;
+
+        if (columns != null)
+            for (int c = 0; c < columns.Length; c++)
+                if (columns[c] != null)
+                    SetColumnShown(c, c < wide);
+
+        if (columnHeadings != null)
+            for (int h = 0; h < columnHeadings.Length; h++)
+                if (columnHeadings[h] != null)
+                    columnHeadings[h].gameObject.SetActive(headingsAbove && h < wide);
+
         for (int i = 0; i < groups.Count; i++)
         {
-            if (columnHeadings != null && i < columnHeadings.Length && columnHeadings[i] != null)
-                columnHeadings[i].text = groups[i].Heading.ToUpperInvariant();
+            int target = wide <= 0 ? 0 : i % wide;
 
-            if (columns == null || i >= columns.Length || columns[i] == null) continue;
+            if (columns == null || target >= columns.Length || columns[target] == null) continue;
+
+            if (headingsAbove)
+            {
+                if (columnHeadings != null && i < columnHeadings.Length && columnHeadings[i] != null)
+                    columnHeadings[i].text = groups[i].Heading.ToUpperInvariant();
+            }
+            else if (rowTemplate != null)
+            {
+                // The heading travels with its rows when a column holds more than one page,
+                // or it would label only the first of them.
+                var heading = Instantiate(rowTemplate, columns[target]);
+                heading.gameObject.SetActive(true);
+                heading.Bind("", groups[i].Heading.ToUpperInvariant());
+                if (heading.saysText != null) heading.saysText.color = UITheme.Hazard;
+                _rows.Add(heading);
+            }
 
             foreach (var line in groups[i].Lines)
             {
-                var row = Instantiate(rowTemplate, columns[i]);
+                var row = Instantiate(rowTemplate, columns[target]);
                 row.gameObject.SetActive(true);
                 row.Bind(line.Control, line.Says);
                 _rows.Add(row);

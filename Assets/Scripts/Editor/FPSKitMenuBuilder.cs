@@ -1329,6 +1329,7 @@ namespace FPSKit.EditorTools
             panel.categoryColumns = columns;
             panel.categoryHeadings = headings;
             panel.rowTemplate = BuildAchievementRowTemplate(shade.rectTransform);
+            panel.headingTemplate = BuildInstructionRowTemplate(shade.rectTransform);
 
             menu.achievements = panel;
             shade.gameObject.SetActive(false);
@@ -1373,12 +1374,39 @@ namespace FPSKit.EditorTools
             fill.raycastTarget = false;
             row.progressFill = fill;
 
-            var mark = Label(rect, "Mark", "\u2713", 30, TextAlignmentOptions.Midline, UITheme.Good);
-            Span(mark.rectTransform, 0.30f, 0.90f, 0f, 20f);
-            mark.rectTransform.anchorMin = new Vector2(1f, 0.30f);
-            mark.rectTransform.anchorMax = new Vector2(1f, 0.90f);
-            mark.rectTransform.sizeDelta = new Vector2(46f, 0f);
-            row.earnedMark = mark.gameObject;
+            // Drawn from two bars rather than typed as U+2713. The project's only font is
+            // LiberationSans SDF, which has no tick: TMP substitutes U+25A1 and logs it, so
+            // what appeared beside the word COMPLETE was an empty box -- which reads as a
+            // rendering fault rather than as a mark. Two rotated rectangles need no glyph
+            // and cannot fall back to anything.
+            var markGo = new GameObject("Mark", typeof(RectTransform));
+            markGo.transform.SetParent(rect, false);
+            var markRect = (RectTransform)markGo.transform;
+            markRect.anchorMin = new Vector2(1f, 0.5f);
+            markRect.anchorMax = new Vector2(1f, 0.5f);
+            markRect.pivot = new Vector2(1f, 0.5f);
+            markRect.sizeDelta = new Vector2(30f, 30f);
+            markRect.anchoredPosition = new Vector2(-14f, 14f);
+
+            var shortArm = Block(markRect, "Short", UITheme.Good);
+            shortArm.raycastTarget = false;
+            var shortRect = shortArm.rectTransform;
+            shortRect.anchorMin = shortRect.anchorMax = new Vector2(0.5f, 0.5f);
+            shortRect.pivot = new Vector2(0.5f, 0.5f);
+            shortRect.sizeDelta = new Vector2(13f, 4f);
+            shortRect.anchoredPosition = new Vector2(-8f, -3f);
+            shortRect.localRotation = Quaternion.Euler(0f, 0f, -45f);
+
+            var longArm = Block(markRect, "Long", UITheme.Good);
+            longArm.raycastTarget = false;
+            var longRect = longArm.rectTransform;
+            longRect.anchorMin = longRect.anchorMax = new Vector2(0.5f, 0.5f);
+            longRect.pivot = new Vector2(0.5f, 0.5f);
+            longRect.sizeDelta = new Vector2(24f, 4f);
+            longRect.anchoredPosition = new Vector2(2f, 1f);
+            longRect.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+            row.earnedMark = markGo;
 
             rowGo.SetActive(false);
             return row;
@@ -1515,10 +1543,34 @@ namespace FPSKit.EditorTools
                                     TextAlignmentOptions.TopLeft, Accent);
                 Span(headings[i].rectTransform, 0.93f, 1f, 0f, 0f);
 
+                // A scroll view rather than a plain stack, and this is the fix for a bug
+                // that is on screen as well as a requirement for a phone.
+                //
+                // A VerticalLayoutGroup neither clips nor scrolls: content that does not
+                // fit is simply drawn past the edge, which is how the eighth combat
+                // achievement ended up half off the bottom. Shrinking rows to fit buys one
+                // window size and loses at the next. A scroll view is correct at every
+                // size -- nothing to scroll when it all fits, and on a landscape handset,
+                // where twenty rows are never going to fit sixty-six millimetres, it is
+                // the only honest answer.
+                var viewGo = new GameObject("Viewport", typeof(RectTransform));
+                viewGo.transform.SetParent(col, false);
+                var view = (RectTransform)viewGo.transform;
+                Span(view, 0f, 0.92f, 0f, 0f);
+
+                var mask = viewGo.AddComponent<Image>();
+                mask.color = new Color(0f, 0f, 0f, 0f);
+                mask.raycastTarget = true;
+                viewGo.AddComponent<RectMask2D>();
+
                 var listGo = new GameObject("Rows", typeof(RectTransform));
-                listGo.transform.SetParent(col, false);
+                listGo.transform.SetParent(view, false);
                 var list = (RectTransform)listGo.transform;
-                Span(list, 0f, 0.92f, 0f, 0f);
+                list.anchorMin = new Vector2(0f, 1f);
+                list.anchorMax = new Vector2(1f, 1f);
+                list.pivot = new Vector2(0.5f, 1f);
+                list.offsetMin = new Vector2(0f, 0f);
+                list.offsetMax = new Vector2(0f, 0f);
 
                 var stack = listGo.AddComponent<VerticalLayoutGroup>();
                 stack.spacing = 10f;
@@ -1526,6 +1578,25 @@ namespace FPSKit.EditorTools
                 stack.childForceExpandHeight = false;
                 stack.childControlWidth = true;
                 stack.childControlHeight = true;
+
+                // Without this the content rect never grows to hold its rows, so the
+                // scroll view has nothing to scroll and clips everything below the fold.
+                var fitter = listGo.AddComponent<ContentSizeFitter>();
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+                var scroll = colGo.AddComponent<ScrollRect>();
+                scroll.viewport = view;
+                scroll.content = list;
+                scroll.horizontal = false;
+                scroll.vertical = true;
+                scroll.movementType = ScrollRect.MovementType.Elastic;
+                scroll.elasticity = 0.08f;
+                scroll.scrollSensitivity = 30f;
+
+                // Inertia is what makes a flick feel like a flick rather than a drag, and
+                // a phone is the only place anybody flicks this.
+                scroll.inertia = true;
+                scroll.decelerationRate = 0.135f;
 
                 columns[i] = list;
             }

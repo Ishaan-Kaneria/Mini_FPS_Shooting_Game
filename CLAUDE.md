@@ -1280,3 +1280,11 @@ because the card is read to find out what pressing the button does.
 - Placeholder audio is synthesised by `Tools/generate-placeholder-audio.py` (stdlib only). It draws from one seeded random stream, so a new clip that uses noise must save and restore `random.getstate()` around itself or every sound authored below it is re-rolled into an identical-sounding but byte-different file.
 - Arena previews (`FPSKit_Generated/Previews/`) are rendered from the built scenes by the dashboard builder. Render them through `RenderPipeline.SubmitRenderRequest`, not `Camera.Render()` — the latter predates scriptable pipelines and under URP returns a frame with the skybox and essentially no lighting, so every arena comes back as black silhouettes. Call `DynamicGI.UpdateEnvironment()` after opening a scene and submit twice, or the first arena captured is lit by nothing while the rest look right.
 - **If a build suddenly has no sound, suspect `Library/` before the files.** A corrupted asset database makes Unity import every `.wav` as a `DefaultAsset` rather than an `AudioClip`, with no error logged anywhere; the builder then writes null into every audio slot and saves a mute scene over a working one. Closing Unity and deleting `Library/` fixes it. `FPSKitSceneBuilder.Clip` now warns per clip and `ReportMissingClips` sums it up at the end of a build, so this is loud rather than silent.
+- **A Unity skill's advice yields to this file.** The `unity` plugin's skills are written for a
+  generic Unity 6 project and several of them are confidently wrong here: the package-selection
+  skill recommends the new Input System for an FPS, and the UI skills route to prefab or UXML
+  authoring. This project is legacy-`Input`-only on purpose, and its UI is *constructed in C#* by
+  `FPSKitMenuBuilder` and `FPSKitSceneBuilder`, so a prefab edit is erased by the next build. The
+  skills are still worth reading -- `optimize-web`, `initialize-ai-navigation`,
+  `physics-3d-collision` and `urp-postprocessing` all apply -- but read them for the technique and
+  keep the conventions above. Where the two disagree, this file wins.

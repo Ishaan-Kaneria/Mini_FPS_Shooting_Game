@@ -219,6 +219,11 @@ namespace FPSKit.EditorTools
                     // river cut through it, rather than a hundred and fifty metres of
                     // floor with walls at the edge -- see FPSKitOpenZone.
                     t.openZone = true;
+
+                    // Explicit now that BuildDuneField reads this. It was getting Sand from
+                    // a hard-coded string; the default on LevelTheme is Concrete, which
+                    // would have quietly turned the dunes to pavement.
+                    t.floorDetail = "Sand";
                     t.arenaSize = 450f;
                     t.apronSize = 1100f;
                     t.wallHeight = 5f;
@@ -393,35 +398,61 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Abandoned Subway":
-                    t.description = "Tight, dark, claustrophobic. Flickering service lights.";
+                    t.description = "Moonlight, sodium lamps and holes in the ground.";
 
-                    t.subwayZone = true;
+                    t.parkZone = true;
+
+                    // The ground is the desert's, subsided: same heightfield, same
+                    // relaxation, same smoothing, so it rolls the way ground does rather
+                    // than the way noise does. Lower and longer than the dunes, because
+                    // this is subsidence under a car park and not a wind form.
+                    t.duneHeight = 7.5f;
+                    t.duneWavelength = 120f;
+                    t.apronSize = 700f;
 
                     // Tiled throughout, which is the one surface here with a man-made
                     // rhythm -- and that rhythm is what tells a player how far down a
                     // platform they are looking.
-                    t.floorDetail = "Tile";
-                    t.wallDetail = "Tile";
+                    // Old asphalt and packed dirt, not tile -- and emphatically not the dune
+                    // field's wind ripples, which would make this a desert with rides in it.
+                    t.floorDetail = "Concrete";
+                    t.wallDetail = "Timber";
                     t.floorDetailSize = 2.4f;
                     t.wallDetailSize = 2f;
-                    t.skyTint = new Color(0.05f, 0.05f, 0.06f);
+                    // A night sky, not an absence of one. Pure black overhead gives every
+                    // silhouette a hard edge against nothing, which reads as a cut-out
+                    // rather than as a skyline.
+                    t.skyTint = new Color(0.07f, 0.09f, 0.15f);
                     t.skyGroundColor = new Color(0.03f, 0.03f, 0.03f);
                     t.atmosphereThickness = 0.3f;
                     t.skyExposure = 0.25f;
-                    t.sunColor = new Color(0.5f, 0.55f, 0.6f);
-                    t.sunIntensity = 0.15f;
-                    t.sunAngles = new Vector2(80f, 0f);
+                    t.sunColor = new Color(0.62f, 0.70f, 0.93f);
+                    // <b>A real moon.</b> The arena this replaced ran at 0.15 with almost no
+                    // ambient and rendered as a dark rectangle -- every bit of its geometry
+                    // present and none of it visible. Dark is a lighting design, not the
+                    // absence of one: the moon has to be strong enough to model the ground
+                    // and throw a shadow, and the dread comes from the colour and the long
+                    // shadows rather than from there being nothing to see.
+                    t.sunIntensity = 0.62f;
+                    // Low, so everything on this ground casts a long shadow across it.
+                    t.sunAngles = new Vector2(26f, 214f);
                     t.shadowStrength = 0.4f;
-                    t.fogColor = new Color(0.05f, 0.055f, 0.06f);
+                    t.fogColor = new Color(0.10f, 0.12f, 0.18f);
                     // Thinner than it was. Underground there is little to fog, and what has to
                     // carry is the daylight down the collapses -- heavy fog swallows exactly
                     // that and leaves the player nothing to navigate by.
-                    t.fogDensity = 0.016f;
-                    t.ambientSky = new Color(0.09f, 0.09f, 0.10f);
-                    t.ambientEquator = new Color(0.06f, 0.06f, 0.07f);
-                    t.ambientGround = new Color(0.02f, 0.02f, 0.02f);
-                    t.floorColor = new Color(0.12f, 0.12f, 0.12f);
-                    t.wallColor = new Color(0.17f, 0.16f, 0.15f);
+                    // 0.016 is an interior number. Outdoors at 450m it is opaque well before the
+                    // far side, and a fog that hides the far half of the map does not read
+                    // as atmosphere, it reads as an empty arena.
+                    t.fogDensity = 0.0034f;
+                    t.ambientSky = new Color(0.17f, 0.20f, 0.27f);
+                    t.ambientEquator = new Color(0.10f, 0.11f, 0.15f);
+                    t.ambientGround = new Color(0.05f, 0.05f, 0.06f);
+                    // Light enough to catch the moon. At 0.12 the ground returned almost nothing
+                    // and the relief in it -- which is the point of this arena -- was
+                    // invisible.
+                    t.floorColor = new Color(0.27f, 0.26f, 0.24f);
+                    t.wallColor = new Color(0.32f, 0.30f, 0.27f);
                     t.coverColors = new[]
                     {
                         new Color(0.14f, 0.14f, 0.13f),

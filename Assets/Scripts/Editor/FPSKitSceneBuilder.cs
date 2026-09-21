@@ -643,7 +643,7 @@ namespace FPSKit.EditorTools
             // The industrial zone is asked about first: a theme that sets both is asking
             // for a factory, and a factory cannot also be a river valley.
             if (_theme.industrialZone) { BuildIndustrialZone(); return; }
-            if (_theme.subwayZone) { BuildSubwayZone(); return; }
+            if (_theme.parkZone) { BuildParkZone(); return; }
             if (_theme.openZone) { BuildOpenZone(); return; }
 
             _claimed.Clear();
@@ -2179,7 +2179,7 @@ namespace FPSKit.EditorTools
         private static Transform[] BuildSpawnPoints()
         {
             if (_theme.industrialZone) return BuildZoneSpawnPoints();
-            if (_theme.subwayZone) return BuildSubwaySpawnPoints();
+            if (_theme.parkZone) return BuildOpenZoneSpawnPoints();
             if (_theme.openZone) return BuildOpenZoneSpawnPoints();
 
             var root = new GameObject("SpawnPoints").transform;

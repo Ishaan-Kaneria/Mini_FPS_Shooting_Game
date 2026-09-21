@@ -363,7 +363,14 @@ namespace FPSKit.EditorTools
             _groundReady = true;
 
             // ---- mesh it ----
-            var sand = MakeDetailMaterial("Sand", _theme.floorColor, "Sand", 0.09f,
+            // <b>Which surface, from the theme.</b> Hard-coded to Sand this drew wind
+            // ripples on every heightfield, which is right for a dune field and wrong for
+            // anything else that wants relief -- an abandoned park on rippled sand reads as
+            // a desert with rides standing in it. The tiling stays as it was so the desert
+            // is unchanged.
+            string detail = string.IsNullOrEmpty(_theme.floorDetail) ? "Sand" : _theme.floorDetail;
+
+            var sand = MakeDetailMaterial("Ground", _theme.floorColor, detail, 0.09f,
                                           _theme.floorSmoothness * 0.4f, 0f, 1.15f);
 
             const int chunkCells = 30;

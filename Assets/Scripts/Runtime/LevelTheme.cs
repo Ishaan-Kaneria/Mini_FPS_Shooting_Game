@@ -240,9 +240,14 @@ public class LevelTheme : ScriptableObject
     public string floorTag = "Concrete";
     public string wallTag = "Concrete";
 
-    [Tooltip("Build this arena as an underground station: twin platform halls, a concourse " +
-             "over them, tunnels and fallen-in roof. Big in extent and tight in every " +
-             "sightline, which is how a station stays claustrophobic at 450m.")]
+    [Tooltip("Build this arena as an abandoned park: smooth subsided ground with broad " +
+             "hollows in it, four rides to navigate by, and shafts in the floor of some " +
+             "hollows that kill on contact. One continuous walkable surface -- there are " +
+             "no levels to connect, which is the whole reason it is built this way.")]
+    public bool parkZone;
+
+    [Tooltip("Superseded by parkZone. Kept so an asset written with it still loads rather " +
+             "than silently losing the field; nothing reads it.")]
     public bool subwayZone;
 
     [Header("Surface detail")]

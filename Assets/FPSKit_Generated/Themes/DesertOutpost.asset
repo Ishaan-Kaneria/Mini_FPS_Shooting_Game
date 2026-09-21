@@ -82,8 +82,9 @@ MonoBehaviour:
   coverMetallic: 0
   floorTag: Concrete
   wallTag: Concrete
+  parkZone: 0
   subwayZone: 0
-  floorDetail: Concrete
+  floorDetail: Sand
   wallDetail: Concrete
   floorDetailSize: 4
   wallDetailSize: 3

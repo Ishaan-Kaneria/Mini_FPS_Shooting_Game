@@ -52,6 +52,15 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static readonly (string Type, string Member, string Why)[] Exempt =
         {
+            ("UITheme", "Signals",
+             "a readonly array of colours, written once where it is declared and never " +
+             "again: SignalFor only indexes it, so there is nothing to go stale"),
+
+            ("Achievements", "All",
+             "the catalogue, built once and never written to. Every entry derives its " +
+             "progress from PlayerStats when it is asked, so what it reports is live even " +
+             "though the array itself survives a play session"),
+
             ("EnemyAI", "NeighbourBuffer",
              "scratch buffer: OverlapSphereNonAlloc rewrites it before every read and " +
              "the loop is bounded by the returned count, so nothing stale is ever read"),
@@ -197,6 +206,21 @@ namespace FPSKit.EditorTools
                                                      BindingFlags.DeclaredOnly))
                 {
                     if (field.IsLiteral) continue;   // const
+
+                    // <b>A readonly field of an immutable type is not state.</b> A colour,
+                    // a number or a string assigned where it is declared cannot change
+                    // after that, so there is nothing to go stale between play sessions and
+                    // a reset hook would have nothing to reset. Color cannot be const --
+                    // it is not a compile-time constant -- so UITheme's palette is
+                    // static readonly and was being reported as nineteen missing hooks.
+                    //
+                    // Deliberately only value types and strings. A readonly *array* or list
+                    // is still state: the reference cannot change and its contents very much
+                    // can, which is exactly why EnemyAI.NeighbourBuffer is exempted by name
+                    // below rather than by this rule.
+                    if (field.IsInitOnly &&
+                        (field.FieldType.IsValueType || field.FieldType == typeof(string)))
+                        continue;
                     found.Add(new Tracked { Name = FriendlyName(field.Name), Member = field });
                 }
 

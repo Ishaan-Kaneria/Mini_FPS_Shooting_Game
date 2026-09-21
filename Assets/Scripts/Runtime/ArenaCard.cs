@@ -73,8 +73,24 @@ public class ArenaCard : HoverCard
                                                        (NameTop - NameBottom));
     }
 
-    public void Bind(ArenaCatalog.Entry entry, UnityEngine.Events.UnityAction onChosen)
+    /// <summary>
+    /// The colour this arena wears on every screen it appears on.
+    ///
+    /// <b>Not the theme's accent, and that distinction is the whole of why this grid used
+    /// to read as one colour.</b> <c>LevelTheme.accentLightColor</c> is a *lighting* value
+    /// -- what the practicals in that arena glow -- so it is muted by the job it actually
+    /// does, and three of the six themes never set it at all and fell back to the same
+    /// orange. A card's colour is an identity: it has to be bright, and it has to be
+    /// unmistakable beside the other five. Those are different requirements and they now
+    /// come from different places.
+    /// </summary>
+    public Color Signal { get; private set; } = UITheme.Hazard;
+
+    public void Bind(ArenaCatalog.Entry entry, int arenaIndex,
+                     UnityEngine.Events.UnityAction onChosen)
     {
+        Signal = UITheme.SignalFor(arenaIndex);
+
         ApplyPhoneLayout();
 
         Entry = entry;
@@ -87,7 +103,7 @@ public class ArenaCard : HoverCard
 
         if (bestText != null) bestText.text = ProgressLine(entry);
 
-        if (accentBar != null) accentBar.color = entry.Accent;
+        if (accentBar != null) accentBar.color = Signal;
 
         if (preview != null)
         {

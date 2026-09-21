@@ -54,17 +54,27 @@ namespace FPSKit.EditorTools
         // every box on its own, which is what lets the fills go this dark without the
         // layout dissolving.
         // ------------------------------------------------------------------
-        static readonly Color Backdrop = new Color32(0x04, 0x06, 0x0A, 0xFF);
-        static readonly Color Panel = new Color32(0x0F, 0x13, 0x18, 0xFF);
-        static readonly Color PanelLift = new Color32(0x1C, 0x22, 0x2B, 0xFF);
-        static readonly Color Border = new Color32(0x5C, 0x69, 0x7A, 0xFF);
-        static readonly Color Accent = new Color32(0xFF, 0xBA, 0x3F, 0xFF);
-        static readonly Color Ink = new Color32(0xF5, 0xF8, 0xFB, 0xFF);
-        static readonly Color InkDim = new Color32(0xAB, 0xB6, 0xC2, 0xFF);
+        // These are UITheme's, named as the builder has always named them. The ramp the
+        // comment above argues for is unchanged -- three steps far enough apart to read as
+        // stacked -- but it now starts at a colour instead of at near-black, and the one
+        // amber has become six signals that each mean a particular arena.
+        static readonly Color Backdrop = UITheme.Well;
+        static readonly Color Panel = UITheme.Chassis;
+        static readonly Color PanelLift = UITheme.Plate;
+        static readonly Color Border = UITheme.Seam;
+        static readonly Color Ink = UITheme.Ink;
+        static readonly Color InkDim = UITheme.InkDim;
+
+        /// <summary>
+        /// The default signal, for chrome that belongs to no particular arena -- the title
+        /// rule, the wallet, a section heading. Anything that *is* an arena takes its own
+        /// from <see cref="UITheme.SignalFor"/> instead.
+        /// </summary>
+        static readonly Color Accent = UITheme.Hazard;
 
         /// <summary>Leaving is the one destructive thing on this screen, so it is the one red.</summary>
         static readonly Color Danger = new Color32(0xA8, 0x2A, 0x1B, 0xFF);
-        static readonly Color DangerLift = new Color32(0xE8, 0x50, 0x3C, 0xFF);
+        static readonly Color DangerLift = UITheme.Warning;
 
         static Sprite _flat;
 

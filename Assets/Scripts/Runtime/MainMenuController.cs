@@ -337,7 +337,7 @@ public class MainMenuController : MonoBehaviour
             if (!loadable) missing++;
 
             var captured = entry;
-            card.Bind(entry, () => Choose(captured));
+            card.Bind(entry, _cards.Count, () => Choose(captured));
 
             if (!loadable && card.button != null) card.button.interactable = false;
 

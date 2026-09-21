@@ -325,6 +325,18 @@ namespace FPSKit.EditorTools
         public static void VerifyTouch() => FPSKitTouchTest.VerifyTouch();
 
         /// <summary>
+        /// Asserts every class of screen is laid out for the hands that are on it.
+        ///
+        /// Cheap -- it starts no play session and builds no scene, because the decision it
+        /// checks is arithmetic over four readings. It is the regression test for a desktop
+        /// that measured itself as a handset: the density a monitor reports sits below the
+        /// floor the touch layer clamps to, so asking the touch layer substituted a phone's
+        /// density and every desktop player lost the arena descriptions and the career
+        /// panel to a layout meant for a thumb.
+        /// </summary>
+        public static void VerifyDevices() => Run(FPSKitDeviceTest.VerifyDevices);
+
+        /// <summary>
         /// Builds one scene and then asserts it is actually playable.
         ///
         /// A build that throws no exception still proves very little: the builder wires

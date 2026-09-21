@@ -25,12 +25,12 @@ MonoBehaviour:
   shadowStrength: 0.4
   fogEnabled: 1
   fogColor: {r: 0.05, g: 0.055, b: 0.06, a: 1}
-  fogDensity: 0.045
+  fogDensity: 0.016
   ambientSky: {r: 0.09, g: 0.09, b: 0.1, a: 1}
   ambientEquator: {r: 0.06, g: 0.06, b: 0.07, a: 1}
   ambientGround: {r: 0.02, g: 0.02, b: 0.02, a: 1}
-  arenaSize: 70
-  wallHeight: 5
+  arenaSize: 450
+  wallHeight: 13
   randomSeed: 13
   scaleLayoutWithArea: 1
   layoutReferenceSize: 60
@@ -82,6 +82,7 @@ MonoBehaviour:
   coverMetallic: 0
   floorTag: Concrete
   wallTag: Concrete
+  subwayZone: 1
   floorDetail: Tile
   wallDetail: Tile
   floorDetailSize: 2.4

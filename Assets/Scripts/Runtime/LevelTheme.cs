@@ -240,6 +240,11 @@ public class LevelTheme : ScriptableObject
     public string floorTag = "Concrete";
     public string wallTag = "Concrete";
 
+    [Tooltip("Build this arena as an underground station: twin platform halls, a concourse " +
+             "over them, tunnels and fallen-in roof. Big in extent and tight in every " +
+             "sightline, which is how a station stays claustrophobic at 450m.")]
+    public bool subwayZone;
+
     [Header("Surface detail")]
     [Tooltip("Which generated detail map this arena's floor wears: Concrete, Metal, Snow, " +
              "Tile, Sand, Rock, Timber or Adobe. Empty means flat colour, which is what " +

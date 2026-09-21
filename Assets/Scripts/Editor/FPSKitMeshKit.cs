@@ -341,9 +341,22 @@ namespace FPSKit.EditorTools
             volume.transform.rotation = Quaternion.identity;
 
             var modifier = volume.AddComponent<Unity.AI.Navigation.NavMeshModifierVolume>();
-            modifier.size = new Vector3(Mathf.Max(0.5f, bounds.size.x - 1.2f),
+
+            // <b>size is in local space, so it is multiplied by whatever the parent is
+            // scaled to.</b> Every caller until now was an art-pack prefab sitting at scale
+            // one, where that is invisible -- but a CreateBlock primitive is a unit cube
+            // whose *scale is its size*, so a 121 x 450 block produced a Not Walkable
+            // volume 121 x 450 times too big. Two of those blanketed an entire arena and
+            // the bake came back with no navmesh anywhere: the scene built, the log said
+            // nothing, and the level had nowhere to spawn a single enemy.
+            var lossy = volume.transform.lossyScale;
+            Vector3 world = new Vector3(Mathf.Max(0.5f, bounds.size.x - 1.2f),
                                         bounds.size.y + 4f,
                                         Mathf.Max(0.5f, bounds.size.z - 1.2f));
+
+            modifier.size = new Vector3(world.x / Mathf.Max(0.0001f, Mathf.Abs(lossy.x)),
+                                        world.y / Mathf.Max(0.0001f, Mathf.Abs(lossy.y)),
+                                        world.z / Mathf.Max(0.0001f, Mathf.Abs(lossy.z)));
             modifier.area = 1;   // Not Walkable
         }
 

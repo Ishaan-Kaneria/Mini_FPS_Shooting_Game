@@ -395,6 +395,8 @@ namespace FPSKit.EditorTools
                 case "Abandoned Subway":
                     t.description = "Tight, dark, claustrophobic. Flickering service lights.";
 
+                    t.subwayZone = true;
+
                     // Tiled throughout, which is the one surface here with a man-made
                     // rhythm -- and that rhythm is what tells a player how far down a
                     // platform they are looking.
@@ -411,7 +413,10 @@ namespace FPSKit.EditorTools
                     t.sunAngles = new Vector2(80f, 0f);
                     t.shadowStrength = 0.4f;
                     t.fogColor = new Color(0.05f, 0.055f, 0.06f);
-                    t.fogDensity = 0.045f;
+                    // Thinner than it was. Underground there is little to fog, and what has to
+                    // carry is the daylight down the collapses -- heavy fog swallows exactly
+                    // that and leaves the player nothing to navigate by.
+                    t.fogDensity = 0.016f;
                     t.ambientSky = new Color(0.09f, 0.09f, 0.10f);
                     t.ambientEquator = new Color(0.06f, 0.06f, 0.07f);
                     t.ambientGround = new Color(0.02f, 0.02f, 0.02f);
@@ -424,8 +429,13 @@ namespace FPSKit.EditorTools
                         new Color(0.11f, 0.13f, 0.13f)
                     };
                     t.coverTag = "Concrete";
-                    t.arenaSize = 70f;
-                    t.wallHeight = 5f;
+                    // 450 to match the desert, against the 70 this was. That size is why the
+                    // arena read as a prototype: a seventy-metre box is not a small station,
+                    // it is a room. The claustrophobia now comes from the plan -- halls and
+                    // passages -- rather than from the walls being close together.
+                    t.arenaSize = 450f;
+                    // Tall enough to carry a concourse over the platform halls.
+                    t.wallHeight = 13f;
                     // Dense and column-heavy. Nothing should be visible for long.
                     t.roomCount = 4;
                     t.platformCount = 1;

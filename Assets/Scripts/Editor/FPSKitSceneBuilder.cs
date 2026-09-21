@@ -438,6 +438,11 @@ namespace FPSKit.EditorTools
             // arena passes, not where the two that use it do.
             ResetTerrain();
 
+            // Cleared here rather than in the layout that sets it, so every arena passes --
+            // the same shape as ResetTerrain above, and for the same reason: a static left
+            // behind by the previous arena in a six-arena batch is used by the next one.
+            _playerStart = null;
+
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
             BuildLighting();
@@ -623,11 +628,22 @@ namespace FPSKit.EditorTools
         private static float Metres(float metresPerTile)
             => 1f / Mathf.Max(0.25f, metresPerTile);
 
+        /// <summary>
+        /// Where this layout wants the player to begin, or null to stand them on the ground
+        /// at the origin.
+        ///
+        /// Cleared per arena in the same place ResetTerrain is called, and for the same
+        /// reason: BuildAllThemes builds six arenas in one editor process, so a start
+        /// position left behind by the previous one would be used by the next.
+        /// </summary>
+        private static Vector3? _playerStart;
+
         private static void BuildArena()
         {
             // The industrial zone is asked about first: a theme that sets both is asking
             // for a factory, and a factory cannot also be a river valley.
             if (_theme.industrialZone) { BuildIndustrialZone(); return; }
+            if (_theme.subwayZone) { BuildSubwayZone(); return; }
             if (_theme.openZone) { BuildOpenZone(); return; }
 
             _claimed.Clear();
@@ -1641,7 +1657,14 @@ namespace FPSKit.EditorTools
             // alternative -- flattening a pad there and pinning it to zero so this line
             // stays true -- put a crater in the middle of the map whose rim was the
             // steepest ground in the level.
-            player.transform.position = new Vector3(0f, GroundHeightAt(0f, 0f) + 1f, 0f);
+            // <b>A layout whose walkable surface does not start at ground level has to say
+            // so.</b> GroundHeightAt answers for terrain, and for a flat floor it answers
+            // zero -- which is right for every arena whose ground is the ground, and wrong
+            // for a station, where the concourse is a metre and a bit up and y=1 puts the
+            // player inside the slab. That is not a small error: embedded in geometry the
+            // player is on no navmesh at all, so *nothing* in the level can reach them, and
+            // what the check reports is 100% of the arena stranded.
+            player.transform.position = _playerStart ?? new Vector3(0f, GroundHeightAt(0f, 0f) + 1f, 0f);
 
             var cc = player.AddComponent<CharacterController>();
             cc.height = 1.8f;
@@ -2156,6 +2179,7 @@ namespace FPSKit.EditorTools
         private static Transform[] BuildSpawnPoints()
         {
             if (_theme.industrialZone) return BuildZoneSpawnPoints();
+            if (_theme.subwayZone) return BuildSubwaySpawnPoints();
             if (_theme.openZone) return BuildOpenZoneSpawnPoints();
 
             var root = new GameObject("SpawnPoints").transform;

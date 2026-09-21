@@ -123,6 +123,35 @@ public class InstructionsPanel : OverlayPanel
         }
     }
 
+
+    /// <summary>
+    /// Whether the story has handed the bomb over, and what to say when it has not.
+    ///
+    /// <b>A page that explains a control the player does not have is worse than a page
+    /// that omits it.</b> The bomb is the campaign's first reward, earned at
+    /// <see cref="Campaign.BombStarGate"/> stars, so before that there is no bomb key,
+    /// no bomb button in the thumb cluster and nothing in the HUD -- and this panel was
+    /// still teaching all three. What that produces is a player following written
+    /// instructions, finding no button where the game says there is one, and concluding
+    /// the controls are broken. Ishaan reported exactly that: "there is no bomb symbol,
+    /// so why".
+    ///
+    /// So the row stays, because the answer to "why" has to be somewhere, and it says
+    /// what it is and how far off it is. The count comes from the dashboard rather than
+    /// from a catalogue wired into this panel: it is the one object in this scene that
+    /// already holds the arena list, and this screen only ever opens over it.
+    /// </summary>
+    bool BombEarned => Campaign.HasPower(Campaign.BombPower);
+
+    string BombLockLine()
+    {
+        var menu = FindAnyObjectByType<MainMenuController>();
+        int stars = menu != null ? menu.TotalStars() : 0;
+
+        return $"Locked. Earn {Campaign.BombStarGate} stars and the story hands it over -- " +
+               $"you have {stars}.";
+    }
+
     readonly struct Line
     {
         public readonly string Control;
@@ -184,13 +213,19 @@ public class InstructionsPanel : OverlayPanel
             }),
 
             // The two nobody finds by experiment, and the reason this panel exists.
-            new Page("Equipment", new List<Line>
-            {
-                new Line(K(c.bomb), "Hold to aim the bomb. Let go to throw it."),
-                new Line("", "Tap it instead and the ring stays up. Tap again to throw."),
-                new Line("", "The mouse moves the marker, not your head."),
-                new Line(K(c.useItem), "Drink. Restores health."),
-            }),
+            new Page("Equipment", BombEarned
+                ? new List<Line>
+                {
+                    new Line(K(c.bomb), "Hold to aim the bomb. Let go to throw it."),
+                    new Line("", "Tap it instead and the ring stays up. Tap again to throw."),
+                    new Line("", "The mouse moves the marker, not your head."),
+                    new Line(K(c.useItem), "Drink. Restores health."),
+                }
+                : new List<Line>
+                {
+                    new Line("BOMB", BombLockLine()),
+                    new Line(K(c.useItem), "Drink. Restores health."),
+                }),
 
             new Page("Level", new List<Line>
             {
@@ -217,12 +252,18 @@ public class InstructionsPanel : OverlayPanel
                 new Line("RELOAD", "Reload."),
             }),
 
-            new Page("Equipment", new List<Line>
-            {
-                new Line("BOMB", "Hold it. Look further down to throw shorter, up to throw further."),
-                new Line("", "Let go to throw."),
-                new Line("DRINK", "Restores health."),
-            }),
+            new Page("Equipment", BombEarned
+                ? new List<Line>
+                {
+                    new Line("BOMB", "Hold it. Look further down to throw shorter, up to throw further."),
+                    new Line("", "Let go to throw."),
+                    new Line("DRINK", "Restores health."),
+                }
+                : new List<Line>
+                {
+                    new Line("BOMB", BombLockLine()),
+                    new Line("DRINK", "Restores health."),
+                }),
 
             new Page("Level", new List<Line>
             {

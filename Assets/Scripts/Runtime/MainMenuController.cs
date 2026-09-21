@@ -80,6 +80,15 @@ public class MainMenuController : MonoBehaviour
     [Tooltip("Heading above the grid. Moved with it when there is no result to show.")]
     public RectTransform arenaHeading;
 
+    [Header("Chrome")]
+    [Tooltip("The title bar. Compressed on a handset, where its authored height is a " +
+             "sixth of the screen rather than a tenth of it.")]
+    public RectTransform headerPanel;
+
+    [Tooltip("The row of dashboard buttons along the bottom. Given more height on a " +
+             "handset so each one clears the size a thumb can reliably hit.")]
+    public RectTransform navRow;
+
     [Tooltip("Space kept clear at the top for the result strip, in reference pixels.")]
     public float topWithResult = 320f;
 
@@ -180,6 +189,7 @@ public class MainMenuController : MonoBehaviour
         // on it, so the grid has to be fitted against the new size rather than the
         // authored one -- and FitGrid below is the first thing that measures.
         PhoneUI.Apply(GetComponentInParent<Canvas>());
+        ApplyFormLayout();
 
         // Before anything is drawn, because a star earned in the level just finished may
         // have opened something and the dashboard is where the player is told. The call
@@ -256,17 +266,15 @@ public class MainMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// Sizes the grid cells to the space there actually is, in both directions.
+    /// Sizes the arena cards to the space there actually is, in both directions, and
+    /// chooses how many go across. <see cref="UIGrid"/> owns the arithmetic; the three
+    /// card screens share it rather than keeping three copies that drift.
     ///
-    /// A GridLayoutGroup has one fixed cell size, which is only ever right at one window
-    /// shape. Deriving it from the width alone was still not enough: three cards sized to
-    /// fill a wide dashboard are tall enough that two rows overflow the bottom of the
-    /// screen, and a GridLayoutGroup does not clip or scroll -- it just draws the last
-    /// row past the edge, which is how the bottom three cards ended up with their
-    /// descriptions cut off.
-    ///
-    /// So the cell is the smaller of what the width allows and what the height allows.
-    /// Whichever axis is tighter wins, and everything fits with nothing to scroll.
+    /// Capped at three across on a handset. The measurement on its own would go wider --
+    /// a landscape phone is twice as wide as it is tall, so a single row of six wins on
+    /// area -- and six cards across 155mm is six thumbnails 20mm wide with a name under
+    /// each that has to shrink to fit. Two rows of three is the same screen spent on
+    /// cards a thumb can hit.
     /// </summary>
     void FitGrid()
     {
@@ -284,47 +292,94 @@ public class MainMenuController : MonoBehaviour
         _fittedWidth = width;
         _fittedHeight = height;
 
-        // <b>The column count is chosen, not fixed.</b> Held at three it is right on a
-        // 16:9 monitor and wrong on a landscape phone, which is twice as wide as it is
-        // tall: the height decides the cell, the cards come out small, and most of the
-        // screen is margin. What the player sees is a big empty page with six little
-        // thumbnails huddled in the middle of it.
-        //
-        // Every arrangement is measured and the one with the largest card wins. On a
-        // monitor that is still three across; on a 2.2:1 phone it is six, which uses the
-        // width the screen actually has.
-        int columns = Mathf.Max(1, gridColumns);
-        float cell = 0f;
+        int cap = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset ? 3 : 0;
 
-        int most = Mathf.Max(1, _cards.Count);
-        for (int tryColumns = 1; tryColumns <= most; tryColumns++)
+        UIGrid.Fit(_layout, cardParent, _cards.Count, cardAspect, 80f, cap);
+    }
+
+    /// <summary>
+    /// Rearranges the dashboard for the machine it is on.
+    ///
+    /// <b>A handset does not get this screen made smaller; it gets a different one.</b>
+    /// Ishaan put it in one line -- a minimised version of the desktop's dashboard is
+    /// not the answer -- and the reason is that what fails on a 155mm screen is the
+    /// arrangement, not the size. The authored layout spends its right-hand third on a
+    /// five-row career panel and about three hundred reference units at the top on a
+    /// title bar, a result strip and a heading. On a monitor that is a comfortable use
+    /// of the space. On a landscape phone, whose short edge is the scarce one, it is
+    /// most of the screen given to furniture, with six arena cards sharing what is left.
+    ///
+    /// So on a handset: the career panel goes (its one figure a player checks before
+    /// the store, the balance, is already in the header), the grid takes the width that
+    /// frees, the chrome is compressed to what it needs, and the button row grows until
+    /// each button clears a thumb. Nothing is scaled here -- <see cref="PhoneUI"/> does
+    /// that, and only to keep the words readable.
+    ///
+    /// Everything it touches is anchored rather than positioned, so a tablet and a
+    /// desktop keep exactly what the builder authored and this method does nothing at
+    /// all on them.
+    /// </summary>
+    void ApplyFormLayout()
+    {
+        if (DeviceProfile.CurrentForm != DeviceProfile.Form.Handset) return;
+
+        // The career panel. HideOnPhone marks it too, but that runs in its own Start and
+        // this has to be true before the grid is measured -- the width it frees is the
+        // whole point.
+        if (profilePanel != null) profilePanel.SetActive(false);
+
+        if (headerPanel != null)
         {
-            int tryRows = Mathf.Max(1, Mathf.CeilToInt(_cards.Count / (float)tryColumns));
-
-            float w = (width
-                       - _layout.padding.left - _layout.padding.right
-                       - _layout.spacing.x * (tryColumns - 1)) / tryColumns;
-
-            float h = (height
-                       - _layout.padding.top - _layout.padding.bottom
-                       - _layout.spacing.y * (tryRows - 1)) / tryRows / cardAspect;
-
-            float candidate = Mathf.Min(w, h);
-            if (candidate <= cell) continue;
-
-            cell = candidate;
-            columns = tryColumns;
+            headerPanel.sizeDelta = new Vector2(-32f, 74f);
+            headerPanel.anchoredPosition = new Vector2(0f, -16f);
         }
 
-        cell = Mathf.Max(80f, cell);
+        if (lastRunPanel != null && lastRunPanel.transform is RectTransform strip)
+        {
+            strip.sizeDelta = new Vector2(-32f, 70f);
+            strip.anchoredPosition = new Vector2(0f, -100f);
+        }
 
-        _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        _layout.constraintCount = columns;
-        _layout.cellSize = new Vector2(cell, cell * cardAspect);
+        // What the grid starts below, with and without a result to report. Both are
+        // reference units and both were written for a 1080-unit screen; a handset's is
+        // about 600 once the reference is shrunk for legibility. They have to clear the
+        // header and the heading above them -- the heading is placed 48 units above the
+        // grid, so a top of 104 would have put it straight through the title bar.
+        topWithResult = 228f;
+        topWithoutResult = 150f;
 
-        // Centred once the height is the limit, so a narrow window leaves an even margin
-        // instead of all the slack on one side.
-        _layout.childAlignment = TextAnchor.UpperCenter;
+        // Wider and shorter cards. The description is the part of a card a handset does
+        // not show, so the height it occupied is height the card does not need -- and on
+        // a screen twice as wide as it is tall, the height is what limits the cell. At
+        // the authored 0.78 two rows of three came out 26mm across with half the width
+        // left as margin; at 0.6 they are 33mm and the margin is gone.
+        cardAspect = 0.6f;
+
+        if (arenaHeading != null)
+        {
+            arenaHeading.anchorMax = new Vector2(1f, arenaHeading.anchorMax.y);
+            arenaHeading.sizeDelta = new Vector2(-40f, 34f);
+        }
+
+        if (cardParent != null)
+        {
+            cardParent.anchorMax = new Vector2(1f, cardParent.anchorMax.y);
+            cardParent.offsetMin = new Vector2(18f, 84f);
+            cardParent.offsetMax = new Vector2(-18f, cardParent.offsetMax.y);
+        }
+
+        if (navRow != null)
+        {
+            // Tall enough that each button clears the nine millimetres below which a
+            // thumb starts missing -- the same floor the in-game touch buttons use, for
+            // the same reason, on the one screen where a miss means leaving the game.
+            navRow.offsetMin = new Vector2(18f, 14f);
+            navRow.offsetMax = new Vector2(-18f, 78f);
+        }
+
+        // Nothing has been measured yet, but say so anyway: this runs before the first
+        // fit on the way in and could be called again if the screen ever changes class.
+        _fittedWidth = _fittedHeight = -1f;
     }
 
     /// <summary>

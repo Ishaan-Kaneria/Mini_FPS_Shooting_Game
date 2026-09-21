@@ -21,24 +21,52 @@ mergeInto(LibraryManager.library, {
     }
   },
 
-  // How many device pixels the browser puts in a CSS pixel.
+  // The density of the framebuffer Unity is actually drawing into, in pixels per inch.
   //
-  // <b>The page deliberately renders a phone at devicePixelRatio 1</b>, because drawing
-  // every pixel of a 3x display costs three times the fill rate for no visible gain. The
-  // cost of that is a unit mismatch nothing else can see: Screen.width then counts CSS
-  // pixels while Screen.dpi still describes the physical panel, so anything converting
-  // millimetres to pixels overstates by exactly this number -- and on a 3x phone the
-  // on-screen controls came out three times the size they were asked for, which is most
-  // of the screen.
+  // <b>Screen.dpi cannot answer this in a browser and the ways it is wrong pull in
+  // opposite directions.</b> Unity's WebGL runtime returns 96 multiplied by the pixel
+  // ratio the page configured, so with the phone path rendering at ratio 1 it reports
+  // 96 -- below the handheld floor, so the touch layer substituted "a typical phone",
+  // 400, while DeviceProfile took 96 at face value and measured a 152mm handset as a
+  // 242mm tablet. One reading, two wrong answers: controls tuned for a density nothing
+  // has, and a phone handed the desktop's menus.
+  //
+  // So the page is asked instead, and it answers with the one thing a browser really
+  // does know: how big a CSS pixel is. A CSS pixel is not a fixed length, but it is a
+  // fixed *intent* -- mobile browsers pick the ideal viewport so that text at 16px is
+  // readable in the hand, which lands every phone and tablet near 150 CSS dpi, while a
+  // desktop sits at the spec's 96. Measured against real hardware that is within a few
+  // millimetres: a 914 CSS pixel landscape phone comes out 155mm against a true 152mm.
+  //
+  // Multiplying by the ratio the page renders at converts that into the framebuffer's
+  // own density, which is the number every millimetre in this game is converted with.
+  // It therefore stays correct whatever sharpness the page chooses: raising the ratio
+  // gives Unity more pixels per millimetre and more pixels per screen, and the physical
+  // size of a button is unchanged.
   //
   // Returned as an integer per-mille so the value survives the float marshalling cleanly.
-  FPSKitDevicePixelRatio: function () {
+  FPSKitFramebufferDpi: function () {
     try {
-      var r = window.devicePixelRatio;
-      if (!r || !isFinite(r) || r <= 0) return 1000;
-      return Math.round(r * 1000);
+      var coarse = false;
+
+      if (window.matchMedia) {
+        coarse = window.matchMedia("(any-pointer: coarse)").matches &&
+                 !window.matchMedia("(any-pointer: fine)").matches;
+      }
+
+      // What the page told createUnityInstance to render at, which is what the runtime
+      // sizes the canvas by. window.devicePixelRatio is the fallback rather than the
+      // answer: it describes the glass, not the backbuffer, and the two differ by
+      // design on a phone.
+      var ratio = (typeof Module !== "undefined" && Module.devicePixelRatio) ||
+                  window.fpskitRenderRatio ||
+                  window.devicePixelRatio || 1;
+
+      if (!isFinite(ratio) || ratio <= 0) ratio = 1;
+
+      return Math.round((coarse ? 150 : 96) * ratio * 1000);
     } catch (e) {
-      return 1000;
+      return 96000;
     }
   },
 

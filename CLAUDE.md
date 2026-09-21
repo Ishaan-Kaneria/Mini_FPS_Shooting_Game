@@ -1302,6 +1302,33 @@ monitor, two on a tablet, one on a handset, with the category headings moving in
 stream when columns are shared, because a heading pinned above a column that now holds two
 categories labels only the first.
 
+**A handset gets its own arrangement, not this one rearranged.** `MainMenuController.ApplyFormLayout`
+is where the dashboard becomes a phone screen: the five-row career panel goes (its one
+figure a player checks before the store, the balance, is already in the header), the arena
+grid takes the third of the width that frees, the title bar and the heading are compressed
+from about three hundred reference units of chrome to a hundred and seventy, and the button
+row grows until each button clears the nine millimetres below which a thumb starts missing.
+Every one of those is an anchor, so a tablet and a desktop get exactly what the builder
+authored and the method does nothing at all. `PhoneUI` still shrinks the canvas reference
+on top -- 0.56 for a menu, 0.80 for the HUD -- but only as a **floor under the type**: it is
+what lifts body text on a 155mm screen off 1.8mm, and on its own it is the magnified desktop
+that was rejected.
+
+**The HUD is scaled less than the menus, deliberately.** It is glanced at rather than read,
+its largest elements (the minimap, the ammo count) are already big enough, and everything
+else on that canvas is the touch layer, which sizes itself in millimetres and does not move
+when the reference does. Growing it as far as the menus spends the middle of a phone screen
+on furniture during a fight.
+
+**`UIGrid` is the one grid fitter.** The arena grid, the level select and the store each
+had the same twenty lines of measure-and-divide, and only one of the three had learned to
+*choose* its column count -- so the other two stayed fixed at a number that is right on
+16:9 and wasteful on a landscape phone, where the height sets the cell and the width
+becomes margin. It measures every arrangement and takes the largest card, with a per-screen
+ceiling for the cases where the arithmetic wins and the argument loses: a store card
+carries three statistics, a sentence and a price, so past two columns on a handset it is a
+card nobody can read whatever its area.
+
 `FPSKitDeviceTest` (`FPSKitBatch.VerifyDevices`) pins fourteen screen classes. It drives
 `DeviceProfile.FormFor` and `ReachFor` with the readings handed in, because batch mode has
 one screen and a check written against the live properties would assert whatever the build
@@ -1312,6 +1339,94 @@ machine is and pass identically with every rule deleted -- the same reason
 `LandscapeLeft`/`LandscapeRight` and the WebGL template calls `screen.orientation.lock`.
 So a handset here is a wide, short surface with thumbs at the **left and right edges** --
 a bottom bar spends the scarcest dimension and sits outside the thumb arc.
+
+## In a browser, `Screen.dpi` is not a measurement of anything
+
+Unity's WebGL runtime answers `Screen.dpi` with **96 times the pixel ratio the page
+configured** -- not the panel's density, and not the backbuffer's either once the page and
+the panel disagree. Everything physical in this game is converted through a density, so one
+bad reading came out as three separate player-visible faults, each of which looked like a
+different feature being broken:
+
+- the on-screen controls were sized against the substituted 400 dpi and came out **three
+  times too large**, with FIRE covering the middle of the screen;
+- the look correction divided by that same 400 against a real 150, so the view turned **a
+  third as far** as the thumb asked and the report was "I have to swipe and swipe to see
+  behind me";
+- and `DeviceProfile` took 96 at face value, measured a **152mm handset as 242mm**, called
+  it a tablet, and handed a phone two columns of achievements and the desktop's card grid.
+
+`WebDevice.FramebufferDpi` is the answer, and it asks the page. A browser does know one
+thing exactly: how big a CSS pixel is meant to be. That is not a fixed length but it is a
+fixed *intent* -- mobile browsers choose the ideal viewport so that text at 16px is readable
+in the hand, which puts every phone and tablet near **150 CSS dpi** and a desktop at the
+spec's **96**. Against real hardware that is within a few millimetres: a 914 CSS pixel
+landscape phone measures 155mm and is truly 152mm. Multiplying by the ratio the page renders
+at turns it into the framebuffer's own density, which is the number every millimetre and
+every swipe is converted with.
+
+**`TouchMetrics.ScreenDpi` is the only place that reads a screen.** `DeviceProfile` asks it
+too. Two consumers measuring the same glass separately is how one platform quirk produced
+two opposite wrong answers.
+
+**The page's sharpness must change nothing the player can feel.** It renders a touch device
+at `min(devicePixelRatio, 2, 1600 / cssLongEdge)` -- about 1.75 on a modern phone, three
+times the pixels of the ratio 1 that shipped, which is what "the game looks very blurry"
+was: roughly 900 pixels drawn and stretched across a 2400 pixel panel. Because the same
+ratio feeds the density above, a control keeps its physical size and a swipe keeps its
+degrees; it only gains resolution. `VerifyDevices` asserts exactly that invariant at ratios
+1, 1.75, 2 and 3, and asserts the absolute figure as well -- a 40mm swipe is worth 630
+reference pixels on every device there has ever been, and the shipped code was
+self-consistently 2.6x short of it.
+
+**WebGL's quality tier is chosen at runtime, because it is the one platform that cannot be
+told in advance.** `QualitySettings` has one entry per platform and WebGL's was 0 -- the
+Mobile tier, written to be cheap -- so every desktop browser player was getting reduced
+render scale and no MSAA as well. `RenderPolicy` picks the PC tier for a pointer and the
+Mobile tier for a finger, before the first scene loads, compiled into the player only: calling
+`SetQualityLevel` in the editor writes the project's current tier to disk as a side effect of
+pressing Play. The Mobile tier's own render scale is back at 1.0; the pixel budget now lives
+in the page, where the screen is known.
+
+## A crosshair authored in canvas units disappears on a phone
+
+The HUD's crosshair is four 2x10 arms against a 1920-wide reference. On a monitor that is a
+hairline and correct. On a phone the canvas scale is about 0.45 and the result is then
+stretched by the browser, so the arms land at roughly **a third of a millimetre** of pale
+line over bright sand -- and the report is not "the crosshair is small", it is that the
+phone has no aim point at all. From the outside that is exactly what it is.
+
+`HUDController.FitCrosshairToDevice` re-derives it in millimetres on a touch screen, adds a
+centre dot the weapon's spread cannot open -- the arms say *how accurately*, the dot says
+*where* -- and outlines it so it survives sand, snow and sky. A pointer keeps the hairline:
+a mouse resolves a hundredth of a degree and it is a deliberate choice there.
+
+Two things about where that runs:
+
+- **Not in the builder**, for the reason `TouchCluster` gives at length: a scene is authored
+  in reference units and a reference unit is not a distance until there is a screen.
+- **Not in `Start` either.** A `CanvasScaler` publishes its factor in its own update, which
+  is after every `Start` in the frame, so anything measured in `Start` is measured against
+  the scale the canvas had *before* the HUD rescaled it for this form. The first frame knows.
+  `TouchCluster` now re-lays itself when that factor moves for the same reason, which makes
+  the ordering between it and the HUD irrelevant rather than lucky.
+
+## A button for equipment you have not earned, and one you have
+
+Two halves of the same rule, and the kit had one of each wrong.
+
+**The bomb button is situational and the check was made once.** `TouchCluster` hid it unless
+a `BombThrower` was carrying data, asked in its own `Start` -- and `PlayerLoadout` arms the
+bomb in *its* `Start`, with no defined order between them. It now re-asks twice a second and
+re-lays only when the answer changes, which also covers the drink button when the belt runs
+out mid-fight.
+
+**And the instructions were teaching a control the player does not have.** The bomb is the
+campaign's first reward, handed over at `Campaign.BombStarGate` stars, so before that there
+is no key, no button and nothing in the HUD -- while HOW TO PLAY still described all three.
+A player who follows written instructions and finds no button concludes the controls are
+broken, which is what was reported: "there is no bomb symbol, so why". The row stays, because
+the answer to *why* has to be somewhere, and it says what it is and how far off it is.
 
 ## The dashboard has four destinations
 

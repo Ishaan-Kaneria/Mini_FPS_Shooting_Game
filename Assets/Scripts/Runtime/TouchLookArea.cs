@@ -74,8 +74,7 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
         // view should be still, not drifting a degree at a time in whatever direction
         // the digitiser is guessing.
         float deadZone = profile != null
-            ? TouchMetrics.MillimetresToPixels(profile.lookDeadZoneMm) *
-              (TouchMetrics.ReferenceDpi / TouchMetrics.Dpi)
+            ? TouchMetrics.MillimetresToReferencePixels(profile.lookDeadZoneMm)
             : 0f;
 
         if (corrected.magnitude < deadZone) return;

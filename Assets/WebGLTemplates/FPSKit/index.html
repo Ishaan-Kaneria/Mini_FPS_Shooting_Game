@@ -309,6 +309,43 @@
                          window.matchMedia("(any-pointer: coarse)").matches &&
                          !window.matchMedia("(any-pointer: fine)").matches);
 
+      // ---------- how sharp to render ----------
+      // A phone's panel has three device pixels to a CSS pixel and drawing all of them
+      // costs three times the fill rate. This used to answer that with ratio 1, which is
+      // the other extreme: the game then rendered about 900 pixels across and the browser
+      // stretched that over a 2400 pixel screen, so every edge in the arena arrived soft
+      // and every label arrived smeared. "The game looks blurry" is what that is, and it
+      // is not a texture or a post-processing setting.
+      //
+      // So the ratio is chosen against a pixel budget rather than against the panel: draw
+      // up to a target long edge, never more than twice the CSS size, and never less than
+      // one. On a 914 CSS pixel phone that lands at 1.75, which is three times the pixels
+      // of what shipped and still well inside what a phone GPU does at sixty frames.
+      //
+      // Nothing in the game has to be retuned for it. Every millimetre is converted
+      // through the same ratio (see FPSKitFramebufferDpi in the jslib), so a control keeps
+      // its physical size and only gains resolution.
+      var TOUCH_TARGET_PIXELS = 1600;
+
+      function chooseRenderRatio() {
+        var panel = window.devicePixelRatio || 1;
+        if (!isFinite(panel) || panel <= 0) panel = 1;
+
+        if (!touchOnly) return Math.min(panel, 2);
+
+        var cssLongEdge = Math.max(window.innerWidth || 0, window.innerHeight || 0);
+        if (!cssLongEdge) return Math.min(panel, 2);
+
+        return Math.max(1, Math.min(panel, 2, TOUCH_TARGET_PIXELS / cssLongEdge));
+      }
+
+      var renderRatio = chooseRenderRatio();
+
+      // Published for the jslib, which needs the ratio Unity is actually rendering at
+      // rather than the one the glass has. Module.devicePixelRatio carries the same
+      // number once the instance exists; this is here for the frames before it does.
+      window.fpskitRenderRatio = renderRatio;
+
       // ---------- landscape ----------
       // Asked for properly first: inside fullscreen, some Android browsers honour an
       // orientation lock. Everywhere else -- and on iOS always -- it throws or rejects,
@@ -401,10 +438,7 @@
         productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
         productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
         showBanner: showBanner,
-        // A phone renders every pixel of a 3x display for no visible gain and a large
-        // frame-time one. Desktops keep their sharpness, capped so that a 4x panel does
-        // not quietly ask for sixteen times the fill rate.
-        devicePixelRatio: touchOnly ? 1 : Math.min(window.devicePixelRatio || 1, 2)
+        devicePixelRatio: renderRatio
       };
 
       if (!("WebAssembly" in window)) {

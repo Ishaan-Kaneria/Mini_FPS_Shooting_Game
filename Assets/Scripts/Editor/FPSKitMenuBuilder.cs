@@ -782,6 +782,7 @@ namespace FPSKit.EditorTools
             Autosize(coins, 16f, 30f);
 
             menu.coinText = coins;
+            menu.headerPanel = bar;
         }
 
         // ------------------------------------------------------------------
@@ -1097,6 +1098,7 @@ namespace FPSKit.EditorTools
             menu.storeButton = store;
             menu.exitButton = exit;
             menu.exitRow = exit.gameObject;
+            menu.navRow = navRect;
 
             BuildExitConfirm(parent, menu);
         }

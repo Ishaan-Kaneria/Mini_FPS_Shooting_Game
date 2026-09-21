@@ -74,11 +74,70 @@ public class TouchCluster : MonoBehaviour
              "gesture bars along the bottom.")]
     [Range(2f, 16f)] public float marginMm = 6f;
 
+    [Tooltip("How often the situational buttons re-ask whether the player is carrying " +
+             "the equipment they drive, in seconds. Cheap, and it has to happen at all: " +
+             "the loadout is applied in its own Start, and which of the two Starts Unity " +
+             "runs first is not defined.")]
+    [Range(0.1f, 2f)] public float situationalCheckInterval = 0.4f;
+
     RectTransform _rect;
+
+    /// <summary>What the last layout believed the player was carrying.</summary>
+    bool _carryingBomb;
+    bool _carryingDrink;
+
+    /// <summary>The canvas scale the last layout was measured against.</summary>
+    float _scaleAtLayout;
+
+    float _nextCheck;
 
     void Awake() => _rect = (RectTransform)transform;
 
     void Start() => Rebuild();
+
+    /// <summary>
+    /// Watches for equipment arriving or running out.
+    ///
+    /// <b>A layout done once at Start is a layout done too early.</b> PlayerLoadout arms
+    /// the bomb in its own Start, so on the frames this ran first the cluster asked
+    /// whether a bomb was carried, was told no, and hid the button for the whole level --
+    /// silently, because a hidden button is indistinguishable from a button the game
+    /// never had. The drink has the same shape at the other end: the belt empties mid
+    /// fight and the button has to go.
+    ///
+    /// Rationed rather than per-frame, and only the answer is compared, so the common
+    /// case costs two component lookups a second and no layout at all.
+    /// </summary>
+    void Update()
+    {
+        if (Time.unscaledTime < _nextCheck) return;
+        _nextCheck = Time.unscaledTime + Mathf.Max(0.1f, situationalCheckInterval);
+
+        if (Carrying(TouchButton.ActionKind.Bomb) == _carryingBomb &&
+            Carrying(TouchButton.ActionKind.UseItem) == _carryingDrink &&
+            !ScaleMoved()) return;
+
+        Rebuild();
+    }
+
+    /// <summary>
+    /// Whether the canvas has been rescaled since the buttons were placed.
+    ///
+    /// <b>Which Start runs first is not this component's business and must not be.</b>
+    /// The HUD rescales its canvas for the form it finds itself on, and a CanvasScaler
+    /// does not publish the new factor until its own update, so a cluster that measured
+    /// in Start can have measured against the previous one -- and every button is then
+    /// out by that ratio, for the whole level, on a layer whose entire promise is that a
+    /// control is the size it says it is. Re-measuring when the number moves costs one
+    /// float comparison twice a second and makes the ordering irrelevant.
+    /// </summary>
+    bool ScaleMoved()
+    {
+        var canvas = GetComponentInParent<Canvas>();
+        float scale = canvas != null ? canvas.scaleFactor : 1f;
+
+        return Mathf.Abs(scale - _scaleAtLayout) > _scaleAtLayout * 0.005f;
+    }
 
     /// <summary>
     /// Re-measures and re-places every button. Safe to call again -- it derives
@@ -100,6 +159,10 @@ public class TouchCluster : MonoBehaviour
         float secondary = Mathf.Max(secondaryMm, floorMm) * unit;
         float gap = gapMm * unit;
         float margin = marginMm * unit;
+
+        _carryingBomb = Carrying(TouchButton.ActionKind.Bomb);
+        _carryingDrink = Carrying(TouchButton.ActionKind.UseItem);
+        _scaleAtLayout = scale;
 
         var live = new List<Slot>();
         foreach (var slot in slots)

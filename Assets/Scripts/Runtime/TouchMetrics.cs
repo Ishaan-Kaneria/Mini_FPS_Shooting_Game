@@ -44,48 +44,61 @@ public static class TouchMetrics
     /// </summary>
     public const float ReferenceDpi = 400f;
 
-    /// <summary>The screen's density, or a sane stand-in when it cannot be trusted.</summary>
-    public static float Dpi
+    /// <summary>
+    /// The best available reading of how many pixels of the framebuffer cover an inch
+    /// of glass, before any clamping. 0 when nothing knows.
+    ///
+    /// <b>One reading, asked once, is the point.</b> Two consumers used to measure the
+    /// screen separately -- this class for control sizes and <see cref="DeviceProfile"/>
+    /// for layout -- and in a browser the same <see cref="Screen.dpi"/> was wrong in
+    /// opposite directions for each of them. See <see cref="WebDevice.FramebufferDpi"/>.
+    /// </summary>
+    public static float ScreenDpi
     {
         get
         {
-            float dpi = Screen.dpi;
-            return dpi >= MinDpi && dpi <= MaxDpi ? dpi : FallbackDpi;
+            if (WebDevice.InBrowser)
+            {
+                float web = WebDevice.FramebufferDpi;
+                if (web > 0f) return web;
+            }
+
+            return Screen.dpi;
         }
     }
+
+    /// <summary>The screen's density, or a sane stand-in when it cannot be trusted.</summary>
+    public static float Dpi => Believable(ScreenDpi) ? ScreenDpi : FallbackDpi;
+
+    static bool Believable(float dpi) => dpi >= MinDpi && dpi <= MaxDpi;
 
     /// <summary>
     /// Pixels of the <b>framebuffer the game is actually drawing into</b> per millimetre
     /// of glass.
     ///
-    /// <b>Not simply Dpi/25.4, and the difference made the controls unusable.</b>
-    /// Screen.dpi describes the panel. Screen.width counts the pixels Unity is rendering.
-    /// Those are the same number on a desktop and on a native Android build, and they are
-    /// not the same on WebGL: the page renders a touch device at devicePixelRatio 1 on
-    /// purpose, because drawing every pixel of a 3x display costs three times the fill
-    /// rate for no visible gain. So a 2400px phone hands Unity an 800px backbuffer while
-    /// still reporting 400dpi, and every millimetre asked for came back three times too
-    /// large -- a FIRE button most of the way across the screen, which is what a player
-    /// sees and cannot work around.
-    ///
-    /// Dividing by the ratio puts both sides in the same units. It is 1 everywhere that
-    /// is not a browser, so nothing else changes.
+    /// <b>Not the panel's density, and the difference made the controls unusable.</b>
+    /// Unity renders one pixel per device pixel on a desktop and on a native Android
+    /// build, and something else entirely in a browser, where the page picks the ratio
+    /// between CSS pixels and the backbuffer. Asking the page for the framebuffer's own
+    /// density keeps both sides of every millimetre conversion in the same units, so a
+    /// 15mm button is 15mm whatever sharpness the page chose -- and raising that
+    /// sharpness later moves nothing on screen.
     /// </summary>
-    public static float PixelsPerMillimetre => PixelsPerMillimetreFor(Dpi, WebDevice.PixelRatio);
+    public static float PixelsPerMillimetre => PixelsPerMillimetreFor(Dpi);
 
     /// <summary>
-    /// The conversion itself, with both readings handed in.
+    /// The conversion itself, with the reading handed in.
     ///
     /// Public <b>only</b> so a check can drive it -- same reason
     /// <see cref="ControlSettings.CanRead"/> and <see cref="PhoneUI.IsHandset"/> are.
     /// Batch mode has one screen and no browser, so a test written against the property
-    /// above would assert whatever the build machine reports and pass identically with the
-    /// pixel-ratio division deleted, which is the exact bug it needs to catch.
+    /// above would assert whatever the build machine reports and pass identically with
+    /// the whole web branch deleted, which is the exact bug it needs to catch.
     /// </summary>
-    public static float PixelsPerMillimetreFor(float dpi, float pixelRatio)
+    public static float PixelsPerMillimetreFor(float dpi)
     {
         float density = dpi >= MinDpi && dpi <= MaxDpi ? dpi : FallbackDpi;
-        return density / 25.4f / Mathf.Max(1f, pixelRatio);
+        return density / 25.4f;
     }
 
     /// <summary>Pixels covering a given physical size on this screen.</summary>
@@ -99,9 +112,39 @@ public static class TouchMetrics
     /// multiplier -- then works in one unit on every device, and none of it has to know
     /// what a screen is. Which is the point: the conversion belongs in the one place
     /// that reads the hardware, not spread across every consumer of a look delta.
+    ///
+    /// <b>It has to be the framebuffer's density, and getting that wrong is invisible
+    /// in exactly one direction.</b> This divided by the panel reading, which in a
+    /// browser was the substituted 400 while the backbuffer was really about 150 to the
+    /// inch -- so a thumb dragged its full physical distance and the view turned a
+    /// third as far as it was tuned to. Nothing about that reads as a units bug: the
+    /// controls answer instantly, they are simply heavy, and the player reports having
+    /// to swipe three times to look behind them. The buttons were sized through the
+    /// corrected path and were the right size, which is what kept it hidden.
     /// </summary>
-    public static Vector2 ToReferencePixels(Vector2 rawPixels)
-        => rawPixels * (ReferenceDpi / Dpi);
+    public static Vector2 ToReferencePixels(Vector2 rawPixels) => ToReferencePixelsFor(rawPixels, Dpi);
+
+    /// <summary>
+    /// The correction with the density handed in, so a check can drive it. Same seam,
+    /// and the same reason, as <see cref="PixelsPerMillimetreFor"/>.
+    /// </summary>
+    public static Vector2 ToReferencePixelsFor(Vector2 rawPixels, float dpi)
+    {
+        float density = dpi >= MinDpi && dpi <= MaxDpi ? dpi : FallbackDpi;
+        return rawPixels * (ReferenceDpi / density);
+    }
+
+    /// <summary>
+    /// A physical distance expressed in the same reference pixels
+    /// <see cref="ToReferencePixels"/> produces.
+    ///
+    /// A threshold compared against a corrected delta has to be corrected the same way,
+    /// and a reference pixel is defined at <see cref="ReferenceDpi"/> on every device --
+    /// so this needs no screen reading at all. Doing it in two steps through the real
+    /// density is what let the look dead zone drift with the hardware.
+    /// </summary>
+    public static float MillimetresToReferencePixels(float millimetres)
+        => millimetres * (ReferenceDpi / 25.4f);
 
     /// <summary>
     /// A canvas-space size for something that must be at least <paramref name="millimetres"/>

@@ -701,10 +701,14 @@ public class StorePanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Sizes the cards to the space there actually is, in both directions. The same
-    /// arithmetic as the arena grid and the level select, and for the same reason: a
-    /// GridLayoutGroup has one fixed cell size and neither clips nor scrolls, so a cell
-    /// that is only right at 16:9 draws the bottom row off the bottom of the window.
+    /// Sizes the cards to the space there actually is, in both directions, and chooses
+    /// how many go across. <see cref="UIGrid"/> owns the arithmetic, shared with the
+    /// arena grid and the level select.
+    ///
+    /// Two across on a handset at most. A store card is a name, three statistics, a
+    /// sentence and a price, so the question is not how much area each one gets but
+    /// whether the sentence can be read -- and on a 155mm screen the answer past two
+    /// columns is no, whatever the measurement prefers.
     /// </summary>
     void FitGrid()
     {
@@ -722,22 +726,13 @@ public class StorePanel : MonoBehaviour
         _fittedWidth = width;
         _fittedHeight = height;
 
-        int columns = Mathf.Max(1, gridColumns);
-        int rows = Mathf.Max(1, Mathf.CeilToInt(_cards.Count / (float)columns));
+        int cap = DeviceProfile.CurrentForm switch
+        {
+            DeviceProfile.Form.Handset => 2,
+            DeviceProfile.Form.Tablet => 3,
+            _ => Mathf.Max(1, gridColumns),
+        };
 
-        float byWidth = (width
-                         - _layout.padding.left - _layout.padding.right
-                         - _layout.spacing.x * (columns - 1)) / columns;
-
-        float byHeight = (height
-                          - _layout.padding.top - _layout.padding.bottom
-                          - _layout.spacing.y * (rows - 1)) / rows / cardAspect;
-
-        float cell = Mathf.Max(90f, Mathf.Min(byWidth, byHeight));
-
-        _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        _layout.constraintCount = columns;
-        _layout.cellSize = new Vector2(cell, cell * cardAspect);
-        _layout.childAlignment = TextAnchor.UpperCenter;
+        UIGrid.Fit(_layout, cardParent, _cards.Count, cardAspect, 90f, cap);
     }
 }

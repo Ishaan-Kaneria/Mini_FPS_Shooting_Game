@@ -12,11 +12,17 @@ using UnityEngine.UI;
 /// is not small type, it is type at about the size of the text on the back of a battery,
 /// and no amount of squinting makes a six-card grid of it legible at arm's length.
 ///
-/// The fix is one number rather than a pass over every label. Lowering the canvas's
-/// reference resolution makes every reference unit cover more of the screen, so the type,
-/// the padding, the cards and the spacing all grow together and the layout keeps its
-/// proportions. Scaling the fonts alone would grow the words inside boxes that did not
-/// grow with them, which is how text starts overflowing its card.
+/// Lowering the canvas's reference resolution makes every reference unit cover more of
+/// the screen, so the type, the padding, the cards and the spacing all grow together and
+/// the layout keeps its proportions. Scaling the fonts alone would grow the words inside
+/// boxes that did not grow with them, which is how text starts overflowing its card.
+///
+/// <b>It is a floor under the type, not the answer.</b> On its own it is the desktop
+/// magnified, which is what shipped and what Ishaan rejected in one line: a minimised
+/// desktop dashboard is not a phone dashboard. What each screen does with its
+/// <see cref="DeviceProfile.CurrentForm"/> -- how many columns, what is dropped, what
+/// takes the width that frees -- is the layout. This just makes sure the words in it can
+/// be read.
 ///
 /// Nothing here is cached. Every member is a fresh read of <see cref="Screen"/> or
 /// <see cref="MobileInput"/>, for the reason the rest of the kit's static helpers are
@@ -26,29 +32,48 @@ using UnityEngine.UI;
 public static class PhoneUI
 {
     /// <summary>
-    /// Under this many millimetres across, a screen is a handset however it got here.
-    ///
-    /// A flagship phone in landscape is about 147mm and a 7" tablet about 151mm, which is
-    /// four millimetres apart -- so no line drawn here separates them, and this one does
-    /// not try: both get the larger layout, and a 10" tablet at 246mm does not. An earlier
-    /// note claimed the line sat "just above the phones" and left the tablet on the desktop
-    /// side, which was never true of 165 and is worth not re-deriving. FPSKitDeviceTest
-    /// pins both tablets so a retune has to face the choice rather than stumble into it.
+    /// Which screen is being scaled. They want different answers and used to get the
+    /// same one.
     /// </summary>
-    const float PhoneWidthMm = 165f;
+    public enum Surface
+    {
+        /// <summary>A menu: read, at rest, with time to spare. Type size is everything.</summary>
+        Menu,
+
+        /// <summary>The HUD: glanced at mid-fight, and already sharing the screen with
+        /// controls that size themselves in millimetres and must not be pushed about.</summary>
+        Hud,
+    }
 
     /// <summary>
-    /// How much of the authored reference to keep on a phone. At 0.70 everything is
-    /// about 1.4x its authored size, which lifts body type from roughly 1.6mm to 2.3mm
-    /// and headings clear of it. Going further starts pushing cards off the screen --
-    /// the grid is fitted to the box it is given, so a bigger unit means fewer, larger
-    /// cards rather than a scrollbar.
+    /// How much of the authored reference to keep, per form and per surface.
+    ///
+    /// <b>This is a legibility floor, not the layout.</b> The arrangement is chosen by
+    /// the screens themselves from <see cref="DeviceProfile.CurrentForm"/> -- fewer
+    /// columns, no career panel, the grid taking the width that frees. What a reference
+    /// shrink does on top of that is make a reference unit cover more glass, which is the
+    /// only way body type on a 155mm screen reaches a size a person can read at arm's
+    /// length. Used on its own, as it was, it is a magnified desktop and the reason
+    /// <c>HideOnPhone</c> had to exist at all.
+    ///
+    /// The HUD is deliberately scaled less than the menus. It is glanced at rather than
+    /// read, its largest elements are the minimap and the ammo count which are already
+    /// big enough, and everything else on that canvas -- the whole touch layer -- is
+    /// sized in millimetres and does not move when the reference does. Growing it as far
+    /// as the menus would spend the middle of a phone screen on furniture during a fight.
     /// </summary>
-    /// <b>This is the approach being replaced.</b> Growing everything by one factor keeps
-    /// the desktop's arrangement and density and merely magnifies them, which is why it had
-    /// to be paired with <c>HideOnPhone</c> deleting whatever then overflowed. A handset
-    /// needs its own arrangement, not this one enlarged. Kept until the per-form layouts
-    /// land, because on a real phone it is still better than nothing.
+    static float ReferenceScaleFor(DeviceProfile.Form form, Surface surface) => form switch
+    {
+        DeviceProfile.Form.Handset => surface == Surface.Hud ? 0.80f : 0.56f,
+        DeviceProfile.Form.Tablet => surface == Surface.Hud ? 0.92f : 0.78f,
+        _ => 1f,
+    };
+
+    /// <summary>
+    /// The old single factor, kept because it names the thing this file used to be.
+    /// 0.70 for every screen on every handheld, paired with deleting whatever no longer
+    /// fitted.
+    /// </summary>
     public const float ReferenceShrink = 0.70f;
 
     /// <summary>The screen's width in millimetres, or 0 when the platform will not say.</summary>
@@ -77,18 +102,29 @@ public static class PhoneUI
     /// <summary>
     /// Grows everything on a canvas by shrinking what it measures itself against.
     ///
-    /// Idempotent: it stores nothing, and re-applying the same shrink to an already
-    /// shrunk canvas would compound, so the authored reference is read from the scaler's
-    /// own <see cref="CanvasScaler.referenceResolution"/> exactly once per call and the
-    /// caller is expected to call it once, at Start.
+    /// Idempotent per call site rather than per canvas: it reads the scaler's authored
+    /// <see cref="CanvasScaler.referenceResolution"/> and multiplies, so calling it twice
+    /// on one canvas would compound. Each canvas has exactly one caller, at Start.
     /// </summary>
-    public static void Apply(Canvas canvas)
+    public static void Apply(Canvas canvas) => Apply(canvas, Surface.Menu);
+
+    public static void Apply(Canvas canvas, Surface surface)
     {
-        if (canvas == null || !Active) return;
+        if (canvas == null) return;
+
+        float scale = ReferenceScaleFor(DeviceProfile.CurrentForm, surface);
+        if (Mathf.Approximately(scale, 1f)) return;
 
         var scaler = canvas.GetComponent<CanvasScaler>();
         if (scaler == null || scaler.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize) return;
 
-        scaler.referenceResolution = scaler.referenceResolution * ReferenceShrink;
+        scaler.referenceResolution = scaler.referenceResolution * scale;
+
+        // Match the shorter edge rather than splitting the difference. A landscape phone
+        // is about 2.2:1 against the authored 16:9, so a 0.5 match lets the extra width
+        // pull every unit back down and undoes most of the shrink -- on the one screen
+        // that needed it most.
+        if (DeviceProfile.CurrentForm == DeviceProfile.Form.Handset)
+            scaler.matchWidthOrHeight = 1f;
     }
 }

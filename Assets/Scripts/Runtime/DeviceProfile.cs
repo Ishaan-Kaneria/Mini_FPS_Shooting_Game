@@ -76,12 +76,21 @@ public static class DeviceProfile
     const float MaxKnownDpi = 900f;
 
     /// <summary>Whether the platform gave a density worth measuring with at all.</summary>
-    public static bool DensityKnown => IsKnownDensity(Screen.dpi);
+    public static bool DensityKnown => IsKnownDensity(TouchMetrics.ScreenDpi);
 
     static bool IsKnownDensity(float dpi) => dpi >= MinKnownDpi && dpi <= MaxKnownDpi;
 
-    /// <summary>The longer edge in millimetres, or 0 when the platform will not say.</summary>
-    public static float LongEdgeMm => LongEdgeMillimetres(Screen.dpi, Screen.width, Screen.height);
+    /// <summary>
+    /// The longer edge in millimetres, or 0 when the platform will not say.
+    ///
+    /// <b>Read through <see cref="TouchMetrics.ScreenDpi"/> rather than from
+    /// <see cref="Screen.dpi"/> directly</b>, because in a browser the latter describes
+    /// neither the glass nor the backbuffer. Taking it at face value measured a 152mm
+    /// landscape handset at 242mm, which is a tablet -- so a phone got two columns of
+    /// achievements, the desktop's card grid and none of the handset arrangements below.
+    /// There is one density reading in the kit now and this is a consumer of it.
+    /// </summary>
+    public static float LongEdgeMm => LongEdgeMillimetres(TouchMetrics.ScreenDpi, Screen.width, Screen.height);
 
     static float LongEdgeMillimetres(float dpi, int width, int height)
         => IsKnownDensity(dpi) ? Mathf.Max(width, height) / (dpi / 25.4f) : 0f;
@@ -95,7 +104,7 @@ public static class DeviceProfile
 
     /// <summary>How much surface there is.</summary>
     public static Form CurrentForm
-        => FormFor(Screen.dpi, Screen.width, Screen.height,
+        => FormFor(TouchMetrics.ScreenDpi, Screen.width, Screen.height,
                    MobileInput.Active || WebDevice.IsTouchOnly, Application.isMobilePlatform);
 
     /// <summary>Shorthand the gameplay layer wants far more often than the exact form.</summary>

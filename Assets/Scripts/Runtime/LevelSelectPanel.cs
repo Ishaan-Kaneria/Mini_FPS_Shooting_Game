@@ -217,12 +217,13 @@ public class LevelSelectPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Sizes the tiles to the space there actually is, in both directions.
+    /// Sizes the level tiles to the space there actually is, in both directions, and
+    /// chooses how many go across. <see cref="UIGrid"/> owns the arithmetic, shared with
+    /// the arena grid and the store.
     ///
-    /// The same arithmetic as the arena grid, and for the same reason: a
-    /// GridLayoutGroup has one fixed cell size and neither clips nor scrolls, so a cell
-    /// that is only right at 16:9 draws the bottom row of levels off the bottom of a
-    /// 4:3 window with nothing to say so.
+    /// A tile is a number, a star row and a line of detail, so it survives being small
+    /// better than a store card does -- four across on a handset is still four tiles a
+    /// thumb can hit, and eight levels in two rows is the whole ladder without scrolling.
     /// </summary>
     void FitGrid()
     {
@@ -240,23 +241,11 @@ public class LevelSelectPanel : MonoBehaviour
         _fittedWidth = width;
         _fittedHeight = height;
 
-        int columns = Mathf.Max(1, gridColumns);
-        int rows = Mathf.Max(1, Mathf.CeilToInt(_tiles.Count / (float)columns));
+        int cap = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset
+            ? 4
+            : Mathf.Max(1, gridColumns);
 
-        float byWidth = (width
-                         - _layout.padding.left - _layout.padding.right
-                         - _layout.spacing.x * (columns - 1)) / columns;
-
-        float byHeight = (height
-                          - _layout.padding.top - _layout.padding.bottom
-                          - _layout.spacing.y * (rows - 1)) / rows / tileAspect;
-
-        float cell = Mathf.Max(70f, Mathf.Min(byWidth, byHeight));
-
-        _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        _layout.constraintCount = columns;
-        _layout.cellSize = new Vector2(cell, cell * tileAspect);
-        _layout.childAlignment = TextAnchor.UpperCenter;
+        UIGrid.Fit(_layout, tileParent, _tiles.Count, tileAspect, 70f, cap);
     }
 
     void Report(string message)

@@ -93,6 +93,21 @@ namespace FPSKit.EditorTools
             // --- And a desktop that admits nothing is still a desktop. Guessing "small"
             // --- from a pixel count here is precisely what broke this.
             new Device("desktop, dpi unknown", 0f, 1920, 1080, false, false, DeviceProfile.Form.Desktop, DeviceProfile.Reach.Pointer),
+
+            // --- A phone in a browser, measured the way WebDevice.FramebufferDpi measures
+            // --- it: CSS pixels at about 150 to the inch, times whatever ratio the page
+            // --- renders at. Both rows are the same handset -- 914 CSS pixels across, a
+            // --- true 152mm -- drawn at the two sharpnesses the page will choose between,
+            // --- and the classification has to be the same for both or raising the
+            // --- resolution would silently change which menus the player gets.
+            // ---
+            // --- This is the row that was failing in the wild. Screen.dpi in a browser
+            // --- reports 96 times the render ratio, which at ratio 1 measured this phone
+            // --- as 242mm: a tablet, so it got two columns of achievements and the
+            // --- desktop's card grid on a 155mm screen.
+            new Device("phone in a browser",  150f,  914,  411, true, false, DeviceProfile.Form.Handset, DeviceProfile.Reach.Touch),
+            new Device("phone, sharper page", 262f, 1600,  719, true, false, DeviceProfile.Form.Handset, DeviceProfile.Reach.Touch),
+            new Device("tablet in a browser", 192f, 1366, 1024, true, false, DeviceProfile.Form.Tablet,  DeviceProfile.Reach.Touch),
         };
 
         public static void VerifyDevices()
@@ -130,46 +145,89 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// That a millimetre is a millimetre on a screen the browser is scaling.
+        /// That a millimetre is a millimetre, and a swipe is a swipe, on a screen the
+        /// browser is scaling.
         ///
-        /// <b>This is the check that was missing when the on-screen controls shipped three
-        /// times too large.</b> The whole touch layer is sized in millimetres, and the
-        /// conversion divides Screen.dpi -- which describes the glass -- by nothing at all.
-        /// That is right on a desktop and on a native build, where Unity renders one pixel
-        /// per device pixel. It is wrong in a browser, because the page renders a touch
-        /// device at devicePixelRatio 1 on purpose: a 3x phone hands Unity a backbuffer a
-        /// third of the width while still reporting the panel's density, so every button
-        /// came out three times the size it asked for and FIRE covered the middle of the
-        /// screen.
+        /// <b>Both halves of this shipped broken, three weeks apart, from one cause.</b>
+        /// The touch layer is written in millimetres and the look in the pixels a swipe
+        /// would cover on a reference screen, and both conversions need the density of
+        /// the framebuffer Unity is drawing into. A browser does not report that: it
+        /// gives the panel's density while handing Unity a backbuffer at whatever ratio
+        /// the page chose. Sizing it wrong made the fire button cover the middle of the
+        /// screen; correcting only the sizing left the look reading the substituted 400
+        /// against a real 150, so the view turned a third as far as the thumb asked and
+        /// the player had to swipe three times to look behind them.
         ///
-        /// VerifyTouch could not see it. It measures the layer in canvas units, and in
-        /// canvas units everything was correct -- the error is entirely in the step from
-        /// canvas units to glass, which needs a real device or this.
+        /// VerifyTouch cannot see either one. It measures the layer in canvas units, and
+        /// in canvas units everything was correct both times -- the whole error lives in
+        /// the step from canvas units to glass, which needs a real device or this.
+        ///
+        /// The invariant is the same for both: <b>the ratio the page renders at must
+        /// change nothing the player can feel.</b> More pixels, same physical sizes, same
+        /// degrees per swipe.
         /// </summary>
         private static void CheckPhysicalSizing(List<string> problems)
         {
-            // A flagship phone, rendered at each of the ratios a browser might hand us.
-            const float Dpi = 416f;
+            // One phone -- 914 CSS pixels across, 150 CSS dpi -- drawn at each of the
+            // ratios the page might choose between.
+            const float CssDpi = 150f;
+            const int CssWidth = 914;
 
-            float atOne = TouchMetrics.PixelsPerMillimetreFor(Dpi, 1f);
+            const float ButtonMm = 15f;    // the fire button
+            const float SwipeMm = 40f;     // a thumb drag across the look area
 
-            foreach (float ratio in new[] { 2f, 2.625f, 3f })
+            float buttonShare = -1f;
+            float swipeReference = -1f;
+
+            foreach (float ratio in new[] { 1f, 1.75f, 2f, 3f })
             {
-                float scaled = TouchMetrics.PixelsPerMillimetreFor(Dpi, ratio);
-                float expected = atOne / ratio;
+                float dpi = CssDpi * ratio;
+                float pixelsPerMm = TouchMetrics.PixelsPerMillimetreFor(dpi);
 
-                if (Mathf.Abs(scaled - expected) > 0.01f)
-                    problems.Add($"at devicePixelRatio {ratio}, a millimetre is " +
-                                 $"{scaled:0.00}px and should be {expected:0.00}px -- " +
-                                 "every touch control would be " +
-                                 $"{scaled / expected:0.0}x the size it asked for");
+                // How much of the screen the button covers. The framebuffer grows with
+                // the ratio and so does the button, so this must not move.
+                float share = ButtonMm * pixelsPerMm / (CssWidth * ratio);
+
+                if (buttonShare < 0f) buttonShare = share;
+                else if (Mathf.Abs(share - buttonShare) > 0.002f)
+                    problems.Add($"at render ratio {ratio}, the fire button covers " +
+                                 $"{share:P1} of the screen and at ratio 1 it covers " +
+                                 $"{buttonShare:P1} -- the page's sharpness is resizing the controls");
+
+                // And how far the view turns for a physical swipe, which is the same
+                // question asked of the other conversion.
+                float raw = SwipeMm * pixelsPerMm;
+                float reference = TouchMetrics.ToReferencePixelsFor(new Vector2(raw, 0f), dpi).x;
+
+                if (swipeReference < 0f) swipeReference = reference;
+                else if (Mathf.Abs(reference - swipeReference) > 1f)
+                    problems.Add($"at render ratio {ratio}, a {SwipeMm}mm swipe is worth " +
+                                 $"{reference:0} reference pixels and at ratio 1 it is worth " +
+                                 $"{swipeReference:0} -- the look speed depends on the page");
             }
 
-            // And a ratio below one, or a nonsense one, must never make things larger.
-            if (TouchMetrics.PixelsPerMillimetreFor(Dpi, 0f) > atOne + 0.01f ||
-                TouchMetrics.PixelsPerMillimetreFor(Dpi, -3f) > atOne + 0.01f)
-                problems.Add("a bad devicePixelRatio made a millimetre bigger than it is " +
-                             "at ratio one, which is the failure this guards against");
+            // And the absolute answer, not merely a consistent one. A reference pixel is
+            // defined at ReferenceDpi, so a 40mm swipe is worth exactly this many of them
+            // on every device there has ever been -- which is the statement the shipped
+            // code failed, by a factor of two and a half, while being perfectly
+            // self-consistent about it.
+            float expected = TouchMetrics.MillimetresToReferencePixels(SwipeMm);
+
+            if (Mathf.Abs(swipeReference - expected) > 1f)
+                problems.Add($"a {SwipeMm}mm swipe turns the view by {swipeReference:0} " +
+                             $"reference pixels and should turn it by {expected:0} -- " +
+                             $"the look is {expected / Mathf.Max(1f, swipeReference):0.0}x " +
+                             "too slow on a phone");
+
+            // A density the platform cannot possibly mean must fall back rather than
+            // divide by nearly nothing.
+            float sane = TouchMetrics.PixelsPerMillimetreFor(CssDpi);
+
+            if (TouchMetrics.PixelsPerMillimetreFor(0f) > sane * 3f ||
+                TouchMetrics.PixelsPerMillimetreFor(-3f) > sane * 3f ||
+                TouchMetrics.PixelsPerMillimetreFor(9000f) > sane * 3f)
+                problems.Add("an impossible density was taken at face value, which is a " +
+                             "division that makes the controls either dead or uncontrollable");
         }
     }
 }

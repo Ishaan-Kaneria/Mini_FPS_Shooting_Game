@@ -128,6 +128,36 @@ public class HUDController : MonoBehaviour
     public float crosshairKick = 4f;
     public float crosshairSmoothing = 14f;
     public Color crosshairColor = Color.white;
+
+    [Header("Crosshair on a touch screen")]
+    [Tooltip("How long each arm is, in millimetres of glass. The authored crosshair is " +
+             "sized in canvas units, which is a length only on the screen it was drawn " +
+             "for -- on a phone the same arms come out about a third of a millimetre " +
+             "wide, which is not a thin crosshair, it is no crosshair at all.")]
+    [Range(1.5f, 8f)] public float touchArmLengthMm = 3.1f;
+
+    [Tooltip("How thick each arm is. A hairline survives a monitor and does not survive " +
+             "a phone being upscaled by its browser.")]
+    [Range(0.2f, 1.5f)] public float touchArmThicknessMm = 0.5f;
+
+    [Tooltip("The hole in the middle at rest. It still opens with the weapon's spread.")]
+    [Range(0.4f, 4f)] public float touchCentreGapMm = 1.1f;
+
+    [Tooltip("The dot in the middle, in millimetres. Zero leaves it out.\n\n" +
+             "The arms open with spread and the dot does not, so the dot is the thing " +
+             "that answers \"where does the bullet go\" while the arms answer \"how " +
+             "accurately\". On a mouse the pointer's own precision makes that a nicety; " +
+             "under a thumb that covers the target it is the whole aim.")]
+    [Range(0f, 2f)] public float touchDotMm = 0.85f;
+
+    [Tooltip("A dark edge drawn around the crosshair, in millimetres. White on white " +
+             "sand is invisible, and the desert is most of this game's daylight.")]
+    [Range(0f, 0.6f)] public float touchOutlineMm = 0.18f;
+
+    [Tooltip("How far the arms jump when a shot goes off, in millimetres. The kick is " +
+             "written in the same units the arms are, so it has to be converted with " +
+             "them or it is a flinch nobody can see.")]
+    [Range(0f, 2f)] public float touchKickMm = 0.55f;
     public Color hitmarkerColor = new Color(1f, 0.35f, 0.3f);
     public Color headshotColor = new Color(1f, 0.85f, 0.2f);
     public float hitmarkerDuration = 0.12f;
@@ -232,6 +262,17 @@ public class HUDController : MonoBehaviour
     /// <summary>Cached crosshair arm Images. See CrosshairImages.</summary>
     Image[] _crosshairImages;
 
+    /// <summary>
+    /// Whether the crosshair has been sized for this screen yet.
+    ///
+    /// <b>Not done in Start, and the reason is the canvas.</b> A CanvasScaler publishes
+    /// its factor in its own update, which is after every Start in the frame -- so a
+    /// crosshair measured in Start is measured against the scale the canvas had before
+    /// the HUD rescaled it for this form, and comes out wrong by exactly that ratio.
+    /// The first frame knows; Start does not.
+    /// </summary>
+    bool _crosshairFitted;
+
     struct Indicator
     {
         public CanvasGroup group;
@@ -278,7 +319,7 @@ public class HUDController : MonoBehaviour
         // exact moment the player has no attention to spare for them. The touch cluster
         // is unaffected: it sizes itself in millimetres and does not care what the canvas
         // is measured against.
-        PhoneUI.Apply(GetComponentInParent<Canvas>());
+        PhoneUI.Apply(GetComponentInParent<Canvas>(), PhoneUI.Surface.Hud);
 
         WriteKeyHints();
         WireButtons();
@@ -428,6 +469,8 @@ public class HUDController : MonoBehaviour
     {
         UpdateTexts();
         UpdateHealthBars();
+        if (!_crosshairFitted) FitCrosshairToDevice();
+
         UpdateCrosshair();
         UpdateBombCursor();
         UpdateVignette();
@@ -1081,6 +1124,122 @@ public class HUDController : MonoBehaviour
         rect.sizeDelta = size;
 
         go.GetComponent<Image>().raycastTarget = false;
+    }
+
+    /// <summary>
+    /// Redraws the crosshair at a size a thumb-held screen can actually show.
+    ///
+    /// <b>The bug this fixes looked like a missing feature.</b> The arms are authored as
+    /// 2x10 canvas units against a 1920-wide reference, which is a hairline on a monitor
+    /// and correct there. In a browser on a phone the canvas scale is about 0.45 and the
+    /// result is then stretched over a panel with three device pixels to each one drawn,
+    /// so the arms land at roughly a third of a millimetre of pale line over bright sand.
+    /// The player's report was not "the crosshair is small"; it was that the phone has no
+    /// aim point at all, and from the outside that is exactly what it is.
+    ///
+    /// So on a touch screen it is sized in millimetres like the rest of the touch layer,
+    /// given a dot the spread cannot open, and outlined so it survives being drawn over
+    /// sand, snow and sky. A pointer keeps what it has: a mouse resolves a hundredth of a
+    /// degree and the hairline is a deliberate choice there, not an accident.
+    ///
+    /// The builder cannot do any of this, for the reason <see cref="TouchCluster"/> gives
+    /// at greater length: a scene is authored in reference units and a reference unit is
+    /// not a distance until there is a screen.
+    /// </summary>
+    void FitCrosshairToDevice()
+    {
+        _crosshairFitted = true;
+
+        if (!DeviceProfile.Touched) return;
+        if (crosshairArms == null || crosshairArms.Length < 4) return;
+
+        var canvas = GetComponentInParent<Canvas>();
+        float scale = canvas != null ? canvas.scaleFactor : 1f;
+        if (scale <= 0.0001f) scale = 1f;
+
+        // Canvas units per millimetre of glass.
+        float unit = TouchMetrics.MillimetresToPixels(1f) / scale;
+
+        float length = Mathf.Max(4f, touchArmLengthMm * unit);
+        float thickness = Mathf.Max(2f, touchArmThicknessMm * unit);
+
+        foreach (var arm in crosshairArms)
+        {
+            if (arm == null) continue;
+
+            // Which way an arm points is read off the shape it was authored as, rather
+            // than assumed from its index -- the order is documented as top, bottom,
+            // left, right, and a rig that rewired them would otherwise come back with a
+            // crosshair made of four crosses.
+            bool vertical = arm.sizeDelta.y >= arm.sizeDelta.x;
+
+            arm.sizeDelta = vertical
+                ? new Vector2(thickness, length)
+                : new Vector2(length, thickness);
+
+            Outline(arm.GetComponent<Image>(), unit);
+        }
+
+        crosshairBaseGap = touchCentreGapMm * unit;
+        _currentGap = crosshairBaseGap;
+
+        // Assigned rather than multiplied, so running this again lands on the same
+        // number. Everything here is re-derived from the screen for that reason.
+        crosshairKick = touchKickMm * unit;
+
+        BuildCentreDot(unit);
+    }
+
+    /// <summary>
+    /// The pip in the middle, made here rather than by the builder because its size is a
+    /// physical one and only the device knows it. Reused if a scene already has one, so
+    /// this is safe to run again.
+    /// </summary>
+    void BuildCentreDot(float unit)
+    {
+        if (crosshairGroup == null || touchDotMm <= 0.01f) return;
+
+        var parent = (RectTransform)crosshairGroup.transform;
+
+        var existing = parent.Find("Dot") as RectTransform;
+        if (existing == null)
+        {
+            var go = new GameObject("Dot", typeof(RectTransform), typeof(Image));
+            existing = (RectTransform)go.transform;
+            existing.SetParent(parent, false);
+        }
+
+        existing.anchorMin = existing.anchorMax = new Vector2(0.5f, 0.5f);
+        existing.pivot = new Vector2(0.5f, 0.5f);
+        existing.anchoredPosition = Vector2.zero;
+        existing.sizeDelta = Vector2.one * Mathf.Max(2f, touchDotMm * unit);
+
+        var image = existing.GetComponent<Image>();
+        image.color = crosshairColor;
+        image.raycastTarget = false;
+
+        Outline(image, unit);
+    }
+
+    /// <summary>
+    /// A dark edge, so the crosshair reads on sand as well as on sky.
+    ///
+    /// Added as a UI effect rather than as a second set of quads behind the first: an
+    /// Outline writes its copies into the same mesh, so it follows the arm when the
+    /// spread moves it and there is nothing to keep in step.
+    /// </summary>
+    void Outline(Image image, float unit)
+    {
+        if (image == null || touchOutlineMm <= 0.001f) return;
+
+        var outline = image.GetComponent<Outline>();
+        if (outline == null) outline = image.gameObject.AddComponent<Outline>();
+
+        float edge = Mathf.Max(1f, touchOutlineMm * unit);
+
+        outline.effectColor = new Color(0f, 0f, 0f, 0.75f);
+        outline.effectDistance = new Vector2(edge, edge);
+        outline.useGraphicAlpha = true;
     }
 
     void UpdateCrosshair()

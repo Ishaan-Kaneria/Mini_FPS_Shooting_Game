@@ -23,6 +23,9 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | Dashboard | `MainMenuController.cs`, `ArenaCard.cs`, `ArenaCatalog.cs` (ScriptableObject), `LevelSelectPanel.cs`, `LevelButton.cs` |
 | Feedback | `HUDController.cs`, `LevelResultsUI.cs` (the stars screen), `Minimap.cs` (the map in the corner), `MinimapMarker.cs`, `EnemyHealthBar.cs`, `DamageNumber.cs`, `Pickup.cs`, `TransientFlash.cs` (shrinks a spawned flash out of sight), `OneShotAudio.cs` (pooled positional one-shots), `ScrollingWater.cs` (drags the river's texture along it) |
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
+| Achievements | `Achievements.cs` (twenty thresholds, all derived), `PlayerStats.cs` (the lifetime counters they read), `AchievementsPanel.cs`, `AchievementRow.cs` |
+| Instructions | `InstructionsPanel.cs` (written from the live bindings), `InstructionRow.cs` |
+| Screens  | `OverlayPanel.cs` (the base every overlay shares), `UITheme.cs` (colour, type and motion tokens), `DeviceProfile.cs` (reach, form, orientation), `PhoneUI.cs` (the one-line question, delegating to it) |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
 `Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), `Store/` (the catalog plus its WeaponData, BombData and ConsumableData), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `MinimapBlip.png`, `Enemy.prefab`, `Bomb.prefab`, `Explosion.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
@@ -84,11 +87,11 @@ Generated Materials**, or `FPSKitBatch.PruneMaterials`, which reports and only d
 with `-fpskitApply`) is how that is cleared; anything the builder still wants, it
 recreates on the next build.
 
-`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
+`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitPark.cs` (the abandoned fairground: hollows, shafts, rides and what stands between them) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the ten checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below), `FPSKitReachTest.cs` (`VerifyReach`, below -- the one that asks whether the navmesh an arena bakes is navmesh anything can get to) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the ten checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below), `FPSKitReachTest.cs` (`VerifyReach`, below -- the one that asks whether the navmesh an arena bakes is navmesh anything can get to) `FPSKitDeviceTest.cs` (`VerifyDevices`, which asserts every class of screen is laid out for the hands that are on it, and builds nothing) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
 
 `FPSKitViews.cs` (`FPSKitBatch.CaptureViews`) is not a test -- it renders a built arena from fixed viewpoints to PNGs, because a generated scene is otherwise write-only from the command line: it is saved in binary so it cannot be read, its geometry is procedural so the code is not a description of the result, and every check here answers whether a level *works* rather than what it looks like. `VerifyZone` would pass just as happily on an arena whose cliffs were inside out. It needs a real graphics device:
 
@@ -466,8 +469,8 @@ arena and each one contributed two enormous steps.
 
 ## Surfaces are textured, and the textures are generated
 
-`FPSKitTextures.cs` renders tiling albedo and normal maps for sand, rock, timber, adobe
-and water into `FPSKit_Generated/Textures/`. Every generated arena was flat-shaded before
+`FPSKitTextures.cs` renders tiling albedo and normal maps for sand, rock, timber, adobe,
+water, concrete, metal, snow and tile into `FPSKit_Generated/Textures/`. Every generated arena was flat-shaded before
 this -- one solid colour per material -- which is readable and completely scaleless: a
 dune the size of a house and one the size of a stadium are the same wash of orange, and a
 player walking over the second cannot tell they are moving.
@@ -1269,6 +1272,229 @@ A store card shows the value a purchase would give the player **now**, not the r
 total of what they have already bought. The health card showed the total and so opened
 on `+0 HP   ·   +0 SHIELD` for anybody who had never bought one -- true, and useless,
 because the card is read to find out what pressing the button does.
+
+## A device is three facts, not one bool
+
+`DeviceProfile` answers what the game is being played on: a **reach** (`Pointer` or
+`Touch`), a **form** (`Handset`, `Tablet`, `Laptop`, `Desktop`, measured in millimetres),
+and an orientation. Three axes because real hardware varies them independently -- a
+touchscreen laptop is a pointer device in practice, and a 12.9in iPad is a *laptop-sized
+surface reached by a finger*, which is the true answer and the useful one: laptop density,
+thumb-sized targets. No single axis can say that.
+
+**What it replaced was one bool and a scale factor**, and that failed twice over.
+
+`PhoneUI.Active` asked `TouchMetrics` for the screen's density -- but that property exists
+to size a thumb target, so when the platform tells it nothing it substitutes *a typical
+phone*, 400 dpi. The question answered itself. Every ordinary monitor reports 96 dpi and
+every 1440p one 109, both under the 120 dpi floor the touch layer clamps to, so both got
+the substitution and a 1920px monitor measured **122mm across**. Desktop players lost the
+arena card descriptions, lost the career panel entirely, and saw the menus and HUD at
+1.43x. The one machine it passed on was a high-dpi laptop, whose density is inside the
+handheld range and so escapes the substitution -- which is why it survived being looked at.
+
+And a phone was getting the desktop's layout magnified, with `HideOnPhone` deleting
+whatever then overflowed. **That is subtraction, not design.** What breaks a six-card grid
+on a handset is that it is a six-card grid, not that the cards are the wrong size --
+scaling preserves arrangement and density, which is exactly what has to change. The
+achievements and instructions screens take their column count from the form: four on a
+monitor, two on a tablet, one on a handset, with the category headings moving into the row
+stream when columns are shared, because a heading pinned above a column that now holds two
+categories labels only the first.
+
+`FPSKitDeviceTest` (`FPSKitBatch.VerifyDevices`) pins fourteen screen classes. It drives
+`DeviceProfile.FormFor` and `ReachFor` with the readings handed in, because batch mode has
+one screen and a check written against the live properties would assert whatever the build
+machine is and pass identically with every rule deleted -- the same reason
+`ControlSettings.CanRead` is public. It is cheap: no scene, no play session.
+
+**The game is landscape-only on every device.** `ProjectSettings` allows only
+`LandscapeLeft`/`LandscapeRight` and the WebGL template calls `screen.orientation.lock`.
+So a handset here is a wide, short surface with thumbs at the **left and right edges** --
+a bottom bar spends the scarcest dimension and sits outside the thumb arc.
+
+## The dashboard has four destinations
+
+`HOW TO PLAY`, `ACHIEVEMENTS`, `STORE` and `EXIT GAME`, built as a `HorizontalLayoutGroup`
+rather than four anchored offsets -- the old pair sat at fixed pixels from the right edge
+and a third and fourth would have reached 1,120px in, fine at one window width and off the
+screen at a narrower one. Every one of them is in `dashboardOnly`, because an overlay is a
+full-screen raycast target and a button left switched on behind one is drawn and
+unreachable.
+
+**Achievements are derived, never stored.** `Achievements` holds twenty thresholds read
+against `PlayerStats` the moment somebody looks, so nothing can disagree with the counters
+and an achievement added later is retroactive for free -- a player with 564 kills already
+has the hundred-kill one the first time the screen opens. Counting happens in
+`GameSession.RecordResult` and `StorePanel.Confirm`, which are already the single points
+every ending and every purchase pass through, so a new ending cannot silently fail to
+count. Stars and finished arenas are *recomputed* from the catalogue instead, because
+`LevelProgress.Record` keeps the best of each attempt -- stars are not additive and a
+counter could only drift from the truth.
+
+**The instructions are read from `ControlSettings`, never written down.** The asset ships
+three presets, so a panel claiming "WASD to move" is wrong for two of them, and wrong in
+the worst way: somebody who follows written instructions and gets nothing concludes the
+game is broken rather than the page. Touch and pointer get *different pages* rather than
+one page with lines crossed out, chosen by `DeviceProfile.Touched`.
+
+**Three things were extracted rather than copied**, because copies drift -- the same
+argument `HoverCard` settles for cards. `UIText.KeyLabel` owns what a key is called on
+screen, so the instruction strip and the instructions panel cannot disagree about whether
+the fire button is "LMB" or "Mouse0". `OverlayPanel` owns open, close, Escape and the trap
+where a panel's own component hides the object that would have run it. `BuildOverlayShell`
+owns the shade, title and back button that three screens share.
+
+## One accent is why a dashboard looks dull
+
+`UITheme` holds the tokens. The menu used to draw all six arenas, the store, the level
+tiles and the results screen in a single amber over near-black, so nothing on any screen
+distinguished itself from anything else -- and it is also the commonest look a dark game
+menu can have.
+
+Six **signal** colours now, held apart in hue so no two cards are confusable and matched in
+luminance so no arena looks more important than another, and an arena wears its own on its
+card, its level tiles and its results screen. The point is that the colour *identifies*:
+a player learns "the cyan one" before they learn "Snowbound Station".
+
+**Not `LevelTheme.accentLightColor`.** That is a lighting value -- what the practicals in
+that arena glow -- so it is muted by the job it actually does, and three of the six themes
+never set it and fell back to the same orange. A light and an identity have opposite
+requirements and now come from different places.
+
+The base is a colour rather than a tinted near-black. What made the old dashboard look
+flat was not that it was dark but that its floor was `#04060A`, against which every bright
+thing appears to float rather than to be lit.
+
+
+## The park is one surface, and that is the whole design
+
+`LevelTheme.parkZone` is the fourth layout mode, and Abandoned Subway is built with it
+at 450x450 -- an abandoned fairground at night, with hollows in the ground and shafts in
+some of them that kill on contact. `FPSKitPark.cs` builds it.
+
+**Everything walkable is the terrain.** That is not a simplification, it is the lesson
+from what it replaced. The arena in this slot was a three-level underground station --
+track beds, platforms, a concourse over both -- joined by stairs, bridges and ramps, and
+every one of those joins was somewhere `NavMeshSurface` could fail to connect. It took
+thirteen build-and-verify cycles to find six separate connectivity failures and it still
+never passed. A park is one continuous surface with things standing on it, so there is
+nothing to fail to connect; it reached a passing check in three.
+
+Write the section down before writing the builder. Of the subway's six failures, five
+were visible in a two-minute sketch of "what is at each x, from the centre outward" --
+that a 4.4m trench can only be entered sideways, that anything crossing it must fly over
+it, that a platform edge strip lands exactly where a bridge does. The sketch was drawn an
+hour too late.
+
+Four things about the park are worth not re-deriving:
+
+- **The ground is the desert's, subsided.** Same `BuildDuneField`, same relaxation, same
+  smoothing, so it rolls the way ground does rather than the way noise does. A hollow is
+  a `FlattenPad` pinned *below* `NaturalHeightAt` rather than carved afterwards, so it
+  goes through the same nearest-pad-wins arithmetic as every other flattened site.
+- **The pitfalls are the shafts, never the hollows.** Same rule the river already taught:
+  a hollow is a place -- you walk down into it and fight in it -- and only the opening in
+  its floor is lethal, with its trigger lid 2.2m *below* the lip so that standing on the
+  edge is safe. Each lethal shaft is lit from inside, which is what makes it readable
+  from across the park: hidden at distance, plain up close.
+- **Dark is a lighting design, not an absence of one.** The station this replaced ran a
+  0.15 moon with near-zero ambient and 0.016 fog over 450m, and rendered as a black
+  rectangle -- every bit of its geometry present and none of it visible. What makes a
+  night arena work is contrast, not dimness: a moon low enough to model the ground and
+  throw long shadows, ambient that is not zero, and *local* light. The park is genuinely
+  black between its lamp posts and warm underneath them, which is both more frightening
+  and more honest about the state of the electrics than a uniform grey.
+- **A stall is not a box.** Props here are built from parts -- a stall is a back, two
+  sides, a counter, an open front, an awning on posts, a sign and a roof -- because what
+  makes a stall legible is the opening you buy across and not its dimensions. A correctly
+  sized, correctly coloured single cube reads as a crate. The built stalls also stopped
+  appearing in `VerifyReach`'s stranded list, which solid cubes had been pinching pockets
+  behind: proper geometry turns out to be better for navigation as well as for looks.
+
+## Shared builder code reads fields its callers never meant to fill
+
+Four latent bugs surfaced in one session, and all four are the same shape: a helper
+reading a value that only one kind of caller was ever expected to populate. Every one of
+them had been shipping silently because the existing arenas happened to avoid it.
+
+- **`BuildDuneField` cut a river through arenas with no river.** It reads
+  `_theme.hazardWidth` to size the hole the gorge needs, so that the bake gets no floor
+  over the water -- unconditionally, and every theme carries that field. A layout that
+  never calls `BuildGorge` still got a 55m channel carved the whole length of its map at
+  `hazardOffset`, with nothing in it: a void that split the arena in two, stranded
+  everything beyond it, and took the ground out from under whatever had been placed near
+  it. Gated on `openZone` now.
+- **`NoEntry` sized its volume in world units and parented it to the object.**
+  `NavMeshModifierVolume.size` is local, so it is multiplied by the parent's scale.
+  Invisible for every caller until then -- art-pack prefabs at scale one -- and
+  catastrophic for a `CreateBlock` primitive, where the scale *is* the size: two 121x450
+  blocks produced Not Walkable volumes that blanketed the arena and the bake came back
+  with **no navmesh anywhere**. Nothing logged, and a level with nowhere to spawn.
+- **`BuildPlayer` assumed the walkable surface starts at ground level.** True of a flat
+  floor and of a heightfield, so true of all six arenas -- and false for any layout whose
+  ground plane is raised, which puts the player *inside* it, on no navmesh, unreachable
+  by everything. `_playerStart` lets a layout say otherwise and is cleared beside
+  `ResetTerrain` so one arena in a six-arena batch cannot inherit the last one's.
+- **`BuildDuneField` hard-coded the Sand detail map.** A fairground stood on wind ripples
+  and read as a desert with rides in it. It takes `LevelTheme.floorDetail` now -- and
+  Desert Outpost had to be pinned to `"Sand"` explicitly in the same change, because it
+  had only ever been getting it from that hard-coded string and the field's default is
+  `Concrete`. The fix would otherwise have quietly turned the dunes to pavement.
+
+**A pad reaches `Radius + Blend`, so that is what has to be claimed.** Claiming only the
+flat part lets a later pad's falloff lap over an earlier one, and the nearer pad wins
+outright -- which is how a sinkhole forty metres away pulled the ground out from under a
+ferris wheel. The same bug the desert already records, where a vantage sixty metres from
+a bridge dragged the sand at the end of the deck down with it.
+
+## VerifyReach reports where, not just how much
+
+One sample point cannot tell a thin ring round the boundary from a severed half of the
+map, and those want completely different fixes. It now prints the extent and centre of
+the stranded ground, the extent of the *reachable* ground beside it, and where the player
+is.
+
+That is the difference between guessing and eliminating. The park's 25% took three failed
+attempts at moving the navmesh seal -- all of them treating a boundary ring that was never
+there -- and then four runs that each killed a family outright: hollows off (unchanged, so
+not hollows), relief flattened (unchanged, so not terrain), player moved east (the split
+*inverted* rather than followed, so the barrier was fixed in world space), and the 13m
+dead strip at a known x pinned it to the terrain chunk builder.
+
+**If a reachability failure is more than a few percent, read the extents before changing
+anything.** A quarter of the arena is never a boundary strip.
+
+## Previews are only rendered with a graphics device
+
+`FPSKit_Generated/Previews/` were **130-byte single-colour PNGs** -- every one of them,
+for as long as they had existed. The largest element on every dashboard card was an empty
+rectangle, which is most of why that screen read as dull whatever the palette did.
+
+They are rendered from the built scenes and the builder falls back to a flat fill when
+there is no graphics device, so **every headless `BuildDashboard` quietly writes the
+fallback over them**. Rebuild with `UNITY_GRAPHICS=1` or the cards go blank again:
+
+```
+UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.BuildDashboard
+```
+
+## A reset can run and still not take
+
+`ResetThemes` reported success and wrote the wrong number, because the case it was
+resetting had two assignments to the same field and the later one won -- a new value added
+near the top of a `Configure` case, and the original still sitting further down.
+
+The documented trap is that changing `Configure` does not reach the asset without a reset.
+This is the layer below it: **the reset ran and the value still did not change.** Every
+check passed, the scene built, and the arena came out at its old size.
+
+So: **verify a reset by reading the `.asset`, not by trusting the log.**
+
+```
+grep -a -o "arenaSize: [0-9.]*" Assets/FPSKit_Generated/Themes/<Theme>.asset
+```
+
 
 ## Project conventions
 

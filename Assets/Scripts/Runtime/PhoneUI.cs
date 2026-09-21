@@ -44,88 +44,35 @@ public static class PhoneUI
     /// the grid is fitted to the box it is given, so a bigger unit means fewer, larger
     /// cards rather than a scrollbar.
     /// </summary>
+    /// <b>This is the approach being replaced.</b> Growing everything by one factor keeps
+    /// the desktop's arrangement and density and merely magnifies them, which is why it had
+    /// to be paired with <c>HideOnPhone</c> deleting whatever then overflowed. A handset
+    /// needs its own arrangement, not this one enlarged. Kept until the per-form layouts
+    /// land, because on a real phone it is still better than nothing.
     public const float ReferenceShrink = 0.70f;
 
-    /// <summary>
-    /// Bounds of a density any platform might genuinely report, handheld or not.
-    ///
-    /// Deliberately much wider than <see cref="TouchMetrics"/>'s handheld range: a desktop
-    /// monitor is 96 dpi and a laptop 130-220, all of which that range rejects. Anything
-    /// inside this is a real reading to measure with; anything outside -- 0, which is what
-    /// a platform reports when it does not know -- is not a small screen, it is no answer.
-    /// </summary>
-    const float MinKnownDpi = 40f;
-    const float MaxKnownDpi = 900f;
-
-    /// <summary>Whether the platform gave a density worth measuring with at all.</summary>
-    static bool DensityKnown
-    {
-        get
-        {
-            float dpi = Screen.dpi;
-            return dpi >= MinKnownDpi && dpi <= MaxKnownDpi;
-        }
-    }
-
-    /// <summary>
-    /// The screen's width in millimetres, from the platform's own density.
-    ///
-    /// <b>Not <see cref="TouchMetrics.PixelsPerMillimetre"/>, and that is the whole bug this
-    /// guards against.</b> That property exists to size a thumb target, so when the platform
-    /// gives it nothing it substitutes a typical phone -- 400 dpi -- which is exactly the
-    /// right guess for its own job and a circular one for this. Asked through it, a 1920px
-    /// monitor at the 96 dpi every desktop reports came back as 122mm across, under the
-    /// 165mm line, and every desktop player was handed the handset layout: no arena
-    /// descriptions, no career panel, everything at 1.43x. Measured on 109 dpi it was 163mm
-    /// -- still under. The one machine it passed on was a high-dpi laptop, which reports a
-    /// number inside the handheld range and so escapes the substitution, which is why this
-    /// survived being looked at.
-    /// </summary>
-    public static float ScreenWidthMm
-        => DensityKnown ? Screen.width / (Screen.dpi / 25.4f) : float.PositiveInfinity;
+    /// <summary>The screen's width in millimetres, or 0 when the platform will not say.</summary>
+    public static float ScreenWidthMm => DeviceProfile.LongEdgeMm;
 
     /// <summary>
     /// Whether to lay this out for a thumb at arm's length.
     ///
-    /// Asked of the touch layer first, because that is the one signal that is certain --
-    /// if the on-screen controls are up, this is a handset whatever the numbers say. The
-    /// physical size is the fallback for the menus, which run before any of that exists.
+    /// <b>Superseded.</b> <see cref="DeviceProfile"/> is where this is decided now, and it
+    /// answers with a form, a reach and an orientation rather than one bool -- because the
+    /// bool is what forced every non-desktop screen through the same magnified desktop.
+    /// This remains as the one-line question, for the decisions that genuinely are binary
+    /// and for the callers that already ask it.
     /// </summary>
-    public static bool Active
-        => IsHandset(Screen.dpi, Screen.width,
-                     MobileInput.Active || WebDevice.IsTouchOnly,
-                     Application.isMobilePlatform);
+    public static bool Active => DeviceProfile.Handheld;
 
     /// <summary>
-    /// The decision itself, with every reading handed in rather than read.
-    ///
-    /// Public <b>only</b> so <c>VerifyDevices</c> can drive it across the densities real
-    /// hardware reports -- same reason <see cref="ControlSettings.CanRead"/> is. Batch mode
-    /// has one screen and cannot pretend to be a 416 dpi handset or a 96 dpi monitor, so a
-    /// check written against <see cref="Active"/> would assert whatever the build machine
-    /// happens to be and pass identically with the rule deleted.
+    /// The decision itself, with the readings handed in. Delegates to
+    /// <see cref="DeviceProfile.FormFor"/> so there is one classifier rather than two that
+    /// can drift apart.
     /// </summary>
-    /// <param name="dpi">What the platform claims, <c>0</c> included.</param>
-    /// <param name="widthPixels">The screen's width in real pixels.</param>
-    /// <param name="touchSignal">On-screen controls exist, or the browser says finger-only.</param>
-    /// <param name="mobilePlatform">This is a handheld build, whatever its screen admits.</param>
     public static bool IsHandset(float dpi, int widthPixels, bool touchSignal, bool mobilePlatform)
-    {
-        // Certain, in order of certainty. On-screen controls existing settles it; so does
-        // the browser telling us the only pointer is a finger.
-        if (touchSignal) return true;
-
-        // With a real density, measure. This is the path a phone on the dashboard takes --
-        // TouchControls has not run there, so MobileInput is still false -- and equally the
-        // path a desktop takes to be told it is not a phone.
-        if (dpi >= MinKnownDpi && dpi <= MaxKnownDpi)
-            return widthPixels / (dpi / 25.4f) < PhoneWidthMm;
-
-        // No density to measure with. Ask the platform rather than guessing from pixels: a
-        // handheld build is a handheld however little it will admit about its screen, and
-        // everything else is a desktop. Guessing "small" here is what broke desktop.
-        return mobilePlatform;
-    }
+        => DeviceProfile.FormFor(dpi, widthPixels, 0, touchSignal, mobilePlatform)
+           == DeviceProfile.Form.Handset;
 
     /// <summary>
     /// Grows everything on a canvas by shrinking what it measures itself against.

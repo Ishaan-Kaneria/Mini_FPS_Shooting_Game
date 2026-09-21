@@ -119,11 +119,57 @@ namespace FPSKit.EditorTools
                     problems.Add($"{where}: PhoneUI.IsHandset says {handset}, form says {s.ExpectForm}");
             }
 
+            CheckPhysicalSizing(problems);
+
             if (problems.Count > 0)
                 throw new Exception("screens laid out for the wrong hands:\n  - " +
                                     string.Join("\n  - ", problems));
 
-            Debug.Log($"[FPSKitBatch] devices: {Fleet.Length} screen classes, form and reach both correct");
+            Debug.Log($"[FPSKitBatch] devices: {Fleet.Length} screen classes, form and reach " +
+                      "both correct, and millimetres survive a scaled framebuffer");
+        }
+
+        /// <summary>
+        /// That a millimetre is a millimetre on a screen the browser is scaling.
+        ///
+        /// <b>This is the check that was missing when the on-screen controls shipped three
+        /// times too large.</b> The whole touch layer is sized in millimetres, and the
+        /// conversion divides Screen.dpi -- which describes the glass -- by nothing at all.
+        /// That is right on a desktop and on a native build, where Unity renders one pixel
+        /// per device pixel. It is wrong in a browser, because the page renders a touch
+        /// device at devicePixelRatio 1 on purpose: a 3x phone hands Unity a backbuffer a
+        /// third of the width while still reporting the panel's density, so every button
+        /// came out three times the size it asked for and FIRE covered the middle of the
+        /// screen.
+        ///
+        /// VerifyTouch could not see it. It measures the layer in canvas units, and in
+        /// canvas units everything was correct -- the error is entirely in the step from
+        /// canvas units to glass, which needs a real device or this.
+        /// </summary>
+        private static void CheckPhysicalSizing(List<string> problems)
+        {
+            // A flagship phone, rendered at each of the ratios a browser might hand us.
+            const float Dpi = 416f;
+
+            float atOne = TouchMetrics.PixelsPerMillimetreFor(Dpi, 1f);
+
+            foreach (float ratio in new[] { 2f, 2.625f, 3f })
+            {
+                float scaled = TouchMetrics.PixelsPerMillimetreFor(Dpi, ratio);
+                float expected = atOne / ratio;
+
+                if (Mathf.Abs(scaled - expected) > 0.01f)
+                    problems.Add($"at devicePixelRatio {ratio}, a millimetre is " +
+                                 $"{scaled:0.00}px and should be {expected:0.00}px -- " +
+                                 "every touch control would be " +
+                                 $"{scaled / expected:0.0}x the size it asked for");
+            }
+
+            // And a ratio below one, or a nonsense one, must never make things larger.
+            if (TouchMetrics.PixelsPerMillimetreFor(Dpi, 0f) > atOne + 0.01f ||
+                TouchMetrics.PixelsPerMillimetreFor(Dpi, -3f) > atOne + 0.01f)
+                problems.Add("a bad devicePixelRatio made a millimetre bigger than it is " +
+                             "at ratio one, which is the failure this guards against");
         }
     }
 }

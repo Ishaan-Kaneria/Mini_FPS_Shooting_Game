@@ -914,8 +914,15 @@ namespace FPSKit.EditorTools
             // fit is better than truncating the one word that says where you are going.
             var name = Label(inner, "Name", "ARENA", 25, TextAlignmentOptions.MidlineLeft, Ink);
             Span(name.rectTransform, 0.335f, 0.448f, 14f, 14f);
-            name.characterSpacing = 4f;
-            Autosize(name, 13f, 25f);
+            // <b>Tracking is expensive on a narrow card.</b> Four units of it on
+            // "INDUSTRIAL WAREHOUSE" is most of a word's worth of extra width, and on a
+            // landscape phone -- where the grid is fitted to a very short screen and the
+            // cards come out small -- that pushed the name past its box. Auto-sizing then
+            // hit its floor and Truncate took the rest, so the card read "XDUSTRIAL WAREH".
+            // Less tracking and a lower floor let it shrink instead of losing its end.
+            name.characterSpacing = 1.5f;
+            name.textWrappingMode = TextWrappingModes.Normal;
+            Autosize(name, 8f, 25f);
             card.nameText = name;
 
             var description = Label(inner, "Description", "", 17,
@@ -927,7 +934,7 @@ namespace FPSKit.EditorTools
             // still will not fit, and trailing off reads as a summary while a glyph
             // sliced in half reads as a rendering fault.
             description.overflowMode = TextOverflowModes.Ellipsis;
-            Autosize(description, 9f, 16f);
+            Autosize(description, 7f, 16f);
             card.descriptionText = description;
 
             // The smallest type on the busiest screen. On a monitor it is what tells the
@@ -1222,7 +1229,7 @@ namespace FPSKit.EditorTools
             nameRect.offsetMin = new Vector2(28f, 0f);
             nameRect.offsetMax = Vector2.zero;
             arenaName.characterSpacing = 8f;
-            Autosize(arenaName, 18f, 40f);
+            Autosize(arenaName, 12f, 40f);
 
             var progress = Label(inner, "Progress", "", 24,
                                  TextAlignmentOptions.MidlineRight, Accent);
@@ -1233,7 +1240,7 @@ namespace FPSKit.EditorTools
             progressRect.offsetMin = Vector2.zero;
             progressRect.offsetMax = new Vector2(-28f, 0f);
             progress.characterSpacing = 4f;
-            Autosize(progress, 13f, 24f);
+            Autosize(progress, 9f, 24f);
 
             var hint = Label(shade.rectTransform, "Hint", "", 20,
                              TextAlignmentOptions.MidlineLeft, InkDim);

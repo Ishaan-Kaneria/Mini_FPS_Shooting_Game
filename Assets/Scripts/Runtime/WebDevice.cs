@@ -14,6 +14,9 @@ public static class WebDevice
 {
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")]
+    private static extern int FPSKitDevicePixelRatio();
+
+    [DllImport("__Internal")]
     private static extern int FPSKitPointerIsCoarseOnly();
 
     [DllImport("__Internal")]
@@ -49,6 +52,28 @@ public static class WebDevice
     /// closed where the browser permits it, and otherwise replaced with a sign-off that
     /// offers a reload. GameDirector.ExitApplication is the only caller.
     /// </summary>
+    /// <summary>
+    /// What the browser is scaling CSS pixels by, or 1 anywhere else.
+    ///
+    /// The page renders a touch device at ratio 1 on purpose, so Unity's backbuffer is
+    /// measured in CSS pixels while <see cref="Screen.dpi"/> still describes the glass.
+    /// Anything that turns a physical size into pixels has to divide by this or it is
+    /// wrong by the whole ratio -- which on a 3x phone made every touch control three
+    /// times the size it asked for.
+    /// </summary>
+    public static float PixelRatio
+    {
+        get
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { return Mathf.Max(1f, FPSKitDevicePixelRatio() / 1000f); }
+            catch (System.EntryPointNotFoundException) { return 1f; }
+#else
+            return 1f;
+#endif
+        }
+    }
+
     public static void Exit()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR

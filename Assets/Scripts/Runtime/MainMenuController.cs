@@ -284,18 +284,39 @@ public class MainMenuController : MonoBehaviour
         _fittedWidth = width;
         _fittedHeight = height;
 
+        // <b>The column count is chosen, not fixed.</b> Held at three it is right on a
+        // 16:9 monitor and wrong on a landscape phone, which is twice as wide as it is
+        // tall: the height decides the cell, the cards come out small, and most of the
+        // screen is margin. What the player sees is a big empty page with six little
+        // thumbnails huddled in the middle of it.
+        //
+        // Every arrangement is measured and the one with the largest card wins. On a
+        // monitor that is still three across; on a 2.2:1 phone it is six, which uses the
+        // width the screen actually has.
         int columns = Mathf.Max(1, gridColumns);
-        int rows = Mathf.Max(1, Mathf.CeilToInt(_cards.Count / (float)columns));
+        float cell = 0f;
 
-        float byWidth = (width
-                         - _layout.padding.left - _layout.padding.right
-                         - _layout.spacing.x * (columns - 1)) / columns;
+        int most = Mathf.Max(1, _cards.Count);
+        for (int tryColumns = 1; tryColumns <= most; tryColumns++)
+        {
+            int tryRows = Mathf.Max(1, Mathf.CeilToInt(_cards.Count / (float)tryColumns));
 
-        float byHeight = (height
-                          - _layout.padding.top - _layout.padding.bottom
-                          - _layout.spacing.y * (rows - 1)) / rows / cardAspect;
+            float w = (width
+                       - _layout.padding.left - _layout.padding.right
+                       - _layout.spacing.x * (tryColumns - 1)) / tryColumns;
 
-        float cell = Mathf.Max(80f, Mathf.Min(byWidth, byHeight));
+            float h = (height
+                       - _layout.padding.top - _layout.padding.bottom
+                       - _layout.spacing.y * (tryRows - 1)) / tryRows / cardAspect;
+
+            float candidate = Mathf.Min(w, h);
+            if (candidate <= cell) continue;
+
+            cell = candidate;
+            columns = tryColumns;
+        }
+
+        cell = Mathf.Max(80f, cell);
 
         _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         _layout.constraintCount = columns;

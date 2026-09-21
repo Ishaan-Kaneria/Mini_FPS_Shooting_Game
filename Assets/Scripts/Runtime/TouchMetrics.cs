@@ -54,7 +54,39 @@ public static class TouchMetrics
         }
     }
 
-    public static float PixelsPerMillimetre => Dpi / 25.4f;
+    /// <summary>
+    /// Pixels of the <b>framebuffer the game is actually drawing into</b> per millimetre
+    /// of glass.
+    ///
+    /// <b>Not simply Dpi/25.4, and the difference made the controls unusable.</b>
+    /// Screen.dpi describes the panel. Screen.width counts the pixels Unity is rendering.
+    /// Those are the same number on a desktop and on a native Android build, and they are
+    /// not the same on WebGL: the page renders a touch device at devicePixelRatio 1 on
+    /// purpose, because drawing every pixel of a 3x display costs three times the fill
+    /// rate for no visible gain. So a 2400px phone hands Unity an 800px backbuffer while
+    /// still reporting 400dpi, and every millimetre asked for came back three times too
+    /// large -- a FIRE button most of the way across the screen, which is what a player
+    /// sees and cannot work around.
+    ///
+    /// Dividing by the ratio puts both sides in the same units. It is 1 everywhere that
+    /// is not a browser, so nothing else changes.
+    /// </summary>
+    public static float PixelsPerMillimetre => PixelsPerMillimetreFor(Dpi, WebDevice.PixelRatio);
+
+    /// <summary>
+    /// The conversion itself, with both readings handed in.
+    ///
+    /// Public <b>only</b> so a check can drive it -- same reason
+    /// <see cref="ControlSettings.CanRead"/> and <see cref="PhoneUI.IsHandset"/> are.
+    /// Batch mode has one screen and no browser, so a test written against the property
+    /// above would assert whatever the build machine reports and pass identically with the
+    /// pixel-ratio division deleted, which is the exact bug it needs to catch.
+    /// </summary>
+    public static float PixelsPerMillimetreFor(float dpi, float pixelRatio)
+    {
+        float density = dpi >= MinDpi && dpi <= MaxDpi ? dpi : FallbackDpi;
+        return density / 25.4f / Mathf.Max(1f, pixelRatio);
+    }
 
     /// <summary>Pixels covering a given physical size on this screen.</summary>
     public static float MillimetresToPixels(float millimetres) => millimetres * PixelsPerMillimetre;

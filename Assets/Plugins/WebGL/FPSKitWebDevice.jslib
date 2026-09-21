@@ -21,6 +21,27 @@ mergeInto(LibraryManager.library, {
     }
   },
 
+  // How many device pixels the browser puts in a CSS pixel.
+  //
+  // <b>The page deliberately renders a phone at devicePixelRatio 1</b>, because drawing
+  // every pixel of a 3x display costs three times the fill rate for no visible gain. The
+  // cost of that is a unit mismatch nothing else can see: Screen.width then counts CSS
+  // pixels while Screen.dpi still describes the physical panel, so anything converting
+  // millimetres to pixels overstates by exactly this number -- and on a 3x phone the
+  // on-screen controls came out three times the size they were asked for, which is most
+  // of the screen.
+  //
+  // Returned as an integer per-mille so the value survives the float marshalling cleanly.
+  FPSKitDevicePixelRatio: function () {
+    try {
+      var r = window.devicePixelRatio;
+      if (!r || !isFinite(r) || r <= 0) return 1000;
+      return Math.round(r * 1000);
+    } catch (e) {
+      return 1000;
+    }
+  },
+
   // Leaves the game, for the dashboard's Exit button.
   //
   // There is no process to end in a browser, so Application.Quit() only tears the

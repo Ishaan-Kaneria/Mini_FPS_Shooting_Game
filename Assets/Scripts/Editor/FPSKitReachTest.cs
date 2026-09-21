@@ -144,6 +144,18 @@ namespace FPSKit.EditorTools
             var worst = Vector3.zero;
             var blamed = new Dictionary<string, int>();
 
+            // <b>Where the stranded ground is, not just one sample of it.</b> One coordinate
+            // says almost nothing: a thin ring round the boundary and a whole quadrant cut
+            // off from the rest print the same single point, and the two want completely
+            // different fixes. The extent and the centre tell them apart at a glance, and
+            // the reachable extent beside them says whether the *player* is the island.
+            var badMin = new Vector2(float.MaxValue, float.MaxValue);
+            var badMax = new Vector2(float.MinValue, float.MinValue);
+            var badSum = Vector2.zero;
+
+            var okMin = new Vector2(float.MaxValue, float.MaxValue);
+            var okMax = new Vector2(float.MinValue, float.MinValue);
+
             for (float x = -half; x <= half; x += Step)
             for (float z = -half; z <= half; z += Step)
             {
@@ -156,10 +168,20 @@ namespace FPSKit.EditorTools
                 on++;
 
                 if (NavMesh.CalculatePath(hit.position, home.position, NavMesh.AllAreas, path)
-                    && path.status == NavMeshPathStatus.PathComplete) continue;
+                    && path.status == NavMeshPathStatus.PathComplete)
+                {
+                    okMin = Vector2.Min(okMin, new Vector2(hit.position.x, hit.position.z));
+                    okMax = Vector2.Max(okMax, new Vector2(hit.position.x, hit.position.z));
+                    continue;
+                }
 
                 stranded++;
                 worst = hit.position;
+
+                var flat = new Vector2(hit.position.x, hit.position.z);
+                badMin = Vector2.Min(badMin, flat);
+                badMax = Vector2.Max(badMax, flat);
+                badSum += flat;
 
                 // What it is standing on, so a failure names the thing to fix rather than
                 // a coordinate.
@@ -188,10 +210,17 @@ namespace FPSKit.EditorTools
                 foreach (var pair in blamed)
                     if (pair.Value > 2) top.Append($" {pair.Key} x{pair.Value};");
 
+                var centre = badSum / Mathf.Max(1, stranded);
+
                 problems.Add($"{name}: {stranded} of {on} sampled patches of navmesh " +
                              $"({share:P1}) cannot reach the player -- an enemy placed on one " +
                              $"stands there until the clock ends the level. Mostly on:{top} " +
-                             $"(one at {worst})");
+                             $"(one at {worst})" +
+                             $"\n      stranded spans x {badMin.x:0} to {badMax.x:0}, " +
+                             $"z {badMin.y:0} to {badMax.y:0}, centred ({centre.x:0}, {centre.y:0})" +
+                             $"\n      reachable spans x {okMin.x:0} to {okMax.x:0}, " +
+                             $"z {okMin.y:0} to {okMax.y:0}" +
+                             $"\n      player at ({home.position.x:0}, {home.position.z:0})");
             }
             else
             {

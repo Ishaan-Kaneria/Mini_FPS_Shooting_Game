@@ -427,31 +427,40 @@ namespace FPSKit.EditorTools
                     t.atmosphereThickness = 0.3f;
                     t.skyExposure = 0.25f;
                     t.sunColor = new Color(0.62f, 0.70f, 0.93f);
+                    // <b>Dark between the lamps, not dim everywhere.</b> The first pass here
+                    // ran the moon at 0.62 with ambient to match, which was legible and not
+                    // remotely abandoned -- an evenly lit park at night is a park that still
+                    // has its power on. Halving the moon and cutting ambient to a third puts
+                    // the darkness back, and the lamp posts scattered through the place are
+                    // what make it navigable: black between them, warm and close under them.
+                    // That is both more frightening and more honest about the state of the
+                    // electrics than a uniform grey.
+                    //
                     // <b>A real moon.</b> The arena this replaced ran at 0.15 with almost no
                     // ambient and rendered as a dark rectangle -- every bit of its geometry
                     // present and none of it visible. Dark is a lighting design, not the
                     // absence of one: the moon has to be strong enough to model the ground
                     // and throw a shadow, and the dread comes from the colour and the long
                     // shadows rather than from there being nothing to see.
-                    t.sunIntensity = 0.62f;
+                    t.sunIntensity = 0.30f;
                     // Low, so everything on this ground casts a long shadow across it.
                     t.sunAngles = new Vector2(26f, 214f);
                     t.shadowStrength = 0.4f;
-                    t.fogColor = new Color(0.10f, 0.12f, 0.18f);
+                    t.fogColor = new Color(0.055f, 0.065f, 0.10f);
                     // Thinner than it was. Underground there is little to fog, and what has to
                     // carry is the daylight down the collapses -- heavy fog swallows exactly
                     // that and leaves the player nothing to navigate by.
                     // 0.016 is an interior number. Outdoors at 450m it is opaque well before the
                     // far side, and a fog that hides the far half of the map does not read
                     // as atmosphere, it reads as an empty arena.
-                    t.fogDensity = 0.0034f;
-                    t.ambientSky = new Color(0.17f, 0.20f, 0.27f);
-                    t.ambientEquator = new Color(0.10f, 0.11f, 0.15f);
-                    t.ambientGround = new Color(0.05f, 0.05f, 0.06f);
+                    t.fogDensity = 0.0052f;
+                    t.ambientSky = new Color(0.075f, 0.09f, 0.135f);
+                    t.ambientEquator = new Color(0.045f, 0.05f, 0.075f);
+                    t.ambientGround = new Color(0.02f, 0.02f, 0.028f);
                     // Light enough to catch the moon. At 0.12 the ground returned almost nothing
                     // and the relief in it -- which is the point of this arena -- was
                     // invisible.
-                    t.floorColor = new Color(0.27f, 0.26f, 0.24f);
+                    t.floorColor = new Color(0.21f, 0.20f, 0.19f);
                     t.wallColor = new Color(0.32f, 0.30f, 0.27f);
                     t.coverColors = new[]
                     {

@@ -280,7 +280,14 @@ namespace FPSKit.EditorTools
             _groundPinned = new bool[_groundN, _groundN];
             _groundRigid = new bool[_groundN, _groundN];
 
-            float edge = _theme.hazardWidth * 0.5f;
+            // <b>Only a layout that builds a river gets a river cut out of its ground.</b>
+            // This hole exists so the gorge has somewhere to be and so the bake gets no
+            // floor over the water. A layout with no gorge still inherited hazardWidth from
+            // the theme's defaults and had a 55m channel cut through it at hazardOffset,
+            // running the whole length of the map with nothing in it -- a void that split
+            // the arena in two, stranded everything on the far side, and took the ground out
+            // from under whatever had been placed near it.
+            float edge = _theme.openZone ? _theme.hazardWidth * 0.5f : -GorgeLipOverlap * 2f;
             float rimFlat = edge + RimBandWidth;
 
             // ---- raw height, then everything that pins it ----
@@ -604,7 +611,14 @@ namespace FPSKit.EditorTools
             var uvs = new Vector2[nx * nz];
             var triangles = new List<int>(cellsI * cellsJ * 6);
 
-            float edge = _theme.hazardWidth * 0.5f;
+            // <b>Only a layout that builds a river gets a river cut out of its ground.</b>
+            // This hole exists so the gorge has somewhere to be and so the bake gets no
+            // floor over the water. A layout with no gorge still inherited hazardWidth from
+            // the theme's defaults and had a 55m channel cut through it at hazardOffset,
+            // running the whole length of the map with nothing in it -- a void that split
+            // the arena in two, stranded everything on the far side, and took the ground out
+            // from under whatever had been placed near it.
+            float edge = _theme.openZone ? _theme.hazardWidth * 0.5f : -GorgeLipOverlap * 2f;
 
             // The hole is cut wider than the water so that the gorge's own lip, which is
             // a smooth curve, has somewhere to overlap the grid's staircase edge.

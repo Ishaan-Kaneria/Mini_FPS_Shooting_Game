@@ -20,15 +20,15 @@ MonoBehaviour:
   atmosphereThickness: 0.3
   skyExposure: 0.25
   sunColor: {r: 0.62, g: 0.7, b: 0.93, a: 1}
-  sunIntensity: 0.62
+  sunIntensity: 0.3
   sunAngles: {x: 26, y: 214}
   shadowStrength: 0.4
   fogEnabled: 1
-  fogColor: {r: 0.1, g: 0.12, b: 0.18, a: 1}
-  fogDensity: 0.0034
-  ambientSky: {r: 0.17, g: 0.2, b: 0.27, a: 1}
-  ambientEquator: {r: 0.1, g: 0.11, b: 0.15, a: 1}
-  ambientGround: {r: 0.05, g: 0.05, b: 0.06, a: 1}
+  fogColor: {r: 0.055, g: 0.065, b: 0.1, a: 1}
+  fogDensity: 0.0052
+  ambientSky: {r: 0.075, g: 0.09, b: 0.135, a: 1}
+  ambientEquator: {r: 0.045, g: 0.05, b: 0.075, a: 1}
+  ambientGround: {r: 0.02, g: 0.02, b: 0.028, a: 1}
   arenaSize: 450
   wallHeight: 13
   randomSeed: 13
@@ -71,7 +71,7 @@ MonoBehaviour:
   pillarCount: 12
   coverHeightRange: {x: 1.2, y: 1.6}
   coverWidthRange: {x: 3, y: 7}
-  floorColor: {r: 0.27, g: 0.26, b: 0.24, a: 1}
+  floorColor: {r: 0.21, g: 0.2, b: 0.19, a: 1}
   wallColor: {r: 0.32, g: 0.3, b: 0.27, a: 1}
   coverColors:
   - {r: 0.14, g: 0.14, b: 0.13, a: 1}

@@ -101,9 +101,71 @@ namespace FPSKit.EditorTools
         }
 
         // ==================================================================
+        /// <summary>
+        /// Who fights in an arena: the shared basics, two of the heavier shared
+        /// variants chosen to suit the ground, the zone's own local threat, the two
+        /// generic bosses and the person who holds the place.
+        ///
+        /// <b>The basics are shared on purpose.</b> Grunts, Runners and Marksmen are in
+        /// every zone because a level's difficulty step has to mean the same thing
+        /// wherever it is played -- if every arena drew from a completely different
+        /// roster, the ladder's curve would be six unrelated curves and no number in
+        /// FPSKitLevels would describe any of them. What varies is the top half of the
+        /// mix, which is the half a player actually remembers.
+        ///
+        /// The pairing is not decoration. Screamers go where there is room to be rushed
+        /// across; Sentinels go where there is cover to break them behind; Brutes go
+        /// where the corners are tight enough that backing away runs out of floor.
+        /// </summary>
+        static List<EnemyArchetype> RosterFor(string themeName)
+        {
+            string[] shared = { "Grunt", "Runner", "Marksman" };
+
+            string[] heavies = themeName switch
+            {
+                "Industrial Warehouse" => new[] { "Brute" },
+                "Snowbound Station" => new[] { "Sentinel" },
+                "Desert Outpost" => new[] { "Screamer" },
+                "Night Rooftop" => new[] { "Sentinel" },
+                "Abandoned Subway" => new[] { "Screamer" },
+                "Mars Colony" => new[] { "Brute", "Sentinel" },
+                _ => new[] { "Brute", "Sentinel", "Screamer" }
+            };
+
+            var roster = new List<EnemyArchetype>();
+
+            void Add(string name)
+            {
+                var archetype = FPSKitEnemyRoster.GetOrCreate(name);
+                if (archetype != null && !roster.Contains(archetype)) roster.Add(archetype);
+            }
+
+            foreach (var name in shared) Add(name);
+            foreach (var name in heavies) Add(name);
+
+            // The zone's own. Indexed by where the arena sits in the campaign, so an
+            // arena the story does not use simply does not get one.
+            int zone = FPSKitCampaign.IndexOfTheme(themeName);
+
+            if (zone >= 0 && zone < FPSKitEnemyRoster.ZoneDebut.Length)
+                Add(FPSKitEnemyRoster.ZoneDebut[zone]);
+
+            // Both generic bosses, because the third and sixth rung of every ladder ask
+            // for one and LevelManager falls back to whatever Boss-role archetype the
+            // roster offers when a level names none.
+            foreach (var name in FPSKitEnemyRoster.GenericBossNames) Add(name);
+
+            // And the person standing at the end of it.
+            string holder = FPSKitCampaign.SiblingFor(themeName);
+            if (!string.IsNullOrEmpty(holder)) Add(holder);
+
+            return roster;
+        }
+
         static void Configure(LevelTheme t, string themeName)
         {
             t.themeName = themeName;
+            t.enemyRoster = RosterFor(themeName);
 
             switch (themeName)
             {

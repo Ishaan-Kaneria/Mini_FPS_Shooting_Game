@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: ToveAuger
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Tove Auger
+  description: Boss. Holds the hall roof and does not stop firing.
+  role: 2
+  bodyColor: {r: 0.34, g: 0.24, b: 0.1, a: 1}
+  headColor: {r: 0.66, g: 0.5, b: 0.22, a: 1}
+  glowColor: {r: 2.4, g: 1.2, b: 0.25, a: 1}
+  scaleMultiplier: 1.9
+  unlockWave: 5
+  baseWeight: 1
+  weightGrowthPerWave: 0
+  maxWeight: 12
+  retireWave: 0
+  healthMultiplier: 11
+  shieldFraction: 0.7
+  damageMultiplier: 1.6
+  speedMultiplier: 0.85
+  ranged: 1
+  attackRange: 22
+  meleeRange: 3.6
+  attackCooldown: 1.6
+  attackWindup: 0.45
+  shotsPerAttack: 4
+  burstInterval: 0.08
+  rangedDamageMultiplier: 0.45
+  rangedSpread: 4.5
+  preferredRangedDistance: 12
+  strafeAmount: 0.35
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 0
+  canRetreat: 0
+  suppressionDamage: 45
+  scoreValue: 4000
+  healthDropChance: 1
+  shieldDropChance: 0.06
+  ammoDropChance: 0

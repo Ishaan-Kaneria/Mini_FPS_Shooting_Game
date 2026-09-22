@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: KestrelAuger
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Kestrel Auger
+  description: Boss. Fires one shell at a time. Do not be where it lands.
+  role: 2
+  bodyColor: {r: 0.18, g: 0.26, b: 0.34, a: 1}
+  headColor: {r: 0.56, g: 0.7, b: 0.82, a: 1}
+  glowColor: {r: 0.8, g: 1.8, b: 2.6, a: 1}
+  scaleMultiplier: 2
+  unlockWave: 6
+  baseWeight: 1
+  weightGrowthPerWave: 0
+  maxWeight: 12
+  retireWave: 0
+  healthMultiplier: 12
+  shieldFraction: 0.5
+  damageMultiplier: 1
+  speedMultiplier: 0.6
+  ranged: 1
+  attackRange: 38
+  meleeRange: 2.4
+  attackCooldown: 2.8
+  attackWindup: 1
+  shotsPerAttack: 1
+  burstInterval: 0.12
+  rangedDamageMultiplier: 2.2
+  rangedSpread: 1.2
+  preferredRangedDistance: 24
+  strafeAmount: 0.1
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 0
+  canRetreat: 0
+  suppressionDamage: 45
+  scoreValue: 4400
+  healthDropChance: 1
+  shieldDropChance: 0.06
+  ammoDropChance: 0

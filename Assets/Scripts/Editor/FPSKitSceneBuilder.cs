@@ -2316,7 +2316,7 @@ namespace FPSKit.EditorTools
             // One prefab, many variants. Every entry is an archetype asset, so a new
             // enemy means duplicating an asset and adding it here -- never a new prefab.
             manager.baseEnemyPrefab = enemyPrefab;
-            manager.enemyTypes = BuildRoster();
+            manager.enemyTypes = BuildRoster(_theme);
 
             manager.levels = FPSKitLevels.GetOrCreate(_theme.themeName);
 
@@ -2379,9 +2379,34 @@ namespace FPSKit.EditorTools
         /// the LevelManager selects by weight and difficulty step, and bosses are drawn
         /// from their own pool.
         /// </summary>
-        private static LevelManager.EnemyType[] BuildRoster()
+        /// <summary>
+        /// Who fights in this arena.
+        ///
+        /// <b>The theme's own roster, not every archetype in the project.</b> This used
+        /// to hand all of them to all six arenas, which is why the six fought
+        /// identically: the only thing separating them was the level's difficulty step,
+        /// and that is the same number in every arena at the same rung. A zone that
+        /// looks different and plays the same is a skybox, and a player works that out
+        /// by the second one.
+        ///
+        /// A theme with no roster gets the lot, exactly as before. That is the fallback
+        /// that keeps <b>FPSKit &gt; Build Scene &gt; From Selected Theme Asset</b>
+        /// working for a theme somebody made without reading this file -- an empty
+        /// roster would otherwise be an arena that spawns nothing at all, with nothing
+        /// logged.
+        /// </summary>
+        private static LevelManager.EnemyType[] BuildRoster(LevelTheme theme)
         {
-            var archetypes = FPSKitEnemyRoster.GetOrCreateAll();
+            var archetypes = theme != null && theme.enemyRoster != null
+                             && theme.enemyRoster.Count > 0
+                ? theme.enemyRoster
+                : FPSKitEnemyRoster.GetOrCreateAll();
+
+            if (theme != null && (theme.enemyRoster == null || theme.enemyRoster.Count == 0))
+                Debug.LogWarning($"[FPSKit] \"{theme.themeName}\" has no enemy roster, so it is " +
+                                 "being given every archetype in the project. Run " +
+                                 "FPSKitBatch.ResetThemes to give it its own.");
+
             var entries = new List<LevelManager.EnemyType>(archetypes.Count);
 
             foreach (var archetype in archetypes)

@@ -14,6 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Mars Colony
   description: Rust sky, thin light, drifting dust.
+  enemyRoster:
+  - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
+  - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
+  - {fileID: 11400000, guid: e7b2c1aeefde2c40cb5f98f5a4ddfeaf, type: 2}
+  - {fileID: 11400000, guid: d7d3993c9579267c5a19d8e86bd0d010, type: 2}
+  - {fileID: 11400000, guid: 917dfef77068ea7ac8f90289145f2529, type: 2}
+  - {fileID: 11400000, guid: e1b2fb1197814a3dfaa58ab298589421, type: 2}
+  - {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+  - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+  - {fileID: 11400000, guid: 4d402ffa29c575e85a6bb6b075faf1a3, type: 2}
   skyboxOverride: {fileID: 0}
   skyTint: {r: 0.72, g: 0.42, b: 0.28, a: 1}
   skyGroundColor: {r: 0.42, g: 0.22, b: 0.14, a: 1}

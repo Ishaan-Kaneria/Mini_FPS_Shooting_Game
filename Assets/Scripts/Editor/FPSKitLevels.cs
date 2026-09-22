@@ -237,7 +237,14 @@ namespace FPSKit.EditorTools
                     briefingTime = number == 1 ? 4.5f : 3f,
 
                     hasBoss = boss,
-                    bossArchetype = boss ? BossFor(number, bosses) : null,
+
+                    // The last rung is the person who holds the zone; the ones before it
+                    // are the generic two.
+                    bossArchetype = !boss
+                        ? null
+                        : last && !string.IsNullOrEmpty(holder)
+                            ? FPSKitEnemyRoster.GetOrCreate(holder)
+                            : BossFor(number, bosses),
                     bossWeight = 4f + 0.5f * number,
                     bossHealthMultiplier = 1f + 0.3f * (number / 3),
 
@@ -282,9 +289,17 @@ namespace FPSKit.EditorTools
         {
             var bosses = new List<EnemyArchetype>();
 
-            foreach (var archetype in FPSKitEnemyRoster.GetOrCreateAll())
+            // The generic two only. Every Auger is a Boss-role archetype now, so a sweep
+            // for "anything with the boss role" would hand rung three of the Warehouse
+            // to Tove -- who is standing at rung eight of the same ladder. Killing her
+            // as a warm-up for herself is not a difficulty curve, it is a continuity
+            // error the player meets before the story has said her name.
+            foreach (var name in FPSKitEnemyRoster.GenericBossNames)
+            {
+                var archetype = FPSKitEnemyRoster.GetOrCreate(name);
                 if (archetype != null && archetype.role == EnemyArchetype.Role.Boss)
                     bosses.Add(archetype);
+            }
 
             if (bosses.Count == 0)
                 Debug.LogWarning("[FPSKit] No archetype has the Boss role, so the boss levels " +

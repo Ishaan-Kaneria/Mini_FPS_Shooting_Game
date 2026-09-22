@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: Foreman
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Foreman
+  description: Comes in close and fires as it walks. No good answer at ten metres.
+  role: 1
+  bodyColor: {r: 0.34, g: 0.26, b: 0.14, a: 1}
+  headColor: {r: 0.58, g: 0.46, b: 0.24, a: 1}
+  glowColor: {r: 1.6, g: 0.8, b: 0.2, a: 1}
+  scaleMultiplier: 1.2
+  unlockWave: 3
+  baseWeight: 0.7
+  weightGrowthPerWave: 0.16
+  maxWeight: 3.5
+  retireWave: 0
+  healthMultiplier: 2.4
+  shieldFraction: 0.4
+  damageMultiplier: 1.3
+  speedMultiplier: 0.9
+  ranged: 1
+  attackRange: 14
+  meleeRange: 3
+  attackCooldown: 1.5
+  attackWindup: 0.35
+  shotsPerAttack: 3
+  burstInterval: 0.07
+  rangedDamageMultiplier: 0.45
+  rangedSpread: 6
+  preferredRangedDistance: 7
+  strafeAmount: 0.3
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 45
+  canRetreat: 1
+  suppressionDamage: 45
+  scoreValue: 340
+  healthDropChance: 0.2
+  shieldDropChance: 0.06
+  ammoDropChance: 0.12

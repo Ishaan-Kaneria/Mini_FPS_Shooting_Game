@@ -325,6 +325,13 @@ namespace FPSKit.EditorTools
         public static void VerifyObjectives() => FPSKitObjectiveTest.VerifyObjectives();
 
         /// <summary>
+        /// Opens every built arena and asks who fights in it: its own roster rather than
+        /// every archetype in the project, its own zone's enemy in it, and no two arenas
+        /// fielding the same list. Cheap -- no play mode, no graphics.
+        /// </summary>
+        public static void VerifyRosters() => FPSKitRosterTest.VerifyRosters();
+
+        /// <summary>
         /// Plays a level and aims, throws and listens to a bomb: the ring has to follow
         /// the mouse smoothly across the whole throw range, a short throw has to land
         /// sooner than a long one, the bomb has to go off where the ring said, and the

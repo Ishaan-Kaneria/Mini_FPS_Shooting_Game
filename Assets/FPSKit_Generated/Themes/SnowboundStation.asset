@@ -14,6 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Snowbound Station
   description: Low winter sun, thick fog, short engagements.
+  enemyRoster:
+  - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
+  - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
+  - {fileID: 11400000, guid: e7b2c1aeefde2c40cb5f98f5a4ddfeaf, type: 2}
+  - {fileID: 11400000, guid: 917dfef77068ea7ac8f90289145f2529, type: 2}
+  - {fileID: 11400000, guid: 9caa126286025bae09939721bedb3f68, type: 2}
+  - {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+  - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+  - {fileID: 11400000, guid: 0674b300a8bef6e2c92b0b2b34a85aba, type: 2}
   skyboxOverride: {fileID: 0}
   skyTint: {r: 0.62, g: 0.68, b: 0.78, a: 1}
   skyGroundColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}

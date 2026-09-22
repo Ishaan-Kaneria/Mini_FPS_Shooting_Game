@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -13,6 +14,16 @@ public class LevelTheme : ScriptableObject
     [Header("Identity")]
     public string themeName = "Industrial";
     [TextArea(2, 4)] public string description;
+
+    [Tooltip("Who fights in this arena. The scene builder stamps this onto the level " +
+             "manager, so an arena's roster is a property of the arena rather than of " +
+             "the kit.\n\n" +
+             "Every arena used to be handed every archetype in the project, separated " +
+             "only by the difficulty step -- which meant the six arenas fought " +
+             "identically and were a skybox apart. Leave it empty and that is what " +
+             "happens again, deliberately: a theme somebody else made still gets a " +
+             "playable roster rather than an empty one.")]
+    public List<EnemyArchetype> enemyRoster = new List<EnemyArchetype>();
 
     [Header("Sky")]
     [Tooltip("Leave empty to generate a procedural sky from the tints below.")]

@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: Outrider
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Outrider
+  description: Fast, keeps its distance, and will not stand and trade.
+  role: 0
+  bodyColor: {r: 0.46, g: 0.34, b: 0.16, a: 1}
+  headColor: {r: 0.72, g: 0.58, b: 0.3, a: 1}
+  glowColor: {r: 1.4, g: 1, b: 0.3, a: 1}
+  scaleMultiplier: 0.95
+  unlockWave: 3
+  baseWeight: 0.9
+  weightGrowthPerWave: 0.18
+  maxWeight: 4
+  retireWave: 0
+  healthMultiplier: 1.1
+  shieldFraction: 0
+  damageMultiplier: 0.9
+  speedMultiplier: 1.45
+  ranged: 1
+  attackRange: 24
+  meleeRange: 2.4
+  attackCooldown: 1.7
+  attackWindup: 0.3
+  shotsPerAttack: 2
+  burstInterval: 0.1
+  rangedDamageMultiplier: 0.5
+  rangedSpread: 4
+  preferredRangedDistance: 17
+  strafeAmount: 0.85
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 16
+  canRetreat: 1
+  suppressionDamage: 28
+  scoreValue: 240
+  healthDropChance: 0.08
+  shieldDropChance: 0.06
+  ammoDropChance: 0.15

@@ -172,7 +172,7 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 12
     hasBoss: 1
-    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossArchetype: {fileID: 11400000, guid: 3d7d6c9f4c5947374bb27cf22b10b6c5, type: 2}
     bossName: Ilsa Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6

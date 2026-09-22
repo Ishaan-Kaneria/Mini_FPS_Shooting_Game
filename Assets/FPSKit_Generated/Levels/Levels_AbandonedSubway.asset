@@ -172,7 +172,7 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 12
     hasBoss: 1
-    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossArchetype: {fileID: 11400000, guid: de1d1c45acbd37be58aabf2af5006815, type: 2}
     bossName: Dev Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6

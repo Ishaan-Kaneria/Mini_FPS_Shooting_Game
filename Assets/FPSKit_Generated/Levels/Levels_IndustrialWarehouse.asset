@@ -172,7 +172,7 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 12
     hasBoss: 1
-    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossArchetype: {fileID: 11400000, guid: c29c16c406db1bd4ea57e9fcc3d4b7c9, type: 2}
     bossName: Tove Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6

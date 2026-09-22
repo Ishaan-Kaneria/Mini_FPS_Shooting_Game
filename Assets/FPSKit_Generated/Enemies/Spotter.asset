@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: Spotter
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Spotter
+  description: Hits from across the map. Fragile, and it knows it.
+  role: 1
+  bodyColor: {r: 0.16, g: 0.18, b: 0.26, a: 1}
+  headColor: {r: 0.4, g: 0.44, b: 0.58, a: 1}
+  glowColor: {r: 2, g: 0.4, b: 0.4, a: 1}
+  scaleMultiplier: 1
+  unlockWave: 5
+  baseWeight: 0.5
+  weightGrowthPerWave: 0.12
+  maxWeight: 2.5
+  retireWave: 0
+  healthMultiplier: 0.7
+  shieldFraction: 0
+  damageMultiplier: 1
+  speedMultiplier: 0.6
+  ranged: 1
+  attackRange: 46
+  meleeRange: 2.4
+  attackCooldown: 2.6
+  attackWindup: 0.85
+  shotsPerAttack: 1
+  burstInterval: 0.12
+  rangedDamageMultiplier: 1.2
+  rangedSpread: 0.8
+  preferredRangedDistance: 34
+  strafeAmount: 0.15
+  chargeSpeedMultiplier: 1
+  staggerThreshold: 12
+  canRetreat: 1
+  suppressionDamage: 45
+  scoreValue: 420
+  healthDropChance: 0.08
+  shieldDropChance: 0.06
+  ammoDropChance: 0.1

@@ -172,7 +172,7 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 12
     hasBoss: 1
-    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossArchetype: {fileID: 11400000, guid: 0674b300a8bef6e2c92b0b2b34a85aba, type: 2}
     bossName: Kestrel Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6

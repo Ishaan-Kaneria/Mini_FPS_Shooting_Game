@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71b3890e0cb4179b680561b32c7bc33e, type: 3}
+  m_Name: DevAuger
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArchetype
+  displayName: Dev Auger
+  description: Boss. Enormous reach in a place with nowhere to stand.
+  role: 2
+  bodyColor: {r: 0.16, g: 0.2, b: 0.14, a: 1}
+  headColor: {r: 0.38, g: 0.5, b: 0.36, a: 1}
+  glowColor: {r: 0.5, g: 2.2, b: 0.8, a: 1}
+  scaleMultiplier: 2.4
+  unlockWave: 9
+  baseWeight: 1
+  weightGrowthPerWave: 0
+  maxWeight: 12
+  retireWave: 0
+  healthMultiplier: 13
+  shieldFraction: 0.6
+  damageMultiplier: 2.3
+  speedMultiplier: 0.75
+  ranged: 0
+  attackRange: 5
+  meleeRange: 5.2
+  attackCooldown: 1.8
+  attackWindup: 0.75
+  shotsPerAttack: 1
+  burstInterval: 0.12
+  rangedDamageMultiplier: 0.4
+  rangedSpread: 2.5
+  preferredRangedDistance: 14
+  strafeAmount: 0.15
+  chargeSpeedMultiplier: 2
+  staggerThreshold: 0
+  canRetreat: 0
+  suppressionDamage: 45
+  scoreValue: 5600
+  healthDropChance: 1
+  shieldDropChance: 0.06
+  ammoDropChance: 0

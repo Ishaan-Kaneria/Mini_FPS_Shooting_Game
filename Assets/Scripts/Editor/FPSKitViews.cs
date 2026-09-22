@@ -85,6 +85,136 @@ namespace FPSKit.EditorTools
         /// </summary>
         static IEnumerable<Shot> Frame(LevelTheme theme)
         {
+            if (theme != null && theme.snowZone) return FrameSnow();
+
+            return FrameDesert(theme);
+        }
+
+        /// <summary>
+        /// The frozen field's viewpoints, and they are <b>found rather than written
+        /// down</b>.
+        ///
+        /// The desert's shots below are hard-coded coordinates aimed at a river, which is
+        /// correct for the arena they were written for and useless anywhere else -- run
+        /// against a snow field, four of the nine point at a canyon that does not exist
+        /// and come back as photographs of empty ground. The lake and the camps here are
+        /// placed from a seeded random, so there are no coordinates to write: the scene is
+        /// already open by the time this runs, so it asks the scene where they are.
+        ///
+        /// The one that earns its place is the last: standing *inside* an igloo looking
+        /// out of its door. That is the only shot that can say the shell is wound the
+        /// right way round, that the doorway is actually a hole, and that the inside is
+        /// lit -- three things invisible from every other angle, two of which have already
+        /// been got wrong once in this project.
+        /// </summary>
+        static IEnumerable<Shot> FrameSnow()
+        {
+            const float Eye = 1.65f;
+
+            var shots = new List<Shot>();
+
+            shots.Add(new Shot
+            {
+                Name = "01_spawn", From = new Vector3(0f, Eye, 0f),
+                Look = new Vector3(140f, 2f, 20f), Fov = 75f
+            });
+
+            var lake = GameObject.Find("Arena/FrozenLake/Ice");
+
+            if (lake != null)
+            {
+                var at = lake.transform.position;
+                float radius = lake.GetComponent<MeshFilter>().sharedMesh.bounds.extents.x;
+
+                // From the shore, across it. The question this answers is whether the lake
+                // reads as a different surface from the snow around it at all -- if it
+                // does not, the one open place in the arena is invisible.
+                shots.Add(new Shot
+                {
+                    Name = "02_lake_shore",
+                    From = at + new Vector3(-radius - 26f, Eye + 2.5f, -radius * 0.4f),
+                    Look = at + new Vector3(radius * 0.6f, 0f, radius * 0.3f), Fov = 74f
+                });
+
+                shots.Add(new Shot
+                {
+                    Name = "03_on_the_lake",
+                    From = at + new Vector3(-radius * 0.55f, Eye, 0f),
+                    Look = at + new Vector3(radius, 1f, 0f), Fov = 78f
+                });
+
+                shots.Add(new Shot
+                {
+                    Name = "04_lake_aerial",
+                    From = at + new Vector3(-radius * 1.6f, 95f, -radius * 1.6f),
+                    Look = at, Fov = 60f
+                });
+            }
+
+            var igloo = FindFirst("Igloo_");
+
+            if (igloo != null)
+            {
+                var at = igloo.transform.position;
+
+                // The door faces its own camp's middle and the tunnel points out along the
+                // igloo's forward, so the view is placed off that axis: straight on, a
+                // tunnel is a dark circle and could be anything.
+                var ahead = igloo.transform.forward;
+
+                shots.Add(new Shot
+                {
+                    Name = "05_camp",
+                    From = at + ahead * 26f + igloo.transform.right * 9f + Vector3.up * (Eye + 1.2f),
+                    Look = at + Vector3.up * 2f, Fov = 70f
+                });
+
+                shots.Add(new Shot
+                {
+                    Name = "06_igloo_door",
+                    From = at + ahead * 21f + Vector3.up * Eye,
+                    Look = at + Vector3.up * 1.4f, Fov = 68f
+                });
+
+                // Inside, looking out. The shot that proves the thing is a room.
+                shots.Add(new Shot
+                {
+                    Name = "07_inside_igloo",
+                    From = at + ahead * -1.6f + Vector3.up * 1.5f,
+                    Look = at + ahead * 30f + Vector3.up * 1.2f, Fov = 80f
+                });
+            }
+
+            var ridge = FindFirst("Ridge_");
+
+            if (ridge != null)
+                shots.Add(new Shot
+                {
+                    Name = "08_pressure_ridge",
+                    From = ridge.transform.position + new Vector3(-18f, Eye + 1f, -14f),
+                    Look = ridge.transform.position + Vector3.up * 1f, Fov = 70f
+                });
+
+            shots.Add(new Shot
+            {
+                Name = "09_aerial", From = new Vector3(-150f, 190f, -190f),
+                Look = new Vector3(60f, 0f, 20f), Fov = 62f
+            });
+
+            return shots;
+        }
+
+        /// <summary>The first object in the scene whose name starts with this.</summary>
+        static GameObject FindFirst(string prefix)
+        {
+            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+                if (t != null && t.name.StartsWith(prefix)) return t.gameObject;
+
+            return null;
+        }
+
+        static IEnumerable<Shot> FrameDesert(LevelTheme theme)
+        {
             float centre = theme == null ? 92f
                 : theme.hazardOffset + Mathf.Sin(1.7f) * theme.hazardMeander * 0.35f;
 

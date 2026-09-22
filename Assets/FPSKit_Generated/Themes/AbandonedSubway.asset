@@ -92,6 +92,9 @@ MonoBehaviour:
   floorTag: Concrete
   wallTag: Concrete
   parkZone: 1
+  snowZone: 0
+  iglooCamps: 5
+  lakeRadius: 62
   subwayZone: 1
   floorDetail: Concrete
   wallDetail: Timber

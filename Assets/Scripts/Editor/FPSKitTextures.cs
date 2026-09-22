@@ -117,6 +117,14 @@ namespace FPSKit.EditorTools
             WriteHeightPair("Snow", SnowHeight, albedoContrast: 0.18f, normalStrength: 1.6f);
             WriteHeightPair("Tile", TileHeight, albedoContrast: 0.46f, normalStrength: 3.0f);
 
+            // Ice is the one surface whose detail has to be *almost nothing*. What reads
+            // as ice is a flat sheet with a few long cracks in it and no grain at all --
+            // give it the pitting that makes concrete read as concrete and it comes back
+            // as wet tarmac. The contrast is the lowest in the set for the same reason.
+            WriteHeightPair("Ice", IceHeight, albedoContrast: 0.10f, normalStrength: 1.2f);
+
+            WriteFlake();
+
             AssetDatabase.Refresh();
         }
 
@@ -171,6 +179,98 @@ namespace FPSKit.EditorTools
         /// -- what reads as snow is the *absence* of it against broad soft relief -- so
         /// sharpening this is what makes generated snow look like pale sand.
         /// </summary>
+        /// <summary>
+        /// Lake ice: a flat sheet, a long crack system, and a scatter of trapped bubbles.
+        ///
+        /// The cracks are drawn as distance to a few wandering lines rather than as noise,
+        /// because what the eye reads as ice is that the flaws are *long and few*. Noise at
+        /// any amplitude gives frosted glass, which is a different material and, on a
+        /// forty-metre sheet, an obviously tiling one.
+        /// </summary>
+        private static float IceHeight(float u, float v)
+        {
+            float h = 0.5f;
+
+            // Three crack systems at different angles, each a wrapping sine so the sheet
+            // tiles. The narrow ones are the ones that read; the wide one is the ridge
+            // the others hang off.
+            h -= 0.34f * Crack(u * 1f + v * 0.35f + 0.11f * TileFbm(u, v, 3, 2, 7701), 0.010f);
+            h -= 0.22f * Crack(v * 1f - u * 0.62f + 0.09f * TileFbm(u, v, 5, 2, 7702), 0.007f);
+            h -= 0.14f * Crack(u * 0.45f + v * 0.9f + 0.14f * TileFbm(u, v, 2, 2, 7703), 0.005f);
+
+            // Trapped air. Small, round, and shallow -- they catch the light rather than
+            // break the surface.
+            float bubbles = TileFbm(u, v, 22, 1, 7704);
+            if (bubbles > 0.82f) h += (bubbles - 0.82f) * 1.1f;
+
+            // The faintest possible swell, so the sheet is not mathematically flat.
+            h += 0.035f * (TileFbm(u, v, 2, 2, 7705) - 0.5f);
+
+            return Mathf.Clamp01(h);
+        }
+
+        /// <summary>
+        /// How close a value is to a wrapped zero crossing -- 1 on the line, 0 away from
+        /// it. What turns a smooth field into a crack.
+        /// </summary>
+        private static float Crack(float t, float width)
+        {
+            float wrapped = t - Mathf.Floor(t);
+            float distance = Mathf.Min(wrapped, 1f - wrapped);
+
+            return Mathf.Clamp01(1f - distance / Mathf.Max(0.0005f, width));
+        }
+
+        /// <summary>
+        /// One snowflake, as a soft round dot with an alpha falloff.
+        ///
+        /// A flake at the size this is drawn on screen is two or three pixels, so it is a
+        /// dot and nothing else -- six-armed crystal geometry would be invisible at every
+        /// distance the player ever sees one. What matters is the falloff: a hard-edged
+        /// dot reads as dirt on the lens, and a flake has to read as something in the air
+        /// between the player and the world.
+        /// </summary>
+        private static void WriteFlake()
+        {
+            const int Size = 32;
+
+            var tex = new Texture2D(Size, Size, TextureFormat.RGBA32, false);
+            var pixels = new Color32[Size * Size];
+
+            for (int y = 0; y < Size; y++)
+            for (int x = 0; x < Size; x++)
+            {
+                float dx = (x + 0.5f) / Size - 0.5f;
+                float dy = (y + 0.5f) / Size - 0.5f;
+
+                float r = Mathf.Sqrt(dx * dx + dy * dy) * 2f;
+                float a = Mathf.Clamp01(1f - r);
+
+                // Squared, so the edge fades rather than stopping.
+                a *= a;
+
+                pixels[y * Size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+
+            string path = $"{TextureFolder}/Flake.png";
+            System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+            {
+                importer.textureType = TextureImporterType.Default;
+                importer.alphaIsTransparency = true;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.mipmapEnabled = true;
+                importer.SaveAndReimport();
+            }
+        }
+
         private static float SnowHeight(float u, float v)
         {
             float drift = TileFbm(u, v, 2, 4, 6601);

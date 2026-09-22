@@ -257,6 +257,22 @@ public class LevelTheme : ScriptableObject
              "no levels to connect, which is the whole reason it is built this way.")]
     public bool parkZone;
 
+    [Tooltip("Build this arena as a frozen field: rolling snow drifts on the same " +
+             "heightfield the dunes use, a frozen lake cut into it, pressure ridges, " +
+             "igloo camps you can walk into, and snow falling everywhere.\n\n" +
+             "Like the park, it is one continuous walkable surface with things standing " +
+             "on it -- there are no levels to connect and so nothing that can fail to " +
+             "connect. Takes precedence over the open zone when both are on.")]
+    public bool snowZone;
+
+    [Tooltip("How many igloo camps the field holds. Each is two or three domes round a " +
+             "windbreak, and each dome can be walked into through a real tunnel.")]
+    [Min(0)] public int iglooCamps = 5;
+
+    [Tooltip("How wide the frozen lake is. It is the one flat, hard, open place in the " +
+             "arena, which is what makes crossing it a decision.")]
+    [Min(0f)] public float lakeRadius = 62f;
+
     [Tooltip("Superseded by parkZone. Kept so an asset written with it still loads rather " +
              "than silently losing the field; nothing reads it.")]
     public bool subwayZone;

@@ -43,6 +43,18 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 6340a5107191f5571acef76d92c52937, type: 3}
     volume: 0.4
     effectLifetime: 1
+  - surfaceTag: Snow
+    effectPrefab: {fileID: 588071429213306832, guid: ecec361f654991d40b32b9950ef27a30, type: 3}
+    clips:
+    - {fileID: 8300000, guid: 6340a5107191f5571acef76d92c52937, type: 3}
+    volume: 0.28
+    effectLifetime: 1
+  - surfaceTag: Ice
+    effectPrefab: {fileID: 8386023642353223733, guid: ac63e627abb867cc692578dbf7a4c8de, type: 3}
+    clips:
+    - {fileID: 8300000, guid: a88b7318b7c86dbb0868f671c8ba909c, type: 3}
+    volume: 0.5
+    effectLifetime: 1
   fallback:
     surfaceTag: Default
     effectPrefab: {fileID: 1238077029557984431, guid: e17a124f7dd870283b34e43bfa3d165f, type: 3}

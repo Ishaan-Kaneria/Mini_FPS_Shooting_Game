@@ -24,21 +24,21 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
   - {fileID: 11400000, guid: 0674b300a8bef6e2c92b0b2b34a85aba, type: 2}
   skyboxOverride: {fileID: 0}
-  skyTint: {r: 0.62, g: 0.68, b: 0.78, a: 1}
-  skyGroundColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
-  atmosphereThickness: 2.2
-  skyExposure: 1.15
-  sunColor: {r: 0.82, g: 0.88, b: 1, a: 1}
-  sunIntensity: 0.95
-  sunAngles: {x: 18, y: 200}
+  skyTint: {r: 0.66, g: 0.74, b: 0.86, a: 1}
+  skyGroundColor: {r: 0.8, g: 0.84, b: 0.9, a: 1}
+  atmosphereThickness: 0.75
+  skyExposure: 1.25
+  sunColor: {r: 0.92, g: 0.95, b: 1, a: 1}
+  sunIntensity: 1.15
+  sunAngles: {x: 38, y: 205}
   shadowStrength: 0.85
   fogEnabled: 1
-  fogColor: {r: 0.76, g: 0.81, b: 0.88, a: 1}
-  fogDensity: 0.028
-  ambientSky: {r: 0.6, g: 0.68, b: 0.8, a: 1}
-  ambientEquator: {r: 0.45, g: 0.5, b: 0.58, a: 1}
-  ambientGround: {r: 0.3, g: 0.34, b: 0.4, a: 1}
-  arenaSize: 95
+  fogColor: {r: 0.84, g: 0.88, b: 0.94, a: 1}
+  fogDensity: 0.0017
+  ambientSky: {r: 0.74, g: 0.82, b: 0.95, a: 1}
+  ambientEquator: {r: 0.72, g: 0.78, b: 0.88, a: 1}
+  ambientGround: {r: 0.66, g: 0.71, b: 0.8, a: 1}
+  arenaSize: 450
   wallHeight: 5
   randomSeed: 44
   scaleLayoutWithArea: 1
@@ -51,12 +51,12 @@ MonoBehaviour:
   hazardOffset: 90
   hazardMeander: 26
   hazardColor: {r: 0.2, g: 0.42, b: 0.52, a: 1}
-  bankColor: {r: 0.44, g: 0.38, b: 0.28, a: 1}
+  bankColor: {r: 0.34, g: 0.35, b: 0.38, a: 1}
   bridgeWidth: 9
   bridgeCount: 2
   bridgeColor: {r: 0.46, g: 0.42, b: 0.36, a: 1}
-  duneHeight: 0
-  duneWavelength: 95
+  duneHeight: 7.5
+  duneWavelength: 58
   duneWindAngle: 34
   backdropCount: 34
   backdropDistance: {x: 620, y: 1150}
@@ -73,25 +73,28 @@ MonoBehaviour:
   zoneTankFarmCount: 2
   zoneContainerYardCount: 3
   zonePowerHouseCount: 1
-  roomCount: 4
-  platformCount: 2
-  coverWallCount: 9
-  crateStackCount: 9
-  pillarCount: 4
+  roomCount: 0
+  platformCount: 0
+  coverWallCount: 0
+  crateStackCount: 0
+  pillarCount: 0
   coverHeightRange: {x: 1.1, y: 1.5}
   coverWidthRange: {x: 4, y: 9}
-  floorColor: {r: 0.78, g: 0.81, b: 0.86, a: 1}
-  wallColor: {r: 0.6, g: 0.64, b: 0.7, a: 1}
+  floorColor: {r: 0.93, g: 0.95, b: 0.98, a: 1}
+  wallColor: {r: 0.74, g: 0.79, b: 0.86, a: 1}
   coverColors:
-  - {r: 0.7, g: 0.74, b: 0.8, a: 1}
-  - {r: 0.42, g: 0.47, b: 0.54, a: 1}
-  - {r: 0.55, g: 0.58, b: 0.62, a: 1}
+  - {r: 0.86, g: 0.9, b: 0.95, a: 1}
+  - {r: 0.58, g: 0.64, b: 0.72, a: 1}
+  - {r: 0.72, g: 0.78, b: 0.84, a: 1}
   floorSmoothness: 0.2
   wallSmoothness: 0.15
   coverMetallic: 0
   floorTag: Concrete
   wallTag: Concrete
   parkZone: 0
+  snowZone: 1
+  iglooCamps: 6
+  lakeRadius: 64
   subwayZone: 0
   floorDetail: Snow
   wallDetail: Concrete

@@ -454,33 +454,88 @@ namespace FPSKit.EditorTools
                     t.wallDetail = "Concrete";
                     t.floorDetailSize = 6f;
                     t.wallDetailSize = 3f;
-                    t.skyTint = new Color(0.62f, 0.68f, 0.78f);
-                    t.skyGroundColor = new Color(0.72f, 0.76f, 0.82f);
-                    t.atmosphereThickness = 2.2f;
-                    t.skyExposure = 1.15f;
-                    t.sunColor = new Color(0.82f, 0.88f, 1f);
-                    t.sunIntensity = 0.95f;
-                    t.sunAngles = new Vector2(18f, 200f);
-                    t.fogColor = new Color(0.76f, 0.81f, 0.88f);
-                    t.fogDensity = 0.028f;
-                    t.ambientSky = new Color(0.60f, 0.68f, 0.80f);
-                    t.ambientEquator = new Color(0.45f, 0.50f, 0.58f);
-                    t.ambientGround = new Color(0.30f, 0.34f, 0.40f);
-                    t.floorColor = new Color(0.78f, 0.81f, 0.86f);
-                    t.wallColor = new Color(0.60f, 0.64f, 0.70f);
+                    t.skyTint = new Color(0.66f, 0.74f, 0.86f);
+                    t.skyGroundColor = new Color(0.80f, 0.84f, 0.90f);
+
+                    // <b>Thin air, and a sun that is up.</b> At 2.2 thickness and 18
+                    // degrees of elevation Unity's procedural sky is a sunset, which in a
+                    // 95m box behind heavy fog was never visible and at 450m is the whole
+                    // top half of the screen: a blazing orange sky over a snow field,
+                    // which reads as a desert somebody painted white. Thin atmosphere is
+                    // what makes a cold sky pale blue rather than warm.
+                    t.atmosphereThickness = 0.75f;
+                    t.skyExposure = 1.25f;
+                    t.sunColor = new Color(0.92f, 0.95f, 1f);
+                    t.sunIntensity = 1.15f;
+                    t.sunAngles = new Vector2(38f, 205f);
+                    t.fogColor = new Color(0.84f, 0.88f, 0.94f);
+                    // <b>Snow bounces.</b> These were written for a 95m box behind thick
+                    // fog, where nothing was ever lit by anything but the fog itself; on
+                    // an open field under a sun they made every dome and every drift face
+                    // that was turned away from the light come back grey. An igloo in
+                    // sunlight is not grey -- the ground under it is throwing most of the
+                    // light back up at it, which is exactly what ambientGround is for and
+                    // why it is the one raised furthest here.
+                    t.ambientSky = new Color(0.74f, 0.82f, 0.95f);
+                    t.ambientEquator = new Color(0.72f, 0.78f, 0.88f);
+                    t.ambientGround = new Color(0.66f, 0.71f, 0.80f);
+                    // Snow is the brightest surface in the game and has to be written as
+                    // one. At 0.78 grey-blue it came back reading as poured concrete --
+                    // correct as a *value* against the old overcast sky, and completely
+                    // wrong as a material once there is a sun on it.
+                    t.floorColor = new Color(0.93f, 0.95f, 0.98f);
+                    t.wallColor = new Color(0.74f, 0.79f, 0.86f);
                     t.coverColors = new[]
                     {
-                        new Color(0.70f, 0.74f, 0.80f),
-                        new Color(0.42f, 0.47f, 0.54f),
-                        new Color(0.55f, 0.58f, 0.62f)
+                        new Color(0.86f, 0.90f, 0.95f),
+                        new Color(0.58f, 0.64f, 0.72f),
+                        new Color(0.72f, 0.78f, 0.84f)
                     };
+
+                    // What the rock breaking through the snow is made of. Dark, because
+                    // it is the only thing out here that is not white and it is what the
+                    // eye navigates by.
+                    t.bankColor = new Color(0.34f, 0.35f, 0.38f);
                     t.coverTag = "Metal";
-                    t.arenaSize = 95f;
-                    t.roomCount = 4;
-                    t.platformCount = 2;
-                    t.coverWallCount = 9;
-                    t.crateStackCount = 9;
-                    t.pillarCount = 4;
+
+                    // A frozen field rather than a walled yard. The 95m box this replaced
+                    // was the smallest arena in the game and read as a car park with snow
+                    // on it; at 450m it is the same size as the desert, which is the
+                    // scale the heightfield, the boundary ridge and the backdrop were all
+                    // written for.
+                    t.snowZone = true;
+                    t.arenaSize = 450f;
+                    t.apronSize = 900f;
+
+                    // Drifts, not dunes. Lower and shorter than the desert's, because
+                    // what snow does is roll -- and because relief this size is what makes
+                    // ground uneven at walking pace rather than at map scale. The
+                    // relaxation caps everything at 26 degrees either way.
+                    // Raised from 5.5/70 after looking at it: at that relief the field
+                    // came back as a white sheet with a slight tilt to it, and the whole
+                    // reason the ground is a heightfield rather than a plane is that a
+                    // player should be able to drop behind a rise. 14.7m of relief over
+                    // 450m is a gentle hill; this is about 20, which is a drift you can
+                    // stand behind. The relaxation caps the slope at 26 degrees either
+                    // way, so more amplitude buys form rather than cliffs.
+                    t.duneHeight = 7.5f;
+                    t.duneWavelength = 58f;
+
+                    t.iglooCamps = 6;
+                    t.lakeRadius = 64f;
+
+                    // Recalibrated for the new size. Fog is exponential-squared, and
+                    // 0.028 was written for a 95m box -- at 450m it is opaque by the
+                    // first drift, which reads as an empty arena rather than a foggy one.
+                    // The desert sits at 0.0011; snow is allowed more, because haze off a
+                    // white field is most of what makes it look cold.
+                    t.fogDensity = 0.0017f;
+
+                    t.roomCount = 0;
+                    t.platformCount = 0;
+                    t.coverWallCount = 0;
+                    t.crateStackCount = 0;
+                    t.pillarCount = 0;
                     t.saturation = -18f;
                     t.contrast = 4f;
                     t.bloomIntensity = 0.6f;

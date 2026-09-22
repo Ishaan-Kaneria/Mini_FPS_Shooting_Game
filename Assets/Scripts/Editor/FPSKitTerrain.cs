@@ -679,7 +679,7 @@ namespace FPSKit.EditorTools
             mesh.RecalculateTangents();
 
             var chunk = MeshObject(parent, "Dune", mesh, material, Vector3.zero, Quaternion.identity,
-                                   Vector3.one, layer, SandTag);
+                                   Vector3.one, layer, GroundTag);
 
             // The map draws footprints of solid things, and a dune is both solid and the
             // size of the map. Left to the height test it is not ground -- it is metres

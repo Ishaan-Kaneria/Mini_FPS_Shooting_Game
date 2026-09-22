@@ -67,7 +67,15 @@ namespace FPSKit.EditorTools
                 foreach (var name in FPSKitThemes.Names)
                 {
                     var theme = FPSKitThemes.GetOrCreate(name);
-                    if (theme == null || !theme.openZone || theme.duneHeight <= 0f) continue;
+                    // Any layout that builds a heightfield, not only the open zone.
+                    //
+                    // Written as `!theme.openZone` this skipped the park and then skipped
+                    // the frozen field -- two arenas whose entire floor is the thing this
+                    // check exists to measure, passing because they were never looked at.
+                    // A test that quietly examines one arena out of three is worse than
+                    // one that fails, because it goes green.
+                    if (theme == null || theme.duneHeight <= 0f) continue;
+                    if (!theme.openZone && !theme.parkZone && !theme.snowZone) continue;
 
                     string path = $"Assets/FPSKit_Generated/Scenes/{name.Replace(" ", "")}.unity";
 
@@ -105,7 +113,40 @@ namespace FPSKit.EditorTools
         static void Check(LevelTheme theme, string name, List<string> problems, StringBuilder notes)
         {
             float half = theme.arenaSize * 0.5f;
-            float clear = theme.hazardWidth * 0.5f + 30f;
+
+            // Only a layout that builds a river has a river to step around. Kept at zero
+            // elsewhere, or a snow field would have a 55m strip down the middle of it
+            // excluded from the sweep for a gorge that was never cut -- the same field
+            // BuildDuneField itself had to be told to stop reading.
+            float clear = theme.openZone ? theme.hazardWidth * 0.5f + 30f : 0f;
+
+            // <b>The heightfield itself, not everything wearing its tag.</b>
+            //
+            // Filtering on the tag was right while only the ground carried it. On the
+            // frozen field the drifts, the igloos and the windbreaks are all tagged Snow
+            // too -- correctly, because that is what they are made of and what they should
+            // sound like -- so a tag filter put the side of an igloo into a sweep that is
+            // measuring ground, and reported 67-degree slopes and 81-degree gradient
+            // changes in an arena whose terrain is relaxed to 26. The same trap the
+            // comment below records for surface normals, one layer along: what makes
+            // something the ground is not what it is made of, it is that it *is* the
+            // ground.
+            var chunks = new HashSet<Collider>();
+
+            foreach (var filter in UnityEngine.Object.FindObjectsByType<MeshFilter>(
+                         FindObjectsSortMode.None))
+            {
+                if (filter == null || filter.gameObject.name != "Dune") continue;
+
+                var collider = filter.GetComponent<Collider>();
+                if (collider != null) chunks.Add(collider);
+            }
+
+            if (chunks.Count == 0)
+            {
+                problems.Add($"{name}: no terrain chunks found, so nothing was measured");
+                return;
+            }
 
             int hits = 0, misses = 0, runs = 0;
             float low = float.MaxValue, high = float.MinValue;
@@ -139,7 +180,7 @@ namespace FPSKit.EditorTools
                     // The canyon is meant to be a hole. Sampling across it would report
                     // its wall as the steepest ground in the level, which it is, and
                     // which is the entire point of it.
-                    if (Mathf.Abs(x - GorgeCentre(theme, z)) < clear)
+                    if (clear > 0f && Mathf.Abs(x - GorgeCentre(theme, z)) < clear)
                     {
                         previousHeight = float.NaN;
                         previousSlope = float.NaN;
@@ -167,7 +208,7 @@ namespace FPSKit.EditorTools
                     // first attempt and does not work: the top of a boulder is as
                     // near-level as a dune is, so half the rocks in the arena passed the
                     // filter and each one contributed two enormous steps.
-                    if (hit.collider == null || !hit.collider.CompareTag("Sand"))
+                    if (hit.collider == null || !chunks.Contains(hit.collider))
                     {
                         previousHeight = float.NaN;
                         previousSlope = float.NaN;

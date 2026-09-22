@@ -12,6 +12,8 @@ TagManager:
   - Flesh
   - Water
   - Sand
+  - Snow
+  - Ice
   layers:
   - Default
   - TransparentFX

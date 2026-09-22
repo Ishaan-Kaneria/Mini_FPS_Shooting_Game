@@ -50,6 +50,29 @@ namespace FPSKit.EditorTools
         /// </summary>
         private const string SandTag = "Sand";
 
+        /// <summary>
+        /// Snow and ice, provisioned with the rest in
+        /// <see cref="EnsureProjectTagsAndLayers"/>. Two tags rather than one because
+        /// they are the two surfaces a player in that arena spends the whole level on
+        /// and they sound nothing alike: a boot in snow is a muffled crunch and a boot on
+        /// lake ice is a hard knock with a ring under it. One tag for both would make
+        /// the frozen lake -- the one piece of ground the arena is built around -- sound
+        /// exactly like the drift beside it.
+        /// </summary>
+        private const string SnowTag = "Snow";
+        private const string IceTag = "Ice";
+
+        /// <summary>
+        /// What the heightfield under this arena is made of.
+        ///
+        /// <b>The ground carries a tag and the tag is what the player hears.</b> Every
+        /// footstep in a 450m arena and most bullet impacts land on it, so a snow field
+        /// whose ground says Sand is a level that crunches like a desert for its whole
+        /// length -- wrong in a way nobody can name and everybody notices, which is the
+        /// same sentence this file already writes about the Sand tag existing at all.
+        /// </summary>
+        private static string GroundTag => _theme != null && _theme.snowZone ? SnowTag : SandTag;
+
         // ==================================================================
         // Menu entries -- one per built-in theme.
         // ==================================================================
@@ -644,6 +667,7 @@ namespace FPSKit.EditorTools
             // for a factory, and a factory cannot also be a river valley.
             if (_theme.industrialZone) { BuildIndustrialZone(); return; }
             if (_theme.parkZone) { BuildParkZone(); return; }
+            if (_theme.snowZone) { BuildSnowZone(); return; }
             if (_theme.openZone) { BuildOpenZone(); return; }
 
             _claimed.Clear();
@@ -1535,7 +1559,19 @@ namespace FPSKit.EditorTools
                 // sound at low volume because the kit has no sand impact authored --
                 // Tools/generate-placeholder-audio.py is where one would go, and it has
                 // to be added at the end of that file or every clip below it re-rolls.
-                Impact(SandTag, new Color(0.82f, 0.72f, 0.54f), 0.16f, "SFX/impact_concrete.wav", 0.4f)
+                Impact(SandTag, new Color(0.82f, 0.72f, 0.54f), 0.16f, "SFX/impact_concrete.wav", 0.4f),
+
+                // Snow throws the biggest, dimmest puff of the set and makes the least
+                // noise of anything in the game: a round into a drift is a thud with no
+                // crack on the front of it. A white spark here would read as a muzzle
+                // flash on the ground.
+                Impact(SnowTag, new Color(0.92f, 0.95f, 1f), 0.20f, "SFX/impact_concrete.wav", 0.28f),
+
+                // Ice does the opposite, and the pair is the point. It is the one hard
+                // surface in that arena, so it is the one that cracks -- a small bright
+                // chip and a sound with an edge on it. A player who has stepped off the
+                // drift and onto the lake should be able to hear that they have.
+                Impact(IceTag, new Color(0.80f, 0.92f, 1f), 0.09f, "SFX/impact_metal.wav", 0.5f)
             };
 
             // Anything untagged still sparks and still ticks, so a shot into imported
@@ -2180,6 +2216,7 @@ namespace FPSKit.EditorTools
         {
             if (_theme.industrialZone) return BuildZoneSpawnPoints();
             if (_theme.parkZone) return BuildOpenZoneSpawnPoints();
+            if (_theme.snowZone) return BuildOpenZoneSpawnPoints();
             if (_theme.openZone) return BuildOpenZoneSpawnPoints();
 
             var root = new GameObject("SpawnPoints").transform;
@@ -3715,7 +3752,8 @@ namespace FPSKit.EditorTools
         /// <summary>Public so the other FPSKit tools can guarantee these exist before they run.</summary>
         public static void EnsureProjectTagsAndLayers()
         {
-            EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh", "Water", SandTag);
+            EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh", "Water", SandTag,
+                       SnowTag, IceTag);
             EnsureLayers("Player", "Enemy", "Environment", "Backdrop");
         }
 

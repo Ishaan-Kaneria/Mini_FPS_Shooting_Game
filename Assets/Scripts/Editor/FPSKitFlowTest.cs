@@ -31,7 +31,7 @@ namespace FPSKit.EditorTools
         enum Phase
         {
             Enter, Story, InspectMenu, OpenDialog, ExitDialog,
-            OpenLevels, InspectLevels, Launch,
+            OpenList, InspectList, OpenLevels, ZoneOpening, InspectLevels, Launch,
             AwaitArena, InspectArena, Quit, AwaitMenu, Judge
         }
 
@@ -45,12 +45,21 @@ namespace FPSKit.EditorTools
         static string _stakes = "";
         static bool _stakesShown;
 
+        static int _listRows;
+        static bool _listClosed;
+        static string _listUnclickable = "";
+        static bool _zoneOpeningShown;
         static bool _storyOpened;
         static bool _storyClosed;
         static bool _identityTaken;
 
         /// <summary>The tester's own answer to the one question, put back in Detach.</summary>
         static int _identityBackup = -1;
+
+        /// <summary>Zone openings this test suppresses, and what they were.</summary>
+        const int OpeningsCleared = 8;
+
+        static readonly bool[] _openingsBackup = new bool[OpeningsCleared];
 
         static int _cardsShown;
         static int _cardsPlayable;
@@ -104,6 +113,10 @@ namespace FPSKit.EditorTools
                 _cardsLocked = _lockedClickable = 0;
                 _gateBroken = "";
                 _storyOpened = _storyClosed = _identityTaken = false;
+                _zoneOpeningShown = false;
+                _listRows = 0;
+                _listClosed = false;
+                _listUnclickable = "";
                 _stakes = "";
                 _stakesShown = false;
 
@@ -115,6 +128,18 @@ namespace FPSKit.EditorTools
                 // the game to pass.
                 _identityBackup = (int)Campaign.Who;
                 Campaign.Who = Campaign.Identity.Unset;
+
+                // The zone openings are shown once each, so on any machine that has run
+                // this before the card would not appear and the assertion about it would
+                // pass on a screen that never opened. Same reasoning as the identity
+                // above, and put back the same way.
+                for (int zone = 0; zone < OpeningsCleared; zone++)
+                {
+                    _openingsBackup[zone] = Campaign.OpeningSeen(zone);
+                    PlayerPrefs.DeleteKey($"FPSKit.Campaign.Opened.{zone}");
+                }
+
+                PlayerPrefs.Save();
                 _levelsOffered = _levelsExpected = _levelsUnlocked = 0;
                 _levelOneOpen = false;
                 _lockedIsInert = true;
@@ -297,6 +322,46 @@ namespace FPSKit.EditorTools
                         Notes.Append($"\n  exit dialog: opened={_dialogOpened} " +
                                      $"closed on cancel={_dialogClosed}, asks \"{_dialogQuestion}\"");
 
+                        _phase = Phase.OpenList;
+                        return;
+                    }
+
+                    case Phase.OpenList:
+                    {
+                        var menu = Menu();
+
+                        if (menu.dossier == null)
+                            throw new Exception("the dashboard has no list screen; run " +
+                                                "FPSKitBatch.BuildDashboard");
+
+                        menu.OpenDossier();
+
+                        // A frame before raycasting, for the reason the level select gets
+                        // one: a graphic enabled this frame is not in the canvas yet.
+                        Wait(0.5, Phase.InspectList);
+                        return;
+                    }
+
+                    case Phase.InspectList:
+                    {
+                        if (Waiting()) return;
+
+                        var menu = Menu();
+
+                        if (!menu.dossier.IsOpen)
+                            throw new Exception("the list screen did not open");
+
+                        foreach (var row in UnityEngine.Object.FindObjectsByType<DossierRow>(
+                                     FindObjectsSortMode.None))
+                            if (row.gameObject.activeInHierarchy) _listRows++;
+
+                        _listUnclickable = UnclickableButtonIn(menu);
+
+                        menu.dossier.Close();
+                        _listClosed = !menu.dossier.IsOpen;
+
+                        Notes.Append($"\n  the list: {_listRows} names shown, closed={_listClosed}");
+
                         _phase = Phase.OpenLevels;
                         return;
                     }
@@ -323,7 +388,32 @@ namespace FPSKit.EditorTools
                         // A frame before anything is raycast at it. A graphic enabled
                         // this frame is not in the canvas yet, so a raycast fired
                         // immediately reports a perfectly good tile as unclickable.
-                        Wait(0.5, Phase.InspectLevels);
+                        Wait(0.5, Phase.ZoneOpening);
+                        return;
+                    }
+
+                    case Phase.ZoneOpening:
+                    {
+                        if (Waiting()) return;
+
+                        var opening = Menu().story;
+
+                        // Choosing a zone for the first time reads its opening before it
+                        // opens the ladder. It has to be shown, and it has to hand over:
+                        // a card that closes back to the dashboard leaves the player
+                        // reading about a place and then standing where they started.
+                        if (opening != null && opening.IsOpen)
+                        {
+                            _zoneOpeningShown = true;
+
+                            if (opening.continueButton != null)
+                                opening.continueButton.onClick.Invoke();
+
+                            Wait(0.6, Phase.InspectLevels);
+                            return;
+                        }
+
+                        _phase = Phase.InspectLevels;
                         return;
                     }
 
@@ -697,6 +787,11 @@ namespace FPSKit.EditorTools
             {
                 Campaign.Who = (Campaign.Identity)_identityBackup;
                 _identityBackup = -1;
+
+                for (int zone = 0; zone < OpeningsCleared; zone++)
+                    if (_openingsBackup[zone]) Campaign.MarkOpeningSeen(zone);
+
+                PlayerPrefs.Save();
             }
 
             FPSKitPlayMode.RestoreStartScene();
@@ -747,6 +842,23 @@ namespace FPSKit.EditorTools
             if (!_stakesShown)
                 problems.Append("\n  - the stakes line never reached the briefing, so nothing " +
                                 "on screen says why the clock is running");
+
+            if (_listRows <= 0)
+                problems.Append("\n  - the list screen shows no names at all, so the eight the " +
+                                "whole campaign is about are nowhere in the game");
+
+            if (!_listClosed)
+                problems.Append("\n  - the list screen would not close, so it is a screen the " +
+                                "player cannot leave");
+
+            if (!string.IsNullOrEmpty(_listUnclickable))
+                problems.Append($"\n  - the list screen's \"{_listUnclickable}\" button cannot be " +
+                                "clicked: a raycast at it hits nothing");
+
+            if (!_zoneOpeningShown)
+                problems.Append("\n  - choosing a zone for the first time did not show its " +
+                                "opening, so the player walks into a place the story never " +
+                                "introduced");
 
             if (!_storyClosed)
                 problems.Append("\n  - the story card is still up after being answered: it " +

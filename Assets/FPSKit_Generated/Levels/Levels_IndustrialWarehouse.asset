@@ -16,7 +16,7 @@ MonoBehaviour:
   stakes: The plant runs to a shift clock and the gates seal when it ends. Finish this before they do -- nobody opens them from the outside, and nobody is coming to look.
   levels:
   - displayName: FIRST CONTACT
-    brief: 6 hostiles. Kill them all before the clock runs out.
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 6 hostiles. Clear them for three stars.
     enemyCount: 6
     timeLimit: 32
     maxAliveAtOnce: 4
@@ -26,6 +26,7 @@ MonoBehaviour:
     objectiveWeight: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 4.5
     bossHealthMultiplier: 1
     healthMultiplier: 1
@@ -36,7 +37,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: 9 hostiles, one magazine, no reload. Kills resupply you.
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 9 hostiles, one magazine, no reload. Kills resupply you.
     enemyCount: 9
     timeLimit: 43
     maxAliveAtOnce: 5
@@ -46,6 +47,7 @@ MonoBehaviour:
     objectiveWeight: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.1
@@ -56,7 +58,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: 12 hostiles and a boss. The boss is most of the score.
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 12 hostiles and a boss. The boss is most of the score.
     enemyCount: 12
     timeLimit: 69
     maxAliveAtOnce: 6
@@ -66,6 +68,7 @@ MonoBehaviour:
     objectiveWeight: 5
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+    bossName: 
     bossWeight: 5.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.2
@@ -76,7 +79,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: 15 hostiles. Stand on the marked ground and keep standing.
+    brief: The shift supervisors have stopped pretending this is a drill. 15 hostiles. Stand on the marked ground and keep standing.
     enemyCount: 15
     timeLimit: 63
     maxAliveAtOnce: 7
@@ -86,6 +89,7 @@ MonoBehaviour:
     objectiveWeight: 7
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 6
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.3
@@ -96,7 +100,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: 18 hostiles, and the lights are not yours.
+    brief: The shift supervisors have stopped pretending this is a drill. 18 hostiles, and the lights are not yours.
     enemyCount: 18
     timeLimit: 73
     maxAliveAtOnce: 8
@@ -106,6 +110,7 @@ MonoBehaviour:
     objectiveWeight: 8
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 6.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.4
@@ -116,7 +121,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: 21 hostiles and a boss. The boss is most of the score.
+    brief: The shift supervisors have stopped pretending this is a drill. 21 hostiles and a boss. The boss is most of the score.
     enemyCount: 21
     timeLimit: 99
     maxAliveAtOnce: 9
@@ -126,6 +131,7 @@ MonoBehaviour:
     objectiveWeight: 9
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
     bossWeight: 7
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.5
@@ -136,7 +142,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
-    brief: 24 hostiles. Clear them, then reach the way out.
+    brief: They are pulling people off the line to hold the floor now. 24 hostiles. Clear them, then reach the way out.
     enemyCount: 24
     timeLimit: 94
     maxAliveAtOnce: 10
@@ -146,6 +152,7 @@ MonoBehaviour:
     objectiveWeight: 11
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 7.5
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.6
@@ -155,8 +162,8 @@ MonoBehaviour:
     rosterStep: 10
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
-    brief: 27 hostiles and a boss. The boss is most of the score.
+  - displayName: TOVE AUGER
+    brief: Tove is on the hall roof. She has not tried to leave. 27 between you and Tove.
     enemyCount: 27
     timeLimit: 120
     maxAliveAtOnce: 11
@@ -166,6 +173,7 @@ MonoBehaviour:
     objectiveWeight: 12
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: Tove Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.7

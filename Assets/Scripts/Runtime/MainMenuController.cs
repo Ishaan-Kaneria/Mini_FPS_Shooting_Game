@@ -64,8 +64,14 @@ public class MainMenuController : MonoBehaviour
              "something owed, and never otherwise.")]
     public StoryPanel story;
 
+    [Tooltip("The eight, and what is known about each. Opened by the List button.")]
+    public DossierPanel dossier;
+
     [Tooltip("Opens the achievements screen.")]
     public Button achievementsButton;
+
+    [Tooltip("Opens the list of the eight.")]
+    public Button listButton;
 
     [Tooltip("Opens the instructions screen.")]
     public Button helpButton;
@@ -169,6 +175,9 @@ public class MainMenuController : MonoBehaviour
     /// <summary>What was on screen before the level select covered it. See ShowDashboard.</summary>
     bool[] _dashboardWasShown;
 
+    /// <summary>Whether the dashboard is currently hidden behind an overlay.</summary>
+    bool _dashboardHidden;
+
     // ======================================================================
     /// <summary>
     /// The power the campaign handed over on the way into this screen, or null. Held so
@@ -232,9 +241,11 @@ public class MainMenuController : MonoBehaviour
         if (achievements != null) achievements.Closed += OnOverlayClosed;
         if (instructions != null) instructions.Closed += OnOverlayClosed;
         if (story != null) story.Closed += OnOverlayClosed;
+        if (dossier != null) dossier.Closed += OnOverlayClosed;
 
         Wire(storeButton, OpenStore);
         Wire(achievementsButton, OpenAchievements);
+        Wire(listButton, OpenDossier);
         Wire(helpButton, OpenInstructions);
         Wire(exitButton, AskToExit);
         Wire(confirmExitButton, Exit);
@@ -281,6 +292,7 @@ public class MainMenuController : MonoBehaviour
         if (achievements != null) achievements.Closed -= OnOverlayClosed;
         if (instructions != null) instructions.Closed -= OnOverlayClosed;
         if (story != null) story.Closed -= OnOverlayClosed;
+        if (dossier != null) dossier.Closed -= OnOverlayClosed;
     }
 
     static void Wire(Button button, UnityEngine.Events.UnityAction action)
@@ -642,9 +654,35 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
+        // The zone's own opening, once, before its ladder. Read on the way in, which is
+        // when a line about the place the player is about to walk into means anything.
+        int zone = campaign != null ? campaign.IndexOfArena(entry.ProgressKey) : -1;
+
+        if (story != null && zone >= 0 && !Campaign.OpeningSeen(zone))
+        {
+            var opening = campaign.ZoneAt(zone);
+
+            if (opening != null && !string.IsNullOrWhiteSpace(opening.opening))
+            {
+                // Held rather than opened now: the ladder opens when the card closes,
+                // and OnOverlayClosed is the one place that happens.
+                _afterStory = entry;
+
+                story.Bind(campaign);
+                story.QueueZoneOpening(zone);
+
+                ShowDashboard(false);
+                story.Open();
+                return;
+            }
+        }
+
         ShowDashboard(false);
         levelSelect.Open(entry);
     }
+
+    /// <summary>The arena to open a ladder for once a story card has been read, or null.</summary>
+    ArenaCatalog.Entry _afterStory;
 
     /// <summary>Opens the shop. What the Store button does.</summary>
     public void OpenStore()
@@ -676,6 +714,19 @@ public class MainMenuController : MonoBehaviour
         achievements.Open();
     }
 
+    /// <summary>Opens the list of the eight. What the List button does.</summary>
+    public void OpenDossier()
+    {
+        if (dossier == null)
+        {
+            Report("This dashboard has no list screen. Run FPSKit > Build Dashboard.");
+            return;
+        }
+
+        ShowDashboard(false);
+        dossier.Open();
+    }
+
     /// <summary>Opens the instructions. What the Help button does.</summary>
     public void OpenInstructions()
     {
@@ -689,7 +740,22 @@ public class MainMenuController : MonoBehaviour
         instructions.Open();
     }
 
-    void OnOverlayClosed() => ShowDashboard(true);
+    void OnOverlayClosed()
+    {
+        // A zone opening was being read. The ladder it was shown for opens now rather
+        // than the dashboard coming back, or the player reads a card about a place and
+        // is returned to the menu they were already leaving.
+        if (_afterStory != null)
+        {
+            var entry = _afterStory;
+            _afterStory = null;
+
+            Choose(entry);
+            return;
+        }
+
+        ShowDashboard(true);
+    }
 
     void OnStoreClosed()
     {
@@ -727,6 +793,14 @@ public class MainMenuController : MonoBehaviour
 
         if (!shown)
         {
+            // Already hidden: record nothing and hide nothing. A second hide would take
+            // its "what was showing" snapshot of a dashboard that is already switched
+            // off, so everything would come back as false and the dashboard would never
+            // be shown again -- which is exactly what one overlay opening another does.
+            if (_dashboardHidden) return;
+
+            _dashboardHidden = true;
+
             if (_dashboardWasShown == null || _dashboardWasShown.Length != dashboardOnly.Length)
                 _dashboardWasShown = new bool[dashboardOnly.Length];
 
@@ -740,6 +814,8 @@ public class MainMenuController : MonoBehaviour
 
             return;
         }
+
+        _dashboardHidden = false;
 
         for (int i = 0; i < dashboardOnly.Length; i++)
         {

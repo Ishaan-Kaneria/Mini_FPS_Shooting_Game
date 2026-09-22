@@ -618,6 +618,7 @@ namespace FPSKit.EditorTools
             BuildStore(root, menu);
             BuildAchievements(root, menu);
             BuildStory(root, menu);
+            BuildDossier(root, menu);
 
             // The dashboard has no player rig to read bindings off, so the panel is handed
             // the same asset the arenas use. Loaded rather than left null so the screen
@@ -649,6 +650,7 @@ namespace FPSKit.EditorTools
                 // VerifyFlow exist to catch.
                 menu.achievementsButton.gameObject,
                 menu.helpButton.gameObject,
+                menu.listButton.gameObject,
 
                 menu.statusText.gameObject
             };
@@ -1069,7 +1071,7 @@ namespace FPSKit.EditorTools
             status.textWrappingMode = TextWrappingModes.Normal;
             menu.statusText = status;
 
-            // The four things a player does that are not playing a level, in one row.
+            // The five things a player does that are not playing a level, in one row.
             //
             // A layout group rather than four anchored offsets, because the old pair were
             // placed at fixed pixels from the right edge and a third and fourth would have
@@ -1096,10 +1098,12 @@ namespace FPSKit.EditorTools
             // Ordered by how often a player wants them, left to right, with the one that
             // ends the session furthest from the others.
             var help = NavButton(navRect, "HelpButton", "HOW  TO  PLAY", Accent);
+            var list = NavButton(navRect, "ListButton", "THE  LIST", UITheme.Alert);
             var career = NavButton(navRect, "CareerButton", "ACHIEVEMENTS", UITheme.Good);
             var store = NavButton(navRect, "StoreButton", "STORE", Accent);
             var exit = NavButton(navRect, "ExitButton", "EXIT  GAME", Danger);
 
+            menu.listButton = list;
             menu.helpButton = help;
             menu.achievementsButton = career;
             menu.storeButton = store;
@@ -1489,6 +1493,102 @@ namespace FPSKit.EditorTools
         /// of each other and one that closes differently from the one it replaced reads as
         /// the interface being unreliable -- the same argument HoverCard settles for cards.
         /// </summary>
+        /// <summary>
+        /// THE LIST: the eight, in columns, with whatever the player has learned about
+        /// each of them.
+        ///
+        /// Built on the shared overlay shell and the shared column splitter, so it reads
+        /// as the same screen as the achievements and the instructions -- which it is,
+        /// three lists of things the player is collecting.
+        /// </summary>
+        static void BuildDossier(RectTransform parent, MainMenuController menu)
+        {
+            var panel = parent.gameObject.AddComponent<DossierPanel>();
+
+            var shade = BuildOverlayShell(parent, "Dossier", "The list",
+                                          "", out var tally, out var back, out var body);
+
+            tally.text = "";
+            tally.color = UITheme.Alert;
+            tally.fontSize = 28f;
+
+            // Two, not four. The achievements screen carries a title and a progress bar
+            // and reads fine in quarters; a name here carries a face and a paragraph,
+            // and at a quarter of the width the paragraph -- which is the whole reason
+            // to open this screen twice -- is a column of two-word lines set at the
+            // smallest size the autosizer will go to.
+            var columns = BuildColumns(body, 2, out _);
+
+            panel.panel = shade.gameObject;
+            panel.backButton = back;
+            panel.tallyText = tally;
+            panel.columns = columns;
+            panel.campaign = FPSKitCampaign.GetOrCreate();
+            panel.rowTemplate = BuildDossierRowTemplate(shade.rectTransform);
+
+            menu.dossier = panel;
+            shade.gameObject.SetActive(false);
+        }
+
+        static DossierRow BuildDossierRowTemplate(RectTransform parent)
+        {
+            var rowGo = new GameObject("DossierRowTemplate", typeof(RectTransform));
+            rowGo.transform.SetParent(parent, false);
+            var rect = (RectTransform)rowGo.transform;
+            rect.sizeDelta = new Vector2(0f, 178f);
+
+            var element = rowGo.AddComponent<LayoutElement>();
+            element.preferredHeight = 178f;
+            element.minHeight = 178f;
+
+            var plate = Block(rect, "Plate", PanelLift);
+            Stretch(plate.rectTransform);
+            plate.raycastTarget = false;
+
+            var row = rowGo.AddComponent<DossierRow>();
+
+            // The face, at the portrait's own 3:4 so it is not mounted in a band of
+            // border -- the same thing the story card had to be told.
+            var frame = Block(rect, "Frame", Border);
+            var frameRect = frame.rectTransform;
+            frameRect.anchorMin = new Vector2(0f, 0.5f);
+            frameRect.anchorMax = new Vector2(0f, 0.5f);
+            frameRect.pivot = new Vector2(0f, 0.5f);
+            frameRect.sizeDelta = new Vector2(114f, 152f);
+            frameRect.anchoredPosition = new Vector2(14f, 0f);
+            frame.raycastTarget = false;
+
+            var face = Block(frameRect, "Portrait", Color.white);
+            Stretch(face.rectTransform);
+            face.rectTransform.offsetMin = new Vector2(3f, 3f);
+            face.rectTransform.offsetMax = new Vector2(-3f, -3f);
+            face.raycastTarget = false;
+            face.preserveAspect = true;
+
+            row.frame = frame;
+            row.portrait = face;
+
+            row.nameText = Label(rect, "Name", "NAME", 26, TextAlignmentOptions.TopLeft, Ink);
+            Span(row.nameText.rectTransform, 0.74f, 0.97f, 146f, 150f);
+            Autosize(row.nameText, 14f, 26f);
+
+            row.statusText = Label(rect, "Status", "", 18,
+                                   TextAlignmentOptions.TopRight, InkDim);
+            Span(row.statusText.rectTransform, 0.74f, 0.97f, 146f, 16f);
+
+            row.holdingText = Label(rect, "Holding", "", 16,
+                                    TextAlignmentOptions.TopLeft, Accent);
+            Span(row.holdingText.rectTransform, 0.60f, 0.74f, 146f, 16f);
+
+            row.beatText = Label(rect, "Beat", "", 16, TextAlignmentOptions.TopLeft, InkDim);
+            Span(row.beatText.rectTransform, 0.06f, 0.58f, 146f, 16f);
+            row.beatText.textWrappingMode = TextWrappingModes.Normal;
+            Autosize(row.beatText, 11f, 16f);
+
+            rowGo.SetActive(false);
+            return row;
+        }
+
         /// <summary>
         /// The story card: a face, a name, a paragraph, and one way forward.
         ///

@@ -43,9 +43,11 @@ public static class Campaign
     const string IdentityKey = "FPSKit.Campaign.Identity";
     const string PowerPrefix  = "FPSKit.Campaign.Power.";
     const string BeatPrefix   = "FPSKit.Campaign.Beat.";
+    const string OpenedPrefix = "FPSKit.Campaign.Opened.";
 
     static string PowerKey(string id) => PowerPrefix + id;
     static string BeatKey(int index) => BeatPrefix + index;
+    static string OpenedKey(int index) => OpenedPrefix + index;
 
     // ---- identity -------------------------------------------------------------
 
@@ -175,6 +177,27 @@ public static class Campaign
         if (zoneIndex < 0 || BeatSeen(zoneIndex)) return false;
 
         PlayerPrefs.SetInt(BeatKey(zoneIndex), 1);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    /// <summary>
+    /// Whether the player has been shown what this zone is, on the way into it.
+    ///
+    /// Separate from <see cref="BeatSeen"/> because they are opposite ends of a zone: an
+    /// opening is read before it is played and a beat after it is won, and a player who
+    /// has done one has not necessarily done the other -- somebody can walk into a zone,
+    /// read the opening, lose every level and never earn the beat.
+    /// </summary>
+    public static bool OpeningSeen(int zoneIndex)
+        => zoneIndex >= 0 && PlayerPrefs.GetInt(OpenedKey(zoneIndex), 0) == 1;
+
+    /// <summary>Records an opening as read. True only on the call that marked it.</summary>
+    public static bool MarkOpeningSeen(int zoneIndex)
+    {
+        if (zoneIndex < 0 || OpeningSeen(zoneIndex)) return false;
+
+        PlayerPrefs.SetInt(OpenedKey(zoneIndex), 1);
         PlayerPrefs.Save();
         return true;
     }
@@ -335,7 +358,10 @@ public static class Campaign
         PlayerPrefs.DeleteKey(PowerKey(BombPower));
 
         for (int i = 0; i < zones; i++)
+        {
             PlayerPrefs.DeleteKey(BeatKey(i));
+            PlayerPrefs.DeleteKey(OpenedKey(i));
+        }
 
         PlayerPrefs.Save();
     }

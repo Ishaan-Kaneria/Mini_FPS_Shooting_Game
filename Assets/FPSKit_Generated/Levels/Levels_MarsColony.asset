@@ -16,7 +16,7 @@ MonoBehaviour:
   stakes: The dome vents to schedule and the schedule is set from the ground, by his sister. Be out of the open when it goes, because it will go whether or not you are.
   levels:
   - displayName: DISPOSAL
-    brief: 6 hostiles and four charges. Reach a charge or lose the clock.
+    brief: Roan's colony has been sealed since the road went quiet. 6 hostiles and four charges. Reach a charge or lose the clock.
     enemyCount: 6
     timeLimit: 32
     maxAliveAtOnce: 4
@@ -26,6 +26,7 @@ MonoBehaviour:
     objectiveWeight: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 4.5
     bossHealthMultiplier: 1
     healthMultiplier: 1.25
@@ -36,7 +37,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
-    brief: 9 hostiles. One of them runs -- that one is the level.
+    brief: Roan's colony has been sealed since the road went quiet. 9 hostiles. One of them runs -- that one is the level.
     enemyCount: 9
     timeLimit: 43
     maxAliveAtOnce: 5
@@ -46,6 +47,7 @@ MonoBehaviour:
     objectiveWeight: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.35
@@ -56,7 +58,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: 12 hostiles and a boss. The boss is most of the score.
+    brief: Roan's colony has been sealed since the road went quiet. 12 hostiles and a boss. The boss is most of the score.
     enemyCount: 12
     timeLimit: 69
     maxAliveAtOnce: 6
@@ -66,6 +68,7 @@ MonoBehaviour:
     objectiveWeight: 5
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+    bossName: 
     bossWeight: 5.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.45
@@ -76,7 +79,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: 15 hostiles, one magazine, no reload. Kills resupply you.
+    brief: The dome crews were told you are a contractor. They know better now. 15 hostiles, one magazine, no reload. Kills resupply you.
     enemyCount: 15
     timeLimit: 63
     maxAliveAtOnce: 7
@@ -86,6 +89,7 @@ MonoBehaviour:
     objectiveWeight: 7
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 6
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.55
@@ -96,7 +100,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: 18 hostiles. Stand on the marked ground and keep standing.
+    brief: The dome crews were told you are a contractor. They know better now. 18 hostiles. Stand on the marked ground and keep standing.
     enemyCount: 18
     timeLimit: 73
     maxAliveAtOnce: 8
@@ -106,6 +110,7 @@ MonoBehaviour:
     objectiveWeight: 8
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 6.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.65
@@ -116,7 +121,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: 21 hostiles and a boss. The boss is most of the score.
+    brief: The dome crews were told you are a contractor. They know better now. 21 hostiles and a boss. The boss is most of the score.
     enemyCount: 21
     timeLimit: 99
     maxAliveAtOnce: 9
@@ -126,6 +131,7 @@ MonoBehaviour:
     objectiveWeight: 9
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
     bossWeight: 7
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.75
@@ -136,7 +142,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: 24 hostiles, and the lights are not yours.
+    brief: Someone on the ground is setting the vent schedule against him too. 24 hostiles, and the lights are not yours.
     enemyCount: 24
     timeLimit: 94
     maxAliveAtOnce: 10
@@ -146,6 +152,7 @@ MonoBehaviour:
     objectiveWeight: 11
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 7.5
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.85
@@ -155,8 +162,8 @@ MonoBehaviour:
     rosterStep: 15
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
-    brief: 27 hostiles and a boss. The boss is most of the score.
+  - displayName: ROAN AUGER
+    brief: Roan is in the open, unsealed, with one question left to ask you. 27 between you and Roan.
     enemyCount: 27
     timeLimit: 120
     maxAliveAtOnce: 11
@@ -166,6 +173,7 @@ MonoBehaviour:
     objectiveWeight: 12
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: Roan Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.95

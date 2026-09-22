@@ -877,7 +877,11 @@ public class LevelManager : MonoBehaviour
             if (boss == null) continue;
 
             ActiveBoss = boss.GetComponent<Health>();
-            ActiveBossName = type.archetype != null
+            // The level's own name wins: the campaign fights two boss chassis as eight
+            // different people, and the archetype only knows which chassis it is.
+            ActiveBossName = !string.IsNullOrWhiteSpace(Level.bossName)
+                ? Level.bossName.ToUpperInvariant()
+                : type.archetype != null
                 ? type.archetype.displayName.ToUpperInvariant()
                 : "BOSS";
             return;

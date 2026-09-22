@@ -48,6 +48,101 @@ namespace FPSKit.EditorTools
         };
 
         /// <summary>
+        /// Who holds each zone, in the same order as <see cref="ZoneOrder"/>, and what
+        /// they held.
+        ///
+        /// <b>Here rather than only inside Configure</b>, because two generators need it:
+        /// this one builds the sibling list from it, and <see cref="FPSKitLevels"/> names
+        /// the last level of each ladder after whoever is standing at the end of it. Two
+        /// tables would drift, and the way they would drift is a level called TOVE AUGER
+        /// in an arena the campaign says Kestrel holds.
+        ///
+        /// The eight are longer than the six zones: the last two hold no site.
+        /// </summary>
+        public static readonly string[] SiblingNames =
+        {
+            "Tove Auger", "Kestrel Auger", "Aurel Auger", "Ilsa Auger",
+            "Dev Auger", "Roan Auger", "Marit Auger", "the eighth name"
+        };
+
+        public static readonly string[] SiblingHoldings =
+        {
+            "the plant", "the quarry", "the convoy road", "the cameras",
+            "the works", "the colony", "the company", "nothing yet"
+        };
+
+        /// <summary>
+        /// One sentence of story for a level, in the voice of the zone it is in.
+        ///
+        /// Four rungs rather than forty-eight bespoke lines: arriving, settling in,
+        /// being noticed, and the last one. <b>A brief is read at a glance on a tile and
+        /// for three seconds under a countdown</b>, so what it has to do is say where the
+        /// player is and that something is moving -- and forty-eight hand-written lines
+        /// would be forty-eight chances for one of them to say something the level does
+        /// not do. The objective sentence is added after this by
+        /// <see cref="FPSKitLevels"/>, so every brief says a place and a task.
+        /// </summary>
+        public static string StoryClause(string themeName, int rung) => themeName switch
+        {
+            "Industrial Warehouse" => rung switch
+            {
+                0 => "Tove's plant still runs three shifts. Nobody has told the yard why.",
+                1 => "The shift supervisors have stopped pretending this is a drill.",
+                2 => "They are pulling people off the line to hold the floor now.",
+                _ => "Tove is on the hall roof. She has not tried to leave."
+            },
+
+            "Snowbound Station" => rung switch
+            {
+                0 => "Kestrel lit the yard a week ago and has kept it lit.",
+                1 => "Her people know the ground and are letting you have the open part of it.",
+                2 => "The quarry crews have stopped working and started waiting.",
+                _ => "Kestrel is at the cut face, standing where the charges are kept."
+            },
+
+            "Desert Outpost" => rung switch
+            {
+                0 => "Aurel's road carries everything the company still owns.",
+                1 => "The convoy escort has been doubled since the quarry went quiet.",
+                2 => "They have stopped moving freight and started moving people.",
+                _ => "Aurel is at the crossing, with the manifests, waiting to explain."
+            },
+
+            "Night Rooftop" => rung switch
+            {
+                0 => "Ilsa has had you on camera since the airport.",
+                1 => "She is not hiding the cameras. She is showing you where they are.",
+                2 => "Every lift in the block has been called to the top floor.",
+                _ => "Ilsa is on the last roof, and she has turned the recording on."
+            },
+
+            "Abandoned Subway" => rung switch
+            {
+                0 => "Dev turned the lights on for you. Only some of them.",
+                1 => "The rides are moving. Nobody is operating them.",
+                2 => "He has opened the shafts that were fenced off.",
+                _ => "Dev is waiting by the wheel, and he knows your first name."
+            },
+
+            "Mars Colony" => rung switch
+            {
+                0 => "Roan's colony has been sealed since the road went quiet.",
+                1 => "The dome crews were told you are a contractor. They know better now.",
+                2 => "Someone on the ground is setting the vent schedule against him too.",
+                _ => "Roan is in the open, unsealed, with one question left to ask you."
+            },
+
+            _ => ""
+        };
+
+        /// <summary>Who holds this arena, or empty for one the story does not use.</summary>
+        public static string SiblingFor(string themeName)
+        {
+            int index = IndexOfTheme(themeName);
+            return index >= 0 && index < SiblingNames.Length ? SiblingNames[index] : "";
+        }
+
+        /// <summary>
         /// Where a theme sits in the campaign, or -1 for one the story does not use.
         /// This is what <see cref="FPSKitLevels"/> shifts its difficulty curve by.
         /// </summary>
@@ -152,48 +247,48 @@ namespace FPSKit.EditorTools
 
             data.identityQuestion = "Before we start -- were you a boy, or a girl?";
 
-            data.siblings = new List<CampaignData.Sibling>
+            // The beats, in the same order as the table above. Split from the names
+            // rather than written beside them so the names stay a table two generators
+            // can share.
+            var beats = new[]
             {
-                Sibling("Tove Auger", "the plant",
-                    "Tove signed the report that called it a gas fault. She did not deny " +
-                    "it and she did not apologise for it. What she said, at the end, was " +
-                    "that the gate your mother put you through was not an escape -- it " +
-                    "was a transfer, and it was arranged."),
+                "Tove signed the report that called it a gas fault. She did not deny it " +
+                "and she did not apologise for it. What she said, at the end, was that " +
+                "the gate your mother put you through was not an escape -- it was a " +
+                "transfer, and it was arranged.",
 
-                Sibling("Kestrel Auger", "the quarry",
-                    "Kestrel kept the charges her father bought and never had to use. " +
-                    "You are carrying one of them now. She was the only one who seemed " +
-                    "to think you had a right to be there."),
+                "Kestrel kept the charges her father bought and never had to use. You are " +
+                "carrying one of them now. She was the only one of them who seemed to " +
+                "think you had a right to be there.",
 
-                Sibling("Aurel Auger", "the convoy road",
-                    "Aurel moved everything the company ever owned, including, once, a " +
-                    "child. He remembered the manifest. He remembered the weight."),
+                "Aurel moved everything the company ever owned, including, once, a child. " +
+                "He remembered the manifest. He remembered the weight.",
 
-                Sibling("Ilsa Auger", "the cameras",
-                    "Ilsa had watched you for twenty years and filed none of it. Someone " +
-                    "was paying her not to. She told you the amount before she told you " +
-                    "the name, because she thought the amount would mean more."),
+                "Ilsa had watched you for twenty years and filed none of it. Someone was " +
+                "paying her not to. She told you the amount before she told you the name, " +
+                "because she thought the amount would mean more.",
 
-                Sibling("Dev Auger", "the works",
-                    "Dev stopped running the company the year it stopped being worth " +
-                    "running and moved into what was left of it. He was the first of them " +
-                    "to call you by your first name."),
+                "Dev stopped running the works the year they stopped being worth running " +
+                "and moved into what was left. He was the first of them to call you by " +
+                "your first name, and he did it without having to be told it.",
 
-                Sibling("Roan Auger", "the colony",
-                    "Roan left before any of it and has spent the years since being the " +
-                    "innocent one. He is the only one who asked you a question. It was " +
-                    "whether you had worked out yet who had been funding you."),
+                "Roan left before any of it and has spent the years since being the one " +
+                "who was not there. He is the only one who asked you a question. It was " +
+                "whether you had worked out yet who had been funding you.",
 
-                Sibling("Marit Auger", "the company",
-                    "Marit has been paying for this since the night it started. Eight " +
-                    "ways is a bad division of an estate. One way is a better one, and " +
-                    "she never had to hold a rifle to arrange it."),
+                "Marit has been paying for this since the night it started. Eight ways is " +
+                "a bad division of an estate. One way is a better one, and she never had " +
+                "to hold a rifle to arrange it.",
 
-                Sibling("the eighth name", "nothing yet",
-                    "Halvard Auger took one child out of that fire on purpose, and the " +
-                    "list has always been eight long. You have been crossing off your " +
-                    "own family in the order somebody else wrote them down.")
+                "Halvard Auger took one child out of that fire on purpose, and the list " +
+                "has always been eight long. You have been crossing your own family off " +
+                "it, in the order somebody else wrote them down."
             };
+
+            data.siblings = new List<CampaignData.Sibling>();
+
+            for (int i = 0; i < SiblingNames.Length; i++)
+                data.siblings.Add(Sibling(SiblingNames[i], SiblingHoldings[i], beats[i]));
 
             data.zones = new List<CampaignData.Zone>
             {

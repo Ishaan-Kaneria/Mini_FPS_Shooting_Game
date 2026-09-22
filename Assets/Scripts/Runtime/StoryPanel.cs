@@ -86,6 +86,14 @@ public class StoryPanel : OverlayPanel
     readonly List<Card> _cards = new List<Card>();
     int _at = -1;
 
+    /// <summary>
+    /// A zone whose opening is to be shown instead of the usual sweep, or -1.
+    ///
+    /// Cleared as soon as the panel opens, so a queued opening is used exactly once and
+    /// the next open goes back to reporting whatever the campaign owes.
+    /// </summary>
+    int _queuedZone = -1;
+
     CampaignData _data;
 
     /// <summary>The campaign this panel is telling. Set by the dashboard before opening.</summary>
@@ -119,10 +127,53 @@ public class StoryPanel : OverlayPanel
         return holder != null && !string.IsNullOrWhiteSpace(holder.beat);
     }
 
+    /// <summary>
+    /// Asks the next open to be this zone's opening rather than the usual sweep.
+    ///
+    /// The openings are shown on the way *into* a zone rather than queued up with the
+    /// beats, because that is when they mean anything: "Kestrel lit the yard a week ago"
+    /// is a thing to read while choosing a level in Kestrel's yard, and the same sentence
+    /// on the dashboard two zones later is somebody else's news.
+    /// </summary>
+    public void QueueZoneOpening(int zoneIndex) => _queuedZone = zoneIndex;
+
     protected override void OnOpened()
     {
         _cards.Clear();
         _at = -1;
+
+        int queued = _queuedZone;
+        _queuedZone = -1;
+
+        if (_data != null && queued >= 0)
+        {
+            var zone = _data.ZoneAt(queued);
+            var holder = _data.HolderOf(zone);
+
+            if (zone != null && !string.IsNullOrWhiteSpace(zone.opening))
+            {
+                Campaign.MarkOpeningSeen(queued);
+
+                _cards.Add(new Card
+                {
+                    Title = zone.displayName != null
+                        ? zone.displayName.ToUpperInvariant()
+                        : "THE NEXT ONE",
+
+                    Subtitle = holder != null && !string.IsNullOrWhiteSpace(holder.displayName)
+                        ? $"HELD BY {holder.displayName.ToUpperInvariant()}"
+                        : "",
+
+                    Body = zone.opening,
+                    Portrait = holder != null ? holder.portrait : null,
+                    ZoneIndex = -1
+                });
+            }
+
+            Wire();
+            Advance();
+            return;
+        }
 
         if (_data != null)
         {

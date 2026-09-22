@@ -28,7 +28,7 @@ MonoBehaviour:
     portrait: {fileID: 2800000, guid: ad7441b4f203fe50381c9ed2981e4660, type: 3}
   - displayName: Kestrel Auger
     holding: the quarry
-    beat: Kestrel kept the charges her father bought and never had to use. You are carrying one of them now. She was the only one who seemed to think you had a right to be there.
+    beat: Kestrel kept the charges her father bought and never had to use. You are carrying one of them now. She was the only one of them who seemed to think you had a right to be there.
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: f479a80a3368c96749e0e2c8a2769410, type: 3}
   - displayName: Aurel Auger
@@ -43,12 +43,12 @@ MonoBehaviour:
     portrait: {fileID: 2800000, guid: f14e8d3a69ff9b727b729d3aa5e02135, type: 3}
   - displayName: Dev Auger
     holding: the works
-    beat: Dev stopped running the company the year it stopped being worth running and moved into what was left of it. He was the first of them to call you by your first name.
+    beat: Dev stopped running the works the year they stopped being worth running and moved into what was left. He was the first of them to call you by your first name, and he did it without having to be told it.
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: a3ec8510accc29b5f9708bb4b7a60801, type: 3}
   - displayName: Roan Auger
     holding: the colony
-    beat: Roan left before any of it and has spent the years since being the innocent one. He is the only one who asked you a question. It was whether you had worked out yet who had been funding you.
+    beat: Roan left before any of it and has spent the years since being the one who was not there. He is the only one who asked you a question. It was whether you had worked out yet who had been funding you.
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: 3d42da7911a1f94319a579662a6145e7, type: 3}
   - displayName: Marit Auger
@@ -58,7 +58,7 @@ MonoBehaviour:
     portrait: {fileID: 2800000, guid: 3bc9c0fa69ceefe2598ffbd09b33128a, type: 3}
   - displayName: the eighth name
     holding: nothing yet
-    beat: Halvard Auger took one child out of that fire on purpose, and the list has always been eight long. You have been crossing off your own family in the order somebody else wrote them down.
+    beat: Halvard Auger took one child out of that fire on purpose, and the list has always been eight long. You have been crossing your own family off it, in the order somebody else wrote them down.
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: 8fa105c5ed8001c508be0096250d80e5, type: 3}
   zones:

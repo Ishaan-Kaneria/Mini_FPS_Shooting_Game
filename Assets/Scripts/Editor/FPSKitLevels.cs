@@ -200,10 +200,22 @@ namespace FPSKit.EditorTools
                 var objective = ObjectiveFor(fought, boss, arenaIndex);
                 if (!boss) fought++;
 
+                bool last = i == LevelsPerArena - 1;
+                string holder = FPSKitCampaign.SiblingFor(themeName);
+
                 var level = new LevelSet.Level
                 {
-                    displayName = LevelName(number, boss, objective),
-                    brief = Brief(number, enemies, boss, objective),
+                    displayName = last && !string.IsNullOrEmpty(holder)
+                        ? holder.ToUpperInvariant()
+                        : LevelName(number, boss, objective),
+
+                    brief = Brief(themeName, i, enemies, boss, objective, last, holder),
+
+                    // Named on the level rather than taken from the archetype, so the
+                    // banner when the boss walks in says who it is rather than which
+                    // chassis it was built on. A level with none falls back to the
+                    // archetype exactly as before.
+                    bossName = last && !string.IsNullOrEmpty(holder) ? holder : "",
 
                     objective = objective,
 
@@ -358,8 +370,27 @@ namespace FPSKit.EditorTools
         /// The line under the name on the tile, and the first thing on screen when a
         /// level starts. It says what the level wants, not how it was generated.
         /// </summary>
-        static string Brief(int number, int enemies, bool boss, LevelSet.Objective objective)
+        static string Brief(string themeName, int index, int enemies, bool boss,
+                            LevelSet.Objective objective, bool last, string holder)
         {
+            // Where the player is, then what the level wants. Four rungs of story for
+            // eight levels, so the arena is saying something different at the bottom of
+            // the ladder and at the top without anybody writing forty-eight lines that
+            // could each be wrong about the level they sit on.
+            int rung = last ? 3 : index < 3 ? 0 : index < 6 ? 1 : 2;
+            string story = FPSKitCampaign.StoryClause(themeName, rung);
+
+            string task = Task(enemies, boss, objective, last, holder);
+
+            return string.IsNullOrEmpty(story) ? task : $"{story} {task}";
+        }
+
+        static string Task(int enemies, bool boss, LevelSet.Objective objective, bool last,
+                           string holder)
+        {
+            if (last && !string.IsNullOrEmpty(holder))
+                return $"{enemies} between you and {holder.Split(' ')[0]}.";
+
             if (boss) return $"{enemies} hostiles and a boss. The boss is most of the score.";
 
             switch (objective)
@@ -383,9 +414,7 @@ namespace FPSKit.EditorTools
                     return $"{enemies} hostiles and four charges. Reach a charge or lose the clock.";
             }
 
-            return number == 1
-                ? $"{enemies} hostiles. Kill them all before the clock runs out."
-                : $"{enemies} hostiles. Clear them for three stars.";
+            return $"{enemies} hostiles. Clear them for three stars.";
         }
 
         // ==================================================================

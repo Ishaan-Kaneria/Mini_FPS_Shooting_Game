@@ -117,6 +117,14 @@ public class LevelSet : ScriptableObject
                  "has a boss and then has none is the worst of both.")]
         public EnemyArchetype bossArchetype;
 
+        [Tooltip("What to call this boss on the banner and the boss bar. Empty falls back " +
+                 "to the archetype's own name.\n\n" +
+                 "It is on the level because a boss is a chassis and a name is a person: " +
+                 "the campaign fights the same two archetypes as eight different Augers, " +
+                 "and a banner reading \"WARDEN\" where the story says Tove is standing " +
+                 "is the seam showing.")]
+        public string bossName;
+
         [Tooltip("What the boss is worth against one ordinary enemy when the stars are " +
                  "counted. At 5 it is a fifth of a twenty-enemy level on its own, which " +
                  "is the point: the boss is the level, and leaving it alive costs a star " +

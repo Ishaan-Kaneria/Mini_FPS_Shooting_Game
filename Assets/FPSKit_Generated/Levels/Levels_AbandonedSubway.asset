@@ -16,7 +16,7 @@ MonoBehaviour:
   stakes: The ground here is older than the fence around it. When the floodlights go, the holes you have been walking round stop being visible -- and they are still exactly where they were.
   levels:
   - displayName: WAY OUT
-    brief: 6 hostiles. Clear them, then reach the way out.
+    brief: Dev turned the lights on for you. Only some of them. 6 hostiles. Clear them, then reach the way out.
     enemyCount: 6
     timeLimit: 32
     maxAliveAtOnce: 4
@@ -26,6 +26,7 @@ MonoBehaviour:
     objectiveWeight: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 4.5
     bossHealthMultiplier: 1
     healthMultiplier: 1.2
@@ -36,7 +37,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
-    brief: 9 hostiles and four charges. Reach a charge or lose the clock.
+    brief: Dev turned the lights on for you. Only some of them. 9 hostiles and four charges. Reach a charge or lose the clock.
     enemyCount: 9
     timeLimit: 43
     maxAliveAtOnce: 5
@@ -46,6 +47,7 @@ MonoBehaviour:
     objectiveWeight: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.3
@@ -56,7 +58,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: 12 hostiles and a boss. The boss is most of the score.
+    brief: Dev turned the lights on for you. Only some of them. 12 hostiles and a boss. The boss is most of the score.
     enemyCount: 12
     timeLimit: 69
     maxAliveAtOnce: 6
@@ -66,6 +68,7 @@ MonoBehaviour:
     objectiveWeight: 5
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+    bossName: 
     bossWeight: 5.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.4
@@ -76,7 +79,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
-    brief: 15 hostiles. One of them runs -- that one is the level.
+    brief: The rides are moving. Nobody is operating them. 15 hostiles. One of them runs -- that one is the level.
     enemyCount: 15
     timeLimit: 63
     maxAliveAtOnce: 7
@@ -86,6 +89,7 @@ MonoBehaviour:
     objectiveWeight: 7
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 6
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.5
@@ -96,7 +100,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: 18 hostiles, one magazine, no reload. Kills resupply you.
+    brief: The rides are moving. Nobody is operating them. 18 hostiles, one magazine, no reload. Kills resupply you.
     enemyCount: 18
     timeLimit: 73
     maxAliveAtOnce: 8
@@ -106,6 +110,7 @@ MonoBehaviour:
     objectiveWeight: 8
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 6.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.6
@@ -116,7 +121,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: 21 hostiles and a boss. The boss is most of the score.
+    brief: The rides are moving. Nobody is operating them. 21 hostiles and a boss. The boss is most of the score.
     enemyCount: 21
     timeLimit: 99
     maxAliveAtOnce: 9
@@ -126,6 +131,7 @@ MonoBehaviour:
     objectiveWeight: 9
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
     bossWeight: 7
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.7
@@ -136,7 +142,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: 24 hostiles. Stand on the marked ground and keep standing.
+    brief: He has opened the shafts that were fenced off. 24 hostiles. Stand on the marked ground and keep standing.
     enemyCount: 24
     timeLimit: 94
     maxAliveAtOnce: 10
@@ -146,6 +152,7 @@ MonoBehaviour:
     objectiveWeight: 11
     hasBoss: 0
     bossArchetype: {fileID: 0}
+    bossName: 
     bossWeight: 7.5
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.8
@@ -155,8 +162,8 @@ MonoBehaviour:
     rosterStep: 14
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
-    brief: 27 hostiles and a boss. The boss is most of the score.
+  - displayName: DEV AUGER
+    brief: Dev is waiting by the wheel, and he knows your first name. 27 between you and Dev.
     enemyCount: 27
     timeLimit: 120
     maxAliveAtOnce: 11
@@ -166,6 +173,7 @@ MonoBehaviour:
     objectiveWeight: 12
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: Dev Auger
     bossWeight: 8
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.9

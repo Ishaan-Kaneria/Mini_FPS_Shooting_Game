@@ -173,6 +173,14 @@ namespace FPSKit.EditorTools
                 // bomb to test; it is put back in Detach like every other borrowed piece
                 // of state, because leaving it on would be a test that unlocked a power
                 // in the developer's own profile.
+                // Ahead of anything that reads or writes a saved value. The save wipe
+                // runs once per profile, on the first play session of a build that has
+                // the campaign -- and it is a DeleteAll, so left to fire on its own it
+                // would land in the middle of this test, between the backup and the
+                // assertions, and take the state the test had just set up with it.
+                // Calling it here is idempotent and makes the order certain.
+                SaveMigration.Apply();
+
                 _bombPowerBackup = Campaign.HasPower(Campaign.BombPower);
                 _bombOwnedBackup = PlayerPrefs.GetInt(BombOwnedKey, 0);
 

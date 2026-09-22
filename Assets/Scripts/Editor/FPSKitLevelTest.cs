@@ -123,6 +123,14 @@ namespace FPSKit.EditorTools
                 _starsAfterFail = _starsAfterPass = -1;
                 _nextUnlockedAfterFail = _nextUnlockedAfterPass = false;
 
+                // Ahead of anything that reads or writes a saved value. The save wipe
+                // runs once per profile, on the first play session of a build that has
+                // the campaign -- and it is a DeleteAll, so left to fire on its own it
+                // would land in the middle of this test, between the backup and the
+                // assertions, and take the state the test had just set up with it.
+                // Calling it here is idempotent and makes the order certain.
+                SaveMigration.Apply();
+
                 BackUpProgress();
 
                 // Cleared so the first attempt starts from a locked ladder, whatever the

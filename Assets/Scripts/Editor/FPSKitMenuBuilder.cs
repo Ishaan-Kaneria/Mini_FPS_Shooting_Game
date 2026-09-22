@@ -598,6 +598,12 @@ namespace FPSKit.EditorTools
             var menu = canvasGo.AddComponent<MainMenuController>();
             menu.catalog = catalog;
 
+            // The order the arenas are played in and which of them are locked. Created
+            // on first use, like the store catalogue and the level sets, so a project
+            // that has never run a reset still gets a campaign rather than a dashboard
+            // with every zone open and no story.
+            menu.campaign = FPSKitCampaign.GetOrCreate();
+
             menu.sounds = BuildSound(canvasGo);
 
             var root = (RectTransform)canvasGo.transform;

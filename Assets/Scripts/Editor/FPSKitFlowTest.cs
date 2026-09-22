@@ -44,6 +44,9 @@ namespace FPSKit.EditorTools
         static int _catalogCount;
         static int _cardsShown;
         static int _cardsPlayable;
+        static int _cardsLocked;
+        static int _lockedClickable;
+        static string _gateBroken = "";
         static int _cardsOverlapping;
         static string _literalTag = "";
         static string _unclickable = "";
@@ -77,9 +80,19 @@ namespace FPSKit.EditorTools
 
                 EditorSceneManager.OpenScene(FPSKitMenuBuilder.MenuScenePath, OpenSceneMode.Single);
 
+                // Ahead of anything that reads or writes a saved value. The save wipe
+                // runs once per profile, on the first play session of a build that has
+                // the campaign -- and it is a DeleteAll, so left to fire on its own it
+                // would land in the middle of this test, between the backup and the
+                // assertions, and take the state the test had just set up with it.
+                // Calling it here is idempotent and makes the order certain.
+                SaveMigration.Apply();
+
                 Errors.Clear();
                 Notes.Clear();
                 _catalogCount = _cardsShown = _cardsPlayable = 0;
+                _cardsLocked = _lockedClickable = 0;
+                _gateBroken = "";
                 _levelsOffered = _levelsExpected = _levelsUnlocked = 0;
                 _levelOneOpen = false;
                 _lockedIsInert = true;
@@ -144,6 +157,16 @@ namespace FPSKit.EditorTools
                             _cardsShown++;
                             if (card.button != null && card.button.interactable) _cardsPlayable++;
 
+                            // A locked zone is drawn in full and cannot be entered. Both
+                            // halves are checked, because a gate that locks nothing and a
+                            // gate that locks everything both look like a working gate
+                            // from any single card.
+                            if (!card.Unlocked)
+                            {
+                                _cardsLocked++;
+                                if (card.button != null && card.button.interactable) _lockedClickable++;
+                            }
+
                             // Six cards in one place is six cards the player cannot see
                             // five of, and it counts as six by every other measure here.
                             // It is what a hover animation writing anchoredPosition did
@@ -156,6 +179,8 @@ namespace FPSKit.EditorTools
                             placed.Add(at);
                         }
 
+                        _gateBroken = GateFault(menu);
+
                         _literalTag = LiteralTagIn(menu);
                         _unclickable = UnclickableButtonIn(menu);
                         _gridOverflow = GridOverflow(menu);
@@ -165,7 +190,8 @@ namespace FPSKit.EditorTools
                         _buttonsTested = menu.GetComponentsInChildren<UnityEngine.UI.Button>(false).Length;
 
                         Notes.Append($"\n  dashboard: {_catalogCount} in catalog, {_cardsShown} cards " +
-                                     $"shown, {_cardsPlayable} playable, {_cardsOverlapping} stacked, " +
+                                     $"shown, {_cardsPlayable} playable, {_cardsLocked} locked by the " +
+                                     $"campaign, {_cardsOverlapping} stacked, " +
                                      $"{_buttonsTested} buttons raycast-tested, grid overflow " +
                                      $"{_gridOverflow:0}px");
 
@@ -400,6 +426,15 @@ namespace FPSKit.EditorTools
             return "";
         }
 
+        /// <summary>
+        /// An arena this test may actually open: in Build Settings, and open in the
+        /// campaign.
+        ///
+        /// The gate is the addition, and without it this test would pick whichever arena
+        /// happened to be first in the catalog, be refused by the dashboard, and fail on
+        /// a level select that never opened -- reporting a broken menu when what it had
+        /// found was a working lock.
+        /// </summary>
         static ArenaCatalog.Entry FirstPlayable(MainMenuController menu)
         {
             if (menu == null || menu.catalog == null) return null;
@@ -407,10 +442,56 @@ namespace FPSKit.EditorTools
             foreach (var entry in menu.catalog.arenas)
             {
                 if (entry == null || string.IsNullOrWhiteSpace(entry.sceneName)) continue;
-                if (Application.CanStreamedLevelBeLoaded(entry.sceneName)) return entry;
+                if (!Application.CanStreamedLevelBeLoaded(entry.sceneName)) continue;
+                if (!Campaign.ArenaUnlocked(menu.campaign, entry.ProgressKey)) continue;
+
+                return entry;
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Audits the campaign gate against its own rule, and reports the first thing
+        /// that disagrees with it.
+        ///
+        /// <b>Asked of the data rather than of the screen</b>, because what a dashboard
+        /// shows depends on how far the profile on this machine has got: on a developer's
+        /// own save every zone may be open, and a check written as "some card is locked"
+        /// would pass with the gate deleted. The rule is what is fixed -- the first zone
+        /// is always open, and every zone after it is open exactly when the child of the
+        /// one before is down -- so that is what is measured.
+        /// </summary>
+        static string GateFault(MainMenuController menu)
+        {
+            var data = menu != null ? menu.campaign : null;
+
+            if (data == null)
+                return "the dashboard has no campaign asset, so every arena is open";
+
+            if (data.ZoneCount <= 1)
+                return $"the campaign has {data.ZoneCount} zone(s), so there is no sequence to gate";
+
+            if (!Campaign.ZoneUnlocked(data, 0))
+                return "the campaign's first zone is locked, so the game cannot be started";
+
+            for (int i = 1; i < data.ZoneCount; i++)
+            {
+                bool open = Campaign.ZoneUnlocked(data, i);
+                bool earned = Campaign.ChildDefeated(data, i - 1);
+
+                if (open != earned)
+                {
+                    var zone = data.ZoneAt(i);
+                    string where = zone != null ? zone.displayName : $"zone {i + 1}";
+
+                    return open
+                        ? $"\"{where}\" is open although the child before it is still standing"
+                        : $"\"{where}\" is locked although the child before it is down";
+                }
+            }
+
+            return "";
         }
 
         /// <summary>
@@ -547,9 +628,21 @@ namespace FPSKit.EditorTools
                 problems.Append($"\n  - the dashboard shows {_cardsShown} cards for {_catalogCount} " +
                                 "arenas in the catalog");
 
-            if (_cardsPlayable != _catalogCount)
-                problems.Append($"\n  - only {_cardsPlayable} of {_catalogCount} cards can be clicked; " +
-                                "an arena is missing from Build Settings");
+            // Playable plus locked has to account for every card. A card that is neither
+            // is one whose scene is missing from Build Settings -- which is a different
+            // failure from a locked one and must not be allowed to hide behind it, or
+            // the player goes and earns the key to a door that is broken.
+            if (_cardsPlayable + _cardsLocked != _catalogCount)
+                problems.Append($"\n  - {_catalogCount - _cardsPlayable - _cardsLocked} of " +
+                                $"{_catalogCount} cards can neither be clicked nor are locked by " +
+                                "the campaign; an arena is missing from Build Settings");
+
+            if (_lockedClickable > 0)
+                problems.Append($"\n  - {_lockedClickable} locked zone(s) can still be clicked: the " +
+                                "campaign gate is decoration");
+
+            if (!string.IsNullOrEmpty(_gateBroken))
+                problems.Append($"\n  - {_gateBroken}");
 
             if (!_dialogOpened)
                 problems.Append("\n  - the Exit button did not open a confirmation");

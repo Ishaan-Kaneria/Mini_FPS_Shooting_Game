@@ -308,7 +308,8 @@ namespace FPSKit.EditorTools
             // ---- explosives ----------------------------------------------
             //
             // The frag is not owned from the start and is not for sale either: it is the
-            // campaign's first reward, handed over at `Campaign.BombStarGate`. That is a
+            // campaign's first reward, handed over by whichever zone of `CampaignData`
+            // names it in `grantsPower`. That is a
             // change of mind and the reason is worth keeping. It used to be owned from
             // the start, for the same reason the rifle is -- the aiming ring is the most
             // interesting control in the game, and a player who has to save four hundred

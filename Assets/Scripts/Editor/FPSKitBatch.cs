@@ -161,6 +161,25 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Re-stamps the built-in zone order, the eight names and every story beat onto
+        /// the campaign asset.
+        ///
+        /// The fifth of the same trap, and the one with the widest blast radius: the
+        /// campaign decides what order the arenas are played in and which of them is
+        /// locked, so a zone reordered in FPSKitCampaign.Configure and never reset is a
+        /// story the code tells and the game does not. Stars the player has already
+        /// earned are untouched.
+        ///
+        /// Run FPSKitBatch.ResetLevelSets after this if the order changed: the level
+        /// difficulty curve is shifted by where an arena sits in the campaign, and it is
+        /// stamped into the level sets rather than read from here at runtime.
+        /// </summary>
+        public static void ResetCampaign()
+        {
+            Run(FPSKitCampaign.ResetAll);
+        }
+
+        /// <summary>
         /// Re-applies the built-in values to every LevelTheme asset.
         ///
         /// The fourth of the same trap. A theme is generated once and then left alone --

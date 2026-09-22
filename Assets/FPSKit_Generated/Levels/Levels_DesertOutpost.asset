@@ -25,11 +25,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 0}
     bossWeight: 4.5
     bossHealthMultiplier: 1
-    healthMultiplier: 1.05
-    damageMultiplier: 1.03
-    speedMultiplier: 1.02
-    aggression: 0.04
-    rosterStep: 2
+    healthMultiplier: 1.1
+    damageMultiplier: 1.06
+    speedMultiplier: 1.04
+    aggression: 0.08
+    rosterStep: 3
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: PUSHBACK
@@ -43,11 +43,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 0}
     bossWeight: 5
     bossHealthMultiplier: 1
-    healthMultiplier: 1.15
-    damageMultiplier: 1.09
-    speedMultiplier: 1.05
-    aggression: 0.16857143
-    rosterStep: 4
+    healthMultiplier: 1.2
+    damageMultiplier: 1.12
+    speedMultiplier: 1.07
+    aggression: 0.20857142
+    rosterStep: 5
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
@@ -61,11 +61,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossWeight: 5.5
     bossHealthMultiplier: 1.3
-    healthMultiplier: 1.25
-    damageMultiplier: 1.15
-    speedMultiplier: 1.08
-    aggression: 0.29714286
-    rosterStep: 5
+    healthMultiplier: 1.3
+    damageMultiplier: 1.18
+    speedMultiplier: 1.1
+    aggression: 0.33714285
+    rosterStep: 6
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: NO COVER
@@ -79,11 +79,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 0}
     bossWeight: 6
     bossHealthMultiplier: 1.3
-    healthMultiplier: 1.35
-    damageMultiplier: 1.21
-    speedMultiplier: 1.11
-    aggression: 0.42571428
-    rosterStep: 7
+    healthMultiplier: 1.4
+    damageMultiplier: 1.24
+    speedMultiplier: 1.13
+    aggression: 0.46571428
+    rosterStep: 8
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
@@ -97,11 +97,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 0}
     bossWeight: 6.5
     bossHealthMultiplier: 1.3
-    healthMultiplier: 1.45
-    damageMultiplier: 1.27
-    speedMultiplier: 1.14
-    aggression: 0.5542857
-    rosterStep: 8
+    healthMultiplier: 1.5
+    damageMultiplier: 1.3
+    speedMultiplier: 1.16
+    aggression: 0.5942857
+    rosterStep: 9
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -115,11 +115,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossWeight: 7
     bossHealthMultiplier: 1.6
-    healthMultiplier: 1.55
-    damageMultiplier: 1.33
-    speedMultiplier: 1.17
-    aggression: 0.6828571
-    rosterStep: 10
+    healthMultiplier: 1.6
+    damageMultiplier: 1.36
+    speedMultiplier: 1.1899999
+    aggression: 0.7228571
+    rosterStep: 11
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: LAST STAND
@@ -133,11 +133,11 @@ MonoBehaviour:
     bossArchetype: {fileID: 0}
     bossWeight: 7.5
     bossHealthMultiplier: 1.6
-    healthMultiplier: 1.65
-    damageMultiplier: 1.39
-    speedMultiplier: 1.2
-    aggression: 0.81142855
-    rosterStep: 11
+    healthMultiplier: 1.7
+    damageMultiplier: 1.42
+    speedMultiplier: 1.22
+    aggression: 0.85142857
+    rosterStep: 12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -151,10 +151,10 @@ MonoBehaviour:
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossWeight: 8
     bossHealthMultiplier: 1.6
-    healthMultiplier: 1.75
-    damageMultiplier: 1.45
-    speedMultiplier: 1.23
-    aggression: 0.94
-    rosterStep: 13
+    healthMultiplier: 1.8
+    damageMultiplier: 1.48
+    speedMultiplier: 1.25
+    aggression: 0.97999996
+    rosterStep: 14
     twoStarScore: 0.8
     oneStarScore: 0.5

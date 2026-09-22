@@ -27,6 +27,14 @@ public class MainMenuController : MonoBehaviour
     [Header("Content")]
     public ArenaCatalog catalog;
 
+    [Tooltip("The campaign: which zones are played in what order, who holds each one, " +
+             "and what falling to the player hands over.\n\n" +
+             "The grid is ordered by this and gated on it. Without one every arena in " +
+             "the catalog is open and in catalog order, which is what this game was " +
+             "before the story -- so a dashboard missing it says so on screen rather " +
+             "than quietly playing the old game.")]
+    public CampaignData campaign;
+
     [Tooltip("Music and interface sounds. Optional -- the dashboard is silent without one.")]
     public UISounds sounds;
 
@@ -195,7 +203,8 @@ public class MainMenuController : MonoBehaviour
         // have opened something and the dashboard is where the player is told. The call
         // is idempotent, so arriving here by any route -- booting, finishing a level,
         // walking out of one -- asks the same question and gets the same answer.
-        _granted = Campaign.RefreshUnlocks(catalog, store != null ? store.catalog : null);
+        _granted = Campaign.RefreshUnlocks(campaign, catalog,
+                                           store != null ? store.catalog : null);
 
         // The two totals that cannot be counted as they happen -- stars are the best of
         // each level's attempts rather than the sum, and an arena is finished or it is
@@ -405,6 +414,43 @@ public class MainMenuController : MonoBehaviour
     }
 
     // ======================================================================
+    /// <summary>
+    /// The arenas to show, in the order the campaign plays them.
+    ///
+    /// <b>The campaign owns the order, not the catalog.</b> The catalog is a list of
+    /// what exists; the campaign is the sequence it is played in, and the two are
+    /// separate so that adding an arena and writing it into the story stay separate
+    /// jobs. An arena the campaign does not mention is still shown -- at the end, and
+    /// ungated -- because the kit has to keep working for a level it did not build.
+    /// </summary>
+    IEnumerable<ArenaCatalog.Entry> InCampaignOrder()
+    {
+        var remaining = new List<ArenaCatalog.Entry>();
+
+        foreach (var entry in catalog.arenas)
+            if (entry != null && !string.IsNullOrWhiteSpace(entry.sceneName))
+                remaining.Add(entry);
+
+        if (campaign != null)
+        {
+            for (int i = 0; i < campaign.ZoneCount; i++)
+            {
+                var zone = campaign.ZoneAt(i);
+                if (zone == null) continue;
+
+                int at = remaining.FindIndex(e => e.ProgressKey == zone.ProgressKey);
+                if (at < 0) continue;
+
+                var entry = remaining[at];
+                remaining.RemoveAt(at);
+
+                yield return entry;
+            }
+        }
+
+        foreach (var entry in remaining) yield return entry;
+    }
+
     void BuildGrid()
     {
         if (cardTemplate == null || cardParent == null)
@@ -425,24 +471,37 @@ public class MainMenuController : MonoBehaviour
         }
 
         int missing = 0;
+        int locked = 0;
 
-        foreach (var entry in catalog.arenas)
+        foreach (var entry in InCampaignOrder())
         {
-            if (entry == null || string.IsNullOrWhiteSpace(entry.sceneName)) continue;
-
             var card = Instantiate(cardTemplate, cardParent);
             card.gameObject.SetActive(true);
 
             bool loadable = Application.CanStreamedLevelBeLoaded(entry.sceneName);
             if (!loadable) missing++;
 
-            var captured = entry;
-            card.Bind(entry, _cards.Count, () => Choose(captured));
+            bool open = Campaign.ArenaUnlocked(campaign, entry.ProgressKey);
+            if (!open) locked++;
 
+            var captured = entry;
+            card.Bind(entry, _cards.Count, open, Campaign.LockNote(campaign, entry.ProgressKey),
+                      () => Choose(captured));
+
+            // An arena missing from Build Settings is a separate failure from a locked
+            // one, and it wins: a card that cannot load must not look merely locked,
+            // because the player would go and earn the key to a door that is broken.
             if (!loadable && card.button != null) card.button.interactable = false;
 
             _cards.Add(card);
         }
+
+        if (campaign == null)
+            Report("This dashboard has no campaign asset, so every arena is open and the " +
+                   "story is not being told. Run FPSKit > Build Dashboard.");
+        else if (locked >= _cards.Count && _cards.Count > 0)
+            Report("Every arena is locked, which cannot be right -- the campaign's first " +
+                   "zone is always open. Run FPSKit > Reset Campaign to Defaults.");
 
         // A card that cannot load its scene is the one failure a player cannot diagnose:
         // it simply does nothing. Say it on the screen rather than only in a log nobody
@@ -528,6 +587,12 @@ public class MainMenuController : MonoBehaviour
     public void Choose(ArenaCatalog.Entry entry)
     {
         if (entry == null || string.IsNullOrWhiteSpace(entry.sceneName)) return;
+
+        if (!Campaign.ArenaUnlocked(campaign, entry.ProgressKey))
+        {
+            Report($"\"{entry.Label}\" is not open yet. {Campaign.LockNote(campaign, entry.ProgressKey)}");
+            return;
+        }
 
         if (levelSelect == null)
         {
@@ -662,6 +727,16 @@ public class MainMenuController : MonoBehaviour
         if (!Application.CanStreamedLevelBeLoaded(entry.sceneName))
         {
             Report($"\"{entry.sceneName}\" is not in Build Settings, so it cannot be loaded.");
+            return;
+        }
+
+        // Two gates, asked in the order the player meets them: the zone has to be open
+        // before a level inside it can be. Both are asked here as well as on the way in,
+        // because this is the one place a scene load can begin and a screen built later
+        // must not be able to route around either.
+        if (!Campaign.ArenaUnlocked(campaign, entry.ProgressKey))
+        {
+            Report($"\"{entry.Label}\" is not open yet. {Campaign.LockNote(campaign, entry.ProgressKey)}");
             return;
         }
 

@@ -128,29 +128,27 @@ public class InstructionsPanel : OverlayPanel
     /// Whether the story has handed the bomb over, and what to say when it has not.
     ///
     /// <b>A page that explains a control the player does not have is worse than a page
-    /// that omits it.</b> The bomb is the campaign's first reward, earned at
-    /// <see cref="Campaign.BombStarGate"/> stars, so before that there is no bomb key,
-    /// no bomb button in the thumb cluster and nothing in the HUD -- and this panel was
-    /// still teaching all three. What that produces is a player following written
-    /// instructions, finding no button where the game says there is one, and concluding
-    /// the controls are broken. Ishaan reported exactly that: "there is no bomb symbol,
-    /// so why".
+    /// that omits it.</b> The bomb is the campaign's first reward, taken off the first
+    /// of the Augers to fall, so before that there is no bomb key, no bomb button in the
+    /// thumb cluster and nothing in the HUD -- and this panel was still teaching all
+    /// three. What that produces is a player following written instructions, finding no
+    /// button where the game says there is one, and concluding the controls are broken.
+    /// Ishaan reported exactly that: "there is no bomb symbol, so why".
     ///
     /// So the row stays, because the answer to "why" has to be somewhere, and it says
-    /// what it is and how far off it is. The count comes from the dashboard rather than
-    /// from a catalogue wired into this panel: it is the one object in this scene that
-    /// already holds the arena list, and this screen only ever opens over it.
+    /// what it is and where it comes from.
+    ///
+    /// <b>The line names no number.</b> It used to quote the star gate, which was true
+    /// of exactly one version of the campaign: which zone hands the bomb over is written
+    /// on <see cref="CampaignData"/> now and is meant to be moved, so a page repeating a
+    /// figure from the asset is a page that goes quietly wrong the first time somebody
+    /// drags a zone.
     /// </summary>
     bool BombEarned => Campaign.HasPower(Campaign.BombPower);
 
     string BombLockLine()
-    {
-        var menu = FindAnyObjectByType<MainMenuController>();
-        int stars = menu != null ? menu.TotalStars() : 0;
-
-        return $"Locked. Earn {Campaign.BombStarGate} stars and the story hands it over -- " +
-               $"you have {stars}.";
-    }
+        => "Locked. It belonged to one of the Augers -- the story hands it over when " +
+           "the first of them goes down.";
 
     readonly struct Line
     {

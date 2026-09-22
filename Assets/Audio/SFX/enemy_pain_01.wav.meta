@@ -8,7 +8,7 @@ AudioImporter:
     loadType: 0
     sampleRateSetting: 0
     sampleRateOverride: 44100
-    compressionFormat: 0
+    compressionFormat: 1
     quality: 0.7
     conversionMode: 0
     preloadAudioData: 1
@@ -16,9 +16,9 @@ AudioImporter:
     Android:
       serializedVersion: 2
       loadType: 0
-      sampleRateSetting: 0
-      sampleRateOverride: 44100
-      compressionFormat: 0
+      sampleRateSetting: 2
+      sampleRateOverride: 22050
+      compressionFormat: 1
       quality: 0.7
       conversionMode: 0
       preloadAudioData: 1

@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// The story's memory: who the player said they were at first boot, which of the
-/// villain's children are down, and which powers the campaign has handed over.
+/// villain's children are down, which powers the campaign has handed over, and which
+/// beats have already been read.
 ///
 /// Written the same way as <see cref="Wallet"/>, <see cref="Loadout"/> and
 /// <see cref="LevelProgress"/> -- every member is an accessor straight over PlayerPrefs
@@ -12,6 +13,12 @@ using UnityEngine;
 /// clear: a campaign flag left true is a story beat that never plays again. Holding no
 /// state means there is nothing to reset, so this has no
 /// <c>RuntimeInitializeOnLoadMethod</c> hook and must never grow one.
+///
+/// <b>The ladder itself is not here.</b> Which zones there are, what order they come in
+/// and what each one hands over live on <see cref="CampaignData"/>, for the same reason
+/// the level clocks live on a <see cref="LevelSet"/>: a number that decides pacing is
+/// content. What is left here is the player's side of it -- what they have done -- and
+/// the two rules that read the two together.
 /// </summary>
 public static class Campaign
 {
@@ -26,26 +33,12 @@ public static class Campaign
     // under the string, so renaming one forgets that the player ever earned it.
     public const string BombPower = "bomb";
 
-    /// <summary>
-    /// Total stars needed before the story hands over the first bomb.
-    ///
-    /// Eight levels at three stars is 24 per arena and three arenas are open at the
-    /// start, so this is a quarter of what is on the table -- enough that the player has
-    /// played all three and not so much that they have to finish any of them.
-    ///
-    /// This lives here only until the children exist. Every gate in the campaign belongs
-    /// on a <c>CampaignData</c> asset with the rest of the ladder, for the same reason
-    /// the level clocks live on a <c>LevelSet</c> and the prices on a
-    /// <c>StoreCatalog</c>: a number that decides pacing is content, not code.
-    /// </summary>
-    public const int BombStarGate = 18;
-
     const string IdentityKey = "FPSKit.Campaign.Identity";
     const string PowerPrefix  = "FPSKit.Campaign.Power.";
-    const string ChildPrefix  = "FPSKit.Campaign.Child.";
+    const string BeatPrefix   = "FPSKit.Campaign.Beat.";
 
     static string PowerKey(string id) => PowerPrefix + id;
-    static string ChildKey(int index) => ChildPrefix + index;
+    static string BeatKey(int index) => BeatPrefix + index;
 
     // ---- identity -------------------------------------------------------------
 
@@ -122,36 +115,131 @@ public static class Campaign
 
     // ---- the villain's children -----------------------------------------------
 
-    /// <summary>Whether this child has been put down.</summary>
-    public static bool ChildDefeated(int index)
-        => index >= 0 && PlayerPrefs.GetInt(ChildKey(index), 0) == 1;
-
-    /// <summary>Records a child as beaten. Kept, never taken back, like a best star.</summary>
-    public static void RecordChildDefeated(int index)
+    /// <summary>
+    /// Whether the child holding this zone is down.
+    ///
+    /// <b>Derived from the player's stars, never stored.</b> A child is the last level of
+    /// their zone, so "is this child down" and "has that level been passed" are the same
+    /// question, and storing a second answer to it is how the two come to disagree -- a
+    /// flag written on one ending and not another, or written and then lost when a save
+    /// is cleared, leaves a campaign that thinks a sibling is dead and a ladder that
+    /// thinks they are alive. Same reasoning as <see cref="Achievements"/>, which reads
+    /// thresholds against the live counters rather than recording that one was met.
+    ///
+    /// The cost is that this is only as good as <see cref="LevelProgress"/>, which is the
+    /// point: there is one record of what the player has beaten.
+    /// </summary>
+    public static bool ChildDefeated(CampaignData data, int zoneIndex)
     {
-        if (index < 0) return;
+        var zone = data != null ? data.ZoneAt(zoneIndex) : null;
+        if (zone == null || zone.siblingIndex < 0 || zone.FinalLevelIndex < 0) return false;
 
-        PlayerPrefs.SetInt(ChildKey(index), 1);
-        PlayerPrefs.Save();
+        return LevelProgress.StarsIn(zone.ProgressKey, zone.FinalLevelIndex) > 0;
     }
 
-    /// <summary>How many of <paramref name="total"/> children are down.</summary>
-    public static int ChildrenDown(int total)
+    /// <summary>How many of the campaign's children are down.</summary>
+    public static int ChildrenDown(CampaignData data)
     {
+        if (data == null) return 0;
+
         int count = 0;
-        for (int i = 0; i < total; i++)
-            if (ChildDefeated(i)) count++;
+        for (int i = 0; i < data.ZoneCount; i++)
+            if (ChildDefeated(data, i)) count++;
 
         return count;
+    }
+
+    // ---- the beats already read -------------------------------------------------
+
+    /// <summary>
+    /// Whether this zone's closing beat has already been shown.
+    ///
+    /// This is the one thing here that genuinely has to be stored: whether a child is
+    /// down is a fact about the world and can be derived, but whether the player has
+    /// *read about it* is a fact about the player and nothing else knows it. Kept, never
+    /// taken back, like a best star.
+    /// </summary>
+    public static bool BeatSeen(int zoneIndex)
+        => zoneIndex >= 0 && PlayerPrefs.GetInt(BeatKey(zoneIndex), 0) == 1;
+
+    /// <summary>Records a beat as read. Returns true only on the call that marked it.</summary>
+    public static bool MarkBeatSeen(int zoneIndex)
+    {
+        if (zoneIndex < 0 || BeatSeen(zoneIndex)) return false;
+
+        PlayerPrefs.SetInt(BeatKey(zoneIndex), 1);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    // ---- the gate ----------------------------------------------------------------
+
+    /// <summary>
+    /// Whether the player may enter a zone.
+    ///
+    /// <b>One line, one place</b>, exactly like <see cref="LevelProgress.IsUnlocked"/>
+    /// and for the same reason: the dashboard, the launcher and anything built later all
+    /// have to ask the same method, because a second opinion about whether something is
+    /// unlocked is a second answer. The first zone is always open; every zone after it
+    /// needs the child of the zone before it to be down.
+    ///
+    /// A zone the campaign does not list, or a campaign asset that is missing entirely,
+    /// is <b>open</b>. That is deliberate: this kit is meant to run in arenas it did not
+    /// build, and a gate that fails closed would make a project with no campaign asset a
+    /// game with one playable arena and no way to find out why.
+    /// </summary>
+    public static bool ZoneUnlocked(CampaignData data, int zoneIndex)
+    {
+        if (data == null || zoneIndex <= 0) return true;
+        if (zoneIndex >= data.ZoneCount) return true;
+
+        // A zone nobody holds cannot gate the one after it -- otherwise a zone added
+        // without a sibling would seal the rest of the campaign behind a fight that
+        // does not exist.
+        var previous = data.ZoneAt(zoneIndex - 1);
+        if (previous == null || previous.siblingIndex < 0) return ZoneUnlocked(data, zoneIndex - 1);
+
+        return ChildDefeated(data, zoneIndex - 1);
+    }
+
+    /// <summary>Whether the arena filed under this progress key may be entered.</summary>
+    public static bool ArenaUnlocked(CampaignData data, string progressKey)
+    {
+        if (data == null) return true;
+
+        int index = data.IndexOfArena(progressKey);
+        return index < 0 || ZoneUnlocked(data, index);
+    }
+
+    /// <summary>
+    /// What the player has to do to open a locked zone, in the words the card shows.
+    /// Empty when the zone is already open.
+    /// </summary>
+    public static string LockNote(CampaignData data, string progressKey)
+    {
+        if (data == null) return "";
+
+        int index = data.IndexOfArena(progressKey);
+        if (index <= 0 || ZoneUnlocked(data, index)) return "";
+
+        var previous = data.ZoneAt(index - 1);
+        var holder = data.HolderOf(previous);
+
+        string where = previous != null && !string.IsNullOrWhiteSpace(previous.displayName)
+            ? previous.displayName.ToUpperInvariant()
+            : "THE ZONE BEFORE";
+
+        return holder != null && !string.IsNullOrWhiteSpace(holder.displayName)
+            ? $"LOCKED  -  FINISH {where}"
+            : $"LOCKED  -  CLEAR {where}";
     }
 
     // ---- stars across the whole campaign ---------------------------------------
 
     /// <summary>
     /// Every star the player holds, in every arena. The per-arena ladder is
-    /// <see cref="LevelProgress"/>'s business; the campaign gates on the total, because
-    /// a child is a reason to go back and finish an arena rather than to grind the one
-    /// in front of you.
+    /// <see cref="LevelProgress"/>'s business; this is the total, which the dashboard
+    /// reports and the achievements are measured against.
     /// </summary>
     public static int TotalStars(ArenaCatalog catalog)
     {
@@ -182,42 +270,65 @@ public static class Campaign
         return stars;
     }
 
-    // ---- the one gate ----------------------------------------------------------
+    // ---- the one place a power may be granted -----------------------------------
 
     /// <summary>
-    /// Brings star-gated unlocks up to date and reports the id of anything granted on
-    /// this call, or null. Called on every return to the dashboard, so it has to be
-    /// cheap and idempotent, and it is the only thing that may hand a power over on the
-    /// strength of a star count -- the same rule <see cref="LevelProgress.IsUnlocked"/>
-    /// follows, and for the same reason: a second opinion about whether something is
-    /// unlocked is a second answer.
+    /// Brings the campaign's unlocks up to date and reports the id of anything granted
+    /// on this call, or null.
+    ///
+    /// Called on every return to the dashboard, so it has to be cheap and idempotent,
+    /// and it is the only thing that may hand a power over -- the same rule
+    /// <see cref="LevelProgress.IsUnlocked"/> follows, and for the same reason.
+    ///
+    /// It walks the zones rather than counting stars, because the campaign is a sequence
+    /// now: a power is what a child was carrying, and it is handed over when that child
+    /// goes down. A run of zones is walked rather than only the last one finished, so a
+    /// profile restored from elsewhere, or one whose grant was interrupted by a closed
+    /// tab, catches up on the next visit instead of losing the power for good.
     /// </summary>
-    public static string RefreshUnlocks(ArenaCatalog arenas, StoreCatalog store)
+    public static string RefreshUnlocks(CampaignData data, ArenaCatalog arenas, StoreCatalog store)
     {
-        if (arenas == null) return null;
-        if (TotalStars(arenas) < BombStarGate) return null;
-        if (!GrantPower(BombPower)) return null;
+        if (data == null) return null;
 
-        // The bomb the story hands over is named by the catalogue rather than here, so
-        // that which explosive the player is given stays a content decision.
-        var bomb = store != null ? store.StoryBomb : null;
-        if (bomb != null)
+        string granted = null;
+
+        for (int i = 0; i < data.ZoneCount; i++)
         {
-            Loadout.GrantBomb(bomb.id);
-            Loadout.SelectBomb(bomb.id);
+            var zone = data.ZoneAt(i);
+            if (zone == null || string.IsNullOrWhiteSpace(zone.grantsPower)) continue;
+            if (!ChildDefeated(data, i)) continue;
+
+            if (!GrantPower(zone.grantsPower)) continue;
+
+            // The bomb the story hands over is named by the catalogue rather than here,
+            // so that which explosive the player is given stays a content decision.
+            if (zone.grantsPower == BombPower && store != null)
+            {
+                var bomb = store.StoryBomb;
+                if (bomb != null)
+                {
+                    Loadout.GrantBomb(bomb.id);
+                    Loadout.SelectBomb(bomb.id);
+                }
+            }
+
+            granted ??= zone.grantsPower;
         }
 
-        return BombPower;
+        return granted;
     }
 
-    /// <summary>Wipes the campaign. Sits beside <see cref="PlayerProfile.Clear"/>.</summary>
-    public static void Clear(int children = 8)
+    /// <summary>
+    /// Wipes the campaign. Sits beside <see cref="PlayerProfile.Clear"/>, and is a
+    /// subset of what <see cref="SaveMigration"/> does on a version change.
+    /// </summary>
+    public static void Clear(int zones = 8)
     {
         PlayerPrefs.DeleteKey(IdentityKey);
         PlayerPrefs.DeleteKey(PowerKey(BombPower));
 
-        for (int i = 0; i < children; i++)
-            PlayerPrefs.DeleteKey(ChildKey(i));
+        for (int i = 0; i < zones; i++)
+            PlayerPrefs.DeleteKey(BeatKey(i));
 
         PlayerPrefs.Save();
     }

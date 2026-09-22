@@ -86,10 +86,19 @@ public class ArenaCard : HoverCard
     /// </summary>
     public Color Signal { get; private set; } = UITheme.Hazard;
 
-    public void Bind(ArenaCatalog.Entry entry, int arenaIndex,
+    /// <summary>
+    /// Whether the campaign has opened this zone yet. A locked card is still drawn in
+    /// full -- seeing where the story goes next is most of the reason to finish where it
+    /// is now -- but it does not light up and it cannot be clicked, the same rule
+    /// <see cref="LevelButton"/> follows for a locked level.
+    /// </summary>
+    public bool Unlocked { get; private set; } = true;
+
+    public void Bind(ArenaCatalog.Entry entry, int arenaIndex, bool unlocked, string lockNote,
                      UnityEngine.Events.UnityAction onChosen)
     {
         Signal = UITheme.SignalFor(arenaIndex);
+        Unlocked = unlocked;
 
         ApplyPhoneLayout();
 
@@ -98,12 +107,34 @@ public class ArenaCard : HoverCard
 
         name = $"Arena_{entry.Label}";
 
-        if (nameText != null) nameText.text = entry.Label.ToUpperInvariant();
+        if (nameText != null)
+        {
+            nameText.text = entry.Label.ToUpperInvariant();
+            nameText.color = unlocked ? UITheme.Ink : UITheme.InkLocked;
+        }
+
         if (descriptionText != null) descriptionText.text = entry.description ?? "";
 
-        if (bestText != null) bestText.text = ProgressLine(entry);
+        // The lock note replaces the progress line rather than sitting beside it: there
+        // is no progress to report on a zone nobody has been allowed into, and "0/8
+        // LEVELS" beside "LOCKED" reads as a zone that was played badly.
+        if (bestText != null)
+        {
+            if (unlocked || string.IsNullOrEmpty(lockNote))
+            {
+                bestText.text = ProgressLine(entry);
+            }
+            else
+            {
+                bestText.text = lockNote;
+                bestText.color = UITheme.InkLocked;
+            }
+        }
 
-        if (accentBar != null) accentBar.color = Signal;
+        // A locked zone keeps its colour but loses its brightness. The six signal
+        // colours are how a player learns which arena is which, so a locked one drawn
+        // grey would have to be learned twice.
+        if (accentBar != null) accentBar.color = unlocked ? Signal : Dim(Signal);
 
         if (preview != null)
         {
@@ -133,6 +164,11 @@ public class ArenaCard : HoverCard
         {
             button.onClick.RemoveAllListeners();
             if (onChosen != null) button.onClick.AddListener(onChosen);
+
+            // Not interactable rather than merely ignored, for the reason a locked level
+            // tile is not: a card that highlights under the pointer and then does
+            // nothing reads as a broken button rather than as a locked one.
+            button.interactable = unlocked;
         }
     }
 
@@ -150,13 +186,28 @@ public class ArenaCard : HoverCard
                          $"{stars} STAR{(stars == 1 ? "" : "S")}");
     }
 
+    /// <summary>How far a locked card's colour and preview are held back.</summary>
+    const float LockedDim = 0.38f;
+
+    /// <summary>
+    /// The locked version of a colour. <b>Alpha is left alone</b>: multiplying the whole
+    /// colour would make the preview translucent as well as dark, and what shows through
+    /// a half-transparent preview is the card behind it.
+    /// </summary>
+    static Color Dim(Color c) => new Color(c.r * LockedDim, c.g * LockedDim, c.b * LockedDim, c.a);
+
+    /// <summary>A locked zone does not light up under the pointer.</summary>
+    protected override bool Hoverable => Unlocked;
+
     /// <summary>Adds the preview brightening and the accent bar to the shared growth.</summary>
     protected override void ApplyHover(float amount)
     {
         base.ApplyHover(amount);
 
         if (preview != null)
-            preview.color = Color.Lerp(_previewBase * (1f - previewDim), _previewBase, amount);
+            preview.color = Unlocked
+                ? Color.Lerp(_previewBase * (1f - previewDim), _previewBase, amount)
+                : Dim(_previewBase);
 
         if (accentBar != null)
         {

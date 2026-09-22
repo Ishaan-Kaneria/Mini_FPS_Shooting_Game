@@ -68,8 +68,12 @@ namespace FPSKit.EditorTools
         {
             for (int i = 0; i < FPSKitThemes.Names.Length; i++)
             {
+                // ArenaIndexOf, not i: the loop is over the themes as they were built
+                // and the curve is shifted by where the arena sits in the campaign.
+                // Passing i here was the same bug as reading the wrong list, written in
+                // the one place that does not call the helper.
                 var set = GetOrCreate(FPSKitThemes.Names[i]);
-                Configure(set, FPSKitThemes.Names[i], i);
+                Configure(set, FPSKitThemes.Names[i], ArenaIndexOf(FPSKitThemes.Names[i]));
                 EditorUtility.SetDirty(set);
             }
 
@@ -110,8 +114,25 @@ namespace FPSKit.EditorTools
             return set;
         }
 
+        /// <summary>
+        /// How far into the campaign this arena is, which is what the difficulty curve
+        /// below is shifted by.
+        ///
+        /// <b>The campaign's order, not the theme list's.</b> The themes are listed in
+        /// the order they were built, which means nothing to a player; the campaign is
+        /// the order they are played in. Shifted by the wrong one, the third zone a
+        /// player reaches is tuned as though it were the second -- a dip in the
+        /// difficulty curve that compiles, builds and ships, and reads as one arena being
+        /// oddly easy rather than as a wrong index.
+        ///
+        /// Falls back to the theme list for an arena the campaign does not use, which is
+        /// any arena added without being written into the story.
+        /// </summary>
         static int ArenaIndexOf(string themeName)
         {
+            int inCampaign = FPSKitCampaign.IndexOfTheme(themeName);
+            if (inCampaign >= 0) return inCampaign;
+
             for (int i = 0; i < FPSKitThemes.Names.Length; i++)
                 if (FPSKitThemes.Names[i] == themeName) return i;
 

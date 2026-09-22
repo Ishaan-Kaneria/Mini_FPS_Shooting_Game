@@ -53,7 +53,10 @@ namespace FPSKit.EditorTools
             "Aurel Auger",
             "Ilsa Auger",
             "Dev Auger",
-            "Roan Auger"
+            "Roan Auger",
+
+            // The last fight in the campaign.
+            "Marit Auger"
         };
 
         /// <summary>
@@ -873,6 +876,60 @@ namespace FPSKit.EditorTools
                     a.canRetreat = false;
                     a.scoreValue = 6000;
                     a.healthDropChance = 1f;
+                    break;
+
+                // ----------------------------------------------------------
+                // The last one, and the only one who never held a site.
+                //
+                // <b>She does everything the other six do, one at a time.</b> That is the
+                // design rather than a bigger number: she has the Warden's reach, the
+                // Harbinger's burst, Aurel's charge and Ilsa's refusal to stand still, so
+                // the fight is every lesson the campaign taught being asked for again in
+                // one room. The room is eighty metres of house, which is the other half
+                // of it -- six arenas taught the player that backing off works, and this
+                // is the level with nowhere to back off to.
+                //
+                // Half again the health of anything else and the deepest armour in the
+                // game, because she arrives with the largest escort in the game as well
+                // and the player has to get through it repeatedly to reach her.
+                case "Marit Auger":
+                    a.description = "Boss. Everything the other seven did, in a house with no room in it.";
+                    a.role = EnemyArchetype.Role.Boss;
+                    a.bodyColor = new Color(0.10f, 0.09f, 0.13f);
+                    a.headColor = new Color(0.78f, 0.66f, 0.38f);
+                    a.glowColor = new Color(3.0f, 2.2f, 0.6f);
+                    a.scaleMultiplier = 2.3f;
+                    a.unlockWave = 12;
+                    a.baseWeight = 1f;
+                    a.healthMultiplier = 20f;
+                    a.shieldFraction = 1.5f;
+                    a.damageMultiplier = 1.9f;
+
+                    // 3.4 m/s, under the player's walk. Even here -- the whole roster is
+                    // written so that disengaging stays possible, and the thing that
+                    // makes this fight hard is the house, not an enemy that cannot be
+                    // walked away from.
+                    a.speedMultiplier = 1.05f;
+                    a.ranged = true;
+                    a.attackRange = 32f;
+                    a.preferredRangedDistance = 14f;
+                    a.shotsPerAttack = 4;
+                    a.burstInterval = 0.09f;
+                    a.attackCooldown = 1.7f;
+                    a.attackWindup = 0.5f;
+                    a.rangedSpread = 3.2f;
+                    a.rangedDamageMultiplier = 0.6f;
+
+                    // And she swings if you close, so standing inside her muzzle is not
+                    // the safe place it is against a pure shooter.
+                    a.meleeRange = 4.4f;
+                    a.chargeSpeedMultiplier = 2.2f;
+                    a.strafeAmount = 0.45f;
+                    a.staggerThreshold = 0f;
+                    a.canRetreat = false;
+                    a.scoreValue = 10000;
+                    a.healthDropChance = 1f;
+                    a.shieldDropChance = 1f;
                     break;
             }
         }

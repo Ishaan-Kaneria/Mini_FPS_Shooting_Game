@@ -210,7 +210,7 @@ public class LevelSelectPanel : MonoBehaviour
             var zone = campaign != null ? campaign.ZoneForArena(entry.ProgressKey) : null;
 
             hintText.text = zone != null && !string.IsNullOrWhiteSpace(zone.opening)
-                ? zone.opening
+                ? Campaign.Expand(zone.opening)
                 : "Clear a level to unlock the next. Kill everything before the clock " +
                   "runs out for three stars.";
         }

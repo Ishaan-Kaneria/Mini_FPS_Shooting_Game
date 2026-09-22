@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d4b019bae083803181917a490b20462, type: 3}
+  m_Name: Levels_TheAugerHouse
+  m_EditorClassIdentifier: Assembly-CSharp::LevelSet
+  arenaScene: TheAugerHouse
+  stakes: Nobody is coming and nothing here is on a timer but her patience. When it runs out the shutters come down on the whole house, and the last thing this family does is keep you in it.
+  levels:
+  - displayName: THE RUNNER
+    brief: The gate is open and nobody is on it. 22 hostiles. One of them runs -- that one is the level.
+    enemyCount: 22
+    timeLimit: 87
+    maxAliveAtOnce: 8
+    spawnInterval: 0.8
+    briefingTime: 4.5
+    objective: 2
+    objectiveWeight: 10
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 4.5
+    bossHealthMultiplier: 1
+    healthMultiplier: 1.3
+    damageMultiplier: 1.18
+    speedMultiplier: 1.12
+    aggression: 0.24
+    rosterStep: 7
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: The gate is open and nobody is on it. 36 hostiles, one magazine, no reload. Kills resupply you.
+    enemyCount: 36
+    timeLimit: 134
+    maxAliveAtOnce: 10
+    spawnInterval: 0.55
+    briefingTime: 3
+    objective: 1
+    objectiveWeight: 16
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1
+    healthMultiplier: 1.4
+    damageMultiplier: 1.24
+    speedMultiplier: 1.15
+    aggression: 0.69
+    rosterStep: 9
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: MARIT AUGER
+    brief: Marit is in his study, with the file open, waiting. 50 between you and Marit.
+    enemyCount: 50
+    timeLimit: 198
+    maxAliveAtOnce: 12
+    spawnInterval: 0.3
+    briefingTime: 3
+    objective: 0
+    objectiveWeight: 22
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 2899886d6c24335f8a5f28b5c3262280, type: 2}
+    bossName: Marit Auger
+    bossWeight: 5.5
+    bossHealthMultiplier: 1.3
+    healthMultiplier: 1.5
+    damageMultiplier: 1.3
+    speedMultiplier: 1.18
+    aggression: 1
+    rosterStep: 10
+    twoStarScore: 0.8
+    oneStarScore: 0.5

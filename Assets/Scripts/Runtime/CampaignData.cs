@@ -85,6 +85,13 @@ public class CampaignData : ScriptableObject
                  "this zone.")]
         public string opening;
 
+        [Tooltip("A second name whose beat also plays when this zone falls, or -1.\n\n" +
+                 "It exists for one card in the whole campaign: the last zone closes on " +
+                 "the person the player just beat and then on the name they have not " +
+                 "worked out yet, and those are two different people. Folding both into " +
+                 "one paragraph would bury the second under the first.")]
+        public int extraBeatSibling = -1;
+
         [Tooltip("The id of the power handed over when this zone falls, or empty. Same " +
                  "kind of permanent key as a store item's id: renaming one forgets that " +
                  "the player ever earned it.")]

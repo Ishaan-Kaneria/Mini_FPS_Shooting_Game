@@ -32,6 +32,18 @@ namespace FPSKit.EditorTools
         /// </summary>
         public const int LevelsPerArena = 8;
 
+        /// <summary>
+        /// How many levels an arena's ladder holds.
+        ///
+        /// Eight everywhere except the last zone, which is three. <b>A finale is not a
+        /// ladder.</b> The Auger House is a house: the player arrives having cleared six
+        /// arenas, and asking them for another eight rungs of the same curve before the
+        /// last fight would turn the ending into a chore with a cutscene at the end of
+        /// it. Three is a way in, a room to get through, and Marit.
+        /// </summary>
+        public static int LevelsFor(string themeName)
+            => themeName == FPSKitThemes.FinaleName ? 3 : LevelsPerArena;
+
         // ==================================================================
         [MenuItem("FPSKit/Create Level Sets", false, 44)]
         public static void CreateAllMenu()
@@ -80,7 +92,8 @@ namespace FPSKit.EditorTools
             AssetDatabase.SaveAssets();
 
             Debug.Log($"<color=lime>[FPSKit]</color> {FPSKitThemes.Names.Length} level sets reset " +
-                      $"to {LevelsPerArena} levels each.");
+                      $"to {LevelsPerArena} levels each, {LevelsFor(FPSKitThemes.FinaleName)} " +
+                      "in the finale.");
         }
 
         public static List<LevelSet> GetOrCreateAll()
@@ -173,7 +186,8 @@ namespace FPSKit.EditorTools
             // arena already holds -- see FPSKitCampaign.StakesFor. An arena outside the
             // campaign gets nothing and the HUD shows the countdown as it always did.
             set.stakes = FPSKitCampaign.StakesFor(themeName);
-            set.levels = new List<LevelSet.Level>(LevelsPerArena);
+            int count = LevelsFor(themeName);
+            set.levels = new List<LevelSet.Level>(count);
 
             var bosses = BossRoster();
 
@@ -184,15 +198,20 @@ namespace FPSKit.EditorTools
             // same ladder the same objective while leaving another one unused.
             int fought = 0;
 
-            for (int i = 0; i < LevelsPerArena; i++)
+            for (int i = 0; i < count; i++)
             {
                 int number = i + 1;
 
                 // A boss every third level, and always on the last one -- the top of a
                 // ladder has to be something rather than one more of the same.
-                bool boss = number % 3 == 0 || number == LevelsPerArena;
+                bool boss = number % 3 == 0 || number == count;
 
-                int enemies = 6 + 3 * i;
+                // The finale opens where an ordinary ladder ends and climbs from there.
+                // The player arrives having cleared six arenas; starting them back at six
+                // hostiles would say the last zone is easier than the one before it.
+                int enemies = themeName == FPSKitThemes.FinaleName
+                    ? 22 + 14 * i
+                    : 6 + 3 * i;
 
                 float clock = Mathf.Round(enemies * SecondsPerEnemy + BaseSeconds
                                           + (boss ? BossSeconds : 0f));
@@ -200,7 +219,7 @@ namespace FPSKit.EditorTools
                 var objective = ObjectiveFor(fought, boss, arenaIndex);
                 if (!boss) fought++;
 
-                bool last = i == LevelsPerArena - 1;
+                bool last = i == count - 1;
                 string holder = FPSKitCampaign.SiblingFor(themeName);
 
                 var level = new LevelSet.Level
@@ -230,8 +249,11 @@ namespace FPSKit.EditorTools
 
                     // The crowd on screen grows more slowly than the crowd in total, so
                     // a later level is a longer fight rather than an unwinnable one.
-                    maxAliveAtOnce = 4 + i,
-                    spawnInterval = Mathf.Lerp(0.8f, 0.3f, i / (float)(LevelsPerArena - 1)),
+                    // And they arrive thicker. Twelve at once against the fourteen an
+                    // eighth-rung level tops out at is what "waves" means here: the
+                    // arena is never not full for the whole of the last fight.
+                    maxAliveAtOnce = themeName == FPSKitThemes.FinaleName ? 8 + 2 * i : 4 + i,
+                    spawnInterval = Mathf.Lerp(0.8f, 0.3f, i / (float)Mathf.Max(1, count - 1)),
 
                     // The first level has more to read on it than the rest.
                     briefingTime = number == 1 ? 4.5f : 3f,
@@ -255,7 +277,7 @@ namespace FPSKit.EditorTools
                     // rules in CLAUDE.md: disengaging has to stay possible.
                     speedMultiplier = Mathf.Min(1.35f, 1f + 0.03f * i + 0.02f * arenaIndex),
 
-                    aggression = Mathf.Clamp01(i / (float)(LevelsPerArena - 1) * 0.9f
+                    aggression = Mathf.Clamp01(i / (float)Mathf.Max(1, count - 1) * 0.9f
                                                + 0.04f * arenaIndex),
 
                     rosterStep = RosterStep(i) + arenaIndex,

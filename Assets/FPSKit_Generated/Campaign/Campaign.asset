@@ -53,12 +53,21 @@ MonoBehaviour:
     portrait: {fileID: 2800000, guid: 3d42da7911a1f94319a579662a6145e7, type: 3}
   - displayName: Marit Auger
     holding: the company
-    beat: Marit has been paying for this since the night it started. Eight ways is a bad division of an estate. One way is a better one, and she never had to hold a rifle to arrange it.
+    beat: 'Marit has been paying for this since the night it started. Eight ways is a bad division of an estate and one way is a better one, and until tonight she had never once had to hold a rifle to arrange it.
+
+
+      She was not surprised to see you. She had your file open on the desk.'
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: 3bc9c0fa69ceefe2598ffbd09b33128a, type: 3}
   - displayName: the eighth name
     holding: nothing yet
-    beat: Halvard Auger took one child out of that fire on purpose, and the list has always been eight long. You have been crossing your own family off it, in the order somebody else wrote them down.
+    beat: 'Marit''s ledger has eight columns and the last one has your name at the top of it.
+
+
+      Halvard Auger took one child out of that fire on purpose. The town buried sixteen and wrote a seventeenth off as gone, and the {child} who went through that gate was written into the will the same week. You have spent twenty years crossing your own family off a list, in the order somebody else put them in.
+
+
+      There is one name left on it.'
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: 8fa105c5ed8001c508be0096250d80e5, type: 3}
   zones:
@@ -66,29 +75,44 @@ MonoBehaviour:
     levels: {fileID: 11400000, guid: dc7b985cf64a425e684e23cd676ce6b1, type: 2}
     siblingIndex: 0
     opening: The town had one employer and one gate. You were eleven the night this place burned, and the report that called it a gas fault was signed by Halvard Auger's daughter. Twenty years on, Tove still runs the plant.
+    extraBeatSibling: -1
     grantsPower: bomb
   - displayName: Snowbound Station
     levels: {fileID: 11400000, guid: f2375f859674c5c87b35e3756c5a0327, type: 2}
     siblingIndex: 1
     opening: Kestrel took the quarry and everything in its magazine. She has known you were coming since the plant went quiet, and she has been lighting the yard for it.
+    extraBeatSibling: -1
     grantsPower: 
   - displayName: Desert Outpost
     levels: {fileID: 11400000, guid: 19a21f71669ec452fa1bce4db121bcb6, type: 2}
     siblingIndex: 2
     opening: Everything the company ever moved went down this road, and Aurel signed for all of it. Including, once, a manifest with a child on it.
+    extraBeatSibling: -1
     grantsPower: 
   - displayName: Night Rooftop
     levels: {fileID: 11400000, guid: eafd0b974f354d6e09074c7a1181b549, type: 2}
     siblingIndex: 3
     opening: Ilsa runs what the company calls security, which is every camera in the city and the decision about which recordings exist. She has watched you for twenty years and filed none of it.
+    extraBeatSibling: -1
     grantsPower: 
   - displayName: Abandoned Subway
     levels: {fileID: 11400000, guid: 2103e99d5365a121ca63d3aa4e9a6695, type: 2}
     siblingIndex: 4
     opening: Dev ran the works into the ground and then moved into what was left. The rides still turn when the wind is behind them. He kept the lights on over the shafts, which is either a courtesy or a trap.
+    extraBeatSibling: -1
     grantsPower: 
   - displayName: Mars Colony
     levels: {fileID: 11400000, guid: 33a84de879134139cb2d8effe32ab3e3, type: 2}
     siblingIndex: 5
     opening: Roan left before any of this happened and has spent every year since being the one who was not there. He is the last name on the list that still lives somewhere with a door on it.
+    extraBeatSibling: -1
+    grantsPower: 
+  - displayName: The Auger House
+    levels: {fileID: 11400000, guid: 56c727975b20158a382c9c547a6fc23d, type: 2}
+    siblingIndex: 6
+    opening: 'The other six are down and the company has one owner left. Marit has not moved, has not hired anybody, and has not stopped paying you.
+
+
+      The house is where it always was. The gate is open.'
+    extraBeatSibling: 7
     grantsPower: 

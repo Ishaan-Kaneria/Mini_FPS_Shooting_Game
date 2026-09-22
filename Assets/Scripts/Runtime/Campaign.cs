@@ -101,6 +101,38 @@ public static class Campaign
         _ => "child"
     };
 
+    /// <summary>
+    /// Fills the pronoun tokens in a piece of story text.
+    ///
+    /// <b>This is what the opening's question is for.</b> The game asks exactly one thing
+    /// about the player and then has to spend it somewhere, or the question was a screen
+    /// that changed nothing -- which is worse than not asking. The beats are written in
+    /// second person, so what the tokens buy is the handful of places somebody else is
+    /// talking *about* the player: a word for what they were at eleven, and the pronouns
+    /// the will was written with.
+    ///
+    /// Unknown tokens are left alone rather than blanked. A line that loses a word is a
+    /// line nobody can tell is broken; a line with <c>{whatever}</c> still in it says
+    /// exactly what went wrong and where.
+    /// </summary>
+    public static string Expand(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.IndexOf('{') < 0) return text;
+
+        return text
+            .Replace("{child}", ChildNoun)
+            .Replace("{Child}", Capitalise(ChildNoun))
+            .Replace("{they}", Subject)
+            .Replace("{They}", Capitalise(Subject))
+            .Replace("{their}", Possessive)
+            .Replace("{Their}", Capitalise(Possessive))
+            .Replace("{them}", Object_)
+            .Replace("{Them}", Capitalise(Object_));
+    }
+
+    static string Capitalise(string word)
+        => string.IsNullOrEmpty(word) ? word : char.ToUpperInvariant(word[0]) + word.Substring(1);
+
     // ---- powers ---------------------------------------------------------------
 
     /// <summary>Whether the campaign has handed this power over yet.</summary>

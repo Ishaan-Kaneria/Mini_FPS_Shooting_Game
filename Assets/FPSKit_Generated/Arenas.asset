@@ -49,3 +49,9 @@ MonoBehaviour:
     preview: {fileID: 2800000, guid: 2c20a3050f9549855bd14ad77b6cf991, type: 3}
     theme: {fileID: 11400000, guid: 13ec61b4e690b8e4cadb01144c2c65e8, type: 2}
     levels: {fileID: 11400000, guid: 33a84de879134139cb2d8effe32ab3e3, type: 2}
+  - displayName: The Auger House
+    sceneName: TheAugerHouse
+    description: The house he built. Lit from inside, and smaller than it looks.
+    preview: {fileID: 2800000, guid: ff69add2b383d3b2ca8362c206f226d6, type: 3}
+    theme: {fileID: 11400000, guid: bfbb1e51cd4ea0171be4c77d203ce5ca, type: 2}
+    levels: {fileID: 11400000, guid: 56c727975b20158a382c9c547a6fc23d, type: 2}

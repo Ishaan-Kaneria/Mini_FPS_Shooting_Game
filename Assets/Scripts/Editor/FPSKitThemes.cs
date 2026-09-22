@@ -22,8 +22,17 @@ namespace FPSKit.EditorTools
             "Snowbound Station",
             "Night Rooftop",
             "Abandoned Subway",
-            "Mars Colony"
+            "Mars Colony",
+            "The Auger House"
         };
+
+        /// <summary>
+        /// The last zone, named here because three generators have to agree about which
+        /// arena is the finale: this one builds it small and dark, the level generator
+        /// gives it three rungs instead of eight, and the campaign gates it on the other
+        /// six being finished.
+        /// </summary>
+        public const string FinaleName = "The Auger House";
 
         [MenuItem("FPSKit/Create Theme Assets", false, 40)]
         public static void CreateAllMenu()
@@ -123,6 +132,10 @@ namespace FPSKit.EditorTools
 
             string[] heavies = themeName switch
             {
+                // The finale fields the worst of everything the campaign has taught the
+                // player to handle, all at once and in a house.
+                FinaleName => new[] { "Brute", "Sentinel", "Hardsuit", "Stalker", "Spotter" },
+
                 "Industrial Warehouse" => new[] { "Brute" },
                 "Snowbound Station" => new[] { "Sentinel" },
                 "Desert Outpost" => new[] { "Screamer" },
@@ -361,6 +374,73 @@ namespace FPSKit.EditorTools
                     t.contrast = 6f;
                     t.filmGrain = 0.12f;
                     t.randomSeed = 21;
+                    break;
+
+                // ----------------------------------------------------------
+                // The finale. A house, not an arena: small, lit from inside, and the
+                // only place in the game where the walls are closer than the sightlines.
+                //
+                // <b>Small is the design.</b> Every other zone is somewhere the player
+                // can back off to; six arenas have taught them that disengaging works.
+                // Eighty metres of rooms takes that away without changing a single
+                // number on an enemy, which is a harder last level than any multiplier
+                // would have bought.
+                case FinaleName:
+                    t.description = "The house he built. Lit from inside, and smaller than it looks.";
+                    t.floorDetail = "Tile";
+                    t.wallDetail = "Concrete";
+                    t.floorDetailSize = 2.5f;
+                    t.wallDetailSize = 3f;
+
+                    // Night outside, so every light in the arena is one somebody left on.
+                    t.skyTint = new Color(0.10f, 0.11f, 0.16f);
+                    t.skyGroundColor = new Color(0.06f, 0.06f, 0.09f);
+                    t.atmosphereThickness = 1.1f;
+                    t.skyExposure = 0.55f;
+                    t.sunColor = new Color(0.55f, 0.62f, 0.85f);
+
+                    // A moon rather than a sun: enough to model the ground and no more.
+                    // The park already records what happens when this goes to zero --
+                    // the arena is not frightening, it is unreadable.
+                    t.sunIntensity = 0.35f;
+                    t.sunAngles = new Vector2(52f, 20f);
+                    t.fogColor = new Color(0.07f, 0.08f, 0.11f);
+                    t.fogDensity = 0.016f;
+                    t.ambientSky = new Color(0.14f, 0.15f, 0.20f);
+                    t.ambientEquator = new Color(0.12f, 0.11f, 0.13f);
+                    t.ambientGround = new Color(0.07f, 0.06f, 0.07f);
+                    t.floorColor = new Color(0.30f, 0.26f, 0.23f);
+                    t.wallColor = new Color(0.24f, 0.21f, 0.20f);
+                    t.coverColors = new[]
+                    {
+                        new Color(0.34f, 0.26f, 0.18f),
+                        new Color(0.22f, 0.19f, 0.18f),
+                        new Color(0.40f, 0.33f, 0.24f)
+                    };
+                    t.coverTag = "Wood";
+
+                    // Eighty metres, more rooms than anywhere else, and pillars instead
+                    // of open floor. Every one of those numbers is pushing the same way.
+                    t.arenaSize = 80f;
+                    t.roomCount = 7;
+                    t.platformCount = 2;
+                    t.coverWallCount = 14;
+                    t.crateStackCount = 6;
+                    t.pillarCount = 10;
+                    // The practicals are the arena. A moon at 0.35 models the ground and
+                    // nothing else, so without these the House is a dark yard with walls
+                    // round it -- which is what the first build of it came out as, while
+                    // its own description said "lit from inside". The lamps are what make
+                    // the rooms rooms, and what makes the dark between them mean anything.
+                    t.accentLightColor = new Color(1f, 0.72f, 0.38f);
+                    t.accentLightCount = 16;
+                    t.accentLightIntensity = 11f;
+                    t.accentLightRange = 13f;
+                    t.accentLightHeight = 3.2f;
+                    t.saturation = -6f;
+                    t.contrast = 10f;
+                    t.bloomIntensity = 0.95f;
+                    t.randomSeed = 81;
                     break;
 
                 // ----------------------------------------------------------

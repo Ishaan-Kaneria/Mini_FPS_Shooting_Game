@@ -26,6 +26,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/FPSKit_Generated/Scenes/MarsColony.unity
     guid: 1f3a5f4769fe2b87fbf09a8766183806
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/TheAugerHouse.unity
+    guid: 61f3ddab50f708d3fa350d9c81894a82
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

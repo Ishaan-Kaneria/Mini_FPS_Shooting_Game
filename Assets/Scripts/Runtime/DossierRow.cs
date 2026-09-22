@@ -61,7 +61,7 @@ public class DossierRow : MonoBehaviour
         // The beat only after they are down: it is what the player learned from them,
         // and printing it beforehand is the story telling itself out of order.
         if (beatText != null)
-            beatText.text = down ? sibling.beat ?? "" : "";
+            beatText.text = down ? Campaign.Expand(sibling.beat ?? "") : "";
 
         if (portrait != null)
         {

@@ -118,6 +118,23 @@ public class StoryPanel : OverlayPanel
         return false;
     }
 
+    /// <summary>Adds a card for a sibling, or nothing if there is nothing to say.</summary>
+    void Queue(CampaignData.Sibling sibling, int zoneIndex)
+    {
+        if (sibling == null || string.IsNullOrWhiteSpace(sibling.beat)) return;
+
+        _cards.Add(new Card
+        {
+            Title = sibling.displayName.ToUpperInvariant(),
+            Subtitle = string.IsNullOrWhiteSpace(sibling.holding)
+                ? ""
+                : sibling.holding.ToUpperInvariant(),
+            Body = sibling.beat,
+            Portrait = sibling.portrait,
+            ZoneIndex = zoneIndex
+        });
+    }
+
     static bool OwesBeat(CampaignData data, int zoneIndex)
     {
         if (Campaign.BeatSeen(zoneIndex)) return false;
@@ -194,18 +211,13 @@ public class StoryPanel : OverlayPanel
             {
                 if (!OwesBeat(_data, i)) continue;
 
-                var holder = _data.HolderOf(_data.ZoneAt(i));
+                var zone = _data.ZoneAt(i);
 
-                _cards.Add(new Card
-                {
-                    Title = holder.displayName.ToUpperInvariant(),
-                    Subtitle = string.IsNullOrWhiteSpace(holder.holding)
-                        ? ""
-                        : holder.holding.ToUpperInvariant(),
-                    Body = holder.beat,
-                    Portrait = holder.portrait,
-                    ZoneIndex = i
-                });
+                // The holder's own card, then whatever else the zone closes on. Only the
+                // first carries the zone index, because marking the beat read is what
+                // stops the pair being shown again and it has to happen once.
+                Queue(_data.HolderOf(zone), i);
+                Queue(_data.SiblingAt(zone.extraBeatSibling), -1);
             }
         }
 
@@ -307,10 +319,15 @@ public class StoryPanel : OverlayPanel
         {
             // The question is part of the opening's body rather than a label of its own,
             // so it sits against the paragraph it follows and the buttons sit under both.
-            bodyText.text = card.AsksIdentity && _data != null
-                                              && !string.IsNullOrWhiteSpace(_data.identityQuestion)
+            string body = card.AsksIdentity && _data != null
+                                             && !string.IsNullOrWhiteSpace(_data.identityQuestion)
                 ? $"{card.Body}\n\n<color=#FFC51F>{_data.identityQuestion}</color>"
                 : card.Body ?? "";
+
+            // Expanded here rather than when the card is built, because the answer can
+            // arrive between the two: the opening card is queued before the question has
+            // been asked and the cards after it are shown once it has.
+            bodyText.text = Campaign.Expand(body);
         }
 
         bool hasFace = card.Portrait != null;

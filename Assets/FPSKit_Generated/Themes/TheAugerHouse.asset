@@ -1,0 +1,127 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 992cb97f9f9be6049911edcaff11c498, type: 3}
+  m_Name: TheAugerHouse
+  m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
+  themeName: The Auger House
+  description: The house he built. Lit from inside, and smaller than it looks.
+  enemyRoster:
+  - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
+  - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
+  - {fileID: 11400000, guid: e7b2c1aeefde2c40cb5f98f5a4ddfeaf, type: 2}
+  - {fileID: 11400000, guid: d7d3993c9579267c5a19d8e86bd0d010, type: 2}
+  - {fileID: 11400000, guid: 917dfef77068ea7ac8f90289145f2529, type: 2}
+  - {fileID: 11400000, guid: e1b2fb1197814a3dfaa58ab298589421, type: 2}
+  - {fileID: 11400000, guid: 88b37e549bf069d9882e3775d0cacd5e, type: 2}
+  - {fileID: 11400000, guid: 5403907776c63d424a6e5873da025efc, type: 2}
+  - {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+  - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+  - {fileID: 11400000, guid: 2899886d6c24335f8a5f28b5c3262280, type: 2}
+  skyboxOverride: {fileID: 0}
+  skyTint: {r: 0.1, g: 0.11, b: 0.16, a: 1}
+  skyGroundColor: {r: 0.06, g: 0.06, b: 0.09, a: 1}
+  atmosphereThickness: 1.1
+  skyExposure: 0.55
+  sunColor: {r: 0.55, g: 0.62, b: 0.85, a: 1}
+  sunIntensity: 0.35
+  sunAngles: {x: 52, y: 20}
+  shadowStrength: 0.85
+  fogEnabled: 1
+  fogColor: {r: 0.07, g: 0.08, b: 0.11, a: 1}
+  fogDensity: 0.016
+  ambientSky: {r: 0.14, g: 0.15, b: 0.2, a: 1}
+  ambientEquator: {r: 0.12, g: 0.11, b: 0.13, a: 1}
+  ambientGround: {r: 0.07, g: 0.06, b: 0.07, a: 1}
+  arenaSize: 80
+  wallHeight: 5
+  randomSeed: 81
+  scaleLayoutWithArea: 1
+  layoutReferenceSize: 60
+  openZone: 0
+  apronSize: 900
+  hazard: 0
+  hazardWidth: 55
+  hazardDepth: 20
+  hazardOffset: 90
+  hazardMeander: 26
+  hazardColor: {r: 0.2, g: 0.42, b: 0.52, a: 1}
+  bankColor: {r: 0.44, g: 0.38, b: 0.28, a: 1}
+  bridgeWidth: 9
+  bridgeCount: 2
+  bridgeColor: {r: 0.46, g: 0.42, b: 0.36, a: 1}
+  duneHeight: 0
+  duneWavelength: 95
+  duneWindAngle: 34
+  backdropCount: 34
+  backdropDistance: {x: 620, y: 1150}
+  backdropHeight: {x: 55, y: 190}
+  backdropWidth: {x: 70, y: 260}
+  backdropColor: {r: 0.44, g: 0.36, b: 0.28, a: 1}
+  landmarkCount: 9
+  outpostCount: 7
+  vantageCount: 8
+  coverLineCount: 14
+  scatterClusterCount: 26
+  industrialZone: 0
+  zoneWorksCount: 3
+  zoneTankFarmCount: 2
+  zoneContainerYardCount: 3
+  zonePowerHouseCount: 1
+  roomCount: 7
+  platformCount: 2
+  coverWallCount: 14
+  crateStackCount: 6
+  pillarCount: 10
+  coverHeightRange: {x: 1.1, y: 1.5}
+  coverWidthRange: {x: 4, y: 9}
+  floorColor: {r: 0.3, g: 0.26, b: 0.23, a: 1}
+  wallColor: {r: 0.24, g: 0.21, b: 0.2, a: 1}
+  coverColors:
+  - {r: 0.34, g: 0.26, b: 0.18, a: 1}
+  - {r: 0.22, g: 0.19, b: 0.18, a: 1}
+  - {r: 0.4, g: 0.33, b: 0.24, a: 1}
+  floorSmoothness: 0.2
+  wallSmoothness: 0.15
+  coverMetallic: 0
+  floorTag: Concrete
+  wallTag: Concrete
+  parkZone: 0
+  subwayZone: 0
+  floorDetail: Tile
+  wallDetail: Concrete
+  floorDetailSize: 2.5
+  wallDetailSize: 3
+  coverTag: Wood
+  accentLightCount: 16
+  accentLightColor: {r: 1, g: 0.72, b: 0.38, a: 1}
+  accentLightIntensity: 11
+  accentLightRange: 13
+  accentLightHeight: 3.2
+  floorMaterial: {fileID: 0}
+  floorTextureSize: 4
+  wallMaterial: {fileID: 0}
+  wallTextureSize: 4
+  coverMaterial: {fileID: 0}
+  crateMaterial: {fileID: 0}
+  propPrefabs: []
+  propCount: 40
+  weatherPrefab: {fileID: 0}
+  ambienceLoop: {fileID: 0}
+  ambienceVolume: 0.35
+  enablePostProcessing: 1
+  bloomIntensity: 0.95
+  postExposure: 0
+  saturation: -6
+  contrast: 10
+  colorFilter: {r: 1, g: 1, b: 1, a: 1}
+  vignetteIntensity: 0.28
+  filmGrain: 0.2

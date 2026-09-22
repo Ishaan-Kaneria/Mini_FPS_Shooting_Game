@@ -44,7 +44,8 @@ namespace FPSKit.EditorTools
             "Desert Outpost",
             "Night Rooftop",
             "Abandoned Subway",
-            "Mars Colony"
+            "Mars Colony",
+            FPSKitThemes.FinaleName
         };
 
         /// <summary>
@@ -130,6 +131,14 @@ namespace FPSKit.EditorTools
                 1 => "The dome crews were told you are a contractor. They know better now.",
                 2 => "Someone on the ground is setting the vent schedule against him too.",
                 _ => "Roan is in the open, unsealed, with one question left to ask you."
+            },
+
+            FPSKitThemes.FinaleName => rung switch
+            {
+                0 => "The gate is open and nobody is on it.",
+                1 => "Her people are in the house, and they were told to expect you.",
+                2 => "Every door on this floor has somebody behind it.",
+                _ => "Marit is in his study, with the file open, waiting."
             },
 
             _ => ""
@@ -277,12 +286,17 @@ namespace FPSKit.EditorTools
                 "whether you had worked out yet who had been funding you.",
 
                 "Marit has been paying for this since the night it started. Eight ways is " +
-                "a bad division of an estate. One way is a better one, and she never had " +
-                "to hold a rifle to arrange it.",
+                "a bad division of an estate and one way is a better one, and until " +
+                "tonight she had never once had to hold a rifle to arrange it.\n\nShe " +
+                "was not surprised to see you. She had your file open on the desk.",
 
-                "Halvard Auger took one child out of that fire on purpose, and the list " +
-                "has always been eight long. You have been crossing your own family off " +
-                "it, in the order somebody else wrote them down."
+                "Marit's ledger has eight columns and the last one has your name at the " +
+                "top of it.\n\nHalvard Auger took one child out of that fire on " +
+                "purpose. The town buried sixteen and wrote a seventeenth off as gone, " +
+                "and the {child} who went through that gate was written into the will " +
+                "the same week. You have spent twenty years crossing your own family off " +
+                "a list, in the order somebody else put them in.\n\nThere is one name " +
+                "left on it."
             };
 
             data.siblings = new List<CampaignData.Sibling>();
@@ -320,7 +334,13 @@ namespace FPSKit.EditorTools
                 Zone("Mars Colony", 5, "",
                     "Roan left before any of this happened and has spent every year since " +
                     "being the one who was not there. He is the last name on the list " +
-                    "that still lives somewhere with a door on it.")
+                    "that still lives somewhere with a door on it."),
+
+                Zone(FPSKitThemes.FinaleName, 6, "", extraBeat: 7,
+                    opening:
+                    "The other six are down and the company has one owner left. Marit " +
+                    "has not moved, has not hired anybody, and has not stopped paying " +
+                    "you.\n\nThe house is where it always was. The gate is open.")
             };
 
             // A face per name. Drawn from constants, so this is idempotent and costs
@@ -352,7 +372,7 @@ namespace FPSKit.EditorTools
         /// them rather than writing a zone with nothing in it.
         /// </summary>
         static CampaignData.Zone Zone(string themeName, int siblingIndex, string grantsPower,
-                                      string opening)
+                                      string opening, int extraBeat = -1)
         {
             var levels = FPSKitLevels.GetOrCreate(themeName);
 
@@ -362,7 +382,8 @@ namespace FPSKit.EditorTools
                 levels = levels,
                 siblingIndex = siblingIndex,
                 grantsPower = grantsPower,
-                opening = opening
+                opening = opening,
+                extraBeatSibling = extraBeat
             };
         }
 
@@ -409,6 +430,11 @@ namespace FPSKit.EditorTools
                 "The dome vents to schedule and the schedule is set from the ground, by " +
                 "his sister. Be out of the open when it goes, because it will go whether " +
                 "or not you are.",
+
+            FPSKitThemes.FinaleName =>
+                "Nobody is coming and nothing here is on a timer but her patience. When " +
+                "it runs out the shutters come down on the whole house, and the last " +
+                "thing this family does is keep you in it.",
 
             _ => ""
         };

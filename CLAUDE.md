@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Level-based FPS built on **Unity 6000.6.0f1** with the **Universal Render Pipeline** (com.unity.render-pipelines.universal 17.6.0). Six arenas, a ladder of eight levels in each: a fixed crowd of NavMesh-driven enemies, a strict clock, and one to three stars. Clearing a level unlocks the next.
+Level-based FPS built on **Unity 6000.6.0f1** with the **Universal Render Pipeline** (com.unity.render-pipelines.universal 17.6.0). **Seven arenas played as a campaign**, each with a ladder of eight levels -- except the finale, which has three. A level is a fixed crowd of NavMesh-driven enemies, a strict clock, an objective, and one to three stars. Clearing a level unlocks the next; clearing a zone's last level puts down the child who holds it and opens the next zone.
 
 ## Layout
 
@@ -26,6 +26,8 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | Achievements | `Achievements.cs` (twenty thresholds, all derived), `PlayerStats.cs` (the lifetime counters they read), `AchievementsPanel.cs`, `AchievementRow.cs` |
 | Instructions | `InstructionsPanel.cs` (written from the live bindings), `InstructionRow.cs` |
 | Screens  | `OverlayPanel.cs` (the base every overlay shares), `UITheme.cs` (colour, type and motion tokens), `DeviceProfile.cs` (reach, form, orientation), `PhoneUI.cs` (the one-line question, delegating to it) |
+| Campaign | `Campaign.cs` (the player's side: identity, powers, beats read, the one gate), `CampaignData.cs` (ScriptableObject: the zones in order, the eight names, the beats), `SaveMigration.cs` (the one-time wipe), `StoryPanel.cs` (the opening and the beat cards), `DossierPanel.cs` / `DossierRow.cs` (THE LIST) |
+| Objectives | `LevelObjective.cs` (the six, and the invariant that none of them may end a level) |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
 
 `Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), `Store/` (the catalog plus its WeaponData, BombData and ConsumableData), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `MinimapBlip.png`, `Enemy.prefab`, `Bomb.prefab`, `Explosion.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
@@ -61,7 +63,7 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 `FPSKitSceneBuilder.cs` (~3200 lines) drives the **FPSKit** menu:
 
-- **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Subway | Mars Colony]** — each calls `BuildScene(themeName)`.
+- **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Subway | Mars Colony | The Auger House]** — each calls `BuildScene(themeName)`.
 - **FPSKit > Build Scene > From Selected Theme Asset** — builds from whatever `LevelTheme` is selected in the Project window, built-in or not. This is how a new arena gets made without touching code.
 - **FPSKit > Build Scene > Build ALL Themes** — builds and saves one scene per theme, registering them in Build Settings so the in-game restart works.
 - **FPSKit > Add Gameplay To Current Scene** — the non-destructive path: injects player, enemies, level manager, HUD, post-FX and a baked NavMesh into an existing level, leaving geometry and baked lighting alone. Refuses to run twice (bails if a `Player`-tagged object exists).
@@ -91,7 +93,7 @@ recreates on the next build.
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
-The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the ten checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below), `FPSKitReachTest.cs` (`VerifyReach`, below -- the one that asks whether the navmesh an arena bakes is navmesh anything can get to) `FPSKitDeviceTest.cs` (`VerifyDevices`, which asserts every class of screen is laid out for the hands that are on it, and builds nothing) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere).
+The headless side is `FPSKitBatch.cs`, which exposes the builder and the tests as public `-executeMethod` entry points because the menu items are private. It is what `Tools/unity-batch.sh` calls, and the checks behind it are `FPSKitControlsTest.cs` (`VerifyControls`, which audits every binding in every preset for collisions and then plays a level driving each action in turn), `FPSKitPlayTest.cs` (`VerifyReplay`), `FPSKitLevelTest.cs` (`VerifyLevels`, which plays one level to a failure and then to a three-star clear), `FPSKitStoreTest.cs` (`VerifyStore`, which buys a gun and two upgrades and then checks both reached the player), `FPSKitCombatTest.cs` (`VerifyCombat`), `FPSKitBombTest.cs` (`VerifyBomb`, which sweeps the aim a degree at a time, holds the key for real and turns the view under it, throws at both ends of the range and listens), `FPSKitFlowTest.cs` (`VerifyFlow`), `FPSKitTerrainTest.cs` (`VerifyTerrain`, below), `FPSKitReachTest.cs` (`VerifyReach`, below -- the one that asks whether the navmesh an arena bakes is navmesh anything can get to) `FPSKitDeviceTest.cs` (`VerifyDevices`, which asserts every class of screen is laid out for the hands that are on it, and builds nothing) and `FPSKitStaticProbe.cs` (`VerifyStatics`, which finds statics by reflection, so a new class with one is audited without being registered anywhere), `FPSKitObjectiveTest.cs` (`VerifyObjectives`, which plays all six objectives in one session and proves an unsatisfiable one still lets the clock end the level) and `FPSKitRosterTest.cs` (`VerifyRosters`, which opens every built arena and fails if two of them field the same enemies -- no play mode, no graphics).
 
 `FPSKitViews.cs` (`FPSKitBatch.CaptureViews`) is not a test -- it renders a built arena from fixed viewpoints to PNGs, because a generated scene is otherwise write-only from the command line: it is saved in binary so it cannot be read, its geometry is procedural so the code is not a description of the result, and every check here answers whether a level *works* rather than what it looks like. `VerifyZone` would pass just as happily on an arena whose cliffs were inside out. It needs a real graphics device:
 
@@ -142,7 +144,7 @@ frames.
 is what kept the view from pulling out while the player had not moved -- still the right
 way round now that the key does move them.
 
-**Three generators, three reset entry points, one trap.** `FPSKitBatch.ResetEnemyArchetypes`, `ResetLevelSets` and `ResetStore` exist because the roster, the level ladders and the store are all generated once and then left alone. Retuning a number in `FPSKitEnemyRoster.Configure`, `FPSKitLevels.Configure` or `FPSKitStore.Configure` does **not** reach the assets the game reads until the matching reset is run. A price or a level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
+**Five generators, five reset entry points, one trap.** `FPSKitBatch.ResetEnemyArchetypes`, `ResetLevelSets`, `ResetStore`, `ResetThemes` and `ResetCampaign` exist because the roster, the level ladders, the store, the themes and the campaign are all generated once and then left alone. Retuning a number in `FPSKitEnemyRoster.Configure`, `FPSKitLevels.Configure`, `FPSKitStore.Configure`, `FPSKitThemes.Configure` or `FPSKitCampaign.Configure` does **not** reach the assets the game reads until the matching reset is run. `ResetCampaign` has the widest blast radius of the five, because the campaign decides what order the arenas are played in and which of them are locked. A price or a level clock changed in code and never reset is a change that compiles, builds and ships without doing anything.
 
 `FPSKitCombatTest` and `FPSKitLevelTest` both retune the live `LevelSet` while they run -- one lengthening the clock so the fight outlives it, the other shortening it so the test does not sit through a full level -- and both put it back in `Detach`. The set is a shared asset: a test that left level one with a four-minute clock would be a test that broke the game to pass.
 
@@ -1422,15 +1424,15 @@ re-lays only when the answer changes, which also covers the drink button when th
 out mid-fight.
 
 **And the instructions were teaching a control the player does not have.** The bomb is the
-campaign's first reward, handed over at `Campaign.BombStarGate` stars, so before that there
+campaign's first reward, handed over when the first of the Augers falls, so before that there
 is no key, no button and nothing in the HUD -- while HOW TO PLAY still described all three.
 A player who follows written instructions and finds no button concludes the controls are
 broken, which is what was reported: "there is no bomb symbol, so why". The row stays, because
 the answer to *why* has to be somewhere, and it says what it is and how far off it is.
 
-## The dashboard has four destinations
+## The dashboard has five destinations
 
-`HOW TO PLAY`, `ACHIEVEMENTS`, `STORE` and `EXIT GAME`, built as a `HorizontalLayoutGroup`
+`HOW TO PLAY`, `THE LIST`, `ACHIEVEMENTS`, `STORE` and `EXIT GAME`, built as a `HorizontalLayoutGroup`
 rather than four anchored offsets -- the old pair sat at fixed pixels from the right edge
 and a third and fourth would have reached 1,120px in, fine at one window width and off the
 screen at a narrower one. Every one of them is in `dashboardOnly`, because an overlay is a
@@ -1610,6 +1612,94 @@ So: **verify a reset by reading the `.asset`, not by trusting the log.**
 grep -a -o "arenaSize: [0-9.]*" Assets/FPSKit_Generated/Themes/<Theme>.asset
 ```
 
+
+## The campaign is a sequence, and it is an asset
+
+`CampaignData` (`FPSKit_Generated/Campaign/Campaign.asset`, generated by
+`FPSKitCampaign.cs`, reset with `FPSKitBatch.ResetCampaign`) holds the whole spine: the
+seven zones in play order, who holds each one, the story beats, and what falling to the
+player hands over. **Reordering the campaign is dragging an entry in a list**; moving
+which zone gives the bomb is retyping one string. Neither is a code change.
+
+The order is Warehouse, Snowbound, Desert, Rooftop, Subway, Mars, The Auger House, and
+`FPSKitCampaign.ZoneOrder` is the one place it is written down -- `FPSKitLevels` shifts
+its difficulty curve by position in *that* list rather than by position in
+`FPSKitThemes.Names`, which is the order the arenas were built in and means nothing to a
+player. Keyed on the wrong one, the third zone a player reaches is tuned as though it
+were the second.
+
+Four rules hold it together:
+
+- **A child being down is derived, never stored.** A sibling *is* the last level of their
+  zone, so `Campaign.ChildDefeated` reads `LevelProgress`. Storing a second answer is how
+  the two come to disagree -- silently. Same rule `Achievements` follows. What *is* stored
+  is whether the player has **read** a beat, because that is a fact about the player.
+- **The gate is one method.** `Campaign.ArenaUnlocked`, exactly like
+  `LevelProgress.IsUnlocked` and for the same reason. A zone the campaign does not list,
+  or a missing campaign asset, is **open** -- the kit runs in arenas it did not build, and
+  a gate that failed closed would be a game with one playable arena and no way to find out
+  why. The dashboard says so on screen when the asset is missing.
+- **`SaveMigration.Version` wipes a profile once.** A save from before the campaign has
+  stars scattered in no order, which under a sequential rule means zones opened by fights
+  that never happened. `DeleteAll` rather than a key list, because a list is a thing to
+  keep in sync with six classes and the one key left off it is the one that makes the wipe
+  look like it worked. **Every play-mode test that touches a saved value calls
+  `SaveMigration.Apply()` in its setup**, or the wipe lands mid-test between the backup and
+  the assertions.
+- **The story is shown where the player already is.** The opening and the beats are
+  `StoryPanel` cards over the dashboard; a zone's opening is read on the way *into* it,
+  once, before its ladder; the stakes line is under every countdown; and `DossierPanel`
+  (THE LIST) is where any of it can be read again. `Campaign.Expand` fills `{child}`,
+  `{they}`, `{their}`, `{them}` **at display time**, because the answer can arrive between
+  a card being queued and shown.
+
+## A level asks for something besides a body count
+
+`LevelSet.Objective` is per level: `Clear`, `OneMagazine`, `Hunt`, `Hold`, `Blackout`,
+`Extraction`, `Disposal`. `LevelObjective.cs` runs whichever one a level names.
+
+**The invariant, and it is not negotiable: an objective may change what *scores* and may
+delay the early finish a cleared roster grants. It may never change what *ends* a level.**
+The clock ends every level without exception -- in a real arena an enemy that falls
+through a gap stays alive forever, so any completion requirement is a guaranteed softlock.
+`VerifyObjectives` sets an extraction on a level it then clears and fails unless the clock
+still ends it.
+
+- **A modifier is worth zero weight.** `OneMagazine` and `Blackout` make the same roster
+  harder; they add nothing to kill or reach. Weighting them would create weight that can
+  never be *earned*, so a perfectly played blackout would cap at two stars.
+- **One magazine has to keep feeding you**, or it is not a hard level, it is one that
+  stopped being playable without saying so. The ammo bonus is held on the objective and
+  read by the spawner -- **never written into an `EnemyArchetype`**, which is a shared
+  asset a level would be editing on disk for every other level that uses it.
+- **Everything an objective places is placed at runtime**, sampled off the navmesh and
+  asked whether the player can actually *route* to it. No scene holds a marked zone or an
+  extraction point, which is why adding these rebuilt nothing.
+
+## Each arena fights differently
+
+`LevelTheme.enemyRoster` is who fights there, stamped into the scene by
+`FPSKitSceneBuilder.BuildRoster`. It used to hand **every archetype in the project to
+every arena**, so the six were separated only by the difficulty step -- the same number at
+the same rung everywhere. A zone that looks different and plays the same is a skybox.
+
+Grunts, Runners and Marksmen are still in every roster on purpose: a difficulty step has
+to mean the same thing wherever it is played, or the ladder is seven unrelated curves. What
+varies is the top half of the mix -- one local threat per zone (`FPSKitEnemyRoster.ZoneDebut`)
+and the person standing at the end of it.
+
+**Every Auger carries the `Boss` role**, so anything sweeping for "a boss archetype" will
+find them. `FPSKitLevels` names the generic two explicitly
+(`FPSKitEnemyRoster.GenericBossNames`) and asks the campaign who holds the arena for the
+last rung -- without that, rung three of the Warehouse is Tove, who is standing at rung
+eight of the same ladder.
+
+A theme with no roster gets the lot and warns. That fallback is what keeps **Build Scene >
+From Selected Theme Asset** working for a theme somebody made without reading this file;
+an empty roster is an arena that spawns nothing, with nothing logged.
+
+`VerifyRosters` fails if an arena carries every archetype, is missing its own zone's
+enemy, has no holder, or fields the same list as another arena.
 
 ## Project conventions
 

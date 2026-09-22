@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Levels_IndustrialWarehouse
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: IndustrialWarehouse
+  stakes: The plant runs to a shift clock and the gates seal when it ends. Finish this before they do -- nobody opens them from the outside, and nobody is coming to look.
   levels:
   - displayName: FIRST CONTACT
     brief: 6 hostiles. Kill them all before the clock runs out.

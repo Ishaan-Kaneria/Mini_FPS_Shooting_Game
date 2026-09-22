@@ -27,7 +27,14 @@ public static class Campaign
     /// story art and voice rather than a character model -- which is why it is cheap
     /// enough to ask for at all.
     /// </summary>
-    public enum Identity { Unset = 0, Man = 1, Woman = 2 }
+    /// <summary>
+    /// <c>Unstated</c> is not the same as <c>Unset</c>, and the difference is the whole
+    /// reason it exists: unset means the game has not asked yet, so the opening plays;
+    /// unstated means the player was asked and declined, so it must never ask again.
+    /// Collapsing the two would make "rather not say" a button that reopens the same
+    /// screen on the next boot, which reads as the answer not having been taken.
+    /// </summary>
+    public enum Identity { Unset = 0, Man = 1, Woman = 2, Unstated = 3 }
 
     // Power ids are permanent keys, exactly like a store item's id: the unlock is filed
     // under the string, so renaming one forgets that the player ever earned it.

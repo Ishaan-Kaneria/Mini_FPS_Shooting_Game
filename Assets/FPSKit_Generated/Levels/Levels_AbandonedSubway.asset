@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Levels_AbandonedSubway
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: AbandonedSubway
+  stakes: The ground here is older than the fence around it. When the floodlights go, the holes you have been walking round stop being visible -- and they are still exactly where they were.
   levels:
   - displayName: FIRST CONTACT
     brief: 6 hostiles. Kill them all before the clock runs out.

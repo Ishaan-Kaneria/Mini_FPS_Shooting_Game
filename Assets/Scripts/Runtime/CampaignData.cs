@@ -48,6 +48,12 @@ public class CampaignData : ScriptableObject
                  "chassis of their own -- the level set's own boss is used meanwhile, " +
                  "so a sibling with nothing here is still a fight rather than nothing.")]
         public EnemyArchetype archetype;
+
+        [Tooltip("The face on their card. Rendered by FPSKit > Generate Portraits as a " +
+                 "still off a company camera, which is what the story says these are.\n\n" +
+                 "A beat with no face is a paragraph on a dark screen, and six of those " +
+                 "in a row are six paragraphs nobody tells apart.")]
+        public Texture2D portrait;
     }
 
     /// <summary>
@@ -79,12 +85,6 @@ public class CampaignData : ScriptableObject
                  "this zone.")]
         public string opening;
 
-        [TextArea(2, 4)]
-        [Tooltip("The stakes, in the zone's own voice: what the clock actually is here " +
-                 "and what happens to somebody still inside when it runs out. Shown " +
-                 "under the countdown at the start of a level.")]
-        public string stakes;
-
         [Tooltip("The id of the power handed over when this zone falls, or empty. Same " +
                  "kind of permanent key as a store item's id: renaming one forgets that " +
                  "the player ever earned it.")]
@@ -108,10 +108,23 @@ public class CampaignData : ScriptableObject
         public int FinalLevelIndex => LevelCount - 1;
     }
 
+    [Header("The opening")]
+    [TextArea(4, 10)]
+    [Tooltip("What the game says before it says anything else, on a genuinely fresh " +
+             "profile. It ends on the one question the game ever asks the player about " +
+             "themselves.")]
+    public string prologue;
+
+    [Tooltip("The question under it. Kept separate from the prologue so the buttons can " +
+             "sit against a line of their own rather than at the end of a paragraph.")]
+    public string identityQuestion = "Before we start -- were you a boy, or a girl?";
+
+    [Header("The eight")]
     [Tooltip("The eight, in the order the story names them. A sibling is referred to by " +
              "index, so reordering this list renames who is where -- add to the end.")]
     public List<Sibling> siblings = new List<Sibling>();
 
+    [Header("The ladder")]
     [Tooltip("The zones in the order they are played. The first is always open; every " +
              "one after it needs the child of the zone before to be down.")]
     public List<Zone> zones = new List<Zone>();

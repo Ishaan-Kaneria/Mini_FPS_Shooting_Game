@@ -123,6 +123,16 @@ public class LevelSet : ScriptableObject
              "arenas never share an unlock chain.")]
     public string arenaScene;
 
+    [TextArea(2, 4)]
+    [Tooltip("What the clock actually is in this arena, and what happens to somebody " +
+             "still inside when it runs out. Shown under the countdown at the start of " +
+             "every level here.\n\n" +
+             "It is on the ladder rather than on the campaign because this is the asset " +
+             "the arena already holds -- LevelManager reads it directly, so the line " +
+             "costs no reference in the scene and no arena has to be rebuilt to change " +
+             "it. The campaign generator is what writes it.")]
+    public string stakes;
+
     public List<Level> levels = new List<Level>();
 
     public int Count => levels != null ? levels.Count : 0;

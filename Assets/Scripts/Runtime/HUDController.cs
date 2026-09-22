@@ -700,9 +700,22 @@ public class HUDController : MonoBehaviour
 
         string brief = levelManager.LevelBrief;
 
+        // Why the clock is running, under what it is counting.
+        //
+        // A strict timer with no reason attached reads as an arcade rule -- beat the
+        // clock for points -- and this game means something nearer the opposite: the
+        // level is a place with a way out that closes. It is one line, it is the arena's
+        // own voice, and the briefing is the only moment in a level with nothing else
+        // happening in it.
+        string stakes = levelManager.LevelStakes;
+
+        string why = string.IsNullOrWhiteSpace(stakes)
+            ? ""
+            : $"\n<size=62%><color=#B8AFA0>{stakes}</color></size>";
+
         briefingText.text = string.IsNullOrWhiteSpace(brief)
-            ? $"GET READY - {seconds}{EquipmentHint()}"
-            : $"{brief}\n<size=70%>GET READY - {seconds}</size>{EquipmentHint()}";
+            ? $"GET READY - {seconds}{why}{EquipmentHint()}"
+            : $"{brief}\n<size=70%>GET READY - {seconds}</size>{why}{EquipmentHint()}";
     }
 
     /// <summary>

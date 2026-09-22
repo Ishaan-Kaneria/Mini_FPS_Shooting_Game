@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Levels_NightRooftop
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: NightRooftop
+  stakes: Ilsa holds the lifts and the lights. When her cycle ends the roof seals with whoever is on it still on it, and the only way down from here is the fast one.
   levels:
   - displayName: FIRST CONTACT
     brief: 6 hostiles. Kill them all before the clock runs out.

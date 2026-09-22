@@ -617,6 +617,7 @@ namespace FPSKit.EditorTools
             BuildLevelSelect(root, menu);
             BuildStore(root, menu);
             BuildAchievements(root, menu);
+            BuildStory(root, menu);
 
             // The dashboard has no player rig to read bindings off, so the panel is handed
             // the same asset the arenas use. Loaded rather than left null so the screen
@@ -1307,6 +1308,7 @@ namespace FPSKit.EditorTools
             select.progressText = progress;
             select.hintText = hint;
             select.statusText = status;
+            select.campaign = FPSKitCampaign.GetOrCreate();
             select.gridColumns = 4;
 
             menu.levelSelect = select;
@@ -1487,6 +1489,155 @@ namespace FPSKit.EditorTools
         /// of each other and one that closes differently from the one it replaced reads as
         /// the interface being unreliable -- the same argument HoverCard settles for cards.
         /// </summary>
+        /// <summary>
+        /// The story card: a face, a name, a paragraph, and one way forward.
+        ///
+        /// <b>Not built on <see cref="BuildOverlayShell"/>.</b> That shell is a title, a
+        /// rule and a back button around a full-width body, which is right for a screen
+        /// somebody came to read -- the instructions, the achievements. This one arrives
+        /// unasked, over the dashboard, and has to look like a thing being shown rather
+        /// than a page being opened: a plate in the middle of a darkened screen, with the
+        /// dashboard still faintly there behind it.
+        ///
+        /// The portrait and the text sit in one row, which is also why there is a frame
+        /// around the face: a generated surveillance still with no border reads as a
+        /// rendering fault, and with one it reads as a photograph.
+        /// </summary>
+        static void BuildStory(RectTransform parent, MainMenuController menu)
+        {
+            var panel = parent.gameObject.AddComponent<StoryPanel>();
+
+            var shade = Block(parent, "Story", new Color(0.016f, 0.024f, 0.039f, 0.93f));
+            Stretch(shade.rectTransform);
+
+            // Eats every click, so the dashboard behind cannot be reached while a card
+            // is up -- the same rule the other overlays follow, and it matters more here
+            // because this one opens on its own.
+            shade.raycastTarget = true;
+
+            var card = Panelled(shade.rectTransform, "Card", PanelLift, out RectTransform inner);
+            card.anchorMin = new Vector2(0.5f, 0.5f);
+            card.anchorMax = new Vector2(0.5f, 0.5f);
+            card.pivot = new Vector2(0.5f, 0.5f);
+            card.sizeDelta = new Vector2(1180f, 620f);
+            card.anchoredPosition = Vector2.zero;
+
+            // ---- the face -------------------------------------------------
+            var frame = Block(inner, "PortraitFrame", Border);
+            // Sized to the portrait's own 3:4, not stretched to the card's height. The
+            // image preserves its aspect, so a taller frame does not make a taller
+            // picture -- it makes the same picture in a mount with a band of border
+            // above and below it, which reads as a misaligned element rather than as a
+            // photograph.
+            var frameRect = frame.rectTransform;
+            frameRect.anchorMin = new Vector2(0f, 0.5f);
+            frameRect.anchorMax = new Vector2(0f, 0.5f);
+            frameRect.pivot = new Vector2(0f, 0.5f);
+            frameRect.sizeDelta = new Vector2(288f, 384f);
+            frameRect.anchoredPosition = new Vector2(36f, 0f);
+            frame.raycastTarget = false;
+
+            var face = Block(frameRect, "Portrait", Color.white);
+            Stretch(face.rectTransform);
+            face.rectTransform.offsetMin = new Vector2(3f, 3f);
+            face.rectTransform.offsetMax = new Vector2(-3f, -3f);
+            face.raycastTarget = false;
+            face.preserveAspect = true;
+
+            // A timecode across the bottom of the frame. It is the one detail that says
+            // "camera" rather than "portrait", and it is why the crudeness of the image
+            // reads as the lens rather than as the budget.
+            var stamp = Label(frameRect, "Stamp", "CAM 04  \u00b7  REC", 15,
+                              TextAlignmentOptions.BottomLeft, new Color(1f, 1f, 1f, 0.45f));
+            Span(stamp.rectTransform, 0f, 0.09f, 12f, 12f);
+            stamp.raycastTarget = false;
+
+            // ---- the words ------------------------------------------------
+            var text = new GameObject("Text", typeof(RectTransform)).GetComponent<RectTransform>();
+            text.SetParent(inner, false);
+            text.anchorMin = new Vector2(0f, 0f);
+            text.anchorMax = new Vector2(1f, 1f);
+            text.pivot = new Vector2(0.5f, 0.5f);
+            text.offsetMin = new Vector2(360f, 36f);
+            text.offsetMax = new Vector2(-40f, -36f);
+
+            var title = Label(text, "Title", "TITLE", 44,
+                              TextAlignmentOptions.BottomLeft, Ink);
+            Span(title.rectTransform, 0.855f, 1f, 0f, 0f);
+            title.characterSpacing = 6f;
+            Autosize(title, 20f, 44f);
+
+            var subtitle = Label(text, "Subtitle", "", 20,
+                                 TextAlignmentOptions.TopLeft, Accent);
+            Span(subtitle.rectTransform, 0.785f, 0.855f, 0f, 0f);
+            subtitle.characterSpacing = 5f;
+
+            var rule = Block(text, "Rule", Accent);
+            Span(rule.rectTransform, 0.775f, 0.780f, 0f, 220f);
+            rule.raycastTarget = false;
+
+            var body = Label(text, "Body", "", 22,
+                             TextAlignmentOptions.TopLeft, InkDim);
+            Span(body.rectTransform, 0.24f, 0.745f, 0f, 0f);
+            body.textWrappingMode = TextWrappingModes.Normal;
+            body.lineSpacing = 12f;
+            Autosize(body, 13f, 22f);
+
+            // ---- the way forward ------------------------------------------
+            var next = MakeButton(text, "ContinueButton", "CONTINUE", PanelLift, Border);
+            var nextRect = (RectTransform)next.transform;
+            nextRect.anchorMin = new Vector2(1f, 0f);
+            nextRect.anchorMax = new Vector2(1f, 0f);
+            nextRect.pivot = new Vector2(1f, 0f);
+            nextRect.sizeDelta = new Vector2(260f, 68f);
+            nextRect.anchoredPosition = Vector2.zero;
+
+            // ---- the one question -----------------------------------------
+            //
+            // A layout group rather than three anchored offsets, for the reason the nav
+            // row is one: three fixed positions are right at one card width, and this
+            // card is sized in reference units against a window of any shape.
+            var row = new GameObject("IdentityRow", typeof(RectTransform)).GetComponent<RectTransform>();
+            row.SetParent(text, false);
+            row.anchorMin = new Vector2(0f, 0f);
+            row.anchorMax = new Vector2(1f, 0f);
+            row.pivot = new Vector2(0.5f, 0f);
+            row.sizeDelta = new Vector2(0f, 72f);
+            row.anchoredPosition = Vector2.zero;
+
+            var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 18f;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+
+            var man = MakeButton(row, "ManButton", "A BOY", PanelLift, Border);
+            var woman = MakeButton(row, "WomanButton", "A GIRL", PanelLift, Border);
+            var decline = MakeButton(row, "DeclineButton", "RATHER NOT SAY", PanelLift, Border);
+
+            panel.panel = shade.gameObject;
+            panel.portrait = face;
+            panel.portraitFrame = frame.gameObject;
+            panel.titleText = title;
+            panel.subtitleText = subtitle;
+            panel.bodyText = body;
+            panel.textArea = text;
+            panel.continueButton = next;
+            panel.continueLabel = next.GetComponentInChildren<TMP_Text>();
+            panel.identityRow = row.gameObject;
+            panel.manButton = man;
+            panel.womanButton = woman;
+            panel.declineButton = decline;
+
+            // No back button. Every other overlay here is somewhere the player chose to
+            // go; this one is shown to them, and the way out of it is to read it.
+            panel.backButton = null;
+
+            menu.story = panel;
+            shade.gameObject.SetActive(false);
+        }
+
         static Image BuildOverlayShell(RectTransform parent, string name, string title,
                                        string subtitle, out TMP_Text subtitleLabel,
                                        out Button back, out RectTransform body)

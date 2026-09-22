@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Levels_MarsColony
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: MarsColony
+  stakes: The dome vents to schedule and the schedule is set from the ground, by his sister. Be out of the open when it goes, because it will go whether or not you are.
   levels:
   - displayName: FIRST CONTACT
     brief: 6 hostiles. Kill them all before the clock runs out.

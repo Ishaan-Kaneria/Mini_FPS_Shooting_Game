@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Levels_DesertOutpost
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: DesertOutpost
+  stakes: The convoy window is the only traffic through here all day. Miss it and you are walking, and the distances out here are not walkable.
   levels:
   - displayName: FIRST CONTACT
     brief: 6 hostiles. Kill them all before the clock runs out.

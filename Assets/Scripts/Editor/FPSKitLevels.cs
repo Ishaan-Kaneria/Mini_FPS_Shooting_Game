@@ -168,6 +168,11 @@ namespace FPSKit.EditorTools
         {
             set.name = $"Levels_{SafeName(themeName)}";
             set.arenaScene = SafeName(themeName);
+
+            // Written by the campaign and stamped here, because this is the asset the
+            // arena already holds -- see FPSKitCampaign.StakesFor. An arena outside the
+            // campaign gets nothing and the HUD shows the countdown as it always did.
+            set.stakes = FPSKitCampaign.StakesFor(themeName);
             set.levels = new List<LevelSet.Level>(LevelsPerArena);
 
             var bosses = BossRoster();

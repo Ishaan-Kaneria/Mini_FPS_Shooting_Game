@@ -165,6 +165,18 @@ public class LevelManager : MonoBehaviour
     public string LevelName { get; private set; } = "";
     public string LevelBrief { get; private set; } = "";
 
+    /// <summary>
+    /// Why the clock exists here, in the arena's own voice -- the sealing gates, the
+    /// closing pass, the venting dome.
+    ///
+    /// <b>A strict clock with no reason given reads as an arcade timer</b>, which is
+    /// the one thing this game is not meant to feel like: the level is a place somebody
+    /// has to get out of. It is per-arena rather than per-level because that is what it
+    /// describes, and it is on the LevelSet because that is the asset the arena already
+    /// holds.
+    /// </summary>
+    public string LevelStakes { get; private set; } = "";
+
     /// <summary>The level being played. Never null once Start has run.</summary>
     public LevelSet.Level Level { get; private set; }
 
@@ -382,6 +394,7 @@ public class LevelManager : MonoBehaviour
 
         LevelName = Level.Label(LevelIndex);
         LevelBrief = Level.brief ?? "";
+        LevelStakes = levels != null ? levels.stakes ?? "" : "";
 
         HasBoss = Level.hasBoss;
         TimeLimit = Level.timeLimit;

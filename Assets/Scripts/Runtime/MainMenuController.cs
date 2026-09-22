@@ -59,6 +59,11 @@ public class MainMenuController : MonoBehaviour
     [Tooltip("How to play, read from the live bindings. Opened by the Help button.")]
     public InstructionsPanel instructions;
 
+    [Tooltip("The story: the opening on a fresh profile, and one card per child as they " +
+             "go down. It has no button -- it opens on the way in when there is " +
+             "something owed, and never otherwise.")]
+    public StoryPanel story;
+
     [Tooltip("Opens the achievements screen.")]
     public Button achievementsButton;
 
@@ -226,6 +231,7 @@ public class MainMenuController : MonoBehaviour
         if (store != null) store.Closed += OnStoreClosed;
         if (achievements != null) achievements.Closed += OnOverlayClosed;
         if (instructions != null) instructions.Closed += OnOverlayClosed;
+        if (story != null) story.Closed += OnOverlayClosed;
 
         Wire(storeButton, OpenStore);
         Wire(achievementsButton, OpenAchievements);
@@ -235,6 +241,32 @@ public class MainMenuController : MonoBehaviour
         Wire(cancelExitButton, CancelExit);
 
         if (exitConfirmPanel != null) exitConfirmPanel.SetActive(false);
+
+        TellStory();
+    }
+
+    /// <summary>
+    /// Opens the story if it is owed anything -- the opening on a fresh profile, or the
+    /// beat for a child who has just gone down.
+    ///
+    /// <b>Last in Start, and only when there is something to say.</b> Last, because it
+    /// covers the dashboard and everything underneath has to be built and measured
+    /// before it is hidden. Only when owed, because an overlay that opens empty is a
+    /// screen the player dismisses for no reason, and this one opens at the exact moment
+    /// they have come back to play the next level.
+    ///
+    /// It is not in <see cref="dashboardOnly"/> for the same reason the other overlays
+    /// are not: that list is what gets hidden *behind* a panel, and this is a panel.
+    /// </summary>
+    void TellStory()
+    {
+        if (story == null || campaign == null) return;
+
+        story.Bind(campaign);
+        if (!story.HasAnythingToSay(campaign)) return;
+
+        ShowDashboard(false);
+        story.Open();
     }
 
     void OnDestroy()
@@ -248,6 +280,7 @@ public class MainMenuController : MonoBehaviour
         if (store != null) store.Closed -= OnStoreClosed;
         if (achievements != null) achievements.Closed -= OnOverlayClosed;
         if (instructions != null) instructions.Closed -= OnOverlayClosed;
+        if (story != null) story.Closed -= OnOverlayClosed;
     }
 
     static void Wire(Button button, UnityEngine.Events.UnityAction action)

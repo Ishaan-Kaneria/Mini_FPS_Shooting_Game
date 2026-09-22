@@ -142,6 +142,16 @@ namespace FPSKit.EditorTools
 
         static void Configure(CampaignData data)
         {
+            data.prologue =
+                "The town had one employer and one gate, and Halvard Auger owned both.\n\n" +
+                "You were eleven the night the plant burned. Your mother put you through " +
+                "the gate and did not come through it herself. The report said sixteen " +
+                "dead and a fault in a gas line, and it was signed by one of his " +
+                "children.\n\n" +
+                "The old man is twenty years dead. The eight are still holding his sites.";
+
+            data.identityQuestion = "Before we start -- were you a boy, or a girl?";
+
             data.siblings = new List<CampaignData.Sibling>
             {
                 Sibling("Tove Auger", "the plant",
@@ -188,64 +198,46 @@ namespace FPSKit.EditorTools
             data.zones = new List<CampaignData.Zone>
             {
                 Zone("Industrial Warehouse", 0, Campaign.BombPower,
-                    opening:
                     "The town had one employer and one gate. You were eleven the night " +
                     "this place burned, and the report that called it a gas fault was " +
                     "signed by Halvard Auger's daughter. Twenty years on, Tove still " +
-                    "runs the plant.",
-                    stakes:
-                    "The plant runs to a shift clock and the gates seal when it ends. " +
-                    "Finish this before they do. Nobody opens them from the outside, and " +
-                    "nobody is coming to look."),
+                    "runs the plant."),
 
                 Zone("Snowbound Station", 1, "",
-                    opening:
                     "Kestrel took the quarry and everything in its magazine. She has " +
                     "known you were coming since the plant went quiet, and she has been " +
-                    "lighting the yard for it.",
-                    stakes:
-                    "The storm closes the pass on a schedule the weather does not " +
-                    "negotiate. Be finished before it shuts, or the station keeps you " +
-                    "until spring, and it will not be keeping you alive."),
+                    "lighting the yard for it."),
 
                 Zone("Desert Outpost", 2, "",
-                    opening:
                     "Everything the company ever moved went down this road, and Aurel " +
-                    "signed for all of it. Including, once, a manifest with a child on it.",
-                    stakes:
-                    "The convoy window is the only traffic through here all day. Miss it " +
-                    "and you are walking, and the distances out here are not walkable."),
+                    "signed for all of it. Including, once, a manifest with a child on it."),
 
                 Zone("Night Rooftop", 3, "",
-                    opening:
                     "Ilsa runs what the company calls security, which is every camera in " +
                     "the city and the decision about which recordings exist. She has " +
-                    "watched you for twenty years and filed none of it.",
-                    stakes:
-                    "She holds the lifts and the lights. When her cycle ends the roof " +
-                    "seals with whoever is on it still on it, and the only way down from " +
-                    "here is the fast one."),
+                    "watched you for twenty years and filed none of it."),
 
                 Zone("Abandoned Subway", 4, "",
-                    opening:
                     "Dev ran the works into the ground and then moved into what was left. " +
                     "The rides still turn when the wind is behind them. He kept the " +
-                    "lights on over the shafts, which is either a courtesy or a trap.",
-                    stakes:
-                    "The ground here is older than the fence around it. When the " +
-                    "floodlights go the holes you have been walking round stop being " +
-                    "visible, and they are still exactly where they were."),
+                    "lights on over the shafts, which is either a courtesy or a trap."),
 
                 Zone("Mars Colony", 5, "",
-                    opening:
                     "Roan left before any of this happened and has spent every year since " +
                     "being the one who was not there. He is the last name on the list " +
-                    "that still lives somewhere with a door on it.",
-                    stakes:
-                    "The dome vents to schedule and the schedule is set from the ground, " +
-                    "by his sister. Be out of the open when it goes, because it will go " +
-                    "whether or not you are.")
+                    "that still lives somewhere with a door on it.")
             };
+
+            // A face per name. Drawn from constants, so this is idempotent and costs
+            // nothing to re-run; wired here because a portrait nothing points at is a
+            // file on disk rather than a face on a card.
+            var names = new string[data.siblings.Count];
+            for (int i = 0; i < data.siblings.Count; i++) names[i] = data.siblings[i].displayName;
+
+            FPSKitPortraits.GenerateAll(names);
+
+            for (int i = 0; i < data.siblings.Count; i++)
+                data.siblings[i].portrait = FPSKitPortraits.Load(names[i]);
 
             // Marit's arena is the seventh zone and does not exist yet -- it is a walled
             // box the size of a house rather than another 450m arena, and it is built in
@@ -265,7 +257,7 @@ namespace FPSKit.EditorTools
         /// them rather than writing a zone with nothing in it.
         /// </summary>
         static CampaignData.Zone Zone(string themeName, int siblingIndex, string grantsPower,
-                                      string opening, string stakes)
+                                      string opening)
         {
             var levels = FPSKitLevels.GetOrCreate(themeName);
 
@@ -275,10 +267,56 @@ namespace FPSKit.EditorTools
                 levels = levels,
                 siblingIndex = siblingIndex,
                 grantsPower = grantsPower,
-                opening = opening,
-                stakes = stakes
+                opening = opening
             };
         }
+
+        /// <summary>
+        /// Why the clock exists in each arena, in that arena's own voice.
+        ///
+        /// <b>Written here and stamped onto the LevelSet by
+        /// <see cref="FPSKitLevels"/>.</b> The line is read in the arena, by the HUD,
+        /// during the briefing -- and the arena holds its ladder already while it holds
+        /// no campaign asset at all. Putting the string on the ladder means no scene
+        /// needs a new reference and no arena has to be rebuilt to change a word of it;
+        /// keeping the text here means the story is still written in one file.
+        ///
+        /// A theme the campaign does not use gets nothing, and the HUD simply shows the
+        /// countdown as it always did.
+        /// </summary>
+        public static string StakesFor(string themeName) => themeName switch
+        {
+            "Industrial Warehouse" =>
+                "The plant runs to a shift clock and the gates seal when it ends. Finish " +
+                "this before they do -- nobody opens them from the outside, and nobody is " +
+                "coming to look.",
+
+            "Snowbound Station" =>
+                "The storm closes the pass on a schedule the weather does not negotiate. " +
+                "Be finished before it shuts, or the station keeps you until spring, and " +
+                "it will not be keeping you alive.",
+
+            "Desert Outpost" =>
+                "The convoy window is the only traffic through here all day. Miss it and " +
+                "you are walking, and the distances out here are not walkable.",
+
+            "Night Rooftop" =>
+                "Ilsa holds the lifts and the lights. When her cycle ends the roof seals " +
+                "with whoever is on it still on it, and the only way down from here is " +
+                "the fast one.",
+
+            "Abandoned Subway" =>
+                "The ground here is older than the fence around it. When the floodlights " +
+                "go, the holes you have been walking round stop being visible -- and they " +
+                "are still exactly where they were.",
+
+            "Mars Colony" =>
+                "The dome vents to schedule and the schedule is set from the ground, by " +
+                "his sister. Be out of the open when it goes, because it will go whether " +
+                "or not you are.",
+
+            _ => ""
+        };
 
         // ==================================================================
         static void EnsureFolders()

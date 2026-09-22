@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Levels_SnowboundStation
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: SnowboundStation
+  stakes: The storm closes the pass on a schedule the weather does not negotiate. Be finished before it shuts, or the station keeps you until spring, and it will not be keeping you alive.
   levels:
   - displayName: FIRST CONTACT
     brief: 6 hostiles. Kill them all before the clock runs out.

@@ -30,7 +30,7 @@ namespace FPSKit.EditorTools
 
         enum Phase
         {
-            Enter, InspectMenu, OpenDialog, ExitDialog,
+            Enter, Story, InspectMenu, OpenDialog, ExitDialog,
             OpenLevels, InspectLevels, Launch,
             AwaitArena, InspectArena, Quit, AwaitMenu, Judge
         }
@@ -42,6 +42,16 @@ namespace FPSKit.EditorTools
         static readonly StringBuilder Notes = new StringBuilder();
 
         static int _catalogCount;
+        static string _stakes = "";
+        static bool _stakesShown;
+
+        static bool _storyOpened;
+        static bool _storyClosed;
+        static bool _identityTaken;
+
+        /// <summary>The tester's own answer to the one question, put back in Detach.</summary>
+        static int _identityBackup = -1;
+
         static int _cardsShown;
         static int _cardsPlayable;
         static int _cardsLocked;
@@ -93,6 +103,18 @@ namespace FPSKit.EditorTools
                 _catalogCount = _cardsShown = _cardsPlayable = 0;
                 _cardsLocked = _lockedClickable = 0;
                 _gateBroken = "";
+                _storyOpened = _storyClosed = _identityTaken = false;
+                _stakes = "";
+                _stakesShown = false;
+
+                // The opening plays once per profile, so on any machine that has run this
+                // before it would not play at all and the assertions below would pass on
+                // a screen that never appeared. Forced to unanswered here and put back in
+                // Detach, like every other borrowed piece of state -- a check that left
+                // the developer's own campaign at the start would be a check that broke
+                // the game to pass.
+                _identityBackup = (int)Campaign.Who;
+                Campaign.Who = Campaign.Identity.Unset;
                 _levelsOffered = _levelsExpected = _levelsUnlocked = 0;
                 _levelOneOpen = false;
                 _lockedIsInert = true;
@@ -132,8 +154,37 @@ namespace FPSKit.EditorTools
                     case Phase.Enter:
                         if (!EditorApplication.isPlaying) { EditorApplication.EnterPlaymode(); return; }
                         _runsBefore = PlayerProfile.Runs;
-                        Wait(1.5, Phase.InspectMenu);
+                        Wait(1.5, Phase.Story);
                         return;
+
+                    case Phase.Story:
+                    {
+                        if (Waiting()) return;
+
+                        var opening = Menu() != null ? Menu().story : null;
+
+                        if (opening == null)
+                            throw new Exception("the dashboard has no story panel; run " +
+                                                "FPSKitBatch.BuildDashboard");
+
+                        // It must be up: the identity was cleared on the way in, so a
+                        // dashboard that did not open it has a cold open nobody will
+                        // ever see.
+                        _storyOpened = opening.IsOpen;
+
+                        if (_storyOpened)
+                        {
+                            // Answered rather than escaped, because the opening is the one
+                            // screen here that cannot be escaped out of -- and answering
+                            // is what the player will do.
+                            if (opening.womanButton != null) opening.womanButton.onClick.Invoke();
+
+                            _identityTaken = Campaign.HasIdentity;
+                        }
+
+                        Wait(0.6, Phase.InspectMenu);
+                        return;
+                    }
 
                     case Phase.InspectMenu:
                     {
@@ -142,6 +193,11 @@ namespace FPSKit.EditorTools
                         var menu = Menu();
                         if (menu == null) throw new Exception("the dashboard scene has no MainMenuController");
                         if (menu.catalog == null) throw new Exception("the dashboard has no arena catalog");
+
+                        // A card answered has to put the dashboard back. Left up, this
+                        // screen is a full-screen raycast target over every button on the
+                        // dashboard, which is the exact failure VerifyFlow exists for.
+                        _storyClosed = menu.story == null || !menu.story.IsOpen;
 
                         _catalogCount = menu.catalog.arenas.Count;
 
@@ -349,6 +405,32 @@ namespace FPSKit.EditorTools
 
                         _strip = hud.instructionText != null ? hud.instructionText.text : "";
                         Notes.Append($"\n  arena loaded, instruction strip reads: \"{Plain(_strip)}\"");
+
+                        // The stakes line: why this arena has a clock on it. It rides on
+                        // the LevelSet rather than on a reference in the scene, so what
+                        // this proves is that the campaign generator actually stamped it
+                        // -- which is the half of the trap that a passing reset hides.
+                        var manager = UnityEngine.Object.FindAnyObjectByType<LevelManager>();
+                        _stakes = manager != null ? manager.LevelStakes : "";
+
+                        // Only while the briefing is up, which is what it is written for.
+                        // Checked rather than assumed, because a level whose briefing has
+                        // already run out would report an empty label and look like a bug.
+                        if (manager != null && manager.IsBriefing && hud.briefingText != null)
+                        {
+                            string shown = Plain(hud.briefingText.text);
+                            string head = _stakes.Length > 24 ? _stakes.Substring(0, 24) : _stakes;
+
+                            _stakesShown = !string.IsNullOrEmpty(head) && shown.Contains(head);
+                            Notes.Append($"\n  briefing reads: \"{shown}\"");
+                        }
+                        else
+                        {
+                            // Not a failure: the assertion below only bites when it ran.
+                            _stakesShown = true;
+                            Notes.Append("\n  briefing had already finished, so only the data " +
+                                         "was checked");
+                        }
 
                         _phase = Phase.Quit;
                         return;
@@ -611,6 +693,12 @@ namespace FPSKit.EditorTools
 
         static void Detach()
         {
+            if (_identityBackup >= 0)
+            {
+                Campaign.Who = (Campaign.Identity)_identityBackup;
+                _identityBackup = -1;
+            }
+
             FPSKitPlayMode.RestoreStartScene();
 
             EditorApplication.update -= Tick;
@@ -643,6 +731,26 @@ namespace FPSKit.EditorTools
 
             if (!string.IsNullOrEmpty(_gateBroken))
                 problems.Append($"\n  - {_gateBroken}");
+
+            if (!_storyOpened)
+                problems.Append("\n  - the opening did not play on a profile that has never " +
+                                "answered it, so nobody is ever told what the game is about");
+
+            if (_storyOpened && !_identityTaken)
+                problems.Append("\n  - answering the opening did not record who the player " +
+                                "is, so it will ask again on the next boot");
+
+            if (string.IsNullOrWhiteSpace(_stakes))
+                problems.Append("\n  - the arena has no stakes line, so its clock is a timer " +
+                                "with no reason attached; run FPSKitBatch.ResetLevelSets");
+
+            if (!_stakesShown)
+                problems.Append("\n  - the stakes line never reached the briefing, so nothing " +
+                                "on screen says why the clock is running");
+
+            if (!_storyClosed)
+                problems.Append("\n  - the story card is still up after being answered: it " +
+                                "covers the whole dashboard, so nothing behind it can be clicked");
 
             if (!_dialogOpened)
                 problems.Append("\n  - the Exit button did not open a confirmation");

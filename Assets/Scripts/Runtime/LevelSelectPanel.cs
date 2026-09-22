@@ -36,6 +36,13 @@ public class LevelSelectPanel : MonoBehaviour
     public TMP_Text arenaNameText;
     public TMP_Text progressText;
     public TMP_Text hintText;
+
+    [Tooltip("The campaign, so the hint line under the header can be this zone's own " +
+             "opening rather than a generic instruction.\n\n" +
+             "This is also where a story beat goes to be re-read: the panel opens on the " +
+             "way into a zone, which is exactly where somebody who skipped a card is " +
+             "standing when they wonder what it said.")]
+    public CampaignData campaign;
     public TMP_Text statusText;
 
     [Header("Grid")]
@@ -199,8 +206,14 @@ public class LevelSelectPanel : MonoBehaviour
                                 $"{unlockedCount} / {set.Count} UNLOCKED";
 
         if (hintText != null)
-            hintText.text = "Clear a level to unlock the next. Kill everything before the " +
-                            "clock runs out for three stars.";
+        {
+            var zone = campaign != null ? campaign.ZoneForArena(entry.ProgressKey) : null;
+
+            hintText.text = zone != null && !string.IsNullOrWhiteSpace(zone.opening)
+                ? zone.opening
+                : "Clear a level to unlock the next. Kill everything before the clock " +
+                  "runs out for three stars.";
+        }
     }
 
     void Choose(int index)

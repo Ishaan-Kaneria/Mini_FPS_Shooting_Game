@@ -12,73 +12,83 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 47195c400fab4bc4f9a9f9ea6fbb4dfc, type: 3}
   m_Name: Campaign
   m_EditorClassIdentifier: Assembly-CSharp::CampaignData
+  prologue: 'The town had one employer and one gate, and Halvard Auger owned both.
+
+
+    You were eleven the night the plant burned. Your mother put you through the gate and did not come through it herself. The report said sixteen dead and a fault in a gas line, and it was signed by one of his children.
+
+
+    The old man is twenty years dead. The eight are still holding his sites.'
+  identityQuestion: Before we start -- were you a boy, or a girl?
   siblings:
   - displayName: Tove Auger
     holding: the plant
     beat: Tove signed the report that called it a gas fault. She did not deny it and she did not apologise for it. What she said, at the end, was that the gate your mother put you through was not an escape -- it was a transfer, and it was arranged.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: ad7441b4f203fe50381c9ed2981e4660, type: 3}
   - displayName: Kestrel Auger
     holding: the quarry
     beat: Kestrel kept the charges her father bought and never had to use. You are carrying one of them now. She was the only one who seemed to think you had a right to be there.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: f479a80a3368c96749e0e2c8a2769410, type: 3}
   - displayName: Aurel Auger
     holding: the convoy road
     beat: Aurel moved everything the company ever owned, including, once, a child. He remembered the manifest. He remembered the weight.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: 0014fe1754f5010c1b83b7914f0ea88b, type: 3}
   - displayName: Ilsa Auger
     holding: the cameras
     beat: Ilsa had watched you for twenty years and filed none of it. Someone was paying her not to. She told you the amount before she told you the name, because she thought the amount would mean more.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: f14e8d3a69ff9b727b729d3aa5e02135, type: 3}
   - displayName: Dev Auger
     holding: the works
     beat: Dev stopped running the company the year it stopped being worth running and moved into what was left of it. He was the first of them to call you by your first name.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: a3ec8510accc29b5f9708bb4b7a60801, type: 3}
   - displayName: Roan Auger
     holding: the colony
     beat: Roan left before any of it and has spent the years since being the innocent one. He is the only one who asked you a question. It was whether you had worked out yet who had been funding you.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: 3d42da7911a1f94319a579662a6145e7, type: 3}
   - displayName: Marit Auger
     holding: the company
     beat: Marit has been paying for this since the night it started. Eight ways is a bad division of an estate. One way is a better one, and she never had to hold a rifle to arrange it.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: 3bc9c0fa69ceefe2598ffbd09b33128a, type: 3}
   - displayName: the eighth name
     holding: nothing yet
     beat: Halvard Auger took one child out of that fire on purpose, and the list has always been eight long. You have been crossing off your own family in the order somebody else wrote them down.
     archetype: {fileID: 0}
+    portrait: {fileID: 2800000, guid: 8fa105c5ed8001c508be0096250d80e5, type: 3}
   zones:
   - displayName: Industrial Warehouse
     levels: {fileID: 11400000, guid: dc7b985cf64a425e684e23cd676ce6b1, type: 2}
     siblingIndex: 0
     opening: The town had one employer and one gate. You were eleven the night this place burned, and the report that called it a gas fault was signed by Halvard Auger's daughter. Twenty years on, Tove still runs the plant.
-    stakes: The plant runs to a shift clock and the gates seal when it ends. Finish this before they do. Nobody opens them from the outside, and nobody is coming to look.
     grantsPower: bomb
   - displayName: Snowbound Station
     levels: {fileID: 11400000, guid: f2375f859674c5c87b35e3756c5a0327, type: 2}
     siblingIndex: 1
     opening: Kestrel took the quarry and everything in its magazine. She has known you were coming since the plant went quiet, and she has been lighting the yard for it.
-    stakes: The storm closes the pass on a schedule the weather does not negotiate. Be finished before it shuts, or the station keeps you until spring, and it will not be keeping you alive.
     grantsPower: 
   - displayName: Desert Outpost
     levels: {fileID: 11400000, guid: 19a21f71669ec452fa1bce4db121bcb6, type: 2}
     siblingIndex: 2
     opening: Everything the company ever moved went down this road, and Aurel signed for all of it. Including, once, a manifest with a child on it.
-    stakes: The convoy window is the only traffic through here all day. Miss it and you are walking, and the distances out here are not walkable.
     grantsPower: 
   - displayName: Night Rooftop
     levels: {fileID: 11400000, guid: eafd0b974f354d6e09074c7a1181b549, type: 2}
     siblingIndex: 3
     opening: Ilsa runs what the company calls security, which is every camera in the city and the decision about which recordings exist. She has watched you for twenty years and filed none of it.
-    stakes: She holds the lifts and the lights. When her cycle ends the roof seals with whoever is on it still on it, and the only way down from here is the fast one.
     grantsPower: 
   - displayName: Abandoned Subway
     levels: {fileID: 11400000, guid: 2103e99d5365a121ca63d3aa4e9a6695, type: 2}
     siblingIndex: 4
     opening: Dev ran the works into the ground and then moved into what was left. The rides still turn when the wind is behind them. He kept the lights on over the shafts, which is either a courtesy or a trap.
-    stakes: The ground here is older than the fence around it. When the floodlights go the holes you have been walking round stop being visible, and they are still exactly where they were.
     grantsPower: 
   - displayName: Mars Colony
     levels: {fileID: 11400000, guid: 33a84de879134139cb2d8effe32ab3e3, type: 2}
     siblingIndex: 5
     opening: Roan left before any of this happened and has spent every year since being the one who was not there. He is the last name on the list that still lives somewhere with a door on it.
-    stakes: The dome vents to schedule and the schedule is set from the ground, by his sister. Be out of the open when it goes, because it will go whether or not you are.
     grantsPower: 

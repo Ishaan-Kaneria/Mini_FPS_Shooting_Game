@@ -81,6 +81,17 @@ public class Weapon : MonoBehaviour
     // whatever puts them back must not have to remember what the upgrades were.
 
     /// <summary>Temporary fire rate multiplier from a consumable. 1 when none is running.</summary>
+    /// <summary>
+    /// Stops this gun reloading at all, for a level that says so.
+    ///
+    /// <b>Not serialized</b>, so it cannot be saved into a prefab or a scene by accident
+    /// and comes back false after a mid-play recompile -- which is the safe direction:
+    /// the failure mode of forgetting the lock is an ordinary level, and the failure
+    /// mode of a lock that persisted is a gun that never reloads again with nothing on
+    /// screen to say why.
+    /// </summary>
+    [System.NonSerialized] public bool reloadLocked;
+
     [System.NonSerialized] public float BoostFireRateMultiplier = 1f;
 
     /// <summary>Temporary reload multiplier from a consumable. Below 1 is faster.</summary>
@@ -438,10 +449,21 @@ public class Weapon : MonoBehaviour
                Quaternion.AngleAxis(offset.y, cam.right) * forward;
     }
 
+    /// <summary>
+    /// Fills the magazine from nothing, without a reload and without touching the
+    /// reserve. What a level hands the player at the start of it.
+    /// </summary>
+    public void Refill()
+    {
+        if (data == null) return;
+
+        CurrentAmmo = MagazineSize;
+    }
+
     // ======================================================================
     public void TryReload()
     {
-        if (IsReloading || data.infiniteAmmo) return;
+        if (reloadLocked || IsReloading || data.infiniteAmmo) return;
         if (CurrentAmmo >= MagazineSize) return;
         if (ReserveAmmo <= 0 && !data.infiniteReserve) return;
 

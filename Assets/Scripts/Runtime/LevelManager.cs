@@ -213,7 +213,26 @@ public class LevelManager : MonoBehaviour
     /// HUD draws this as a bar with the star thresholds marked on it, so the player can
     /// see what the next star costs while there is still time to go and get it.
     /// </summary>
-    public float ScoreFraction => _totalWeight <= 0f ? 0f : Mathf.Clamp01(_killedWeight / _totalWeight);
+    /// <summary>
+    /// What the level asks for beyond the roster, or null on a plain clear. Created at
+    /// the start of every run and destroyed at the end of it.
+    /// </summary>
+    public LevelObjective Objective { get; private set; }
+
+    /// <summary>One line about the objective for the HUD, or empty.</summary>
+    public string ObjectiveLine => Objective != null ? Objective.HudLine : "";
+
+    /// <summary>
+    /// How much of this level has been earned, counting the objective beside the kills.
+    ///
+    /// The objective's weight is in <see cref="LevelSet.Level.TotalWeight"/> already, so
+    /// a level with one is not three stars for the roster alone -- which is the whole
+    /// reason for having one.
+    /// </summary>
+    public float ScoreFraction => _totalWeight <= 0f
+        ? 0f
+        : Mathf.Clamp01((_killedWeight + (Objective != null ? Objective.EarnedWeight : 0f))
+                        / _totalWeight);
 
     /// <summary>Set once, when the level ends. Read by the results screen.</summary>
     public LevelResult Result { get; private set; }
@@ -268,6 +287,12 @@ public class LevelManager : MonoBehaviour
     float _spawnAngle;
     float _killedWeight;
     float _totalWeight;
+
+    /// <summary>
+    /// When the clock runs out, as a wall-clock time. A field rather than a local so a
+    /// charge going off can take seconds out of it -- see <see cref="PenaliseClock"/>.
+    /// </summary>
+    float _deadline;
     float _startedAt;
 
     Health _playerHealth;
@@ -416,6 +441,44 @@ public class LevelManager : MonoBehaviour
     /// the clock and the kill count would otherwise carry across a seam the player never
     /// asked for. A finished level is never revived.
     /// </summary>
+    /// <summary>
+    /// Stops whatever is running and plays this level again from the briefing.
+    ///
+    /// It exists for the objective check, which plays six different objectives in one
+    /// session rather than paying for six play-mode entries -- the same reason
+    /// <see cref="KillAllEnemies"/> is public. The level is re-read on the way in, so a
+    /// test that retuned the asset gets the level it just wrote rather than the one
+    /// that was resolved at Start.
+    ///
+    /// Everything alive is discarded without being counted as lost, because this is not
+    /// something that happens to a player: nothing here should reach the replacement
+    /// queue or the score.
+    /// </summary>
+    public void RestartLevel()
+    {
+        StopAllCoroutines();
+
+        _levelRoutine = null;
+        _pendingSpawns = 0;
+
+        DiscardAll(countAsLost: false);
+
+        if (Objective != null) Objective.End();
+        Destroy(Objective);
+        Objective = null;
+
+        IsFinished = false;
+        IsRunning = false;
+        IsBriefing = false;
+
+        ActiveBoss = null;
+        ActiveBossName = "";
+
+        ResolveLevel();
+
+        _levelRoutine = StartCoroutine(RunLevel());
+    }
+
     void RecoverLevelLoop()
     {
         if (_levelRoutine != null || IsFinished) return;
@@ -432,6 +495,13 @@ public class LevelManager : MonoBehaviour
         Killed = 0;
         _killedWeight = 0f;
         BossKilled = false;
+
+        // Replaced rather than reused, because Restart re-runs a level in the same scene
+        // and an objective carries the ground it marked and the lights it took.
+        if (Objective != null) Objective.End();
+        Destroy(Objective);
+
+        Objective = LevelObjective.Begin(this, Level);
 
         IsBriefing = true;
         BriefingRemaining = Level.briefingTime;
@@ -458,20 +528,57 @@ public class LevelManager : MonoBehaviour
         // The clock is the level's own rule now, so it is checked first and without
         // exception: a level that quietly ran on past its limit because one enemy was
         // still walking over would make every star meaningless.
-        float deadline = Time.time + TimeLimit;
+        _deadline = Time.time + TimeLimit;
 
-        while (!IsFinished && Time.time < deadline && Killed < TotalEnemies)
+        // The objective may hold the level open past a cleared roster -- it may never
+        // hold it open past the clock, and it is not consulted about that at all. A
+        // level whose extraction point is unreachable runs out its clock and is scored
+        // on what was actually done, which is the only behaviour that cannot softlock.
+        while (!IsFinished && Time.time < _deadline
+               && (Killed < TotalEnemies || !ObjectiveSatisfied))
         {
-            TimeRemaining = Mathf.Max(0f, deadline - Time.time);
+            TimeRemaining = Mathf.Max(0f, _deadline - Time.time);
             yield return null;
         }
 
-        TimeRemaining = Mathf.Max(0f, deadline - Time.time);
+        TimeRemaining = Mathf.Max(0f, _deadline - Time.time);
 
         if (IsFinished) yield break;
 
-        Finish(Killed >= TotalEnemies ? LevelResult.Ending.Cleared : LevelResult.Ending.TimeUp);
+        Finish(Killed >= TotalEnemies && ObjectiveSatisfied
+            ? LevelResult.Ending.Cleared
+            : LevelResult.Ending.TimeUp);
     }
+
+    /// <summary>
+    /// True when the level's extra task is done, or when it has none. <b>Only ever used
+    /// to decide whether a cleared roster may finish early</b> -- never whether the
+    /// level ends.
+    /// </summary>
+    bool ObjectiveSatisfied => Objective == null || Objective.Satisfied;
+
+    /// <summary>
+    /// Takes seconds off the clock. The only thing in the game that does, and the whole
+    /// reason a charge going off matters.
+    ///
+    /// It cannot end the level on its own: the loop above checks the deadline on the
+    /// next frame either way, so the worst this does is bring that frame forward.
+    /// </summary>
+    public void PenaliseClock(float seconds)
+    {
+        if (seconds <= 0f || !IsRunning) return;
+
+        _deadline -= seconds;
+        TimeRemaining = Mathf.Max(0f, _deadline - Time.time);
+    }
+
+    /// <summary>
+    /// Whether the player could walk to a point. Public so <see cref="LevelObjective"/>
+    /// can ask it before marking ground -- an objective on an island is an objective the
+    /// player is scored against and cannot reach, which is the same failure the spawner
+    /// already refuses.
+    /// </summary>
+    public bool CanPlayerReach(Vector3 point) => CanReachPlayerFrom(point);
 
     IEnumerator SpawnLevel()
     {
@@ -1134,6 +1241,8 @@ public class LevelManager : MonoBehaviour
         Director?.RegisterKill(archetype, health.LastDamage.isHeadshot,
                                health.transform.position, byBomb);
 
+        Objective?.NoteKilled(health.gameObject);
+
         TryDrop(archetype, health.transform.position);
     }
 
@@ -1152,7 +1261,12 @@ public class LevelManager : MonoBehaviour
         float shieldChance = archetype != null ? archetype.shieldDropChance : 0.06f;
         if (TrySpawnDrop(shieldPickupPrefab, shieldChance, spot)) return;
 
-        float ammoChance = archetype != null ? archetype.ammoDropChance : 0f;
+        // The level's own bonus on top of the archetype's, never written into it: an
+        // EnemyArchetype is one shared asset, so a level that raised a drop chance on it
+        // would raise it for every other level using that enemy, on disk, for good.
+        float ammoChance = (archetype != null ? archetype.ammoDropChance : 0f)
+                           + (Objective != null ? Objective.AmmoDropBonus : 0f);
+
         TrySpawnDrop(ammoPickupPrefab, ammoChance, spot);
     }
 

@@ -177,6 +177,13 @@ namespace FPSKit.EditorTools
 
             var bosses = BossRoster();
 
+            // How many levels so far have asked for an objective. The rotation below is
+            // keyed on this rather than on the level index, and the difference is not
+            // cosmetic: the boss slots are not evenly spaced, so at eight levels an
+            // index-keyed rotation of six comes back round and hands two levels of the
+            // same ladder the same objective while leaving another one unused.
+            int fought = 0;
+
             for (int i = 0; i < LevelsPerArena; i++)
             {
                 int number = i + 1;
@@ -190,10 +197,21 @@ namespace FPSKit.EditorTools
                 float clock = Mathf.Round(enemies * SecondsPerEnemy + BaseSeconds
                                           + (boss ? BossSeconds : 0f));
 
+                var objective = ObjectiveFor(fought, boss, arenaIndex);
+                if (!boss) fought++;
+
                 var level = new LevelSet.Level
                 {
-                    displayName = LevelName(number, boss),
-                    brief = Brief(number, enemies, boss),
+                    displayName = LevelName(number, boss, objective),
+                    brief = Brief(number, enemies, boss, objective),
+
+                    objective = objective,
+
+                    // Worth about a fifth of a mid-ladder roster, so an objective ignored
+                    // costs a star and an objective done is most of the difference
+                    // between two and three. Scaled with the level so it keeps that share
+                    // as the crowd grows rather than becoming a rounding error by level 8.
+                    objectiveWeight = Mathf.Round(Mathf.Max(4f, enemies * 0.45f)),
 
                     enemyCount = enemies,
                     timeLimit = clock,
@@ -277,25 +295,98 @@ namespace FPSKit.EditorTools
             return bosses[Mathf.Min(rank, bosses.Count - 1)];
         }
 
-        static string LevelName(int number, bool boss)
+        /// <summary>
+        /// What each level asks for beyond its roster.
+        ///
+        /// Three rules, and all three are about what a ladder feels like rather than
+        /// about the objectives themselves:
+        ///
+        /// <b>A boss level is always a plain clear.</b> The boss is the level -- it is
+        /// most of the weight by design -- and asking the player to also hold ground or
+        /// carry a charge across the arena during it is two levels fighting each other
+        /// for the same clock.
+        ///
+        /// <b>The first level of the campaign is a plain clear too.</b> Whatever else is
+        /// true of a first level, it has to teach the thing every other level is built
+        /// on, and it cannot do that while also introducing a rule.
+        ///
+        /// <b>The rotation is offset by the arena.</b> Without that, the fourth level of
+        /// all six zones is the same objective, and a player who has finished one arena
+        /// has seen the whole ladder of the next one before starting it.
+        /// </summary>
+        static LevelSet.Objective ObjectiveFor(int fought, bool boss, int arenaIndex)
+        {
+            if (boss) return LevelSet.Objective.Clear;
+            if (fought == 0 && arenaIndex == 0) return LevelSet.Objective.Clear;
+
+            var rotation = new[]
+            {
+                LevelSet.Objective.Hunt,
+                LevelSet.Objective.OneMagazine,
+                LevelSet.Objective.Hold,
+                LevelSet.Objective.Blackout,
+                LevelSet.Objective.Extraction,
+                LevelSet.Objective.Disposal
+            };
+
+            return rotation[(fought + arenaIndex) % rotation.Length];
+        }
+
+        static string LevelName(int number, bool boss, LevelSet.Objective objective)
         {
             if (boss) return $"BOSS {number / 3}";
 
-            string[] names =
+            // Named for what it asks, because the name is on the tile the player is
+            // choosing from and "NO COVER" says nothing that "BLACKOUT" does not say
+            // better. The plain clears keep the old names, which is most of what they
+            // were ever for.
+            switch (objective)
             {
-                "FIRST CONTACT", "PUSHBACK", "OVERRUN", "NO COVER",
-                "HOLD THE LINE", "THINNING OUT", "LAST STAND"
-            };
+                case LevelSet.Objective.Hunt: return "THE RUNNER";
+                case LevelSet.Objective.OneMagazine: return "ONE MAGAZINE";
+                case LevelSet.Objective.Hold: return "HOLD THE LINE";
+                case LevelSet.Objective.Blackout: return "BLACKOUT";
+                case LevelSet.Objective.Extraction: return "WAY OUT";
+                case LevelSet.Objective.Disposal: return "DISPOSAL";
+            }
 
+            string[] names = { "FIRST CONTACT", "PUSHBACK", "OVERRUN", "NO COVER", "LAST STAND" };
             return names[(number - 1) % names.Length];
         }
 
-        static string Brief(int number, int enemies, bool boss)
-            => boss
-                ? $"{enemies} hostiles and a boss. The boss is most of the score."
-                : number == 1
-                    ? $"{enemies} hostiles. Kill them all before the clock runs out."
-                    : $"{enemies} hostiles. Clear them for three stars.";
+        /// <summary>
+        /// The line under the name on the tile, and the first thing on screen when a
+        /// level starts. It says what the level wants, not how it was generated.
+        /// </summary>
+        static string Brief(int number, int enemies, bool boss, LevelSet.Objective objective)
+        {
+            if (boss) return $"{enemies} hostiles and a boss. The boss is most of the score.";
+
+            switch (objective)
+            {
+                case LevelSet.Objective.Hunt:
+                    return $"{enemies} hostiles. One of them runs -- that one is the level.";
+
+                case LevelSet.Objective.OneMagazine:
+                    return $"{enemies} hostiles, one magazine, no reload. Kills resupply you.";
+
+                case LevelSet.Objective.Hold:
+                    return $"{enemies} hostiles. Stand on the marked ground and keep standing.";
+
+                case LevelSet.Objective.Blackout:
+                    return $"{enemies} hostiles, and the lights are not yours.";
+
+                case LevelSet.Objective.Extraction:
+                    return $"{enemies} hostiles. Clear them, then reach the way out.";
+
+                case LevelSet.Objective.Disposal:
+                    return $"{enemies} hostiles and four charges. Reach a charge or lose the clock.";
+            }
+
+            return number == 1
+                ? $"{enemies} hostiles. Kill them all before the clock runs out."
+                : $"{enemies} hostiles. Clear them for three stars.";
+        }
 
         // ==================================================================
         static void EnsureFolders()

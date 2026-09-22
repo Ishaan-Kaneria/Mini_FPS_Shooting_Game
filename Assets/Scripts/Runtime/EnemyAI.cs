@@ -160,6 +160,18 @@ public class EnemyAI : MonoBehaviour
              "supposed to be the thing that does not care.")]
     public bool canRetreat = true;
 
+    /// <summary>
+    /// Runs and keeps running, whatever the suppression says. Set by a hunt level on the
+    /// one enemy it marks.
+    ///
+    /// It goes through <see cref="UpdateRetreat"/> rather than being a state of its own
+    /// because retreating is already exactly this behaviour -- break off, pick cover,
+    /// re-pick it on arrival -- with a timer on it. What a hunt removes is the timer, so
+    /// this is that one condition and nothing else. A seventh state would be six copies
+    /// of the movement code for one missing line.
+    /// </summary>
+    [System.NonSerialized] public bool forcedFlight;
+
     [Tooltip("Damage inside the window below that sends it looking for cover.")]
     [Min(1f)] public float suppressionDamage = 45f;
 
@@ -544,6 +556,24 @@ public class EnemyAI : MonoBehaviour
     /// </summary>
     bool UpdateRetreat()
     {
+        // The hunt's quarry. Ahead of the timer, because the timer is the only thing
+        // that would ever bring it back into the fight.
+        if (forcedFlight)
+        {
+            CurrentState = State.Retreat;
+
+            if (_agent.isOnNavMesh)
+            {
+                _agent.isStopped = false;
+
+                if (!_agent.pathPending
+                    && _agent.remainingDistance <= _agent.stoppingDistance + 0.5f)
+                    SetRetreatGoal();
+            }
+
+            return true;
+        }
+
         if (Time.time < _retreatUntil)
         {
             CurrentState = State.Retreat;

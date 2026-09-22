@@ -512,6 +512,8 @@ public class HUDController : MonoBehaviour
     int _shownScore = Unset;
     int _shownCombo = Unset, _shownMultiplier = Unset;
     int _shownLevel = Unset;
+    string _shownObjective = "";
+
     int _shownKilled = Unset, _shownClock = Unset;
     int _shownBriefing = Unset;
     int _shownCoins = Unset;
@@ -653,10 +655,17 @@ public class HUDController : MonoBehaviour
         int killed = running ? levelManager.Killed : Hidden;
         int clock = running ? Mathf.CeilToInt(levelManager.TimeRemaining) : Hidden;
 
-        if (killed == _shownKilled && clock == _shownClock) return;
+        // The objective's own line moves every frame it has a distance or a fuse in it,
+        // so it is part of what makes this label dirty. Compared rather than assumed
+        // changed: the string is already being built either way, and what costs anything
+        // here is TMP laying the label out again.
+        string task = running ? levelManager.ObjectiveLine : "";
+
+        if (killed == _shownKilled && clock == _shownClock && task == _shownObjective) return;
 
         _shownKilled = killed;
         _shownClock = clock;
+        _shownObjective = task;
 
         if (!running)
         {
@@ -669,7 +678,13 @@ public class HUDController : MonoBehaviour
         if (levelManager.TimeRemaining <= clockWarningTime)
             time = $"<color=#{ColorUtility.ToHtmlStringRGB(clockWarningColor)}>{time}</color>";
 
-        objectiveText.text = $"{killed} / {levelManager.TotalEnemies} KILLED   <size=110%>{time}</size>";
+        string counts = $"{killed} / {levelManager.TotalEnemies} KILLED   <size=110%>{time}</size>";
+
+        // Under the count, dimmer and smaller. Above it would put the thing that changes
+        // least where the eye already goes for the two things that change most.
+        objectiveText.text = string.IsNullOrEmpty(task)
+            ? counts
+            : $"{counts}\n<size=64%><color=#B8AFA0>{task}</color></size>";
     }
 
     void UpdateBriefingText()

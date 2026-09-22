@@ -25,6 +25,45 @@ public class LevelSet : ScriptableObject
     /// star. Everything here is per-level on purpose -- a difficulty curve written as
     /// a formula in code is one nobody can bend for a single level that plays badly.
     /// </summary>
+    /// <summary>
+    /// What a level asks for beyond killing the roster.
+    ///
+    /// <b>None of these may change what *ends* a level.</b> The clock ends it, always and
+    /// without exception -- see the comment on <c>LevelManager.RunLevel</c>. An objective
+    /// may only change what *scores*, and may at most delay the early finish that a
+    /// cleared roster grants. Written the other way round -- "the level ends when the
+    /// zone has been held" -- a single enemy down a hole is a guaranteed softlock, which
+    /// is the one failure this kit is built to be incapable of.
+    ///
+    /// Everything here is therefore either a modifier on how the fight is fought
+    /// (<see cref="OneMagazine"/>, <see cref="Blackout"/>) or a second source of weight
+    /// beside the kills (<see cref="Hunt"/>, <see cref="Hold"/>,
+    /// <see cref="Extraction"/>, <see cref="Disposal"/>).
+    /// </summary>
+    public enum Objective
+    {
+        /// <summary>Kill the roster. The original level, and still most of them.</summary>
+        Clear = 0,
+
+        /// <summary>No reloading. Kills feed you instead, so accuracy is the resource.</summary>
+        OneMagazine = 1,
+
+        /// <summary>One of them runs, is worth most of the level, and is marked.</summary>
+        Hunt = 2,
+
+        /// <summary>Stand in a marked place while the fight comes to you.</summary>
+        Hold = 3,
+
+        /// <summary>The lights are somebody else's to switch off.</summary>
+        Blackout = 4,
+
+        /// <summary>Clear it, then get to the way out before the clock does.</summary>
+        Extraction = 5,
+
+        /// <summary>Charges on timers. Reach one to make it safe, or lose clock to it.</summary>
+        Disposal = 6
+    }
+
     [Serializable]
     public class Level
     {
@@ -56,6 +95,17 @@ public class LevelSet : ScriptableObject
         [Tooltip("Seconds of read-the-briefing before the clock starts. The clock must " +
                  "not be running while the player is still reading what the level is.")]
         [Min(0f)] public float briefingTime = 3f;
+
+        [Header("Objective")]
+        [Tooltip("What this level asks for beyond the roster. See the enum: none of these " +
+                 "may change what ends a level, only what scores.")]
+        public Objective objective = Objective.Clear;
+
+        [Tooltip("What the objective is worth against one ordinary enemy, on the same " +
+                 "scale bossWeight uses. It is added to the level's total, so a level " +
+                 "with an objective has more to earn and the roster alone is no longer " +
+                 "three stars -- which is the point of having one.")]
+        [Min(0f)] public float objectiveWeight = 6f;
 
         [Header("Boss")]
         [Tooltip("Adds a boss on top of the count above. It arrives with the level rather " +
@@ -115,7 +165,26 @@ public class LevelSet : ScriptableObject
         /// Everything that has to die, counted the way the stars count it: each ordinary
         /// enemy is worth one and the boss is worth <see cref="bossWeight"/>.
         /// </summary>
-        public float TotalWeight => enemyCount + (hasBoss ? bossWeight : 0f);
+        public float TotalWeight => enemyCount + (hasBoss ? bossWeight : 0f) + ObjectiveWeight;
+
+        /// <summary>
+        /// What the objective adds to the level's weight, or zero for the objectives
+        /// that are modifiers rather than tasks.
+        ///
+        /// <b>A modifier must be worth nothing.</b> "No reloading" and "the lights are
+        /// off" make the same roster harder; they do not add anything to kill or reach.
+        /// Weighting them would mean a player who beat a harder level scored a fraction
+        /// of it for free, and -- worse -- that the weight could never be earned at all,
+        /// so a perfectly played blackout would cap at two stars.
+        /// </summary>
+        public float ObjectiveWeight => objective switch
+        {
+            Objective.Hunt => objectiveWeight,
+            Objective.Hold => objectiveWeight,
+            Objective.Extraction => objectiveWeight,
+            Objective.Disposal => objectiveWeight,
+            _ => 0f
+        };
     }
 
     [Tooltip("The arena these levels are played in, as it appears in Build Settings. " +

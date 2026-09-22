@@ -317,6 +317,14 @@ namespace FPSKit.EditorTools
         public static void VerifyStore() => FPSKitStoreTest.VerifyStore();
 
         /// <summary>
+        /// Plays every objective in a real arena: each one must arm, say what it wants,
+        /// and place whatever it claims to have marked -- and the last pass proves that
+        /// an objective which can never be satisfied still lets the clock end the level,
+        /// which is the invariant the whole feature is allowed to exist under.
+        /// </summary>
+        public static void VerifyObjectives() => FPSKitObjectiveTest.VerifyObjectives();
+
+        /// <summary>
         /// Plays a level and aims, throws and listens to a bomb: the ring has to follow
         /// the mouse smoothly across the whole throw range, a short throw has to land
         /// sooner than a long one, the bomb has to go off where the ring said, and the

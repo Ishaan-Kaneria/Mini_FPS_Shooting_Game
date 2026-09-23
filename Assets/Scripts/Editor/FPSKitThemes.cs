@@ -449,7 +449,7 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Snowbound Station":
-                    t.description = "Low winter sun, thick fog, short engagements.";
+                    t.description = "A polar station, pine forest, ice caves and crevasses. Low sun, drifting snow.";
 
                     // Snow underfoot, concrete for the station. Snow's map is the softest
                     // of the set on purpose -- what reads as snow is the absence of fine
@@ -458,7 +458,11 @@ namespace FPSKit.EditorTools
                     t.wallDetail = "Concrete";
                     t.floorDetailSize = 6f;
                     t.wallDetailSize = 3f;
-                    t.skyTint = new Color(0.66f, 0.74f, 0.86f);
+                    // Blizzard and light (2026-09-23): a low, cold, slightly gold sun that throws long
+                    // blue shadows across the field -- the one thing that gives white ground a shape
+                    // -- under a pale overcast rather than the clear blue it was. Shadows are what
+                    // snow is drawn with; at the old 38 degrees there were hardly any.
+                    t.skyTint = new Color(0.72f, 0.76f, 0.82f);
                     t.skyGroundColor = new Color(0.80f, 0.84f, 0.90f);
 
                     // <b>Thin air, and a sun that is up.</b> At 2.2 thickness and 18
@@ -467,12 +471,12 @@ namespace FPSKit.EditorTools
                     // top half of the screen: a blazing orange sky over a snow field,
                     // which reads as a desert somebody painted white. Thin atmosphere is
                     // what makes a cold sky pale blue rather than warm.
-                    t.atmosphereThickness = 0.75f;
-                    t.skyExposure = 1.25f;
-                    t.sunColor = new Color(0.92f, 0.95f, 1f);
+                    t.atmosphereThickness = 1.35f;
+                    t.skyExposure = 1.15f;
+                    t.sunColor = new Color(1f, 0.90f, 0.76f);
                     t.sunIntensity = 1.15f;
-                    t.sunAngles = new Vector2(38f, 205f);
-                    t.fogColor = new Color(0.84f, 0.88f, 0.94f);
+                    t.sunAngles = new Vector2(17f, 205f);
+                    t.fogColor = new Color(0.80f, 0.84f, 0.90f);
                     // <b>Snow bounces.</b> These were written for a 95m box behind thick
                     // fog, where nothing was ever lit by anything but the fog itself; on
                     // an open field under a sun they made every dome and every drift face
@@ -480,7 +484,7 @@ namespace FPSKit.EditorTools
                     // sunlight is not grey -- the ground under it is throwing most of the
                     // light back up at it, which is exactly what ambientGround is for and
                     // why it is the one raised furthest here.
-                    t.ambientSky = new Color(0.74f, 0.82f, 0.95f);
+                    t.ambientSky = new Color(0.62f, 0.72f, 0.90f);
                     t.ambientEquator = new Color(0.72f, 0.78f, 0.88f);
                     t.ambientGround = new Color(0.66f, 0.71f, 0.80f);
                     // Snow is the brightest surface in the game and has to be written as
@@ -533,7 +537,7 @@ namespace FPSKit.EditorTools
                     // first drift, which reads as an empty arena rather than a foggy one.
                     // The desert sits at 0.0011; snow is allowed more, because haze off a
                     // white field is most of what makes it look cold.
-                    t.fogDensity = 0.0017f;
+                    t.fogDensity = 0.0022f;
 
                     t.roomCount = 0;
                     t.platformCount = 0;

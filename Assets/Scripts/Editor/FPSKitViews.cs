@@ -126,7 +126,7 @@ namespace FPSKit.EditorTools
         /// </summary>
         static IEnumerable<Shot> Frame(LevelTheme theme)
         {
-            if (theme != null && theme.snowZone) return FrameSnow();
+            if (theme != null && theme.snowZone) return System.Linq.Enumerable.Concat(FrameSnow(), FrameSnowLife());
             if (theme != null && theme.industrialZone) return FrameIndustrial();
             if (theme != null && theme.openZone && !theme.volcanicZone)
                 return System.Linq.Enumerable.Concat(FrameDesert(theme), FrameDesertLife());
@@ -495,6 +495,55 @@ namespace FPSKit.EditorTools
                 var p = plane.Value.center;
                 yield return new Shot { Name = "15_plane", Grounded = true, From = new Vector3(p.x + 24f, 1.65f, p.z + 18f),
                                         Look = p, Fov = 70f };
+            }
+        }
+
+        /// <summary>Snowbound's newer places, found in the scene like the camps are.</summary>
+        static IEnumerable<Shot> FrameSnowLife()
+        {
+            Bounds? Of(string name)
+            {
+                var go = FindFirst(name);
+                if (go == null) return null;
+                var r = go.GetComponentInChildren<Renderer>();
+                return r != null ? r.bounds : new Bounds(go.transform.position, Vector3.one);
+            }
+
+            var anchor = FindFirst("PreviewAnchor");
+            if (anchor != null)
+                yield return new Shot { Name = "10_station", From = anchor.transform.position,
+                                        Look = anchor.transform.position + anchor.transform.forward * 50f, Fov = 62f };
+
+            var bridge = Of("RopeBridge");
+            if (bridge.HasValue)
+            {
+                var b = bridge.Value.center;
+                yield return new Shot { Name = "11_crevasse", Grounded = true, From = new Vector3(b.x + 14f, 1.8f, b.z + 14f),
+                                        Look = new Vector3(b.x, b.y - 2f, b.z), Fov = 72f };
+            }
+
+            var cave = Of("IceCave");
+            if (cave.HasValue)
+            {
+                var c = cave.Value.center;
+                yield return new Shot { Name = "12_ice_cave", Grounded = true, From = new Vector3(c.x + 18f, 1.65f, c.z + 18f),
+                                        Look = new Vector3(c.x, 2f, c.z), Fov = 72f };
+            }
+
+            var fall = Of("FrozenFall");
+            if (fall.HasValue)
+            {
+                var f = fall.Value.center;
+                yield return new Shot { Name = "13_icefall", Grounded = true, From = new Vector3(f.x * 0.8f, 1.65f, f.z * 0.8f),
+                                        Look = new Vector3(f.x, f.y, f.z), Fov = 72f };
+            }
+
+            var pines = Of("PineTrunks");
+            if (pines.HasValue)
+            {
+                var p = pines.Value.center;
+                yield return new Shot { Name = "14_forest", Grounded = true, From = new Vector3(p.x + 30f, 1.65f, p.z + 30f),
+                                        Look = new Vector3(p.x, 4f, p.z), Fov = 72f };
             }
         }
 

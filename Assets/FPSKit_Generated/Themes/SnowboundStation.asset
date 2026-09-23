@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Snowbound Station
   displayName: 
-  description: Low winter sun, thick fog, short engagements.
+  description: A polar station, pine forest, ice caves and crevasses. Low sun, drifting snow.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
   - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
@@ -25,18 +25,18 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
   - {fileID: 11400000, guid: 0674b300a8bef6e2c92b0b2b34a85aba, type: 2}
   skyboxOverride: {fileID: 0}
-  skyTint: {r: 0.66, g: 0.74, b: 0.86, a: 1}
+  skyTint: {r: 0.72, g: 0.76, b: 0.82, a: 1}
   skyGroundColor: {r: 0.8, g: 0.84, b: 0.9, a: 1}
-  atmosphereThickness: 0.75
-  skyExposure: 1.25
-  sunColor: {r: 0.92, g: 0.95, b: 1, a: 1}
+  atmosphereThickness: 1.35
+  skyExposure: 1.15
+  sunColor: {r: 1, g: 0.9, b: 0.76, a: 1}
   sunIntensity: 1.15
-  sunAngles: {x: 38, y: 205}
+  sunAngles: {x: 17, y: 205}
   shadowStrength: 0.85
   fogEnabled: 1
-  fogColor: {r: 0.84, g: 0.88, b: 0.94, a: 1}
-  fogDensity: 0.0017
-  ambientSky: {r: 0.74, g: 0.82, b: 0.95, a: 1}
+  fogColor: {r: 0.8, g: 0.84, b: 0.9, a: 1}
+  fogDensity: 0.0022
+  ambientSky: {r: 0.62, g: 0.72, b: 0.9, a: 1}
   ambientEquator: {r: 0.72, g: 0.78, b: 0.88, a: 1}
   ambientGround: {r: 0.66, g: 0.71, b: 0.8, a: 1}
   arenaSize: 450

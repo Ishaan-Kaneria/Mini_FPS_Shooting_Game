@@ -149,6 +149,12 @@ namespace FPSKit.EditorTools
             _pads.Clear();
             ResetLavaField();
             ResetDesertLife();
+            ResetSnowLife();
+
+            // The plant's own, read by shared helpers (the catwalk's second stair asks both):
+            // in a six-arena batch, the next arena would inherit the plant's roads and gates.
+            ResetDense();
+            _roadTiles.Clear();
         }
 
         /// <summary>
@@ -635,7 +641,7 @@ namespace FPSKit.EditorTools
             {
                 float x = _groundMin + i * _groundStep;
                 float z = _groundMin + j * _groundStep;
-                return Mathf.Abs(x - GorgeCentreAt(z)) < holeHalf;
+                return Mathf.Abs(x - GorgeCentreAt(z)) < holeHalf || InCrevasse(x, z, 0f);
             }
 
             for (int a = 0; a < nx; a++)

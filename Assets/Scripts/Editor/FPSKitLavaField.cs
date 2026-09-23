@@ -321,6 +321,11 @@ namespace FPSKit.EditorTools
             float half = _theme.arenaSize * 0.5f;
             if (Mathf.Abs(x) > half - margin || Mathf.Abs(z) > half - margin) return false;
 
+            // Only a layout with a river has a canyon to keep clear of. The snow field has no
+            // gorge, but it still carries a hazard width from the theme's defaults, and asked
+            // regardless this carved a phantom strip down it that nothing could be laid on.
+            if (!_theme.openZone) return !InCrevasse(x, z, margin);
+
             float clear = _theme.hazardWidth * 0.5f + GorgeLipOverlap + RimBandWidth * 0.6f + margin;
             return Mathf.Abs(x - GorgeCentreAt(z)) > clear;
         }

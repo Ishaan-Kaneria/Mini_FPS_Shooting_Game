@@ -110,6 +110,9 @@ namespace FPSKit.EditorTools
             PlanLake(rng, half);
             PlanCamps(rng, half);
 
+            // The station, the crevasses, the caves and the icefall (FPSKitSnowLife).
+            PlanSnowLife(half);
+
             // ---- ground ----
             BuildDuneField(root, layer, half);
             BuildApron(root, backdrop, half);
@@ -121,6 +124,7 @@ namespace FPSKit.EditorTools
             BuildCamps(root, layer, rng);
             BuildPressureRidges(root, layer, rng, half);
             BuildSnowScatter(root, layer, rng, half);
+            BuildSnowLife(root, layer, backdrop, half);
             BuildSnowfall(root);
 
             // The same call and the same numbers the open zone and the park use. Inside

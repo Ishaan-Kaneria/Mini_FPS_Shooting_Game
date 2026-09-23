@@ -27,7 +27,7 @@ MonoBehaviour:
     levels: {fileID: 11400000, guid: 19a21f71669ec452fa1bce4db121bcb6, type: 2}
   - displayName: Snowbound Station
     sceneName: SnowboundStation
-    description: Low winter sun, thick fog, short engagements.
+    description: A polar station, pine forest, ice caves and crevasses. Low sun, drifting snow.
     preview: {fileID: 2800000, guid: c0a35379b809cd88b95f25251ba457fe, type: 3}
     theme: {fileID: 11400000, guid: ae4a2989451bce14e966a26b79d80e01, type: 2}
     levels: {fileID: 11400000, guid: f2375f859674c5c87b35e3756c5a0327, type: 2}

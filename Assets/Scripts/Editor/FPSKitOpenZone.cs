@@ -193,6 +193,9 @@ namespace FPSKit.EditorTools
 
             BuildProps(root, layer, rng, half);
             BuildAccentLights(root, rng);
+
+            // Last, so "empty" means empty after everything else has had its turn.
+            BuildDesertFill(root, layer, half);
         }
 
         // ==================================================================

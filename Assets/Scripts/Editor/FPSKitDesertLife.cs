@@ -59,6 +59,10 @@ namespace FPSKit.EditorTools
 
         private static void ResolveDesertLifeMaterials()
         {
+            // Made on first use by the fill; cleared here so a batch of arenas does not hand
+            // one theme's materials to the next.
+            _acaciaMat = _netMat = _sandbagMat = null;
+
             _earthMat = MakeDetailMaterial("PackedEarth", new Color(0.55f, 0.45f, 0.32f), "Adobe", 0.2f, 0.06f, 0f, 0.8f);
             _trackMat = MakeDetailMaterial("Track", new Color(0.50f, 0.41f, 0.29f), "Sand", 0.12f, 0.05f, 0f, 0.7f);
             _grassMat = MakeDetailMaterial("OasisGrass", new Color(0.30f, 0.40f, 0.16f), "Sand", 0.3f, 0.12f, 0f, 0.6f);
@@ -1102,6 +1106,227 @@ namespace FPSKit.EditorTools
             }
             Visual(parent, "Debris", debris, _alloyMat, backdrop);
         }
+
+        // ==================================================================
+        // Filling the empty ground
+        // ==================================================================
+        /// <summary>
+        /// The last pass: finds the long stretches of open sand nothing else claimed and puts
+        /// something in them -- groves of acacia in most, and in the biggest a fighting position
+        /// under a camouflage net. Ishaan, looking at the desert after the town went in: "fill
+        /// some very long unused area with some trees or a killing net space".
+        ///
+        /// Found by scanning the claims rather than chosen up front, because "empty" means
+        /// empty after everything else has had its turn.
+        /// </summary>
+        private static void BuildDesertFill(Transform root, int layer, float half)
+        {
+            if (!DesertLife) return;
+
+            var rng = new System.Random(_theme.randomSeed * 9973 + 5);
+            var group = new GameObject("Fill").transform;
+            group.SetParent(root, false);
+
+            var spots = new List<Vector2>();
+            for (float x = -half + 30f; x <= half - 30f; x += 14f)
+                for (float z = -half + 30f; z <= half - 30f; z += 14f)
+                {
+                    var p = new Vector2(x + Rand(rng, -4f, 4f), z + Rand(rng, -4f, 4f));
+                    if (p.magnitude < 40f || !Drapeable(p.x, p.y, 12f)) continue;
+                    if (!OpenSand(p, 15f)) continue;
+                    spots.Add(p);
+                }
+
+            for (int i = spots.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (spots[i], spots[j]) = (spots[j], spots[i]); }
+
+            int nets = 0, groves = 0;
+            var taken = new List<Vector2>();
+            bool Near(Vector2 p, float r) { foreach (var t in taken) if ((t - p).magnitude < r) return true; return false; }
+
+            foreach (var p in spots)
+            {
+                if (Near(p, 30f)) continue;   // an earlier one took it
+
+                if (nets < 6 && OpenSand(p, 20f))
+                {
+                    NetPosition(group, layer, rng, p);
+                    nets++;
+                }
+                else if (groves < 22)
+                {
+                    AcaciaGrove(group, layer, rng, p);
+                    groves++;
+                }
+                else continue;
+
+                taken.Add(p);
+            }
+
+            Debug.Log($"[FPSKit] desert fill: {groves} grove(s), {nets} net position(s) in {spots.Count} empty spot(s).");
+        }
+
+        /// <summary>
+        /// Whether a circle of desert is bare: nothing but sand in it from knee height up, and
+        /// clear of the track. Asked of the physics scene rather than of the claim circles,
+        /// which by the end of a build overlap across nearly the whole map -- the first run of
+        /// this found no empty ground at all on a map that is mostly empty ground.
+        /// </summary>
+        private static bool OpenSand(Vector2 p, float radius)
+        {
+            foreach (var t in _track)
+                if (!float.IsNaN(t.x) && (t - p).magnitude < radius * 0.6f + 5f) return false;
+
+            Physics.SyncTransforms();
+            float g = GroundHeightAt(p.x, p.y);
+            var hits = Physics.OverlapCapsule(new Vector3(p.x, g + 0.6f + radius, p.y), new Vector3(p.x, g + 30f, p.y),
+                                              radius, ~0, QueryTriggerInteraction.Ignore);
+
+            foreach (var hit in hits)
+                if (!hit.CompareTag(SandTag)) return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// A handful of acacias: a short leaning trunk forking into two or three limbs, under a
+        /// flat umbrella of canopy. The canopy is off the bake -- a flat crown is exactly what
+        /// a NavMeshSurface bakes as an island in the sky -- and carries no collider; the
+        /// trunk does.
+        /// </summary>
+        private static void AcaciaGrove(Transform parent, int layer, System.Random rng, Vector2 centre)
+        {
+            _acaciaMat ??= MakeMaterial("Acacia", new Color(0.30f, 0.34f, 0.15f), 0.08f, 0f);
+
+            int trees = 4 + rng.Next(6);
+            var trunks = new MeshBuild { UVScale = 0.5f };
+
+            for (int i = 0; i < trees; i++)
+            {
+                float a = Rand(rng, 0f, Mathf.PI * 2f), r = Mathf.Sqrt((float)rng.NextDouble()) * 13f;
+                var p = centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
+                var foot = new Vector3(p.x, GroundHeightAt(p.x, p.y) - 0.3f, p.y);
+
+                float h = Rand(rng, 2.6f, 4f);
+                var lean = new Vector3(Rand(rng, -0.25f, 0.25f), 1f, Rand(rng, -0.25f, 0.25f)).normalized;
+                var fork = foot + lean * h;
+                trunks.Tube(foot, fork, 0.24f, 0.17f, 7);
+
+                float crown = h + Rand(rng, 1.2f, 2f);
+                float spread = Rand(rng, 3.2f, 5f);
+                int limbs = 2 + rng.Next(2);
+                for (int k = 0; k < limbs; k++)
+                {
+                    float la = Rand(rng, 0f, Mathf.PI * 2f);
+                    var tip = new Vector3(foot.x + Mathf.Cos(la) * spread * 0.45f, foot.y + crown, foot.z + Mathf.Sin(la) * spread * 0.45f);
+                    trunks.Tube(fork, tip, 0.14f, 0.07f, 6);
+                }
+
+                var canopy = MeshObject(parent, "AcaciaCanopy", BoulderMesh(1 + rng.Next(20), 0.3f, 0.6f), _acaciaMat,
+                                        new Vector3(foot.x, foot.y + crown + 0.35f, foot.z),
+                                        Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f),
+                                        new Vector3(spread * 0.5f, 0.32f, spread * 0.5f * Rand(rng, 0.8f, 1.2f)),
+                                        layer, null, collider: false);
+                NoStanding(canopy);
+                Hide(canopy);
+            }
+
+            MeshObject(parent, "AcaciaTrunks", ToMesh(trunks, DenseKey("acacia")), _timberMat, Vector3.zero,
+                       Quaternion.identity, Vector3.one, layer, "Wood");
+
+            // Dry grass under them, where the shade is.
+            Drape(parent, "AcaciaShade", BlobMesh("AcaciaShade", centre, 15f, 7501 + rng.Next(100), 0.06f, 1f,
+                                                  Rand(rng, 1f, 1.6f), Rand(rng, 0f, 3f)), _grassMat, LayerMask.NameToLayer("Backdrop"));
+        }
+
+        /// <summary>
+        /// A fighting position under a camouflage net: a ring of sandbags, chest high, broken
+        /// by two gaps on opposite sides so it is never a pen; a net on poles over it, sagging;
+        /// and ammunition boxes inside. A place to hold -- and, from outside, a place that
+        /// somebody is holding.
+        ///
+        /// The sandbags follow the dune, one course at a time; the net has no collider (it is
+        /// above head height) and is drawn from both sides.
+        /// </summary>
+        private static void NetPosition(Transform parent, int layer, System.Random rng, Vector2 centre)
+        {
+            _netMat ??= MakeMaterial("CamoNet", new Color(0.36f, 0.34f, 0.22f), 0.04f, 0f);
+            _sandbagMat ??= MakeDetailMaterial("Sandbag", new Color(0.62f, 0.54f, 0.38f), "Timber", 0.8f, 0.05f, 0f, 1f);
+
+            const float ring = 6f;
+            float gapA = Rand(rng, 0f, Mathf.PI * 2f), gapB = gapA + Mathf.PI;
+
+            var bags = new MeshBuild { UVScale = 0.5f };
+            int segments = 26;
+            for (int i = 0; i < segments; i++)
+            {
+                float a = i * Mathf.PI * 2f / segments;
+                if (Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, gapA * Mathf.Rad2Deg)) < 20f) continue;
+                if (Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, gapB * Mathf.Rad2Deg)) < 20f) continue;
+
+                var p = centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * ring;
+                float g = GroundHeightAt(p.x, p.y);
+                var rot = Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f);
+                for (int course = 0; course < 3; course++)
+                    bags.Box(new Vector3(p.x, g + 0.18f + course * 0.34f, p.y), new Vector3(0.7f, 0.34f, 1.55f - course * 0.12f), rot);
+            }
+            NoStanding(MeshObject(parent, "Sandbags", ToMesh(bags, DenseKey("sandbags")), _sandbagMat, Vector3.zero,
+                                  Quaternion.identity, Vector3.one, layer, "Concrete"));
+
+            // Poles, and the net on them: a sagging grid, highest over the poles.
+            var poles = new MeshBuild { UVScale = 0.5f };
+            var tops = new Vector3[4];
+            for (int i = 0; i < 4; i++)
+            {
+                float a = gapA + Mathf.PI * 0.25f + i * Mathf.PI * 0.5f;
+                var p = centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (ring - 1.3f);
+                float g = GroundHeightAt(p.x, p.y);
+                tops[i] = new Vector3(p.x, g + 3f, p.y);
+                poles.Box(new Vector3(p.x, g + 1.5f, p.y), new Vector3(0.12f, 3f, 0.12f), Quaternion.identity);
+            }
+            MeshObject(parent, "NetPoles", ToMesh(poles, DenseKey("netpoles")), _timberMat, Vector3.zero,
+                       Quaternion.identity, Vector3.one, layer, "Wood");
+
+            float floor = GroundHeightAt(centre.x, centre.y);
+            const int N = 9;
+            var net = new MeshBuild { UVScale = 0.6f };
+            Vector3 NetAt(int i, int j)
+            {
+                float u = i / (float)(N - 1) * 1.5f - 0.25f, v = j / (float)(N - 1) * 1.5f - 0.25f;
+                // Bilinear across the four pole tops, stretched past them, sagging between.
+                var a = Vector3.LerpUnclamped(tops[0], tops[1], u);
+                var b = Vector3.LerpUnclamped(tops[3], tops[2], u);
+                var p = Vector3.LerpUnclamped(a, b, v);
+                float sag = Mathf.Sin(Mathf.Clamp01(u) * Mathf.PI) * Mathf.Sin(Mathf.Clamp01(v) * Mathf.PI) * 0.5f;
+                float edge = Mathf.Max(Mathf.Max(-u, u - 1f), Mathf.Max(-v, v - 1f));
+                p.y -= sag + Mathf.Max(0f, edge) * 3.5f;
+                p.y = Mathf.Max(p.y, floor + 0.6f);
+                p.y += Fbm2(i * 0.7f, j * 0.7f, 7601, 2) * 0.25f;
+                return p;
+            }
+            for (int i = 0; i < N - 1; i++)
+                for (int j = 0; j < N - 1; j++)
+                {
+                    AddUp(net, NetAt(i, j), NetAt(i + 1, j), NetAt(i + 1, j + 1), NetAt(i, j + 1));
+                    AddDown(net, NetAt(i, j), NetAt(i + 1, j), NetAt(i + 1, j + 1), NetAt(i, j + 1));
+                }
+            var netGo = MeshObject(parent, "CamoNet", ToMesh(net, DenseKey("camonet")), _netMat, Vector3.zero,
+                                   Quaternion.identity, Vector3.one, layer, null, collider: false);
+            NoStanding(netGo);
+            Hide(netGo);
+
+            // Ammunition boxes, as cover inside.
+            var boxes = new MeshBuild { UVScale = 0.5f };
+            for (int i = 0; i < 4; i++)
+            {
+                var p = centre + new Vector2(Rand(rng, -2.5f, 2.5f), Rand(rng, -2.5f, 2.5f));
+                boxes.Box(new Vector3(p.x, GroundHeightAt(p.x, p.y) + 0.35f, p.y), new Vector3(1.1f, 0.7f, 0.6f),
+                          Quaternion.Euler(0f, Rand(rng, 0f, 90f), 0f));
+            }
+            NoStanding(MeshObject(parent, "AmmoBoxes", ToMesh(boxes, DenseKey("ammoboxes")), _netMat, Vector3.zero,
+                                  Quaternion.identity, Vector3.one, layer, "Wood"));
+        }
+
+        private static Material _acaciaMat, _netMat, _sandbagMat;
 
         // ==================================================================
         // Heat and dust

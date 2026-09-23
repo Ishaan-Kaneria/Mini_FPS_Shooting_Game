@@ -473,6 +473,22 @@ namespace FPSKit.EditorTools
                                         Look = p + new Vector3(-6f, 3f, 14f), Fov = 72f };
             }
 
+            var net = Of("CamoNet");
+            if (net.HasValue)
+            {
+                var p = net.Value.center;
+                yield return new Shot { Name = "16_net_position", Grounded = true, From = new Vector3(p.x + 16f, 1.65f, p.z + 12f),
+                                        Look = new Vector3(p.x, p.y - 1.5f, p.z), Fov = 70f };
+            }
+
+            var grove = Of("AcaciaTrunks");
+            if (grove.HasValue)
+            {
+                var p = grove.Value.center;
+                yield return new Shot { Name = "17_acacia_grove", Grounded = true, From = new Vector3(p.x + 22f, 1.65f, p.z + 16f),
+                                        Look = new Vector3(p.x, p.y, p.z), Fov = 70f };
+            }
+
             var plane = Of("PlaneFuselage");
             if (plane.HasValue)
             {

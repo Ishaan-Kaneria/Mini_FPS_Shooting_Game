@@ -89,7 +89,7 @@ Generated Materials**, or `FPSKitBatch.PruneMaterials`, which reports and only d
 with `-fpskitApply`) is how that is cleared; anything the builder still wants, it
 recreates on the next build.
 
-`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitPark.cs` (the abandoned fairground: hollows, shafts, rides and what stands between them), `FPSKitVolcanic.cs` (the Unknown Planet's dressing: sky, cones, vents, lava), `FPSKitLavaField.cs` (its ground: flows, pits, and everything draped on the plain) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
+`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitIndustrialDense.cs` (narrow roads, walled compounds and gates, street tunnels, and the buildings packed against the walls), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitPark.cs` (the abandoned fairground: hollows, shafts, rides and what stands between them), `FPSKitVolcanic.cs` (the Unknown Planet's dressing: sky, cones, vents, lava), `FPSKitLavaField.cs` (its ground: flows, pits, and everything draped on the plain) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
@@ -688,6 +688,26 @@ spills and markings. All of it is faded and close in value to what it sits on --
 first cut was saturated yellow hatching at full opacity across every junction, which was
 the loudest thing in the arena from every angle, and the job of ground detail is to be
 noticed without being looked at.
+
+**A street is a corridor, not a gap between car parks.** Ishaan's next verdict was "very
+empty, the roads are quite big", and it was one fact: twenty-metre carriageways between
+hundred-metre yards with buildings stood in the middle, so every eye-level view was forty
+metres of open asphalt. `FPSKitIndustrialDense.cs` narrows every road to ten metres of
+carriageway (`CarriageHalf`; still two lanes for the car) inside the same twenty-metre tile
+grid, walls every block at `CompoundLine` with gates, spans three streets with buildings the
+road runs through, and packs buildings against the compound walls. Four rules hold it up:
+
+- **Two gates on two sides, or no wall.** A walled yard is a building for navigation
+  purposes: one way in is a cul-de-sac, none is an island. Gates go where the ground just
+  inside is clear, and everything built afterwards keeps off the gate approaches.
+- **Free ground is asked of the physics scene**, not of the claim circles -- districts
+  claim almost none of what they scatter. Loose pack clutter (pallets, barrels, crates)
+  gives way to a building; anything structural vetoes it.
+- **The districts are compact.** The container yard used to space its boxes evenly from
+  edge to edge and the depot scattered its stock over the whole block, which left no
+  footprint anywhere and no yard either: the block looked empty from the ground and was
+  full to anything placed later. Stacks take a band along one side; stock one laydown area.
+- **Closed buildings are sealed with `SealBox`**, a world-space volume -- not `NoEntry`.
 
 **None of it is a NavMeshModifier.** Flat ground detail is kept off the bake by *layer*
 -- the backdrop layer, which the NavMeshSurface already excludes and which the apron

@@ -195,6 +195,7 @@ namespace FPSKit.EditorTools
             _blocks.Clear();
             _packCache.Clear();
             _packMissing.Clear();
+            ResetDense();
 
             ClearMeshPool();
             ResetTerrain();
@@ -209,6 +210,7 @@ namespace FPSKit.EditorTools
 
             ResolveSurfaceMaterials();
             ResolveZoneMaterials();
+            ResolveDenseMaterials();
 
             // The spawn, before anything can be dropped on it. Wide, because the first
             // thing the player sees should be the plant and not the side of a shed.
@@ -217,9 +219,19 @@ namespace FPSKit.EditorTools
             BuildZoneGround(root, layer, backdrop, half);
 
             PlanStreets(half);
+            PlanStreetTunnels(rng, half);
             BuildStreets(root, half);
             BuildStreetFurniture(root, layer, rng);
             BuildBlocks(root, layer, rng, half);
+
+            // What makes it a place rather than a plan (FPSKitIndustrialDense). In this
+            // order because each asks the scene what the one before it left free: the
+            // gates take the clear ground first, the tunnels' wings next, then the infill
+            // fills what is left, and the walls go up last round all of it.
+            ChooseGates(rng, half);
+            BuildStreetTunnels(root, layer, rng);
+            BuildInfill(root, layer, rng);
+            BuildCompoundWalls(root, layer, rng);
 
             // Last of the ground passes, because the kerbs follow the road tiles and
             // the bay markings follow the blocks, and neither exists until both of those
@@ -536,34 +548,9 @@ namespace FPSKit.EditorTools
 
             foreach (var tile in _roadTiles)
             {
-                Vector3 at = new Vector3(tile.x * Tile, 0.02f, tile.y * Tile);
-
-                // A bend where the run turns, a straight otherwise. Worked out from the
-                // neighbours rather than stored, so the plan stays one set of tiles.
-                bool n = _roadTiles.Contains(tile + Vector2Int.up);
-                bool s = _roadTiles.Contains(tile + Vector2Int.down);
-                bool e = _roadTiles.Contains(tile + Vector2Int.right);
-                bool w = _roadTiles.Contains(tile + Vector2Int.left);
-
-                string prefab = RoadStraight;
-                float yaw = (e || w) && !(n || s) ? 90f : 0f;
-
-                if ((n || s) && (e || w) && !((n && s) || (e && w)))
-                {
-                    prefab = RoadBendA;
-                    if (n && e) yaw = 0f;
-                    else if (e && s) yaw = 90f;
-                    else if (s && w) yaw = 180f;
-                    else yaw = 270f;
-                }
-
-                var go = Place(streets, prefab, at, yaw);
-
-                // The road is drawn on the minimap as the street plan, which is most of
-                // what makes a 500m site navigable from the corner of the screen.
-                if (go != null) Mark(go, new Color(0.24f, 0.24f, 0.26f), -8);
-
-                Claim(at.x, at.z, Tile * 0.42f);
+                // Ten metres of carriageway on a twenty-metre tile: see CarriageHalf.
+                PlaceRoadTile(streets, tile);
+                Claim(tile.x * Tile, tile.y * Tile, Tile * 0.42f);
             }
         }
 
@@ -686,6 +673,12 @@ namespace FPSKit.EditorTools
                     // street beside the district rather than through the middle of it.
                     float shift = Rand(rng, -Tile, Tile);
                     Vector3 offset = alongX ? new Vector3(0f, 0f, shift) : new Vector3(shift, 0f, 0f);
+
+                    // Not over a street tunnel: the building on it stands higher than the pipes.
+                    bool blocked = false;
+                    for (float t = 0f; t <= 1f; t += 0.05f)
+                        if (UnderStreetTunnel(Vector3.Lerp(a + offset, b + offset, t))) { blocked = true; break; }
+                    if (blocked) continue;
 
                     BuildPipeBridge(group, layer, a + offset, b + offset, Rand(rng, 9f, 13f));
                     built++;
@@ -1002,14 +995,25 @@ namespace FPSKit.EditorTools
 
             bool alongX = size.x >= size.y;
             float rowRun = alongX ? size.x : size.y;
-            float across = alongX ? size.y : size.x;
+            float blockAcross = alongX ? size.y : size.x;
 
-            int rows = Mathf.Clamp(Mathf.FloorToInt(across / 11f), 2, 5);
-            int perRow = Mathf.Clamp(Mathf.FloorToInt(rowRun / 9f), 2, 7);
+            // <b>The stacks take one side of the block, not all of it.</b> Spread evenly
+            // from edge to edge, a few dozen boxes left no ground anywhere big enough to
+            // build on and no space that read as a yard either -- a hundred-metre block
+            // with a container every eleven metres is empty from the ground and full as
+            // far as anything placed later is concerned. Packed into a band along one
+            // side, it is a stacking area, and the rest of the block is left for the
+            // warehouses such a yard serves (FPSKitIndustrialDense).
+            float across = blockAcross * 0.55f;
+            float bandShift = (blockAcross - across) * 0.5f * (rng.Next(2) == 0 ? 1f : -1f);
+            rowRun *= 0.86f;
+
+            int rows = Mathf.Clamp(Mathf.FloorToInt(across / 10f), 2, 5);
+            int perRow = Mathf.Clamp(Mathf.FloorToInt(rowRun / 8.5f), 2, 8);
 
             for (int r = 0; r < rows; r++)
             {
-                float lane = -across * 0.5f + across * (r + 0.5f) / rows;
+                float lane = bandShift - across * 0.5f + across * (r + 0.5f) / rows;
 
                 for (int c = 0; c < perRow; c++)
                 {
@@ -1044,10 +1048,11 @@ namespace FPSKit.EditorTools
             // them, so it crosses every lane and gives the yard a top edge -- without it
             // a container yard from the ground is a maze of six-metre boxes with the sky
             // on top, and the fight in it has no third dimension at all.
-            BuildGantryCrane(yard, layer, rng, Vector3.zero,
-                             Mathf.Min(across * 0.92f, 58f), 12.5f, alongX ? 90f : 0f);
+            var craneAt = alongX ? new Vector3(0f, 0f, bandShift) : new Vector3(bandShift, 0f, 0f);
+            BuildGantryCrane(yard, layer, rng, craneAt,
+                             Mathf.Min(across * 0.98f, 58f), 12.5f, alongX ? 90f : 0f);
 
-            Claim(centre.x, centre.z, Mathf.Min(size.x, size.y) * 0.4f);
+            Claim(centre.x + craneAt.x, centre.z + craneAt.z, across * 0.5f);
             BuildSign(yard, layer, new Vector3(0f, 0f, size.y * 0.42f), 0f, SignKind.Warning);
         }
 
@@ -1072,12 +1077,18 @@ namespace FPSKit.EditorTools
             NoEntry(Place(depot, ShedSmall, new Vector3(size.x * 0.26f, 0f, -size.y * 0.22f), 90f));
             Place(depot, Generator, new Vector3(size.x * 0.3f, 0f, size.y * 0.3f));
 
+            // Stock in one laydown area rather than sprinkled over the whole block, for the
+            // reason the container yard gives: sprinkled, it is too thin to read as a
+            // stockyard and too wide to leave room for anything else.
+            var stock = new Vector3(Rand(rng, -size.x * 0.15f, size.x * 0.15f), 0f,
+                                    Rand(rng, -size.y * 0.15f, size.y * 0.15f));
+
             int items = ForArea(size, 260f, 10, 34);
             for (int i = 0; i < items; i++)
             {
                 float a = (float)rng.NextDouble() * Mathf.PI * 2f;
-                float r = (float)rng.NextDouble() * Mathf.Min(size.x, size.y) * 0.46f;
-                Vector3 at = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                float r = Mathf.Sqrt((float)rng.NextDouble()) * Mathf.Min(size.x, size.y) * 0.2f;
+                Vector3 at = stock + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
 
                 string[] clutter = { Pallets, PalletOne, BagsPallet, CrateBig, CrateFlat,
                                      BarrelSet, BarrelOne, Dumpster, PipeVent };
@@ -1122,23 +1133,28 @@ namespace FPSKit.EditorTools
                 Vector3 centre = new Vector3(tile.x * Tile, 0f, tile.y * Tile);
                 if (centre.magnitude < Tile * 1.2f) continue;   // keep the spawn clear
 
+                // On the pavement, between the kerb and the compound wall. Placed at the old
+                // twenty-metre kerb these would now stand in the wall, or -- on a street
+                // running east to west -- in the middle of the carriageway.
+                float kerb = CarriageHalf + 1.6f;
+
                 if (neighbours >= 3 && rng.NextDouble() < 0.55)
                 {
-                    // Barriers pulled back to the kerb, not across the lane.
-                    float kerb = Tile * 0.42f;
-                    for (int i = 0; i < 3; i++)
-                        Place(street, RoadBlock,
-                              centre + new Vector3(-kerb + i * 2.4f, 0f, kerb), 90f);
-
+                    Place(street, RoadBlock, centre + new Vector3(-kerb, 0f, kerb), 45f);
                     BuildSign(street, layer, centre + new Vector3(kerb, 0f, -kerb),
                               (float)rng.NextDouble() * 360f, SignKind.Warning);
                 }
-                else if (rng.NextDouble() < 0.22)
+                else if (neighbours == 2 && rng.NextDouble() < 0.22)
                 {
-                    float kerb = Tile * 0.44f;
+                    bool runsX = _roadTiles.Contains(tile + Vector2Int.right) && _roadTiles.Contains(tile + Vector2Int.left);
+                    bool runsZ = _roadTiles.Contains(tile + Vector2Int.up) && _roadTiles.Contains(tile + Vector2Int.down);
+                    if (!runsX && !runsZ) continue;
+
                     float side = rng.Next(2) == 0 ? kerb : -kerb;
-                    Place(street, rng.Next(2) == 0 ? ElecBox : PipeVent,
-                          centre + new Vector3(side, 0f, Rand(rng, -6f, 6f)),
+                    var offset = runsZ ? new Vector3(side, 0f, Rand(rng, -6f, 6f))
+                                       : new Vector3(Rand(rng, -6f, 6f), 0f, side);
+
+                    Place(street, rng.Next(2) == 0 ? ElecBox : PipeVent, centre + offset,
                           (float)rng.NextDouble() * 360f);
                 }
             }

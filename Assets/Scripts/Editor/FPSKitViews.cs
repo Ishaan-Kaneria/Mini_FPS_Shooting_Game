@@ -112,6 +112,7 @@ namespace FPSKit.EditorTools
         static IEnumerable<Shot> Frame(LevelTheme theme)
         {
             if (theme != null && theme.snowZone) return FrameSnow();
+            if (theme != null && theme.industrialZone) return FrameIndustrial();
 
             return FrameDesert(theme);
         }
@@ -237,6 +238,38 @@ namespace FPSKit.EditorTools
                 if (t != null && t.name.StartsWith(prefix)) return t.gameObject;
 
             return null;
+        }
+
+        /// <summary>
+        /// The plant's viewpoints. It had none -- it fell through to the desert's, which
+        /// aim at a river -- so nothing here had ever been looked at except from the air.
+        ///
+        /// The street plan is fixed (see PlanStreets): avenues and cross streets at 0 and
+        /// ±100 m, the ring road at ±220 m, blocks of eighty to a hundred metres between.
+        /// The ground is flat at zero, so the heights here are real heights.
+        /// </summary>
+        static IEnumerable<Shot> FrameIndustrial()
+        {
+            const float eye = 1.65f;
+
+            yield return new Shot { Name = "01_spawn_north", From = new Vector3(0f, eye, 0f),
+                                    Look = new Vector3(0f, 4f, 200f), Fov = 75f };
+            yield return new Shot { Name = "02_spawn_east", From = new Vector3(0f, eye, 0f),
+                                    Look = new Vector3(200f, 4f, 0f), Fov = 75f };
+            yield return new Shot { Name = "03_down_a_street", From = new Vector3(100f, eye, -190f),
+                                    Look = new Vector3(100f, 3f, 20f), Fov = 72f };
+            yield return new Shot { Name = "04_in_a_block_ne", From = new Vector3(60f, eye, 60f),
+                                    Look = new Vector3(160f, 4f, 150f), Fov = 75f };
+            yield return new Shot { Name = "05_in_a_block_sw", From = new Vector3(-150f, eye, -60f),
+                                    Look = new Vector3(-160f, 4f, -180f), Fov = 75f };
+            yield return new Shot { Name = "06_ring_road", From = new Vector3(-220f, eye, -200f),
+                                    Look = new Vector3(-220f, 3f, 100f), Fov = 72f };
+            // Low, because the plant's fog is written for eye level: exponential-squared at
+            // this density, anything much past two hundred metres of air is grey.
+            yield return new Shot { Name = "07_aerial", From = new Vector3(-190f, 60f, -190f),
+                                    Look = new Vector3(-60f, 0f, -60f), Fov = 70f };
+            yield return new Shot { Name = "08_overhead", From = new Vector3(40f, 110f, -60f),
+                                    Look = new Vector3(60f, 0f, 60f), Fov = 75f };
         }
 
         static IEnumerable<Shot> FrameDesert(LevelTheme theme)

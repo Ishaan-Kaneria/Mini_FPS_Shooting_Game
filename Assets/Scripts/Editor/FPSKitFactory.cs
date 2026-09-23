@@ -571,11 +571,21 @@ namespace FPSKit.EditorTools
             var build = new MeshBuild { UVScale = 0.4f };
             const float wide = 3.6f;
 
-            // Portal legs.
+            // Portal legs -- but none on a carriageway. A bridge between two districts
+            // spans the street between them, and a leg every sixteen metres lands one in
+            // the road more often than not; on a road ten metres wide it blocks a lane.
             int bays = Mathf.Max(2, Mathf.RoundToInt(length / 16f));
+            var rotation = Quaternion.Euler(0f, yaw, 0f);
+            var middle = (from + to) * 0.5f;
+
             for (int i = 0; i <= bays; i++)
             {
                 float z = -length * 0.5f + length * i / bays;
+
+                bool inRoad = false;
+                for (int side = -1; side <= 1; side += 2)
+                    if (OnCarriageway(middle + rotation * new Vector3(side * wide * 0.5f, 0f, z))) inRoad = true;
+                if (inRoad) continue;
 
                 for (int side = -1; side <= 1; side += 2)
                     build.Box(new Vector3(side * wide * 0.5f, height * 0.5f, z),
@@ -674,10 +684,9 @@ namespace FPSKit.EditorTools
                 // A kerb on every side that is not more road. Built per tile rather than
                 // per run, so a junction loses its kerbs automatically instead of having
                 // them laid across the carriageway.
-                if (!n) kerbs.Box(centre + new Vector3(0f, 0.09f, edge), new Vector3(Tile, 0.18f, 0.4f), Quaternion.identity);
-                if (!s) kerbs.Box(centre + new Vector3(0f, 0.09f, -edge), new Vector3(Tile, 0.18f, 0.4f), Quaternion.identity);
-                if (!e) kerbs.Box(centre + new Vector3(edge, 0.09f, 0f), new Vector3(0.4f, 0.18f, Tile), Quaternion.identity);
-                if (!w) kerbs.Box(centre + new Vector3(-edge, 0.09f, 0f), new Vector3(0.4f, 0.18f, Tile), Quaternion.identity);
+                //
+                // Along the ten-metre carriageway, not the twenty-metre tile: see CarriageHalf.
+                RoadKerbs(kerbs, centre, n, s, e, w);
 
                 int neighbours = (n ? 1 : 0) + (s ? 1 : 0) + (e ? 1 : 0) + (w ? 1 : 0);
 
@@ -689,8 +698,8 @@ namespace FPSKit.EditorTools
                     // player standing on one is looking at nothing but paint.
                     if (rng.NextDouble() > 0.4f) continue;
 
-                    for (float o = -edge * 0.55f; o < edge * 0.55f; o += 4.4f)
-                        Paint(paint, centre + new Vector3(o, 0f, 0f), 0.3f, Tile * 0.6f, 45f);
+                    for (float o = -CarriageHalf * 0.6f; o < CarriageHalf * 0.6f; o += 2.6f)
+                        Paint(paint, centre + new Vector3(o, 0f, 0f), 0.3f, CarriageHalf * 1.3f, 45f);
                 }
                 else
                 {

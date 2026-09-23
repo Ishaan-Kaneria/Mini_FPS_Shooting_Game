@@ -438,6 +438,11 @@ namespace FPSKit.EditorTools
 
             NoStanding(go);
             if (go != null) Mark(go, new Color(0.40f, 0.26f, 0.20f), 4);
+
+            // A stack that is not smoking is a monument. Seeded off where it stands, so a
+            // rebuild writes the same scene.
+            Plume(parent, at + Vector3.up * (height + 1f), radius * 0.5f, Mathf.Clamp(height / 40f, 0.7f, 1.3f),
+                  Mathf.RoundToInt(at.x * 31f + at.z * 17f), steam: true);
         }
 
         /// <summary>
@@ -487,12 +492,20 @@ namespace FPSKit.EditorTools
             build.Tube(new Vector3(0f, 0f, 0f), new Vector3(0f, 0.8f, 0f),
                        Profile(0f) * 1.2f, Profile(0f) * 1.2f, sides);
 
+            // The panel concrete at one repeat per ten metres, not the perimeter wall's
+            // material: that one is tiled sixty times across for a five-hundred-metre wall,
+            // and wrapped round a tower it came out as fine grey streaks with a sheen.
             var go = MeshObject(parent, "CoolingTower",
-                                ToMesh(build, $"cooler{height:0}_{radius:0}"), _zoneConcrete,
+                                ToMesh(build, $"cooler{height:0}_{radius:0}"), _denseConcrete ?? _zoneConcrete,
                                 at, Quaternion.identity, Vector3.one, layer, "Concrete");
 
             NoStanding(go);
             if (go != null) Mark(go, new Color(0.58f, 0.58f, 0.56f), 4);
+
+            // The steam is the landmark as much as the tower is: a white column you can
+            // find the power house by from anywhere on the site.
+            Plume(parent, at + Vector3.up * (height - 2f), radius * 0.45f, 2.2f,
+                  Mathf.RoundToInt(at.x * 13f + at.z * 7f), steam: true);
         }
 
         /// <summary>

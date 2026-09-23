@@ -709,6 +709,15 @@ road runs through, and packs buildings against the compound walls. Four rules ho
   full to anything placed later. Stacks take a band along one side; stock one laydown area.
 - **Closed buildings are sealed with `SealBox`**, a world-space volume -- not `NoEntry`.
 
+**Nothing on this site may shine.** The pack's concrete comes at smoothness 0.5, and with no
+baked reflection anywhere in the kit, gloss reflects Unity's default grey-blue: the compound
+walls read as brushed silver ("the shiny silver wall doesn't fit"). `Matte` takes it off.
+The same missing reflection is why the catwalks were invisible for a different reason: they
+were the transparent lattice all over, tiled so finely it mipped to nothing, so the stair
+stood in plain view and the bridge it led to did not. Walkways are a solid deck on a
+safety-yellow frame now. `CaptureViews` runs every particle system forward before
+rendering, because particles do not simulate in edit mode and no plume had ever been seen.
+
 **None of it is a NavMeshModifier.** Flat ground detail is kept off the bake by *layer*
 -- the backdrop layer, which the NavMeshSurface already excludes and which the apron
 already uses. A modifier does not exclude geometry, it marks it *Not Walkable*, so a kerb

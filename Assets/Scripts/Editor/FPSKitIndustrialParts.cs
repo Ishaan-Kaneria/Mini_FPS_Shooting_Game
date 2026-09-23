@@ -125,12 +125,22 @@ namespace FPSKit.EditorTools
             float yaw = Mathf.Atan2(delta.x, delta.z) * Mathf.Rad2Deg;
             Vector3 mid = (from + to) * 0.5f;
 
+            // Deck and frame are two meshes in two materials: see _zoneSafety.
+            var deckBuild = new MeshBuild { UVScale = 0.6f };
             var build = new MeshBuild { UVScale = 0.6f };
             const float wide = 2.4f;
 
-            // Deck.
-            build.Box(new Vector3(0f, height, 0f), new Vector3(wide, 0.14f, length),
-                      Quaternion.identity);
+            // Deck, with stringers under both edges and a toe board along each side, so it
+            // has an edge you can see from the ground.
+            deckBuild.Box(new Vector3(0f, height, 0f), new Vector3(wide, 0.14f, length),
+                          Quaternion.identity);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                build.Box(new Vector3(side * (wide * 0.5f - 0.1f), height - 0.2f, 0f),
+                          new Vector3(0.2f, 0.3f, length), Quaternion.identity);
+                build.Box(new Vector3(side * (wide * 0.5f - 0.03f), height + 0.14f, 0f),
+                          new Vector3(0.04f, 0.16f, length), Quaternion.identity);
+            }
 
             // Legs, every six metres, in pairs.
             int legs = Mathf.Max(2, Mathf.RoundToInt(length / 6f));
@@ -163,9 +173,15 @@ namespace FPSKit.EditorTools
                 }
             }
 
-            var deck = MeshObject(parent, "Catwalk", ToMesh(build, $"catwalk{length:0}h{height:0.0}"),
-                                  _zoneGrate, mid, Quaternion.Euler(0f, yaw, 0f), Vector3.one,
+            var deck = MeshObject(parent, "Catwalk", ToMesh(deckBuild, $"catwalkdeck{length:0}h{height:0.0}"),
+                                  _zoneDeck, mid, Quaternion.Euler(0f, yaw, 0f), Vector3.one,
                                   layer, "Metal");
+
+            var frame = MeshObject(parent, "CatwalkFrame", ToMesh(build, $"catwalkframe{length:0}h{height:0.0}"),
+                                   _zoneSafety, mid, Quaternion.Euler(0f, yaw, 0f), Vector3.one,
+                                   layer, "Metal");
+            NoStanding(frame);
+            Hide(frame);
 
             // Drawn on the map above whatever it crosses, because a walkway over a
             // container lane is a different place from the lane and the map has to say so.

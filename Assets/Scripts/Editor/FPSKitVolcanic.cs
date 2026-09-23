@@ -1520,7 +1520,8 @@ namespace FPSKit.EditorTools
         /// Configured in the editor and saved into the scene, so there is nothing to run
         /// at load and nothing a stripped shader can break.
         /// </summary>
-        private static void Plume(Transform parent, Vector3 at, float radius, float scale, int seed)
+        private static void Plume(Transform parent, Vector3 at, float radius, float scale, int seed,
+                                  bool steam = false)
         {
             var go = new GameObject("Smoke");
             go.transform.SetParent(parent, false);
@@ -1571,9 +1572,18 @@ namespace FPSKit.EditorTools
             var colour = system.colorOverLifetime;
             colour.enabled = true;
 
+            // Or, for a plant's stacks and cooling towers, steam: white where it leaves and
+            // greying as it thins, with no fire under it to light it.
             var gradient = new Gradient();
             gradient.SetKeys(
-                new[]
+                steam
+                ? new[]
+                {
+                    new GradientColorKey(new Color(0.94f, 0.94f, 0.92f), 0f),
+                    new GradientColorKey(new Color(0.82f, 0.82f, 0.82f), 0.3f),
+                    new GradientColorKey(new Color(0.62f, 0.63f, 0.65f), 1f)
+                }
+                : new[]
                 {
                     new GradientColorKey(new Color(0.95f, 0.46f, 0.24f), 0f),
                     new GradientColorKey(new Color(0.42f, 0.30f, 0.27f), 0.25f),

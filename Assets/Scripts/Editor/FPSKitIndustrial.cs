@@ -232,6 +232,7 @@ namespace FPSKit.EditorTools
             BuildStreetTunnels(root, layer, rng);
             BuildInfill(root, layer, rng);
             BuildCompoundWalls(root, layer, rng);
+            BuildStreetscape(root, layer, rng);
 
             // Last of the ground passes, because the kerbs follow the road tiles and
             // the bay markings follow the blocks, and neither exists until both of those
@@ -387,6 +388,23 @@ namespace FPSKit.EditorTools
             // road marking on a new car park, and it was the loudest thing in the arena
             // from every angle -- which is the opposite of the job, since the whole
             // point of ground detail is to be noticed without being looked at.
+            // <b>Matte.</b> The pack's concrete comes at smoothness 0.5, and nothing in this
+            // kit bakes a sky reflection, so at that gloss every wall reflects Unity's
+            // default grey-blue environment -- which on the compound walls read as sheets of
+            // brushed silver standing along every street. Weathered concrete and old
+            // cladding have no sheen worth the name.
+            Matte(_zoneConcrete, 0.1f);
+            Matte(_zoneCladding, 0.16f);
+
+            // Walkways and their frames. The catwalks were the lattice grating all over --
+            // deck, legs and rails -- and a transparent map tiled that finely mips down to
+            // nothing: the stair up to a walkway stood there in plain view and the bridge
+            // it led to was invisible from a few metres away. Safety yellow on the frame is
+            // what every plant paints them, and it is the colour that says "you can go up
+            // there" from across a yard.
+            _zoneSafety = MakeMaterial("ZoneSafety", new Color(0.80f, 0.60f, 0.10f), 0.28f, 0.1f);
+            _zoneDeck = MakeMaterial("ZoneDeck", new Color(0.27f, 0.28f, 0.29f), 0.25f, 0.45f);
+
             _zoneLine  = MakeMaterial("ZoneLine",  new Color(0.60f, 0.58f, 0.47f), 0.06f, 0f);
             _zoneStain = MakeMaterial("ZoneStain", new Color(0.17f, 0.165f, 0.16f), 0.20f, 0f);
             _zoneDirt  = MakeMaterial("ZoneDirt",  new Color(0.43f, 0.40f, 0.35f), 0.03f, 0f);

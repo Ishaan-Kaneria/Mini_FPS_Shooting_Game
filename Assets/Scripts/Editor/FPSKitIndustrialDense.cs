@@ -87,7 +87,8 @@ namespace FPSKit.EditorTools
         /// <summary>Pool keys for the one-off meshes here. ToMesh pools by key, and a key two buildings share is one building drawn twice.</summary>
         private static int _denseKey;
 
-        private static Material _denseGlass, _denseDoor;
+        private static Material _denseGlass, _denseDoor, _denseConcrete, _zoneSafety, _zoneDeck;
+        private static Material _lampPole, _lampHead;
         private static Material[] _denseCladding, _denseBrick;
 
         private static void ResetDense()
@@ -130,8 +131,37 @@ namespace FPSKit.EditorTools
                 TintedTile(concrete, "ZoneBrickDark", Vector2.one, new Color(0.92f, 0.60f, 0.50f)) ?? _zoneBrick
             };
 
+            // Weathered concrete at one repeat per panel, for the compound walls, the street
+            // tunnels and the cooling tower. See Matte for why none of these may shine.
+            _denseConcrete = TintedTile(concrete, "ZoneWallConcrete", Vector2.one, new Color(0.84f, 0.82f, 0.78f))
+                             ?? _zoneConcrete;
+
+            foreach (var m in _denseCladding) Matte(m, 0.16f);
+            foreach (var m in _denseBrick) Matte(m, 0.1f);
+            Matte(_denseConcrete, 0.1f);
+
             _denseGlass = MakeMaterial("ZoneGlass", new Color(0.07f, 0.09f, 0.11f), 0.82f, 0.25f);
             _denseDoor = _zoneRust;
+
+            _lampPole = MakeMaterial("ZoneLampPole", new Color(0.21f, 0.22f, 0.23f), 0.3f, 0.4f);
+            _lampHead = MakeMaterial("ZoneLampHead", new Color(1f, 0.86f, 0.62f), 0.4f, 0f);
+            SetEmission(_lampHead, new Color(1f, 0.72f, 0.38f) * 1.6f);
+
+            // The steam over the stacks, the same puff the volcanic smoke uses.
+            _smokeMat = ParticleMaterial("Smoke", "Puff", additive: false, Color.white);
+        }
+
+        /// <summary>
+        /// Takes the sheen off a material. Nothing in this kit bakes a reflection, so any
+        /// gloss reflects Unity's default grey-blue environment rather than this sky.
+        /// </summary>
+        private static void Matte(Material mat, float smoothness)
+        {
+            if (mat == null) return;
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
+            if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", smoothness);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0f);
+            UnityEditor.EditorUtility.SetDirty(mat);
         }
 
         // ==================================================================
@@ -448,7 +478,7 @@ namespace FPSKit.EditorTools
                         walls.Box(P(side * (inner - 0.15f), clear * 0.5f, a), S(0.5f, clear, 0.9f), Quaternion.identity);
                 }
 
-                MeshObject(group, "TunnelWalls", ToMesh(walls, DenseKey("tunnelwalls")), _zoneConcrete,
+                MeshObject(group, "TunnelWalls", ToMesh(walls, DenseKey("tunnelwalls")), _denseConcrete,
                            Vector3.zero, Quaternion.identity, Vector3.one, layer, "Concrete");
 
                 // ---- roof and the storey on it ----
@@ -708,9 +738,13 @@ namespace FPSKit.EditorTools
                     }
                 }
 
+                // Sheet walls are painted -- blue, green or oxide -- never bare: bare grey
+                // sheet at any gloss reads as galvanised silver, and it is the one material
+                // in the arena that looked like it came from somewhere else.
+                int[] painted = { 1, 2, 4 };
                 var material = c.Style == 0 ? _denseBrick[rng.Next(_denseBrick.Length)]
-                             : c.Style == 1 ? _zoneConcrete
-                             : _denseCladding[rng.Next(_denseCladding.Length)];
+                             : c.Style == 1 ? _denseConcrete
+                             : _denseCladding[painted[rng.Next(painted.Length)]];
 
                 var go = MeshObject(group, "CompoundWall", ToMesh(wall, DenseKey("compoundwall")), material,
                                     Vector3.zero, Quaternion.identity, Vector3.one, layer,
@@ -836,6 +870,120 @@ namespace FPSKit.EditorTools
             light.intensity = 1.6f;
             light.color = new Color(1f, 0.88f, 0.66f);
             light.shadows = LightShadows.None;
+        }
+
+        // ==================================================================
+        // Streetscape
+        // ==================================================================
+        /// <summary>
+        /// What a works street has along it besides walls: lamp standards on the pavement,
+        /// arms out over the carriageway, one a tile on alternating sides; and pipe racks
+        /// carried along the top of some of the compound walls, bridging their gates.
+        ///
+        /// The lamps are welded into one mesh for the poles and one for the heads, and the
+        /// heads glow rather than cast light -- a hundred real lights across the site is a
+        /// hundred extra passes on every surface they reach, for a daytime scene. The pipes
+        /// have no collider: they run above head height and only the eye needs them.
+        /// </summary>
+        private static void BuildStreetscape(Transform root, int layer, System.Random rng)
+        {
+            var group = new GameObject("Streetscape").transform;
+            group.SetParent(root, false);
+
+            // ---- lamps ----
+            var poles = new MeshBuild { UVScale = 0.5f };
+            var heads = new MeshBuild { UVScale = 0.5f };
+            const float poleHeight = 7.5f;
+
+            foreach (var tile in _roadTiles)
+            {
+                bool n = _roadTiles.Contains(tile + Vector2Int.up), s = _roadTiles.Contains(tile + Vector2Int.down);
+                bool e = _roadTiles.Contains(tile + Vector2Int.right), w = _roadTiles.Contains(tile + Vector2Int.left);
+
+                bool alongZ = n && s && !e && !w;
+                bool alongX = e && w && !n && !s;
+                if (!alongZ && !alongX) continue;
+
+                var centre = new Vector3(tile.x * Tile, 0f, tile.y * Tile);
+                if (centre.magnitude < 20f || UnderStreetTunnel(centre, 2f)) continue;
+
+                // Alternate sides down the street, so the lamps stagger.
+                float side = ((tile.x + tile.y) & 1) == 0 ? 1f : -1f;
+                var across = alongZ ? Vector3.right : Vector3.forward;
+                var foot = centre + across * side * (CarriageHalf + 0.9f);
+
+                poles.Tube(foot, foot + Vector3.up * poleHeight, 0.14f, 0.1f, 8);
+                var armEnd = foot - across * side * 2.2f + Vector3.up * poleHeight;
+                poles.Box((foot + Vector3.up * poleHeight + armEnd) * 0.5f,
+                          alongZ ? new Vector3(2.2f, 0.12f, 0.12f) : new Vector3(0.12f, 0.12f, 2.2f), Quaternion.identity);
+                heads.Box(armEnd + Vector3.down * 0.18f,
+                          alongZ ? new Vector3(0.9f, 0.18f, 0.45f) : new Vector3(0.45f, 0.18f, 0.9f), Quaternion.identity);
+            }
+
+            if (poles.Triangles.Count > 0)
+            {
+                var poleGo = MeshObject(group, "LampPoles", ToMesh(poles, DenseKey("lamppoles")), _lampPole,
+                                        Vector3.zero, Quaternion.identity, Vector3.one, layer, "Metal");
+                NoStanding(poleGo);
+                Hide(poleGo);
+
+                Hide(MeshObject(group, "LampHeads", ToMesh(heads, DenseKey("lampheads")), _lampHead,
+                                Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false));
+            }
+
+            // ---- pipe racks along the walls ----
+            var pipes = new MeshBuild { UVScale = 0.5f };
+            var brackets = new MeshBuild { UVScale = 0.5f };
+
+            foreach (var c in _compounds)
+            {
+                if (!c.Walled) continue;
+
+                for (int side = 0; side < 4; side++)
+                {
+                    if (rng.NextDouble() > 0.3) continue;
+
+                    SideFrame(c, side, out float from, out float to, out float line, out float inward);
+
+                    // Not along a side a tunnel takes a stretch of: the pipes would run into it.
+                    bool tunnel = false;
+                    for (float a = from; a < to; a += 2f) if (SideUnderTunnel(c, side, a)) { tunnel = true; break; }
+                    if (tunnel) continue;
+
+                    Vector3 At(float a, float y, float o) => side < 2 ? new Vector3(a, y, line - inward * o) : new Vector3(line - inward * o, y, a);
+
+                    float y0 = c.Height + 0.7f;
+                    int count = 2 + rng.Next(2);
+                    float[] radii = { 0.32f, 0.22f, 0.16f };
+
+                    for (int k = 0; k < count; k++)
+                    {
+                        float y = y0 + k * 0.55f;
+                        pipes.Tube(At(from + 1f, y, 0.2f), At(to - 1f, y, 0.2f), radii[k], radii[k], 8);
+                    }
+
+                    // A bracket on the wall head every six metres, skipping the gates.
+                    for (float a = from + 2f; a < to - 1f; a += 6f)
+                    {
+                        bool inGate = false;
+                        foreach (var g in c.Gates)
+                            if (g.Side == side && Mathf.Abs(a - g.At) < g.Width * 0.5f + 0.5f) { inGate = true; break; }
+                        if (inGate) continue;
+
+                        float h = y0 + count * 0.55f - c.Height;
+                        brackets.Box(At(a, c.Height + h * 0.5f, 0.2f),
+                                     side < 2 ? new Vector3(0.18f, h, 0.7f) : new Vector3(0.7f, h, 0.18f), Quaternion.identity);
+                    }
+                }
+            }
+
+            if (pipes.Triangles.Count > 0)
+            {
+                Hide(MeshObject(group, "WallPipes", ToMesh(pipes, DenseKey("wallpipes")), _zoneSteel,
+                                Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false));
+                Hide(MeshObject(group, "WallPipeBrackets", ToMesh(brackets, DenseKey("wallbrackets")), _lampPole,
+                                Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false));
+            }
         }
 
         // ==================================================================

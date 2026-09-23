@@ -96,6 +96,12 @@ namespace FPSKit.EditorTools
             // at all, while everything after it looks right.
             DynamicGI.UpdateEnvironment();
 
+            // Particles do not run in edit mode, so every plume on every map was invisible
+            // here and the smoke had never once been looked at. Run each system forward to
+            // where it would be a while into a level.
+            foreach (var system in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+                system.Simulate(14f, withChildren: true, restart: true);
+
             var settings = FPSKitThemes.GetOrCreate(theme);
             foreach (var shot in Frame(settings)) Render(shot, outputFolder);
 
@@ -270,6 +276,25 @@ namespace FPSKit.EditorTools
                                     Look = new Vector3(-60f, 0f, -60f), Fov = 70f };
             yield return new Shot { Name = "08_overhead", From = new Vector3(40f, 110f, -60f),
                                     Look = new Vector3(60f, 0f, 60f), Fov = 75f };
+
+            // A walkway and its stair, found rather than written down: the catwalks go
+            // wherever the tank farms and the power house put their pipe runs.
+            var catwalk = FindFirst("Catwalk");
+            if (catwalk != null)
+            {
+                var at = catwalk.transform.position;
+                var side = catwalk.transform.right;
+                yield return new Shot { Name = "09_catwalk", From = at + side * 16f + catwalk.transform.forward * -10f + Vector3.up * 1.2f,
+                                        Look = at, Fov = 70f };
+            }
+
+            var cooler = FindFirst("CoolingTower");
+            if (cooler != null)
+            {
+                var at = cooler.transform.position;
+                yield return new Shot { Name = "10_steam", From = at + new Vector3(90f, 6f, -90f),
+                                        Look = at + Vector3.up * 40f, Fov = 70f };
+            }
         }
 
         static IEnumerable<Shot> FrameDesert(LevelTheme theme)

@@ -254,6 +254,7 @@ public static class Campaign
     {
         if (data == null || zoneIndex <= 0) return true;
         if (zoneIndex >= data.ZoneCount) return true;
+        if (DebugUnlock.Active) return true;
 
         // A zone nobody holds cannot gate the one after it -- otherwise a zone added
         // without a sibling would seal the rest of the campaign behind a fight that

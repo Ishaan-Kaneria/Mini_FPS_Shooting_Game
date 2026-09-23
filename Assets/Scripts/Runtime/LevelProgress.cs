@@ -40,7 +40,7 @@ public static class LevelProgress
     /// </summary>
     public static bool IsUnlocked(string arena, int index)
     {
-        if (index <= 0) return true;
+        if (index <= 0 || DebugUnlock.Active) return true;
         return StarsIn(arena, index - 1) > 0;
     }
 

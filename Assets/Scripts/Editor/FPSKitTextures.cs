@@ -420,11 +420,19 @@ namespace FPSKit.EditorTools
         // ==================================================================
         /// <summary>
         /// Renders one height function into an albedo and a normal map and imports both.
+        ///
+        /// <paramref name="albedo"/>, when given, supplies the shade separately from the
+        /// relief, for a surface whose colour and shape disagree -- ash lies pale and flat
+        /// over rock that is dark and cracked, and a single field cannot say both.
+        /// <paramref name="size"/> defaults to <see cref="TextureSize"/>; a map meant to
+        /// tile over a wider patch of ground needs more pixels to keep the same detail.
         /// </summary>
         private static void WriteHeightPair(string name, System.Func<float, float, float> height,
-                                            float albedoContrast, float normalStrength)
+                                            float albedoContrast, float normalStrength,
+                                            System.Func<float, float, float> albedo = null,
+                                            int size = 0)
         {
-            int n = TextureSize;
+            int n = size > 0 ? size : TextureSize;
             var field = new float[n * n];
 
             for (int y = 0; y < n; y++)
@@ -432,19 +440,20 @@ namespace FPSKit.EditorTools
                     field[y * n + x] = Mathf.Clamp01(height(x / (float)n, y / (float)n));
 
             // ---- albedo: the height field as light and shade around mid grey ----
-            var albedo = new Color32[n * n];
+            var albedoPixels = new Color32[n * n];
 
             for (int i = 0; i < field.Length; i++)
             {
-                float value = Mathf.Clamp01(0.5f + (field[i] - 0.5f) * albedoContrast);
+                float shade = albedo != null ? albedo((i % n) / (float)n, (i / n) / (float)n) : field[i];
+                float value = Mathf.Clamp01(0.5f + (shade - 0.5f) * albedoContrast);
 
                 // Gamma, because the PNG is sRGB and the shader works in linear. Written
                 // straight, every one of these came out noticeably too dark.
                 byte b = (byte)Mathf.RoundToInt(Mathf.Pow(value, 1f / 2.2f) * 255f);
-                albedo[i] = new Color32(b, b, b, 255);
+                albedoPixels[i] = new Color32(b, b, b, 255);
             }
 
-            WritePng($"{TextureFolder}/{name}_Albedo.png", albedo, n, importer =>
+            WritePng($"{TextureFolder}/{name}_Albedo.png", albedoPixels, n, importer =>
             {
                 importer.textureType = TextureImporterType.Default;
                 importer.sRGBTexture = true;
@@ -496,7 +505,7 @@ namespace FPSKit.EditorTools
                 importer.wrapMode = TextureWrapMode.Repeat;
                 importer.filterMode = FilterMode.Trilinear;
                 importer.anisoLevel = 8;
-                importer.maxTextureSize = TextureSize;
+                importer.maxTextureSize = Mathf.Max(size, TextureSize);
                 importer.SaveAndReimport();
             }
         }

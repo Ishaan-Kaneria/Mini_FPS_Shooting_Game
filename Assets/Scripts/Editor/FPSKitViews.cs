@@ -47,6 +47,32 @@ namespace FPSKit.EditorTools
             public Vector3 From;
             public Vector3 Look;
             public float Fov;
+
+            /// <summary>
+            /// Heights are above the ground under the camera rather than above zero.
+            ///
+            /// The desert's shots were written for ground near zero, and on a field whose
+            /// ground is metres higher they put the camera inside the terrain: what came
+            /// back was the sky below the horizon, a smooth brown gradient across the
+            /// bottom of the frame that looks entirely like dark ground in shadow.
+            /// </summary>
+            public bool Grounded;
+        }
+
+        /// <summary>
+        /// The lowest solid surface under a point, which on a field is the ground itself --
+        /// not a deck overhead. Not for shots over the canyon, where the lowest surface is
+        /// the river bed; the rim shots are left absolute, because the rim is held at zero.
+        /// </summary>
+        static float GroundUnder(Vector3 p)
+        {
+            float best = float.NaN;
+
+            foreach (var hit in Physics.RaycastAll(new Vector3(p.x, 600f, p.z), Vector3.down, 1200f,
+                                                   ~0, QueryTriggerInteraction.Ignore))
+                if (float.IsNaN(best) || hit.point.y < best) best = hit.point.y;
+
+            return float.IsNaN(best) ? 0f : best;
         }
 
         public static void Capture()
@@ -222,19 +248,19 @@ namespace FPSKit.EditorTools
 
             yield return new Shot
             {
-                Name = "01_spawn_east", From = new Vector3(0f, eye, 0f),
+                Name = "01_spawn_east", Grounded = true, From = new Vector3(0f, eye, 0f),
                 Look = new Vector3(140f, 2f, 20f), Fov = 75f
             };
 
             yield return new Shot
             {
-                Name = "02_spawn_north", From = new Vector3(0f, eye, 0f),
+                Name = "02_spawn_north", Grounded = true, From = new Vector3(0f, eye, 0f),
                 Look = new Vector3(-30f, 4f, 160f), Fov = 75f
             };
 
             yield return new Shot
             {
-                Name = "03_dune_crest", From = new Vector3(-70f, eye + 6f, -60f),
+                Name = "03_dune_crest", Grounded = true, From = new Vector3(-70f, eye + 6f, -60f),
                 Look = new Vector3(40f, 0f, 30f), Fov = 70f
             };
 
@@ -270,9 +296,19 @@ namespace FPSKit.EditorTools
                 Look = new Vector3(60f, 0f, 20f), Fov = 62f
             };
 
+            // Across the open plain rather than from a pad. Every other shot here stands
+            // on flattened ground -- the spawn, the rim, a deck -- which is exactly the
+            // ground that has had its character taken out, so none of them could show
+            // whether the plain itself reads as varied.
             yield return new Shot
             {
-                Name = "09_ground_close", From = new Vector3(-40f, 1.1f, 30f),
+                Name = "10_open_plain", Grounded = true, From = new Vector3(-150f, eye + 1.5f, -150f),
+                Look = new Vector3(-60f, 0f, -40f), Fov = 72f
+            };
+
+            yield return new Shot
+            {
+                Name = "09_ground_close", Grounded = true, From = new Vector3(-40f, 1.1f, 30f),
                 Look = new Vector3(10f, 0.2f, 55f), Fov = 60f
             };
         }
@@ -286,6 +322,14 @@ namespace FPSKit.EditorTools
 
             try
             {
+                if (shot.Grounded)
+                {
+                    // The look point rises with the camera so each shot keeps its angle.
+                    float lift = GroundUnder(shot.From);
+                    shot.From.y += lift;
+                    shot.Look.y += lift;
+                }
+
                 rig.transform.position = shot.From;
                 rig.transform.rotation = Quaternion.LookRotation((shot.Look - shot.From).normalized,
                                                                  Vector3.up);

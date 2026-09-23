@@ -324,6 +324,15 @@ namespace FPSKit.EditorTools
         /// half a metre on each side so it eats the room and not the ground against the
         /// outside of the walls.
         /// </para>
+        ///
+        /// <para>
+        /// <b>Only for an object that is not both turned and stretched.</b> The volume is a
+        /// child, and a child of a rotated, non-uniformly scaled object lives in a sheared
+        /// frame the navigation package cannot represent -- it rebuilds the box from lossy
+        /// scale and rotation, and the bake then ignores it without a word. The volcanic
+        /// cones were exactly that and every one of them kept its hollow disc of navmesh;
+        /// see SealCone, which puts the volume on an unscaled object of its own instead.
+        /// </para>
         /// </summary>
         private static void NoEntry(GameObject go)
         {

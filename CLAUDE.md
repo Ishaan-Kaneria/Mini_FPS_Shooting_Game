@@ -89,7 +89,7 @@ Generated Materials**, or `FPSKitBatch.PruneMaterials`, which reports and only d
 with `-fpskitApply`) is how that is cleared; anything the builder still wants, it
 recreates on the next build.
 
-`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitPark.cs` (the abandoned fairground: hollows, shafts, rides and what stands between them) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
+`FPSKitSceneBuilder` is partial across several files, all of them the same class: `FPSKitOpenZone.cs` (where the open-zone arena's pieces go), `FPSKitDesert.cs` (what they are made of), `FPSKitTerrain.cs` (the heightfield), `FPSKitIndustrial.cs` and `FPSKitIndustrialParts.cs` (the plant and its fittings), `FPSKitFactory.cs` (the big industrial structures -- halls, chimneys, silos, cooling towers, cranes, and what the ground is wearing), `FPSKitMeshKit.cs` (procedural meshes, noise, and the `Hide`/`NoStanding`/`NoEntry`/`SealNavMeshOutside`/`Mark` bookkeeping every generated object needs) and `FPSKitPark.cs` (the abandoned fairground: hollows, shafts, rides and what stands between them), `FPSKitVolcanic.cs` (the Unknown Planet's dressing: sky, cones, vents, lava), `FPSKitLavaField.cs` (its ground: flows, pits, and everything draped on the plain) and `FPSKitTextures.cs` (the detail maps). Splitting is not tidiness -- they share the whole rest of the builder, so a split anywhere else would mean passing half of it around.
 
 Other editor tools: `FPSKitThemes.cs` (creates/resets `LevelTheme` assets), `FPSKitLevels.cs` (creates/resets `LevelSet` assets), `FPSKitEnemyRoster.cs` (creates/resets `EnemyArchetype` assets), `FPSKitStore.cs` (creates/resets the `StoreCatalog` and its stock), `FPSKitArtTools.cs` (**FPSKit > Art Pack Setup**), `FPSKitEnemySetup.cs` (**FPSKit > Enemy Setup**), `FPSKitMobileControls.cs` (**FPSKit > Add Mobile Touch Controls**), `ControlSettingsEditor.cs` (custom inspector with control presets), `FPSKitGraphics.cs` (the render settings that live on the pipeline asset rather than in any scene, applied alongside `EnsureProjectTagsAndLayers`), `FPSKitAudioImportPolicy.cs` (stamps import settings on a clip the moment it lands under `Assets/Audio/`).
 
@@ -1528,6 +1528,37 @@ Four things about the park are worth not re-deriving:
   sized, correctly coloured single cube reads as a crate. The built stalls also stopped
   appearing in `VerifyReach`'s stranded list, which solid cubes had been pinching pockets
   behind: proper geometry turns out to be better for navigation as well as for looks.
+
+## The volcanic plain is accidents, not a pattern
+
+Ishaan's verdict on the first Unknown Planet was "too predictable and very artificial", and
+both came from the same place: it was the desert's dune generator with the sand swapped for
+basalt. Dunes are regular by nature; a lava field is a pile of separate events. So
+`FPSKitLavaField.VolcanicHeightAt` replaces the dune trains with meandering flow lobes,
+tumuli and collapse pits, and `BuildLavaFieldSurface` drapes fresh flows, hot ground, ash,
+sulphur, fissures and rubble over it -- still inside the 26-degree cap and the chatter limit.
+Three things found on the way:
+
+- **Anything in a tiled texture repeats, including the glow.** Lighting a third of the
+  basalt's cracks turned the 32m tile into a lattice visible from any height. The ground's
+  own glow is now nearly nothing, and heat lives in `BuildHotGround`: drapes that share the
+  ground's maps and world UVs, so a patch's cracks are the plain's cracks, lit. The
+  landscape-scale colour comes through the Lit shader's detail slot (`Basalt_Macro`, linear,
+  0.5 = no change) at a period that does not divide the tile's.
+- **Nothing bakes lighting, so nothing reflects the sky.** Every glossy surface reflected
+  Unity's default grey-blue: obsidian came out silver and fresh lava like ice. `ReflectSky`
+  builds a cubemap from the painted panorama and sets it as the custom reflection. A
+  realtime probe was tried first, and rejected: it only renders once the level is running,
+  so no check can see whether it works.
+- **`NoEntry` does nothing under an object that is both rotated and non-uniformly
+  scaled.** The volume inherits a sheared frame the navigation package cannot represent,
+  and the bake drops it without a word -- the volcanic cones kept a hollow disc of navmesh
+  inside every one of them. `SealCone` puts the volume on an unscaled object of its own.
+
+`CaptureViews` shots marked `Grounded` now measure height from the ground under them: the
+fixed heights were written for a floor at zero and put the camera under the plain, which
+renders as a smooth brown gradient that looks exactly like ground in shadow.
+`10_open_plain` is the one shot not standing on a flattened pad.
 
 ## Shared builder code reads fields its callers never meant to fill
 

@@ -49,6 +49,7 @@ namespace FPSKit.EditorTools
     public static partial class FPSKitSceneBuilder
     {
         private static Material _lavaMat, _obsidianMat, _cinderMat, _smokeMat, _emberMat;
+        private static Material _flowMat, _ashMat, _sulfurMat, _crustMat, _warmGroundMat, _hotGroundMat;
 
         /// <summary>The emission tint of anything molten. HDR: past 1 is what the bloom catches.</summary>
         private static readonly Color MoltenGlow = new Color(1f, 0.36f, 0.06f);
@@ -63,8 +64,16 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void WriteVolcanicTextures()
         {
-            WriteHeightPair("Basalt", BasaltHeight, albedoContrast: 0.5f, normalStrength: 3.4f);
-            WriteMask("Basalt_Glow", BasaltGlow);
+            // Twice the resolution of every other map, because it tiles over nearly three
+            // times the ground -- see BasaltTiling.
+            WriteHeightPair("Basalt", BasaltHeight, albedoContrast: 0.62f, normalStrength: 5.2f,
+                            albedo: BasaltShade, size: BasaltSize);
+            WriteMask("Basalt_Glow", BasaltGlow, BasaltSize);
+            WriteMask("Basalt_Cracks", BasaltCracks, BasaltSize);
+            WriteMacro("Basalt_Macro");
+
+            WriteHeightPair("Pahoehoe", PahoehoeHeight, albedoContrast: 0.5f, normalStrength: 4.4f);
+            WriteMask("Pahoehoe_Glow", PahoehoeGlow);
 
             WriteHeightPair("Lava", LavaHeight, albedoContrast: 0.55f, normalStrength: 2.6f);
             WriteMask("Lava_Glow", LavaGlow);
@@ -95,7 +104,12 @@ namespace FPSKit.EditorTools
         /// crusts into plates with the melt showing between them.
         /// </summary>
         private static Vector2 Worley(float u, float v, int period, int seed)
+            => Worley(u, v, period, seed, out _);
+
+        /// <summary>As above, and a number from 0 to 1 that is the same everywhere in the nearest cell.</summary>
+        private static Vector2 Worley(float u, float v, int period, int seed, out float cellId)
         {
+            cellId = 0f;
             float x = u * period, y = v * period;
             int cx = Mathf.FloorToInt(x), cy = Mathf.FloorToInt(y);
 
@@ -113,7 +127,7 @@ namespace FPSKit.EditorTools
 
                     float d = Mathf.Sqrt((px - x) * (px - x) + (py - y) * (py - y));
 
-                    if (d < f1) { f2 = f1; f1 = d; }
+                    if (d < f1) { f2 = f1; f1 = d; cellId = Hash01(wx, wy, 2, seed); }
                     else if (d < f2) f2 = d;
                 }
 
@@ -121,46 +135,234 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// Cooled basalt: jointing polygons, vesicles, and a ropy skin over the top.
-        ///
-        /// The polygons are the columnar jointing a flow cracks into as it cools, and
-        /// they are what says "this was liquid once" rather than "this is dark rock".
+        /// Pixels across the basalt maps. They tile every <see cref="BasaltRepeat"/> metres,
+        /// so this keeps them at about three centimetres a pixel, which is what the old
+        /// eleven-metre tile had at 512.
         /// </summary>
-        private static float BasaltHeight(float u, float v)
+        private const int BasaltSize = 1024;
+
+        /// <summary>
+        /// Metres of ground per repeat of the basalt maps.
+        ///
+        /// <b>Eleven was the first value, and it was the single most artificial thing in
+        /// the arena.</b> Five cracked polygons to a tile, every crack the same width and
+        /// every one of them glowing, repeated forty times across the map: from any rise
+        /// it read as a tiled floor, and from the air as a printed grid. Thirty-two metres
+        /// is longer than anyone looks at the ground from, and the tile now holds whole
+        /// regions of different rock, so there is no one motif for the eye to catch
+        /// repeating. The macro map (<see cref="WriteMacro"/>) tiles on a period that does
+        /// not divide this one, so even the repeat itself never lines up twice.
+        /// </summary>
+        private const float BasaltRepeat = 32f;
+
+        /// <summary>The Lit shader's tiling for <see cref="BasaltRepeat"/>, since UVs are world metres.</summary>
+        private const float BasaltTiling = 1f / BasaltRepeat;
+
+        /// <summary>
+        /// Everything the basalt's three maps read, worked out once per pixel so the
+        /// relief, the shade and the glow can never disagree about where a crack is.
+        ///
+        /// A cooled lava field is not one surface. It is <b>plates</b> -- jointing polygons
+        /// of every size, some shattered into smaller ones; <b>pahoehoe</b>, smooth ropy skin
+        /// with few cracks; <b>clinker</b>, the rubbly broken top of an a'a flow; and
+        /// <b>ash</b> drifted over all of it, filling the cracks and burying the glow. The
+        /// four are laid out by low-frequency fields inside the tile, and it is having
+        /// them side by side -- rather than any cleverness in any one -- that stops the
+        /// ground reading as a pattern.
+        /// </summary>
+        private struct BasaltSample
         {
-            var cells = Worley(u + 0.04f * (TileFbm(u, v, 3, 2, 3301) - 0.5f), v, 5, 3302);
-            float joint = Ramp(0f, 0.12f, cells.y - cells.x);
+            public float Height, Shade, Glow, Cracks;
+        }
 
-            // Gas bubbles frozen in the rock. Small, dense, and sunk rather than raised.
-            float bubbles = TileFbm(u, v, 40, 2, 3303);
-            float pits = bubbles > 0.7f ? (bubbles - 0.7f) * 1.6f : 0f;
+        private static BasaltSample SampleBasalt(float u, float v)
+        {
+            // ---- regions ----
+            float kind = TileFbm(u, v, 3, 3, 3310);
+            float ash = Ramp(0.54f, 0.68f, TileFbm(u, v, 2, 3, 3311));
+            float ropy = 1f - Ramp(0.34f, 0.44f, kind);
+            float clinker = Ramp(0.6f, 0.7f, kind);
 
-            // Pahoehoe: the ropy wrinkles a flow's skin drags into as it moves.
-            float rope = Mathf.Sin((u * 9f + TileFbm(u, v, 4, 3, 3304) * 3.2f) * Mathf.PI * 2f)
-                         * 0.5f + 0.5f;
+            // ---- plates ----
+            // Warped hard, so a joint wanders rather than running ruler-straight between
+            // two lattice points; and the crack width drifts, so no two look alike.
+            float wu = (TileFbm(u, v, 4, 3, 3301) - 0.5f) * 0.05f;
+            float wv = (TileFbm(u, v, 4, 3, 3321) - 0.5f) * 0.05f;
+            var cells = Worley(u + wu, v + wv, 12, 3302, out float cellId);
+            float edge = cells.y - cells.x;
 
-            float grain = TileFbm(u, v, 24, 3, 3305);
+            float width = Mathf.Lerp(0.03f, 0.12f, TileFbm(u, v, 5, 2, 3312));
+            float plate = Ramp(0f, width, edge);
 
-            return joint * 0.42f + rope * 0.16f + grain * 0.36f - pits * 0.3f + 0.06f;
+            // Some plates have shattered into smaller ones as they cooled.
+            float shatter = Ramp(0.52f, 0.64f, TileFbm(u, v, 4, 2, 3313));
+            var fine = Worley(u + wv * 0.6f, v + wu * 0.6f, 30, 3322);
+            float subEdge = fine.y - fine.x;
+            float sub = Mathf.Lerp(1f, Ramp(0f, 0.07f, subEdge), shatter);
+
+            // Each plate slightly domed and sitting at its own height, so a joint is a
+            // small step as well as a crack -- which is what lets a low sun pick the
+            // plates out one by one.
+            float dome = Mathf.Clamp01(edge * 2.2f) * 0.25f;
+            float step = (cellId - 0.5f) * 0.12f;
+
+            float grain = TileFbm(u, v, 40, 3, 3305);
+            float bubbles = TileFbm(u, v, 64, 2, 3303);
+            float pits = bubbles > 0.68f ? (bubbles - 0.68f) * 1.8f : 0f;
+
+            float plates = plate * sub * 0.5f + dome + step + grain * 0.28f - pits * 0.3f + 0.08f;
+
+            // ---- pahoehoe: ropes dragged into arcs by the flow ----
+            float drift = TileFbm(u, v, 3, 3, 3304);
+            float rope = Mathf.Sin((u * 22f + v * 7f + drift * 7f) * Mathf.PI * 2f) * 0.5f + 0.5f;
+            float ropes = rope * 0.34f + grain * 0.24f + dome * 0.6f + 0.22f
+                        + (1f - Ramp(0f, width * 0.6f, edge)) * -0.18f;
+
+            // ---- clinker: rough, lumpy, broken ----
+            float rubble = TileFbm(u, v, 24, 4, 3314);
+            float clinkers = rubble * 0.85f + grain * 0.15f;
+
+            float h = plates;
+            h = Mathf.Lerp(h, ropes, ropy);
+            h = Mathf.Lerp(h, clinkers, clinker);
+
+            // ---- ash: fills the low ground first ----
+            float settle = ash * Mathf.Lerp(1f, 0.55f, Mathf.Clamp01(h * 1.6f - 0.3f));
+            float ashTop = 0.46f + TileFbm(u, v, 48, 2, 3315) * 0.08f;
+            h = Mathf.Lerp(h, Mathf.Max(h, ashTop), settle);
+
+            // ---- shade ----
+            float mottle = TileFbm(u, v, 6, 3, 3317) - 0.5f;
+            float shade = 0.5f + (h - 0.5f) * 0.8f + mottle * 0.3f
+                        - clinker * 0.08f + ropy * 0.03f
+                        - (1f - plate) * 0.2f * (1f - ropy);
+            shade = Mathf.Lerp(shade, 0.78f + mottle * 0.2f, settle * 0.9f);
+
+            // ---- glow ----
+            // Two masks. Cracks is every crack that could glow -- not the ash-buried ones,
+            // few in the ropy skin and the clinker -- and is what the hot ground laid over
+            // the plain lights up (BuildHotGround). Glow is a sparse, faint handful of them,
+            // and is all the plain itself carries.
+            //
+            // <b>The plain's own glow has to be almost nothing</b>, because anything in this
+            // map repeats every BasaltRepeat metres. The first cut lit a third of the cracks
+            // in every tile, and from any height the lit patches lined up into a lattice
+            // across the whole field -- the tile made visible by the one thing designed to
+            // break it up. Heat that goes where it likes has to come from geometry placed
+            // where it likes, not from a texture.
+            float crackLine = 1f - Ramp(0f, width * 0.32f, edge);
+            float subLine = (1f - Ramp(0f, 0.022f, subEdge)) * shatter * 0.55f;
+            float flicker = Mathf.Lerp(0.35f, 1f, TileFbm(u, v, 9, 2, 3318));
+
+            float cracks = Mathf.Max(crackLine, subLine) * flicker
+                         * (1f - ropy * 0.8f) * (1f - clinker * 0.75f) * (1f - Mathf.Clamp01(settle * 1.4f));
+
+            float hot = Ramp(0.7f, 0.84f, TileFbm(u, v, 3, 3, 3306));
+
+            return new BasaltSample { Height = h, Shade = shade, Glow = cracks * hot, Cracks = cracks };
+        }
+
+        private static float BasaltHeight(float u, float v) => SampleBasalt(u, v).Height;
+        private static float BasaltShade(float u, float v) => SampleBasalt(u, v).Shade;
+        private static float BasaltGlow(float u, float v) => SampleBasalt(u, v).Glow;
+        private static float BasaltCracks(float u, float v) => SampleBasalt(u, v).Cracks;
+
+        /// <summary>
+        /// Fresh pahoehoe: the glossy skin of a flow that stopped yesterday. Ropes in
+        /// arcs, a few toes, and hardly a crack. Laid over the raised flows on the plain
+        /// (see BuildFlowSurfaces), so the lobes read as a different, newer rock from
+        /// the ground they ran across.
+        /// </summary>
+        private static float PahoehoeHeight(float u, float v)
+        {
+            float drift = TileFbm(u, v, 2, 3, 5501);
+            float bend = TileFbm(u, v, 3, 2, 5502);
+
+            // Arcs, not stripes: the phase curves with distance from a wandering centre.
+            float du = u - 0.5f + (bend - 0.5f) * 0.4f, dv = v - 0.5f;
+            float arc = Mathf.Sqrt(du * du * 0.4f + dv * dv) * 18f;
+
+            float rope = Mathf.Sin((u * 11f + arc + drift * 5f) * Mathf.PI * 2f) * 0.5f + 0.5f;
+            var toes = Worley(u, v, 4, 5503);
+            float toe = Ramp(0f, 0.3f, toes.y - toes.x);
+
+            float skin = TileFbm(u, v, 32, 3, 5504);
+
+            return rope * 0.36f * toe + toe * 0.34f + skin * 0.22f + 0.06f;
+        }
+
+        /// <summary>Where the skin has split and the melt shows: the seams between toes, in places.</summary>
+        private static float PahoehoeGlow(float u, float v)
+        {
+            var toes = Worley(u, v, 4, 5503);
+            float seam = 1f - Ramp(0f, 0.035f, toes.y - toes.x);
+            float hot = Ramp(0.6f, 0.8f, TileFbm(u, v, 2, 3, 5505));
+
+            return seam * hot;
         }
 
         /// <summary>
-        /// Which of the basalt's cracks are still hot: the joints, but only in patches.
+        /// A colour layer at landscape scale: soot, drifted ash and oxidised rock, laid
+        /// over the basalt through the Lit shader's detail slot.
         ///
-        /// Every crack glowing is a grid of orange lines -- a pattern the eye finds in a
-        /// second and then sees repeating every tile across the whole arena. A
-        /// low-frequency mask lets a crack glow in one place and be dead rock a metre
-        /// along, which is also what a cooling field actually looks like.
+        /// It exists because any single tile, however varied, is still a tile, and a
+        /// four-hundred-metre field is thirteen of them in a row. This one repeats every
+        /// <see cref="MacroRepeat"/> metres, which does not divide
+        /// <see cref="BasaltRepeat"/>, so the two only line up again after a distance
+        /// longer than the arena. What the eye gets is broad patches of darker and paler
+        /// ground that come from nowhere and go nowhere -- which is what a real lava field
+        /// looks like from a rise.
+        ///
+        /// <b>Linear, and centred on 0.5.</b> The shader doubles this and multiplies, so 0.5
+        /// is "no change". Imported as sRGB, 0.5 would be sampled as about 0.21 and the
+        /// whole arena would go forty per cent darker with no other sign of why.
+        ///
+        /// The one map in this kit that carries colour, and the exception is deliberate:
+        /// every value in it is a small multiple of neutral, so the theme's floor colour
+        /// still decides what colour the ground is.
         /// </summary>
-        private static float BasaltGlow(float u, float v)
+        private static void WriteMacro(string name)
         {
-            var cells = Worley(u + 0.04f * (TileFbm(u, v, 3, 2, 3301) - 0.5f), v, 5, 3302);
-            float crack = 1f - Ramp(0f, 0.035f, cells.y - cells.x);
+            const int N = 512;
+            var pixels = new Color32[N * N];
 
-            float hot = Ramp(0.56f, 0.72f, TileFbm(u, v, 2, 3, 3306));
+            var neutral = new Color(0.5f, 0.5f, 0.5f);
+            var ash = new Color(0.64f, 0.62f, 0.60f);
+            var oxide = new Color(0.60f, 0.46f, 0.41f);
+            var soot = new Color(0.36f, 0.35f, 0.35f);
 
-            return crack * hot;
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float u = x / (float)N, v = y / (float)N;
+
+                    float s = TileFbm(u, v, 3, 4, 7701);
+                    float a = TileFbm(u, v, 4, 4, 7702);
+                    float o = TileFbm(u, v, 2, 4, 7703);
+                    float fine = TileFbm(u, v, 16, 2, 7704) - 0.5f;
+
+                    var c = neutral;
+                    c = Color.Lerp(c, soot, Ramp(0.54f, 0.70f, s) * 0.85f);
+                    c = Color.Lerp(c, oxide, Ramp(0.56f, 0.70f, o) * 0.8f);
+                    c = Color.Lerp(c, ash, Ramp(0.57f, 0.72f, a) * 0.9f);
+
+                    float jitter = 1f + fine * 0.12f;
+
+                    pixels[y * N + x] = new Color32(
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.r * jitter) * 255f),
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.g * jitter) * 255f),
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.b * jitter) * 255f), 255);
+                }
+
+            WritePng($"{TextureFolder}/{name}.png", pixels, N, importer =>
+            {
+                importer.textureType = TextureImporterType.Default;
+                importer.sRGBTexture = false;
+            });
         }
+
+        /// <summary>Metres per repeat of the macro map. Chosen not to divide <see cref="BasaltRepeat"/>.</summary>
+        private const float MacroRepeat = 173f;
 
         /// <summary>
         /// A lava river's surface: crust plates riding on the melt, with the melt showing
@@ -194,9 +396,9 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>A grayscale mask for an emission map. sRGB, because emission is a colour.</summary>
-        private static void WriteMask(string name, System.Func<float, float, float> mask)
+        private static void WriteMask(string name, System.Func<float, float, float> mask, int size = 0)
         {
-            int n = TextureSize;
+            int n = size > 0 ? size : TextureSize;
             var pixels = new Color32[n * n];
 
             for (int y = 0; y < n; y++)
@@ -285,7 +487,8 @@ namespace FPSKit.EditorTools
         private static Material VolcanicSky()
         {
             string texPath = $"{TextureFolder}/Sky_{SafeName(_theme.themeName)}.png";
-            WriteVolcanicSky(texPath);
+            var panorama = WriteVolcanicSky(texPath);
+            ReflectSky(panorama, $"{TextureFolder}/Reflection_{SafeName(_theme.themeName)}.cubemap");
 
             string path = $"{MaterialFolder}/Sky_{SafeName(_theme.themeName)}.mat";
             var shader = Shader.Find("Skybox/Panoramic");
@@ -305,9 +508,12 @@ namespace FPSKit.EditorTools
             return mat;
         }
 
-        private static void WriteVolcanicSky(string path)
+        private const int SkyWidth = 2048, SkyHeight = 1024;
+
+        /// <summary>Paints the panorama, writes it, and hands the pixels back for <see cref="ReflectSky"/>.</summary>
+        private static Color32[] WriteVolcanicSky(string path)
         {
-            const int W = 2048, H = 1024;
+            const int W = SkyWidth, H = SkyHeight;
             var pixels = new Color32[W * H];
 
             // Ground-coloured rather than black. Nobody looks at the nadir on purpose, but
@@ -387,6 +593,88 @@ namespace FPSKit.EditorTools
                 importer.textureCompression = TextureImporterCompression.CompressedHQ;
                 importer.SaveAndReimport();
             }
+
+            return pixels;
+        }
+
+        /// <summary>
+        /// Makes the painted sky the thing every glossy surface reflects.
+        ///
+        /// <b>Nothing in this kit bakes lighting, so there is no reflection generated from
+        /// the skybox</b>, and without one Unity reflects its own default environment -- a
+        /// pale grey-blue. On sand that hardly shows. On this map it was most of what the
+        /// obsidian looked like, and the fresh flows, the iron decks and the spires all came
+        /// back blue-white: brushed silver and frozen streams under a red sky.
+        ///
+        /// A realtime reflection probe that draws only the sky was the first attempt, and it
+        /// is the wrong tool for a picture that never changes -- it only renders once the
+        /// level is running, so nothing checked in the editor shows whether it worked. This
+        /// is the same answer computed once, at build time, and saved with the scene: a small
+        /// cubemap sampled straight from the panorama's pixels, set as the environment's
+        /// custom reflection. Its mips are what rougher surfaces read, so a box-filtered
+        /// chain is enough for a sky that is a gradient and some smoke.
+        /// </summary>
+        private static void ReflectSky(Color32[] panorama, string path)
+        {
+            const int N = 64;
+            var cube = new Cubemap(N, TextureFormat.RGBA32, true);
+
+            Color Sample(Vector3 d)
+            {
+                // The same lat-long mapping Skybox/Panoramic uses (its ToRadialCoords), at
+                // zero rotation, so the reflection and the sky agree about where the smoke is.
+                float u = 0.5f - Mathf.Atan2(d.z, d.x) / (Mathf.PI * 2f);
+                float v = 0.5f + Mathf.Asin(Mathf.Clamp(d.y, -1f, 1f)) / Mathf.PI;
+
+                int x = Mathf.Clamp((int)(Mathf.Repeat(u, 1f) * SkyWidth), 0, SkyWidth - 1);
+                int y = Mathf.Clamp((int)(v * SkyHeight), 0, SkyHeight - 1);
+
+                return panorama[y * SkyWidth + x];
+            }
+
+            var faces = new[]
+            {
+                CubemapFace.PositiveX, CubemapFace.NegativeX, CubemapFace.PositiveY,
+                CubemapFace.NegativeY, CubemapFace.PositiveZ, CubemapFace.NegativeZ
+            };
+
+            var face = new Color[N * N];
+
+            foreach (var f in faces)
+            {
+                for (int j = 0; j < N; j++)
+                    for (int i = 0; i < N; i++)
+                    {
+                        // Cubemap faces are addressed from the top row down.
+                        float a = (i + 0.5f) / N * 2f - 1f;
+                        float b = (j + 0.5f) / N * 2f - 1f;
+
+                        Vector3 d;
+                        switch (f)
+                        {
+                            case CubemapFace.PositiveX: d = new Vector3(1f, -b, -a); break;
+                            case CubemapFace.NegativeX: d = new Vector3(-1f, -b, a); break;
+                            case CubemapFace.PositiveY: d = new Vector3(a, 1f, b); break;
+                            case CubemapFace.NegativeY: d = new Vector3(a, -1f, -b); break;
+                            case CubemapFace.PositiveZ: d = new Vector3(a, -b, 1f); break;
+                            default: d = new Vector3(-a, -b, -1f); break;
+                        }
+
+                        face[j * N + i] = Sample(d.normalized);
+                    }
+
+                cube.SetPixels(face, f);
+            }
+
+            cube.Apply(true);
+
+            var existing = AssetDatabase.LoadAssetAtPath<Cubemap>(path);
+            if (existing != null) AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(cube, path);
+
+            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+            RenderSettings.customReflectionTexture = cube;
+            RenderSettings.reflectionIntensity = 1f;
         }
 
         // ==================================================================
@@ -403,10 +691,23 @@ namespace FPSKit.EditorTools
             // The ground, under the same role name BuildDuneField asks for, so the dune
             // field, the boundary ridge and the apron are one surface. The glow is added
             // here and survives BuildDuneField's own call, which never touches emission.
-            var ground = MakeDetailMaterial("Ground", _theme.floorColor, "Basalt", 0.09f,
+            var ground = MakeDetailMaterial("Ground", _theme.floorColor, "Basalt", BasaltTiling,
                                             _theme.floorSmoothness * 0.4f, 0f, 1.15f);
-            Glow(ground, "Basalt_Glow", MoltenGlow * 2.4f);
+            Glow(ground, "Basalt_Glow", MoltenGlow * 1.4f);
+            Macro(ground, "Basalt_Macro", 1f / MacroRepeat);
             _sandMat = ground;
+
+            // The same ground, still hot: see BuildHotGround. Identical maps and tiling, so
+            // a patch's cracks are the plain's own cracks, lit.
+            _warmGroundMat = MakeDetailMaterial("GroundWarm", _theme.floorColor, "Basalt", BasaltTiling,
+                                                _theme.floorSmoothness * 0.4f, 0f, 1.15f);
+            Glow(_warmGroundMat, "Basalt_Cracks", MoltenGlow * 1.1f);
+            Macro(_warmGroundMat, "Basalt_Macro", 1f / MacroRepeat);
+
+            _hotGroundMat = MakeDetailMaterial("GroundHot", _theme.floorColor, "Basalt", BasaltTiling,
+                                               _theme.floorSmoothness * 0.4f, 0f, 1.15f);
+            Glow(_hotGroundMat, "Basalt_Cracks", MoltenGlow * 3.4f);
+            Macro(_hotGroundMat, "Basalt_Macro", 1f / MacroRepeat);
 
             // The river. Crust-dark under the glow: see the class summary.
             _lavaMat = MakeDetailMaterial("Lava", new Color(0.20f, 0.09f, 0.06f), "Lava", 0.05f,
@@ -417,7 +718,7 @@ namespace FPSKit.EditorTools
             // The rock nearest the melt, lit by it. Dark, because it is lit from below and
             // only a little, and with the hot cracks showing through.
             _rockWetMat = MakeDetailMaterial("RockWet", Shade(_theme.bankColor, 0.62f), "Basalt",
-                                             0.16f, 0.3f, 0f, 1.1f);
+                                             BasaltTiling * 2f, 0.3f, 0f, 1.1f);
             Glow(_rockWetMat, "Basalt_Glow", MoltenGlow * 2.2f);
 
             // Iron rather than timber: the bridge trestles and the scaffold decks stand
@@ -434,8 +735,26 @@ namespace FPSKit.EditorTools
 
             // Reddish scoria round a crater's lip, where the rock was thrown out hot.
             _cinderMat = MakeDetailMaterial("Cinder", new Color(0.38f, 0.17f, 0.11f), "Basalt",
-                                            0.12f, 0.18f, 0f, 1.3f);
+                                            BasaltTiling * 2.5f, 0.18f, 0f, 1.3f);
             Glow(_cinderMat, "Basalt_Glow", MoltenGlow * 1.8f);
+
+            // What lies on the plain: see BuildLavaFieldSurface. The fresh flows are darker
+            // and glossier than the ground they ran over, which is the whole of how a
+            // player can tell a new flow from an old one at a distance.
+            // Satin, not glass. At 0.62 it mirrored the environment and every flow on the
+            // map came back as a blue-white sheet -- a frozen river, on a volcano.
+            _flowMat = MakeDetailMaterial("Flow", new Color(0.15f, 0.12f, 0.11f), "Pahoehoe",
+                                          1f / 14f, 0.32f, 0f, 1.2f);
+            Glow(_flowMat, "Pahoehoe_Glow", MoltenGlow * 2.8f);
+
+            // Ash drifts carry wind ripples, so they borrow the sand's map: which is right,
+            // because they are exactly that.
+            _ashMat = MakeDetailMaterial("Ash", new Color(0.40f, 0.37f, 0.35f), "Sand",
+                                         0.16f, 0.08f, 0f, 0.9f);
+            _sulfurMat = MakeDetailMaterial("Sulfur", new Color(0.72f, 0.60f, 0.22f), "Sand",
+                                            0.3f, 0.12f, 0f, 0.6f);
+            _crustMat = MakeDetailMaterial("Crust", new Color(0.17f, 0.14f, 0.13f), "Basalt",
+                                           BasaltTiling * 6f, 0.3f, 0f, 1.4f);
 
             _smokeMat = ParticleMaterial("Smoke", "Puff", additive: false, Color.white);
             _emberMat = ParticleMaterial("Ember", "Flake", additive: true, MoltenGlow * 4f);
@@ -460,6 +779,26 @@ namespace FPSKit.EditorTools
             // arena had every emission colour and map written and not one thing glowing.
             // MakeTintableMaterial records the same trap.
             SetEmission(mat, hdr);
+        }
+
+        /// <summary>
+        /// Lays a colour map over a material at its own tiling, through the Lit shader's
+        /// detail slot -- see <see cref="WriteMacro"/> for why it exists and why it is linear.
+        /// Like emission, the keyword is not implied by the texture: without
+        /// <c>_DETAIL_MULX2</c> the map is assigned and never sampled.
+        /// </summary>
+        private static void Macro(Material mat, string map, float tiling)
+        {
+            if (mat == null || !mat.HasProperty("_DetailAlbedoMap")) return;
+
+            var tex = LoadDetail(map);
+            if (tex == null) return;
+
+            mat.SetTexture("_DetailAlbedoMap", tex);
+            mat.SetTextureScale("_DetailAlbedoMap", new Vector2(tiling, tiling));
+            if (mat.HasProperty("_DetailAlbedoMapScale")) mat.SetFloat("_DetailAlbedoMapScale", 1f);
+            mat.EnableKeyword("_DETAIL_MULX2");
+            EditorUtility.SetDirty(mat);
         }
 
         /// <summary>
@@ -544,6 +883,43 @@ namespace FPSKit.EditorTools
         private const float CraterFloor = 0.78f;
 
         /// <summary>
+        /// How one volcano departs from <see cref="ConeProfile"/>.
+        ///
+        /// <b>Every volcano used to be the same volcano.</b> One profile, scaled, with a
+        /// little noise on the rim -- so the horizon was thirty flat-topped cones of one
+        /// shape at thirty sizes, and at a distance a cone with a wide crater reads as a
+        /// mesa. Real volcanic horizons are mixed: steep stratovolcanoes with a small
+        /// summit, broad shields you can barely tell are mountains, cones whose rim has
+        /// broken away on one side, and summits that sit off-centre because the vent moved.
+        ///
+        /// A value type with a key, because the meshes are pooled by it and the cone, its
+        /// pool and its tongues each rebuild the same rings from it -- three copies that
+        /// have to agree to the centimetre or the lava runs inside the rock.
+        /// </summary>
+        private struct ConeShape
+        {
+            /// <summary>Scale on the radius of the summit and crater: below 1 a peak, above it a shield's broad top.</summary>
+            public float Top;
+
+            /// <summary>How far the summit sits off the axis, in unit radius, and which way.</summary>
+            public float Lean, LeanAngle;
+
+            /// <summary>0 to 1: how deeply one side of the rim has broken away, and where.</summary>
+            public float Breach, BreachAngle;
+
+            /// <summary>How many gullies are cut round the flank.</summary>
+            public float Ribs;
+
+            public static ConeShape Cinder => new ConeShape { Top = 1f, Ribs = 5.5f };
+
+            public string Key => $"{Top:0.00}_{Lean:0.000}_{LeanAngle:0.00}_{Breach:0.00}_{BreachAngle:0.00}_{Ribs:0.0}";
+
+            /// <summary>Where the axis has drifted to at a height fraction.</summary>
+            public Vector3 Offset(float height)
+                => new Vector3(Mathf.Cos(LeanAngle), 0f, Mathf.Sin(LeanAngle)) * (Lean * height * height);
+        }
+
+        /// <summary>
         /// A cone to that profile, closed top and bottom, with its flank cut by gullies.
         ///
         /// <b>Wound up the flank -- lower ring, upper ring, upper next, lower next -- which
@@ -559,7 +935,7 @@ namespace FPSKit.EditorTools
         /// a few per cent of the radius, which on a cone is enough to bury a tongue inside
         /// the rock it is meant to be running down.
         /// </summary>
-        private static Vector3[][] ConeRings(int seed)
+        private static Vector3[][] ConeRings(int seed, ConeShape shape)
         {
             int levels = ConeProfile.Length;
             var rings = new Vector3[levels][];
@@ -568,6 +944,11 @@ namespace FPSKit.EditorTools
             {
                 rings[l] = new Vector3[ConeSides];
                 var p = ConeProfile[l];
+
+                // The summit scaled towards Top, eased in from the foot so the base stays
+                // where it was placed.
+                float scale = Mathf.Lerp(1f, shape.Top, Smooth(Mathf.Clamp01(p.y)));
+                var drift = shape.Offset(p.y);
 
                 for (int s = 0; s < ConeSides; s++)
                 {
@@ -578,13 +959,23 @@ namespace FPSKit.EditorTools
                     // something weathered rather than as a lathe.
                     float lump = Fbm2(Mathf.Cos(a) * 1.8f, Mathf.Sin(a) * 1.8f + l * 0.4f, seed, 2) * 0.22f;
                     float gully = l > 0 && l < ConeRim
-                        ? -0.06f * Mathf.Pow(Mathf.Abs(Mathf.Sin(a * 5.5f + seed)), 3f)
+                        ? -0.06f * Mathf.Pow(Mathf.Abs(Mathf.Sin(a * shape.Ribs + seed)), 3f)
                         : 0f;
 
-                    float r = p.x * (1f + lump + gully);
+                    float r = p.x * scale * (1f + lump + gully);
                     float y = p.y + (l == ConeRim ? Fbm2(a * 2f, seed * 0.1f, seed + 9, 2) * 0.05f : 0f);
 
-                    rings[l][s] = new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+                    // A breach: the rim and the upper flank pulled down on one side towards
+                    // the height of the crater floor, never below it -- lower than the floor
+                    // and the crater would have a hole in its side.
+                    if (shape.Breach > 0f && l >= ConeRim - 1)
+                    {
+                        float window = Mathf.Pow(Mathf.Max(0f, Mathf.Cos(a - shape.BreachAngle)), 6f);
+                        float notch = 0.80f + (y - 0.80f) * 0.25f;
+                        y = Mathf.Lerp(y, notch, shape.Breach * window);
+                    }
+
+                    rings[l][s] = new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r) + drift;
                 }
             }
 
@@ -601,14 +992,28 @@ namespace FPSKit.EditorTools
             return Vector3.Lerp(rings[l][s], rings[l][n], at - Mathf.Floor(at));
         }
 
-        private static Mesh VolcanoMesh(int seed)
-            => Pooled($"volcano_{seed}", () =>
+        /// <summary>The middle of a ring and its mean radius about that middle.</summary>
+        private static Vector3 RingCentre(Vector3[] ring, out float radius)
+        {
+            var centre = Vector3.zero;
+            foreach (var p in ring) centre += p;
+            centre /= ring.Length;
+
+            radius = 0f;
+            foreach (var p in ring) radius += new Vector2(p.x - centre.x, p.z - centre.z).magnitude;
+            radius /= ring.Length;
+
+            return centre;
+        }
+
+        private static Mesh VolcanoMesh(int seed, ConeShape shape)
+            => Pooled($"volcano_{seed}_{shape.Key}", () =>
             {
                 var build = new MeshBuild { UVScale = 0.2f };
                 int levels = ConeProfile.Length;
                 int sides = ConeSides;
 
-                var rings = ConeRings(seed);
+                var rings = ConeRings(seed, shape);
 
                 for (int l = 0; l < levels - 1; l++)
                     for (int s = 0; s < sides; s++)
@@ -619,7 +1024,8 @@ namespace FPSKit.EditorTools
 
                 // The crater floor facing up, and the base facing down, so the shape is
                 // closed from every side and its centroid means something to VerifyZone.
-                var floor = new Vector3(0f, CraterFloor, 0f);
+                // The floor follows the summit if it has drifted off the axis.
+                var floor = new Vector3(0f, CraterFloor, 0f) + shape.Offset(CraterFloor);
                 int last = levels - 1;
 
                 for (int s = 0; s < sides; s++)
@@ -635,18 +1041,23 @@ namespace FPSKit.EditorTools
         /// <summary>
         /// The pool in the crater: a disc of lava just above the crater floor, facing up.
         /// Fanned as centre, next, this -- the order the frozen lake records as the one
-        /// that faces the sky.
+        /// that faces the sky. Sized and centred on the cone's own innermost ring, so a
+        /// narrow summit gets a narrow pool and a leaning one gets it under its crater.
         /// </summary>
-        private static Mesh CraterPoolMesh() => Pooled("craterPool", () =>
+        private static Mesh CraterPoolMesh(int seed, ConeShape shape) => Pooled($"craterPool_{seed}_{shape.Key}", () =>
         {
             var build = new MeshBuild { UVScale = 1.6f };
             const int Sides = 20;
-            float r = ConeProfile[ConeProfile.Length - 1].x * 1.12f;
+
+            var rings = ConeRings(seed, shape);
+            var middle = RingCentre(rings[rings.Length - 1], out float inner);
+
+            float r = inner * 1.12f;
             // Above the edge of the crater floor (0.80) and below where the wall rises past the
             // pool's rim, so its edge is always tucked under rock rather than hanging in air.
             float y = CraterFloor + 0.025f;
 
-            var centre = new Vector3(0f, y, 0f);
+            var centre = new Vector3(middle.x, y, middle.z);
 
             for (int i = 0; i < Sides; i++)
             {
@@ -654,8 +1065,8 @@ namespace FPSKit.EditorTools
                 float t1 = (i + 1) / (float)Sides * Mathf.PI * 2f;
 
                 build.Tri(centre,
-                          new Vector3(Mathf.Cos(t1) * r, y, Mathf.Sin(t1) * r),
-                          new Vector3(Mathf.Cos(t0) * r, y, Mathf.Sin(t0) * r));
+                          centre + new Vector3(Mathf.Cos(t1) * r, 0f, Mathf.Sin(t1) * r),
+                          centre + new Vector3(Mathf.Cos(t0) * r, 0f, Mathf.Sin(t0) * r));
             }
 
             return build.ToMesh("CraterPool");
@@ -666,18 +1077,26 @@ namespace FPSKit.EditorTools
         /// pushed a little proud of them. <paramref name="width"/> is a half-width in the
         /// cone's unit radius. Built with the flank's winding -- lower ring, upper ring,
         /// upper next, lower next -- so it faces out of the cone as the flank does.
+        ///
+        /// Pushed out from each ring's own centre rather than from the axis: on a leaning
+        /// peak the axis can be outside the summit's ring altogether, and "away from the
+        /// axis" on the near side is then straight into the rock.
         /// </summary>
-        private static Mesh LavaTongueMesh(int coneSeed, int seed, float start, float width, int down)
-            => Pooled($"tongue_{coneSeed}_{seed}_{start:0.000}_{width:0.000}_{down}", () =>
+        private static Mesh LavaTongueMesh(int coneSeed, ConeShape shape, int seed, float start, float width, int down)
+            => Pooled($"tongue_{coneSeed}_{shape.Key}_{seed}_{start:0.000}_{width:0.000}_{down}", () =>
             {
                 var build = new MeshBuild { UVScale = 2.2f };
-                var rings = ConeRings(coneSeed);
+                var rings = ConeRings(coneSeed, shape);
                 int from = Mathf.Max(0, ConeRim - down);
+
+                var centres = new Vector3[rings.Length];
+                var radii = new float[rings.Length];
+                for (int l = 0; l < rings.Length; l++) centres[l] = RingCentre(rings[l], out radii[l]);
 
                 Vector3 At(int l, float a)
                 {
                     var p = OnRing(rings, l, a);
-                    var radial = new Vector3(p.x, 0f, p.z);
+                    var radial = new Vector3(p.x - centres[l].x, 0f, p.z - centres[l].z);
 
                     // Out along the radius and up a touch: enough to clear the chord the
                     // cone is meshed with between two of its ribs, and no more.
@@ -690,8 +1109,8 @@ namespace FPSKit.EditorTools
                     float a0 = start + Fbm2(l * 0.7f, seed, seed, 2) * 0.35f;
                     float a1 = start + Fbm2((l + 1) * 0.7f, seed, seed, 2) * 0.35f;
 
-                    float w0 = width / ConeProfile[l].x * Mathf.Lerp(0.55f, 1f, (l - from) / (float)down);
-                    float w1 = width / ConeProfile[l + 1].x * Mathf.Lerp(0.55f, 1f, (l + 1 - from) / (float)down);
+                    float w0 = width / Mathf.Max(radii[l], 0.02f) * Mathf.Lerp(0.55f, 1f, (l - from) / (float)down);
+                    float w1 = width / Mathf.Max(radii[l + 1], 0.02f) * Mathf.Lerp(0.55f, 1f, (l + 1 - from) / (float)down);
 
                     build.Quad(At(l, a0 - w0), At(l + 1, a1 - w1), At(l + 1, a1 + w1), At(l, a0 + w0));
                 }
@@ -702,11 +1121,14 @@ namespace FPSKit.EditorTools
         /// <summary>
         /// One cone, with its pool, and optionally lava down its side and smoke out of it.
         /// Returns the cone so the caller can decide what the bake and the map make of it.
+        ///
+        /// A breached cone sends its first tongue out through the breach, because that is
+        /// the way the lava went -- it is what broke the rim.
         /// </summary>
         private static GameObject Volcano(Transform parent, int layer, System.Random rng, string name,
                                           Material rock, Vector3 foot, float width, float height,
                                           int seed, bool collider, int tongues, bool smoke,
-                                          float smokeScale)
+                                          float smokeScale, ConeShape shape)
         {
             var at = new GameObject(name + "Site").transform;
             at.SetParent(parent, false);
@@ -715,17 +1137,19 @@ namespace FPSKit.EditorTools
             var scale = new Vector3(width * 0.5f, height, width * 0.5f * Rand(rng, 0.82f, 1.15f));
             var turn = Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f);
 
-            var cone = MeshObject(at, name, VolcanoMesh(seed), rock,
+            var cone = MeshObject(at, name, VolcanoMesh(seed, shape), rock,
                                   Vector3.zero, turn, scale, layer, _theme.wallTag, collider);
 
-            var pool = MeshObject(at, "CraterPool", CraterPoolMesh(), _lavaMat, Vector3.zero, turn, scale,
+            var pool = MeshObject(at, "CraterPool", CraterPoolMesh(seed, shape), _lavaMat, Vector3.zero, turn, scale,
                                   layer, "Untagged", collider: false);
             Hide(pool);
 
             for (int i = 0; i < tongues; i++)
             {
+                float start = i == 0 && shape.Breach > 0f ? shape.BreachAngle : Rand(rng, 0f, Mathf.PI * 2f);
+
                 var tongue = MeshObject(at, "LavaTongue",
-                                        LavaTongueMesh(seed, i, Rand(rng, 0f, Mathf.PI * 2f),
+                                        LavaTongueMesh(seed, shape, i, start,
                                                        Rand(rng, 0.03f, 0.055f), 3 + rng.Next(3)),
                                         _lavaMat, Vector3.zero, turn, scale, layer, "Untagged",
                                         collider: false);
@@ -733,7 +1157,11 @@ namespace FPSKit.EditorTools
             }
 
             if (smoke)
-                Plume(at, new Vector3(0f, height * 0.9f, 0f), width * 0.045f, smokeScale, rng.Next());
+            {
+                var summit = shape.Offset(1f);
+                Plume(at, turn * new Vector3(summit.x * scale.x, height * 0.9f, summit.z * scale.z),
+                      width * 0.045f * shape.Top, smokeScale, rng.Next());
+            }
 
             return cone;
         }
@@ -762,14 +1190,35 @@ namespace FPSKit.EditorTools
 
                 var rock = Rand(rng, 0f, 1f) < 0.5f ? _rockMat : _rockDarkMat;
 
+                // Varied, but only a little: every one of these has to keep an upper flank
+                // past the fifty degrees a player can climb, and a shield or a deep breach
+                // would hand them a ramp to the crater. See ConeProfile.
+                var shape = new ConeShape
+                {
+                    Top = Rand(rng, 0.8f, 1.15f),
+                    Lean = Rand(rng, 0f, 0.035f),
+                    LeanAngle = Rand(rng, 0f, Mathf.PI * 2f),
+                    Breach = rng.NextDouble() < 0.4 ? Rand(rng, 0.5f, 1f) : 0f,
+                    BreachAngle = Rand(rng, 0f, Mathf.PI * 2f),
+                    Ribs = Rand(rng, 3.5f, 8f)
+                };
+
                 var cone = Volcano(group, layer, rng, "Volcano", rock, foot, plan.Width, plan.Height,
-                                   plan.Seed, collider: true, tongues: rng.Next(0, 3), smoke: true,
-                                   smokeScale: 0.7f);
+                                   plan.Seed, collider: true, tongues: rng.Next(0, 3) + (shape.Breach > 0f ? 1 : 0),
+                                   smoke: rng.NextDouble() < 0.75, smokeScale: Rand(rng, 0.5f, 0.9f), shape: shape);
 
                 // A cone's crater and its lower flanks are both shallower than the agent
                 // slope; left on the bake, every landmark grows two islands of navmesh
                 // nothing can reach, one of them in a crater full of lava.
                 NoStanding(cone);
+
+                // And it is hollow. The shell is sunk into the plain, so the plain carries
+                // on underneath it, and NoStanding marks the shell rather than the ground
+                // inside it: every landmark held a disc of navmesh the size of its own foot,
+                // sealed in and invisible. That was 2.7 % of the arena once the cones began
+                // to vary in girth -- enough for VerifyReach to find, and enough for the
+                // spawner to put an enemy inside a mountain for the whole of a level.
+                SealCone(group, cone);
 
                 // Scoria thrown out of it, lying round its foot.
                 int thrown = rng.Next(3, 7);
@@ -788,8 +1237,48 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The horizon: volcanoes rather than mesas, one in three smoking and glowing.
+        /// Takes the ground inside a cone's foot off the bake.
+        ///
+        /// <b>Not <see cref="NoEntry"/>, which parents its volume to the object.</b> A cone is
+        /// both turned and stretched, so a child of it lives in a sheared frame -- and the
+        /// navigation package rebuilds a volume's box from its lossy scale and rotation,
+        /// neither of which can hold a shear. The volume was there, it contained every
+        /// stranded point when asked in its own local space, and the bake ignored it
+        /// completely. A volume on an unscaled object of its own, in world space, has no
+        /// frame to get wrong.
+        ///
+        /// Square, and as wide as the foot is at the ground, which takes the corners of a
+        /// few metres of flank round the outside as well. Those were NoStanding already.
+        /// </summary>
+        private static void SealCone(Transform parent, GameObject cone)
+        {
+            var renderer = cone.GetComponent<Renderer>();
+            if (renderer == null) return;
+
+            var bounds = renderer.bounds;
+
+            var go = new GameObject("ConeSeal");
+            go.transform.SetParent(parent, false);
+            go.transform.position = bounds.center;
+            go.transform.rotation = Quaternion.identity;
+            go.transform.localScale = Vector3.one;
+
+            var volume = go.AddComponent<Unity.AI.Navigation.NavMeshModifierVolume>();
+            volume.size = new Vector3(bounds.size.x - 1.2f, bounds.size.y + 4f, bounds.size.z - 1.2f);
+            volume.area = 1;   // Not Walkable
+        }
+
+        /// <summary>
+        /// The horizon: volcanoes rather than mesas, of several kinds, in ranges.
         /// No colliders, on the layer the bake ignores -- they are only ever looked at.
+        ///
+        /// <b>Placed in groups, not round a dial.</b> The first version spaced them by the
+        /// golden angle, which is the most even spacing there is, and that was the problem:
+        /// thirty evenly spaced peaks of one shape read as a fence round the arena. A real
+        /// volcanic horizon is ranges and gaps -- a cluster of cones along one rift, a lone
+        /// giant, a long empty stretch of plain. So a handful of ranges are chosen first and
+        /// most volcanoes join one, a few stand alone, and the sizes are skewed so that a
+        /// few are huge and most are not.
         /// </summary>
         private static void BuildVolcanicBackdrop(Transform root, int layer, System.Random rng)
         {
@@ -798,29 +1287,91 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Backdrop").transform;
             group.SetParent(root, false);
 
+            // ---- ranges ----
+            int ranges = 5 + rng.Next(3);
+            var rangeAngles = new float[ranges];
+            var rangeSpread = new float[ranges];
+
+            for (int r = 0; r < ranges; r++)
+            {
+                rangeAngles[r] = Rand(rng, 0f, Mathf.PI * 2f);
+                rangeSpread[r] = Rand(rng, 0.08f, 0.28f);
+            }
+
             for (int i = 0; i < _theme.backdropCount; i++)
             {
-                float angle = i * 2.39996f;
+                float angle;
+
+                if (rng.NextDouble() < 0.78)
+                {
+                    int r = rng.Next(ranges);
+                    // Roughly normal about the range's line: two uniforms averaged.
+                    float jitter = (Rand(rng, -1f, 1f) + Rand(rng, -1f, 1f)) * 0.5f;
+                    angle = rangeAngles[r] + jitter * rangeSpread[r];
+                }
+                else
+                {
+                    angle = Rand(rng, 0f, Mathf.PI * 2f);
+                }
+
                 float distance = Rand(rng, _theme.backdropDistance.x, _theme.backdropDistance.y);
 
-                float h = Rand(rng, _theme.backdropHeight.x, _theme.backdropHeight.y);
-                float w = Rand(rng, _theme.backdropWidth.x, _theme.backdropWidth.y);
+                // Skewed: most volcanoes are small, a few dominate their part of the sky.
+                float size = Mathf.Pow((float)rng.NextDouble(), 2.2f);
+                float h = Mathf.Lerp(_theme.backdropHeight.x, _theme.backdropHeight.y, size);
 
-                // Never taller than it is wide by much: a volcano that is a needle reads
-                // as a spire, and the spires are what the obsidian is for.
-                w = Mathf.Max(w, h * 1.5f);
+                var shape = new ConeShape
+                {
+                    Lean = 0f,
+                    LeanAngle = Rand(rng, 0f, Mathf.PI * 2f),
+                    Breach = rng.NextDouble() < 0.3 ? Rand(rng, 0.6f, 1f) : 0f,
+                    BreachAngle = Rand(rng, 0f, Mathf.PI * 2f),
+                    Ribs = Rand(rng, 3f, 9f)
+                };
+
+                float w;
+                double kind = rng.NextDouble();
+
+                if (kind < 0.4)
+                {
+                    // Stratovolcano: steep, with a small summit. The shape that says
+                    // "volcano" to anybody, and the one the first version had none of.
+                    shape.Top = Rand(rng, 0.18f, 0.4f);
+                    w = h * Rand(rng, 1.5f, 2.1f);
+                }
+                else if (kind < 0.62)
+                {
+                    // Shield: broad and low, a long slope with a wide top.
+                    shape.Top = Rand(rng, 1.15f, 1.45f);
+                    w = h * Rand(rng, 3.2f, 4.6f);
+                    h *= 0.55f;
+                }
+                else
+                {
+                    // Cinder cone, as before -- but no longer everything.
+                    shape.Top = Rand(rng, 0.75f, 1.05f);
+                    w = h * Rand(rng, 1.7f, 2.5f);
+                }
+
+                // A summit that has wandered off the axis, never so far it leaves its own
+                // crater ring behind: see ConeShape.
+                shape.Lean = Rand(rng, 0f, 0.55f) * ConeProfile[ConeRim].x * shape.Top;
 
                 var pos = new Vector3(Mathf.Cos(angle) * distance, -h * 0.06f, Mathf.Sin(angle) * distance);
 
                 float haze = Mathf.InverseLerp(_theme.backdropDistance.x, _theme.backdropDistance.y, distance);
                 var tint = Color.Lerp(_theme.backdropColor, _theme.fogColor, haze * 0.4f);
+                // Some rock is darker and some redder, so a range is not one flat colour.
+                tint = Color.Lerp(tint, new Color(tint.r * 1.25f, tint.g * 0.9f, tint.b * 0.85f),
+                                  (float)rng.NextDouble() * 0.6f);
+                tint = Shade(tint, Rand(rng, 0.8f, 1.1f));
                 var mat = MakeMaterial($"Mesa_{ColorKey(tint)}", tint, 0.05f, 0f);
 
-                bool active = i % 3 == 0;
+                bool active = rng.NextDouble() < 0.33;
 
                 var cone = Volcano(group, layer, rng, "Mesa", mat, pos, w, h, rng.Next(1, 999),
-                                   collider: false, tongues: active ? 2 + rng.Next(3) : 0,
-                                   smoke: active, smokeScale: Mathf.Clamp(h / 45f, 1.6f, 5f));
+                                   collider: false, tongues: active ? 1 + rng.Next(3) : 0,
+                                   smoke: active, smokeScale: Mathf.Clamp(h / 45f, 1.6f, 5f), shape: shape);
 
                 Hide(cone);
             }
@@ -850,10 +1401,15 @@ namespace FPSKit.EditorTools
                 float ground = LowestGroundIn(point.x, point.y, width * 0.66f);
                 var foot = new Vector3(point.x, ground - 0.5f, point.y);
 
+                // The plain cinder shape, always: the throat's kill trigger below is sized
+                // from ConeProfile, and a vent whose crater had moved would leave it
+                // guarding rock while the real pool stood unguarded beside it.
                 var vent = Volcano(group, layer, rng, "Vent", _cinderMat, foot, width, height, 800 + i,
-                                   collider: true, tongues: 0, smoke: true, smokeScale: 0.45f);
+                                   collider: true, tongues: 0, smoke: true, smokeScale: 0.45f,
+                                   shape: ConeShape.Cinder);
 
                 NoStanding(vent);
+                _ventSites.Add(new Vector3(point.x, point.y, width * 0.66f));
 
                 // The pool's own trigger, the size of the pool and a little above it.
                 var throat = new GameObject("VentHeat");

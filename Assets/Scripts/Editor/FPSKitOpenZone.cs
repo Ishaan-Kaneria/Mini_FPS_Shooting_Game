@@ -97,6 +97,9 @@ namespace FPSKit.EditorTools
             ClearMeshPool();
             ResetTerrain();
 
+            // Before anything asks how high the ground is: the flows are part of the answer.
+            PlanLavaField(_theme.arenaSize * 0.5f);
+
             var root = new GameObject("Arena").transform;
             int layer = LayerMask.NameToLayer("Environment");
             int backdrop = LayerMask.NameToLayer("Backdrop");
@@ -173,6 +176,7 @@ namespace FPSKit.EditorTools
             {
                 BuildVents(root, layer, rng, half);
                 BuildSpires(root, layer, rng, half);
+                BuildLavaFieldSurface(root, backdrop, half);
                 BuildLavaGlow(root, half);
                 BuildAshfall(root);
             }

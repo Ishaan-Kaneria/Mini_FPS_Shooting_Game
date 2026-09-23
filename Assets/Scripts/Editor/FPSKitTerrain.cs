@@ -147,6 +147,7 @@ namespace FPSKit.EditorTools
             _groundRigid = null;
             _groundReady = false;
             _pads.Clear();
+            ResetLavaField();
         }
 
         /// <summary>
@@ -377,7 +378,9 @@ namespace FPSKit.EditorTools
             // is unchanged.
             string detail = string.IsNullOrEmpty(_theme.floorDetail) ? "Sand" : _theme.floorDetail;
 
-            var sand = MakeDetailMaterial("Ground", _theme.floorColor, detail, 0.09f,
+            // The volcanic ground tiles far wider than sand -- see BasaltRepeat.
+            var sand = MakeDetailMaterial("Ground", _theme.floorColor, detail,
+                                          _theme.volcanicZone ? BasaltTiling : 0.09f,
                                           _theme.floorSmoothness * 0.4f, 0f, 1.15f);
 
             const int chunkCells = 30;
@@ -428,6 +431,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static float DuneHeightAt(float x, float z)
         {
+            // A lava plain is not a dune field; see FPSKitLavaField.
+            if (_theme.volcanicZone) return VolcanicHeightAt(x, z);
+
             float wind = _theme.duneWindAngle * Mathf.Deg2Rad;
             float cos = Mathf.Cos(wind), sin = Mathf.Sin(wind);
 

@@ -33,8 +33,10 @@ namespace FPSKit.EditorTools
         public const string CatalogPath = "Assets/FPSKit_Generated/Arenas.asset";
         public const string PreviewFolder = "Assets/FPSKit_Generated/Previews";
 
-        const int PreviewWidth = 512;
-        const int PreviewHeight = 288;
+        // Twice the old 512: a card is shown at several hundred pixels wide on a desktop, and
+        // at 512 every one of them was visibly soft.
+        const int PreviewWidth = 1024;
+        const int PreviewHeight = 576;
 
         // ------------------------------------------------------------------
         // Palette. Small on purpose: six colours is what keeps a generated screen
@@ -331,6 +333,17 @@ namespace FPSKit.EditorTools
                     Quaternion.Euler(pitch, 34f, 0f) * Vector3.forward, Vector3.up);
 
                 camera.fieldOfView = Mathf.Lerp(68f, 66f, Mathf.InverseLerp(150f, 420f, size));
+
+                // <b>An arena can choose its own card.</b> The builder leaves a "PreviewAnchor"
+                // where the level is best seen from, when the spawn is not that place -- the
+                // desert's spawn is deliberately open sand, and its card was a picture of a
+                // dune with the town, the oasis and the oil field all out of frame.
+                var anchor = GameObject.Find("PreviewAnchor");
+                if (anchor != null)
+                {
+                    rig.transform.SetPositionAndRotation(anchor.transform.position, anchor.transform.rotation);
+                    camera.fieldOfView = 60f;
+                }
                 camera.nearClipPlane = 0.1f;
                 camera.farClipPlane = Mathf.Max(400f, size * 4f);
                 camera.clearFlags = CameraClearFlags.Skybox;

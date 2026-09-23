@@ -287,6 +287,18 @@ namespace FPSKit.EditorTools
             BuildWrecks(group, layer, backdrop, rng);
             BuildDust(group, rng, half);
 
+            // Where the dashboard card is taken from: outside the town on the side away from
+            // the river, at minaret height, looking across the rooftops and the oasis towards
+            // the water. See FPSKitMenuBuilder.Capture.
+            var river = new Vector2(GorgeCentreAt(_townCentre.y), _townCentre.y);
+            var toRiver = (river - _townCentre).normalized;
+            var from = _townCentre - toRiver * (_townRadius + 22f) + new Vector2(-toRiver.y, toRiver.x) * 18f;
+            var look = _townCentre + toRiver * 30f;
+            var anchor = new GameObject("PreviewAnchor").transform;
+            anchor.SetParent(group, false);
+            anchor.position = new Vector3(from.x, GroundHeightAt(from.x, from.y) + 16f, from.y);
+            anchor.rotation = Quaternion.LookRotation(new Vector3(look.x, GroundHeightAt(_townCentre.x, _townCentre.y) + 2f, look.y) - anchor.position);
+
             Debug.Log($"[FPSKit] desert: town at {_townCentre}, oasis {_hasOasis}, fields {_hasFields}, " +
                       $"{_oilSites.Count} oil site(s), plane {_hasPlane}, track {_track.Count} points.");
         }

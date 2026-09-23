@@ -101,10 +101,10 @@ MonoBehaviour:
     opening: Dev ran the works into the ground and then moved into what was left. The rides still turn when the wind is behind them. He kept the lights on over the shafts, which is either a courtesy or a trap.
     extraBeatSibling: -1
     grantsPower: 
-  - displayName: Mars Colony
+  - displayName: Unknown Planet
     levels: {fileID: 11400000, guid: 33a84de879134139cb2d8effe32ab3e3, type: 2}
     siblingIndex: 5
-    opening: Roan left before any of this happened and has spent every year since being the one who was not there. He is the last name on the list that still lives somewhere with a door on it.
+    opening: Roan left before any of this happened, for a world nobody bothered to name, and has spent every year since being the one who was not there. The ground there is still being made. He is the last name on the list that still lives somewhere with a door on it.
     extraBeatSibling: -1
     grantsPower: 
   - displayName: The Auger House

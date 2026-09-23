@@ -696,48 +696,126 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Mars Colony":
-                    t.description = "Rust sky, thin light, drifting dust.";
+                    // Filed as Mars Colony, shown as the Unknown Planet. The key names the
+                    // scene, the ladder and the campaign slot, and the ladder's scene name
+                    // is what stars are saved under -- renaming it would move the arena
+                    // out from under every save that has reached it.
+                    t.displayName = "Unknown Planet";
+                    t.description = "A world still being made. Molten river, red sky, ash on the wind.";
 
-                    // Regolith and rock, reusing the desert's maps rather than generating a
-                    // near-identical fifth one. Tiled wide, because the thing that sells a
-                    // dust plain is that the detail keeps going rather than that it is fine.
-                    t.floorDetail = "Sand";
-                    t.wallDetail = "Rock";
-                    t.floorDetailSize = 7f;
-                    t.wallDetailSize = 4f;
-                    t.skyTint = new Color(0.72f, 0.42f, 0.28f);
-                    t.skyGroundColor = new Color(0.42f, 0.22f, 0.14f);
-                    t.atmosphereThickness = 1.8f;
-                    t.skyExposure = 1.0f;
-                    t.sunColor = new Color(1f, 0.80f, 0.62f);
+                    // ---- the sky ----
+                    // Painted, not these four: volcanicZone swaps the procedural sky for a
+                    // panorama (FPSKitVolcanic.VolcanicSky), because the procedural one
+                    // scatters red away and came back green. Kept tuned so turning the
+                    // dressing off still gives a warm sky rather than the default blue.
+                    t.skyTint = new Color(0.95f, 0.36f, 0.14f);
+                    t.skyGroundColor = new Color(0.30f, 0.10f, 0.05f);
+                    t.atmosphereThickness = 3.1f;
+                    t.skyExposure = 1.15f;
+                    t.sunColor = new Color(1f, 0.58f, 0.32f);
                     t.sunIntensity = 1.05f;
-                    t.sunAngles = new Vector2(26f, 300f);
-                    t.fogColor = new Color(0.58f, 0.35f, 0.24f);
-                    t.fogDensity = 0.014f;
-                    t.ambientSky = new Color(0.55f, 0.34f, 0.24f);
-                    t.ambientEquator = new Color(0.36f, 0.24f, 0.18f);
-                    t.ambientGround = new Color(0.20f, 0.12f, 0.09f);
-                    t.floorColor = new Color(0.44f, 0.26f, 0.18f);
-                    t.wallColor = new Color(0.52f, 0.50f, 0.49f);
+                    t.sunAngles = new Vector2(24f, 300f);
+                    t.shadowStrength = 0.75f;
+
+                    // Smoky rather than dusty. Thinner than the old colony's 0.014, which
+                    // was an interior number: exponential-squared at 450m hides the far
+                    // half of the map, and an arena whose volcanoes cannot be seen is an
+                    // arena with no volcanoes.
+                    t.fogColor = new Color(0.52f, 0.22f, 0.11f);
+                    t.fogDensity = 0.0014f;
+
+                    // Lit from below as well as above: the ground colour is the glow off
+                    // the river and the vents, and it is what stops every face turned away
+                    // from a low sun going black -- the desert records that a face in
+                    // shadow dark enough to hide an enemy is a fault, not a mood.
+                    t.ambientSky = new Color(0.52f, 0.26f, 0.16f);
+                    t.ambientEquator = new Color(0.40f, 0.20f, 0.12f);
+                    t.ambientGround = new Color(0.34f, 0.14f, 0.07f);
+
+                    // ---- the ground ----
+                    // Cooled basalt: near black, with the glow in its cracks supplied by
+                    // the material rather than by the colour. Light enough to model the
+                    // relief under a low red sun; at true basalt black the dunes vanish.
+                    t.floorColor = new Color(0.25f, 0.20f, 0.18f);
+                    t.floorSmoothness = 0.35f;
+                    t.floorDetail = "Basalt";
+                    t.wallDetail = "Rock";
+                    t.floorDetailSize = 9f;
+                    t.wallDetailSize = 4f;
+                    // Block-built walls, the survey crews' own: dark stone, not mud brick.
+                    t.wallColor = new Color(0.30f, 0.26f, 0.24f);
                     t.coverColors = new[]
                     {
-                        new Color(0.55f, 0.53f, 0.52f),
-                        new Color(0.48f, 0.30f, 0.20f),
-                        new Color(0.62f, 0.58f, 0.54f)
+                        new Color(0.30f, 0.27f, 0.26f),
+                        new Color(0.42f, 0.24f, 0.16f),
+                        new Color(0.22f, 0.21f, 0.21f)
                     };
-                    t.coverTag = "Metal";
-                    t.coverMetallic = 0.35f;
-                    t.arenaSize = 120f;
+                    t.coverTag = "Concrete";
+                    t.coverMetallic = 0.2f;
+
+                    // ---- the layout: the open zone, dressed as a volcanic field ----
+                    // The desert's layout because it is the one that has been proven --
+                    // the gorge, the bridges and the kill volume that follows the meander
+                    // all pass VerifyZone -- and a lava river is the same obstacle as a
+                    // water one: an edge you must not cross except where the level says.
+                    t.openZone = true;
+                    t.volcanicZone = true;
+                    t.arenaSize = 450f;
+                    t.apronSize = 1100f;
+                    t.wallHeight = 5f;
+
+                    t.hazard = LevelTheme.Hazard.Lava;
+                    t.hazardWidth = 48f;
+                    // Shallower than the desert's twenty-two. The whole point of a lava
+                    // river is that you can see it from where you stand, and at twenty
+                    // metres down it is a glow at the bottom of a hole.
+                    t.hazardDepth = 13f;
+                    t.hazardOffset = 96f;
+                    t.hazardMeander = 26f;
+                    t.hazardColor = new Color(1f, 0.42f, 0.08f);
+                    // The canyon rock: basalt with iron in it.
+                    t.bankColor = new Color(0.30f, 0.22f, 0.19f);
+                    t.bridgeColor = new Color(0.26f, 0.23f, 0.22f);
+                    t.bridgeWidth = 9f;
+                    t.bridgeCount = 2;
+
+                    // Ash dunes over a lava plain: lower and longer than the desert's sand,
+                    // because a cooled flow is broad and rolling rather than crested. Still
+                    // relaxed to the same 26 degrees -- the vehicle cap is not a desert rule.
+                    t.duneHeight = 8f;
+                    t.duneWavelength = 110f;
+                    t.duneWindAngle = 58f;
+
+                    // The horizon is volcanoes, several of them smoking.
+                    t.backdropCount = 30;
+                    t.backdropDistance = new Vector2(620f, 1200f);
+                    t.backdropHeight = new Vector2(70f, 240f);
+                    t.backdropWidth = new Vector2(120f, 360f);
+                    t.backdropColor = new Color(0.20f, 0.12f, 0.10f);
+                    t.landmarkCount = 10;
+
+                    t.outpostCount = 8;
+                    t.vantageCount = 9;
+                    t.coverLineCount = 20;
+                    t.scatterClusterCount = 52;
+
+                    // Unused while openZone is on.
                     t.roomCount = 3;
                     t.platformCount = 3;
                     t.coverWallCount = 7;
                     t.crateStackCount = 6;
                     t.pillarCount = 5;
-                    t.accentLightCount = 6;
-                    t.accentLightColor = new Color(0.55f, 0.85f, 1f);
-                    t.accentLightIntensity = 10f;
-                    t.saturation = 8f;
-                    t.contrast = 12f;
+                    t.propCount = 0;
+                    t.accentLightCount = 0;
+                    t.accentLightColor = new Color(1f, 0.45f, 0.15f);
+
+                    // Bloom is what makes the lava glow rather than merely be orange.
+                    t.bloomIntensity = 1.1f;
+                    t.saturation = 10f;
+                    t.contrast = 14f;
+                    t.colorFilter = new Color(1f, 0.93f, 0.88f);
+                    t.vignetteIntensity = 0.32f;
+                    t.filmGrain = 0.18f;
                     t.randomSeed = 66;
                     break;
             }

@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Levels_MarsColony
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: MarsColony
-  stakes: The dome vents to schedule and the schedule is set from the ground, by his sister. Be out of the open when it goes, because it will go whether or not you are.
+  stakes: The rock here is still cooling and the river is still molten. His sister has learned when the vents go. Be off the open ground when they do, because they will go whether or not you are.
   levels:
   - displayName: DISPOSAL
-    brief: Roan's colony has been sealed since the road went quiet. 6 hostiles and four charges. Reach a charge or lose the clock.
+    brief: Roan's camp has been silent since the last shuttle lifted off. 6 hostiles and four charges. Reach a charge or lose the clock.
     enemyCount: 6
     timeLimit: 32
     maxAliveAtOnce: 4
@@ -37,7 +37,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
-    brief: Roan's colony has been sealed since the road went quiet. 9 hostiles. One of them runs -- that one is the level.
+    brief: Roan's camp has been silent since the last shuttle lifted off. 9 hostiles. One of them runs -- that one is the level.
     enemyCount: 9
     timeLimit: 43
     maxAliveAtOnce: 5
@@ -58,7 +58,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: Roan's colony has been sealed since the road went quiet. 12 hostiles and a boss. The boss is most of the score.
+    brief: Roan's camp has been silent since the last shuttle lifted off. 12 hostiles and a boss. The boss is most of the score.
     enemyCount: 12
     timeLimit: 69
     maxAliveAtOnce: 6
@@ -79,7 +79,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: The dome crews were told you are a contractor. They know better now. 15 hostiles, one magazine, no reload. Kills resupply you.
+    brief: The crews out here were told you are a contractor. They know better now. 15 hostiles, one magazine, no reload. Kills resupply you.
     enemyCount: 15
     timeLimit: 63
     maxAliveAtOnce: 7
@@ -100,7 +100,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: The dome crews were told you are a contractor. They know better now. 18 hostiles. Stand on the marked ground and keep standing.
+    brief: The crews out here were told you are a contractor. They know better now. 18 hostiles. Stand on the marked ground and keep standing.
     enemyCount: 18
     timeLimit: 73
     maxAliveAtOnce: 8
@@ -121,7 +121,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: The dome crews were told you are a contractor. They know better now. 21 hostiles and a boss. The boss is most of the score.
+    brief: The crews out here were told you are a contractor. They know better now. 21 hostiles and a boss. The boss is most of the score.
     enemyCount: 21
     timeLimit: 99
     maxAliveAtOnce: 9
@@ -142,7 +142,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: Someone on the ground is setting the vent schedule against him too. 24 hostiles, and the lights are not yours.
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 24 hostiles, and the lights are not yours.
     enemyCount: 24
     timeLimit: 94
     maxAliveAtOnce: 10
@@ -163,7 +163,7 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ROAN AUGER
-    brief: Roan is in the open, unsealed, with one question left to ask you. 27 between you and Roan.
+    brief: Roan is out on the open rock, suit cracked, with one question left to ask you. 27 between you and Roan.
     enemyCount: 27
     timeLimit: 120
     maxAliveAtOnce: 11

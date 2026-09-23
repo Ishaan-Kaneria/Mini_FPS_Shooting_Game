@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: SnowboundStation
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Snowbound Station
+  displayName: 
   description: Low winter sun, thick fog, short engagements.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
@@ -95,6 +96,7 @@ MonoBehaviour:
   snowZone: 1
   iglooCamps: 6
   lakeRadius: 64
+  volcanicZone: 0
   subwayZone: 0
   floorDetail: Snow
   wallDetail: Concrete

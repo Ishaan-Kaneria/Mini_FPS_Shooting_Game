@@ -49,6 +49,18 @@ public class Snowfall : MonoBehaviour
     [Tooltip("The wind, in metres per second. A vertical fall reads as rain.")]
     public Vector3 wind = new Vector3(1.6f, 0f, 0.7f);
 
+    [Header("Look")]
+    [Tooltip("The colour of a flake. With a second colour set, each one is picked between " +
+             "the two -- which is how the same weather is ash in one arena and snow in " +
+             "another.")]
+    public Color tint = new Color(1f, 1f, 1f, 0.85f);
+
+    [Tooltip("The other end of the range. Fully transparent means every flake is tint.")]
+    public Color tintAlt = new Color(0f, 0f, 0f, 0f);
+
+    [Tooltip("Smallest and largest flake, in metres.")]
+    public Vector2 size = new Vector2(0.06f, 0.16f);
+
     ParticleSystem _system;
 
     void Start()
@@ -83,10 +95,14 @@ public class Snowfall : MonoBehaviour
 
         // Long enough to fall the whole way down and a little past, so flakes are not
         // seen vanishing at knee height.
-        main.startLifetime = (ceiling + 6f) / Mathf.Max(0.1f, fallSpeed);
+        // Measured on the speed rather than the direction: a negative fall is a rise --
+        // embers going up -- and dividing by it would give every one a negative life.
+        main.startLifetime = (ceiling + 6f) / Mathf.Max(0.1f, Mathf.Abs(fallSpeed));
         main.startSpeed = 0f;
-        main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.16f);
-        main.startColor = new Color(1f, 1f, 1f, 0.85f);
+        main.startSize = new ParticleSystem.MinMaxCurve(size.x, size.y);
+        main.startColor = tintAlt.a > 0f
+            ? new ParticleSystem.MinMaxGradient(tint, tintAlt)
+            : new ParticleSystem.MinMaxGradient(tint);
         main.maxParticles = Mathf.Max(64, flakes);
 
         // The whole point. In Local, walking drags the weather along with the player.

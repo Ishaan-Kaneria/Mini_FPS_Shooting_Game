@@ -13,7 +13,19 @@ public class LevelTheme : ScriptableObject
 {
     [Header("Identity")]
     public string themeName = "Industrial";
+
+    [Tooltip("What the player is shown: the dashboard card, the level select and the " +
+             "zone's story card. Empty shows themeName.\n\n" +
+             "Separate from themeName because themeName is a key, not a label -- it names " +
+             "the scene file, the level ladder, the post-FX profile and the campaign slot, " +
+             "and the ladder's scene name is what a player's stars are filed under. " +
+             "Renaming an arena for the player must not move any of that.")]
+    public string displayName;
+
     [TextArea(2, 4)] public string description;
+
+    /// <summary>The name a player reads. See <see cref="displayName"/>.</summary>
+    public string Label => string.IsNullOrWhiteSpace(displayName) ? themeName : displayName;
 
     [Tooltip("Who fights in this arena. The scene builder stamps this onto the level " +
              "manager, so an arena's roster is a property of the arena rather than of " +
@@ -272,6 +284,16 @@ public class LevelTheme : ScriptableObject
     [Tooltip("How wide the frozen lake is. It is the one flat, hard, open place in the " +
              "arena, which is what makes crossing it a decision.")]
     [Min(0f)] public float lakeRadius = 62f;
+
+    [Tooltip("Dress the open zone as a volcanic world rather than a desert: the river is " +
+             "molten and lights the canyon from below, the landmarks are cinder cones with " +
+             "glowing craters, vents breathe smoke across the ground, ash drifts past the " +
+             "player, and the horizon is volcanoes rather than mesas.\n\n" +
+             "Only the dressing changes. The layout, the gorge, the bridges and the " +
+             "trigger at the bottom are the open zone's, because that is the part that has " +
+             "been proven to connect and to kill only where it should. Needs openZone and " +
+             "wants hazard set to Lava.")]
+    public bool volcanicZone;
 
     [Tooltip("Superseded by parkZone. Kept so an asset written with it still loads rather " +
              "than silently losing the field; nothing reads it.")]

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: TheAugerHouse
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: The Auger House
+  displayName: 
   description: The house he built. Lit from inside, and smaller than it looks.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
@@ -98,6 +99,7 @@ MonoBehaviour:
   snowZone: 0
   iglooCamps: 5
   lakeRadius: 62
+  volcanicZone: 0
   subwayZone: 0
   floorDetail: Tile
   wallDetail: Concrete

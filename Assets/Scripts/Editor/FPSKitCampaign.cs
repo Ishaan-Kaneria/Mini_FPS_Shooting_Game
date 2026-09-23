@@ -127,10 +127,10 @@ namespace FPSKit.EditorTools
 
             "Mars Colony" => rung switch
             {
-                0 => "Roan's colony has been sealed since the road went quiet.",
-                1 => "The dome crews were told you are a contractor. They know better now.",
-                2 => "Someone on the ground is setting the vent schedule against him too.",
-                _ => "Roan is in the open, unsealed, with one question left to ask you."
+                0 => "Roan's camp has been silent since the last shuttle lifted off.",
+                1 => "The crews out here were told you are a contractor. They know better now.",
+                2 => "Someone at the camp has learned to read the vents, and is reading them against him.",
+                _ => "Roan is out on the open rock, suit cracked, with one question left to ask you."
             },
 
             FPSKitThemes.FinaleName => rung switch
@@ -332,9 +332,10 @@ namespace FPSKit.EditorTools
                     "lights on over the shafts, which is either a courtesy or a trap."),
 
                 Zone("Mars Colony", 5, "",
-                    "Roan left before any of this happened and has spent every year since " +
-                    "being the one who was not there. He is the last name on the list " +
-                    "that still lives somewhere with a door on it."),
+                    "Roan left before any of this happened, for a world nobody bothered " +
+                    "to name, and has spent every year since being the one who was not " +
+                    "there. The ground there is still being made. He is the last name on " +
+                    "the list that still lives somewhere with a door on it."),
 
                 Zone(FPSKitThemes.FinaleName, 6, "", extraBeat: 7,
                     opening:
@@ -376,9 +377,13 @@ namespace FPSKit.EditorTools
         {
             var levels = FPSKitLevels.GetOrCreate(themeName);
 
+            // What the player reads on the zone's card, which is not always the key the
+            // arena is filed under -- see LevelTheme.displayName.
+            var theme = FPSKitThemes.GetOrCreate(themeName);
+
             return new CampaignData.Zone
             {
-                displayName = themeName,
+                displayName = theme != null ? theme.Label : themeName,
                 levels = levels,
                 siblingIndex = siblingIndex,
                 grantsPower = grantsPower,
@@ -427,9 +432,9 @@ namespace FPSKit.EditorTools
                 "are still exactly where they were.",
 
             "Mars Colony" =>
-                "The dome vents to schedule and the schedule is set from the ground, by " +
-                "his sister. Be out of the open when it goes, because it will go whether " +
-                "or not you are.",
+                "The rock here is still cooling and the river is still molten. His " +
+                "sister has learned when the vents go. Be off the open ground when they " +
+                "do, because they will go whether or not you are.",
 
             FPSKitThemes.FinaleName =>
                 "Nobody is coming and nothing here is on a timer but her patience. When " +

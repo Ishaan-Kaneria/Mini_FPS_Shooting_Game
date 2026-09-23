@@ -266,9 +266,22 @@ namespace FPSKit.EditorTools
                 {
                     var build = new MeshBuild { UVScale = 0.16f };
 
+                    // <b>Wound per side.</b> Row k steps towards the river, which is +x on
+                    // the west wall and -x on the east, so one winding cannot face both
+                    // walls at the water. Written once for both, the east wall faced into
+                    // the rock: culled from every angle anybody sees it, so the eye went
+                    // straight through it to the sky below the horizon. Over the desert that
+                    // sky is sand-coloured and the hole passed for a shadowed cliff; over
+                    // the volcanic world it is near black, and the whole east side of the
+                    // canyon came out as a black band.
                     for (int i = 0; i < slices; i++)
                         for (int k = CanyonBands[b]; k < CanyonBands[b + 1]; k++)
-                            build.Quad(grid[i][k], grid[i + 1][k], grid[i + 1][k + 1], grid[i][k + 1]);
+                        {
+                            if (side < 0)
+                                build.Quad(grid[i][k], grid[i + 1][k], grid[i + 1][k + 1], grid[i][k + 1]);
+                            else
+                                build.Quad(grid[i][k], grid[i][k + 1], grid[i + 1][k + 1], grid[i + 1][k]);
+                        }
 
                     var wall = MeshObject(group, $"Cliff{sideName}_{b}", build.ToMesh($"Cliff_{sideName}_{b}"),
                                           materials[b], Vector3.zero, Quaternion.identity, Vector3.one,
@@ -382,11 +395,38 @@ namespace FPSKit.EditorTools
                 float behind = GorgeCentreAt(z - slice * 0.5f);
                 float yaw = Mathf.Atan2(ahead - behind, slice) * Mathf.Rad2Deg;
 
-                var water = MeshObject(group, "Water", quad, _waterMat,
+                GameObject water;
+
+                if (_theme.hazard == LevelTheme.Hazard.Lava)
+                {
+                    // <b>World-space UVs for lava, one mesh per slice.</b> The shared quad
+                    // gives every slice the same patch of texture, which on water is a
+                    // ripple nobody can follow and on lava is a crust pattern the eye picks
+                    // out at once -- the first build was a conveyor of identical orange
+                    // tiles down the canyon. Laid in world space, the crust runs on unbroken
+                    // across every seam and the scroll moves it as one flow.
+                    var rotation = Quaternion.Euler(0f, yaw, 0f);
+                    var centre = new Vector3(GorgeCentreAt(z), WaterSurfaceY, z);
+                    float hw = bedHalf * 1.05f, hl = slice * 0.5f + 1f;
+
+                    var build = new MeshBuild { UVScale = 1f };
+                    build.Quad(centre + rotation * new Vector3(-hw, 0f, -hl),
+                               centre + rotation * new Vector3(-hw, 0f, hl),
+                               centre + rotation * new Vector3(hw, 0f, hl),
+                               centre + rotation * new Vector3(hw, 0f, -hl));
+
+                    water = MeshObject(group, "Water", build.ToMesh("LavaSlice"), _waterMat,
+                                       Vector3.zero, Quaternion.identity, Vector3.one,
+                                       layer, "Water", collider: false);
+                }
+                else
+                {
+                    water = MeshObject(group, "Water", quad, _waterMat,
                                        new Vector3(GorgeCentreAt(z), WaterSurfaceY, z),
                                        Quaternion.Euler(0f, yaw, 0f),
                                        new Vector3(bedHalf * 2.1f, 1f, slice + 2f),
                                        layer, "Water", collider: false);
+                }
 
                 NoStanding(water);
                 Mark(water, _theme.hazardColor, order: 1);
@@ -395,7 +435,10 @@ namespace FPSKit.EditorTools
             // One component for the whole river rather than one per slice: it collects
             // the renderers once and pushes a scrolling UV offset through a property
             // block, so nothing instances a material and nothing leaks one.
-            group.gameObject.AddComponent<ScrollingWater>().scrollSpeed = new Vector2(0.012f, 0.05f);
+            // Lava creeps. At the water's speed it read as a conveyor belt of orange tiles.
+            group.gameObject.AddComponent<ScrollingWater>().scrollSpeed =
+                _theme.hazard == LevelTheme.Hazard.Lava ? new Vector2(0.003f, 0.012f)
+                                                        : new Vector2(0.012f, 0.05f);
         }
 
         /// <summary>The trigger is cut into slices of this many metres of z.</summary>
@@ -406,6 +449,13 @@ namespace FPSKit.EditorTools
         /// its middle.
         /// </remarks>
         private const float KillSliceLength = 10f;
+
+        /// <summary>
+        /// How far under the rim a lava gorge's trigger starts. Below the top shelf's lowest
+        /// row (row two, about a metre down) with room for a player's chest over it, which is
+        /// what VerifyZone measures: nobody standing on the shelf may be inside it.
+        /// </summary>
+        private const float LavaLidBelowRim = 2.4f;
 
         /// <summary>
         /// The trigger that makes falling in mean something: a chain of boxes following
@@ -458,6 +508,19 @@ namespace FPSKit.EditorTools
 
             float lid = WaterSurfaceY + 2.5f;
             float floor = -depth - 10f;
+
+            // <b>Over lava, the edge is the hazard, not the surface.</b> With the lid just
+            // over the melt a player who goes over the fence lands on the bench and stands
+            // there, ten metres above something that would have killed them from further
+            // away than that. So the lid comes up to a couple of metres under the rim, and
+            // the box widens to the canyon's third row, which is where the wall stops being
+            // the walkable top shelf -- everything below the shelf is lethal, and the shelf
+            // (a metre down at most) and the bridge decks stay clear of it.
+            if (_theme.hazard == LevelTheme.Hazard.Lava)
+            {
+                lid = -LavaLidBelowRim;
+                reach = outer - CanyonInsets[3];
+            }
 
             float from = -half - CanyonOverrun;
             float to = half + CanyonOverrun;

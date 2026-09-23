@@ -109,6 +109,10 @@ namespace FPSKit.EditorTools
             BuildSurfaceTextures();
             ResolveOutdoorMaterials();
 
+            // After the desert's palette rather than instead of it: the volcanic one only
+            // replaces the handful of materials the shared passes reach for.
+            if (_theme.volcanicZone) ResolveVolcanicMaterials();
+
             // The player's start, and then the river, before anything can be placed on
             // either. TryClaim only knows what has already been claimed.
             // Wide enough that the first thing the player sees is the level rather than
@@ -146,19 +150,37 @@ namespace FPSKit.EditorTools
             BuildCrossings(root, layer, half);
             BuildRiverFence(root, layer, half);
             BuildBoundary(root, layer, half);
-            BuildBackdrop(root, backdrop, rng, half);
+
+            if (_theme.volcanicZone) BuildVolcanicBackdrop(root, backdrop, rng);
+            else BuildBackdrop(root, backdrop, rng, half);
 
             // Nothing outside the seal is anybody's to stand on, however much sand
             // there is out there.
             SealNavMeshOutside(root, half - BermToe + 1f, half + _theme.apronSize);
 
             // ---- content ----
-            BuildLandmarks(root, layer, rng);
+            if (_theme.volcanicZone) BuildVolcanoLandmarks(root, layer, rng);
+            else BuildLandmarks(root, layer, rng);
+
             BuildOutposts(root, layer, rng);
             BuildVantages(root, layer, rng);
             BuildCoverLines(root, layer, rng, half);
             BuildScatter(root, layer, rng, half);
-            BuildVegetation(root, layer, rng, half);
+
+            // Nothing grows here. What stands on the plain instead is what the heat made:
+            // vents still breathing, and glass where the lava froze too fast to crystallise.
+            if (_theme.volcanicZone)
+            {
+                BuildVents(root, layer, rng, half);
+                BuildSpires(root, layer, rng, half);
+                BuildLavaGlow(root, half);
+                BuildAshfall(root);
+            }
+            else
+            {
+                BuildVegetation(root, layer, rng, half);
+            }
+
             BuildProps(root, layer, rng, half);
             BuildAccentLights(root, rng);
         }
@@ -845,6 +867,15 @@ namespace FPSKit.EditorTools
             {
                 float w = Rand(rng, 16f, 34f);
                 float h = Rand(rng, 12f, 26f);
+
+                // A cinder cone is broader and taller than a butte, and never so squat that
+                // its upper flank falls under the fifty degrees a player can climb -- a
+                // crater somebody can walk up to is a perch nothing else can reach.
+                if (_theme.volcanicZone)
+                {
+                    w *= 1.6f;
+                    h = Mathf.Max(h * 1.35f, w * 0.48f);
+                }
 
                 if (!TryClaim(rng, half * 0.94f, w * 0.75f, out Vector2 p)) continue;
 

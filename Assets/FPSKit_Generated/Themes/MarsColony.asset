@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: MarsColony
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Mars Colony
-  description: Rust sky, thin light, drifting dust.
+  displayName: Unknown Planet
+  description: A world still being made. Molten river, red sky, ash on the wind.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
   - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
@@ -25,50 +26,50 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
   - {fileID: 11400000, guid: 4d402ffa29c575e85a6bb6b075faf1a3, type: 2}
   skyboxOverride: {fileID: 0}
-  skyTint: {r: 0.72, g: 0.42, b: 0.28, a: 1}
-  skyGroundColor: {r: 0.42, g: 0.22, b: 0.14, a: 1}
-  atmosphereThickness: 1.8
-  skyExposure: 1
-  sunColor: {r: 1, g: 0.8, b: 0.62, a: 1}
+  skyTint: {r: 0.95, g: 0.36, b: 0.14, a: 1}
+  skyGroundColor: {r: 0.3, g: 0.1, b: 0.05, a: 1}
+  atmosphereThickness: 3.1
+  skyExposure: 1.15
+  sunColor: {r: 1, g: 0.58, b: 0.32, a: 1}
   sunIntensity: 1.05
-  sunAngles: {x: 26, y: 300}
-  shadowStrength: 0.85
+  sunAngles: {x: 24, y: 300}
+  shadowStrength: 0.75
   fogEnabled: 1
-  fogColor: {r: 0.58, g: 0.35, b: 0.24, a: 1}
-  fogDensity: 0.014
-  ambientSky: {r: 0.55, g: 0.34, b: 0.24, a: 1}
-  ambientEquator: {r: 0.36, g: 0.24, b: 0.18, a: 1}
-  ambientGround: {r: 0.2, g: 0.12, b: 0.09, a: 1}
-  arenaSize: 120
+  fogColor: {r: 0.52, g: 0.22, b: 0.11, a: 1}
+  fogDensity: 0.0014
+  ambientSky: {r: 0.52, g: 0.26, b: 0.16, a: 1}
+  ambientEquator: {r: 0.4, g: 0.2, b: 0.12, a: 1}
+  ambientGround: {r: 0.34, g: 0.14, b: 0.07, a: 1}
+  arenaSize: 450
   wallHeight: 5
   randomSeed: 66
   scaleLayoutWithArea: 1
   layoutReferenceSize: 60
-  openZone: 0
-  apronSize: 900
-  hazard: 0
-  hazardWidth: 55
-  hazardDepth: 20
-  hazardOffset: 90
+  openZone: 1
+  apronSize: 1100
+  hazard: 3
+  hazardWidth: 48
+  hazardDepth: 13
+  hazardOffset: 96
   hazardMeander: 26
-  hazardColor: {r: 0.2, g: 0.42, b: 0.52, a: 1}
-  bankColor: {r: 0.44, g: 0.38, b: 0.28, a: 1}
+  hazardColor: {r: 1, g: 0.42, b: 0.08, a: 1}
+  bankColor: {r: 0.3, g: 0.22, b: 0.19, a: 1}
   bridgeWidth: 9
   bridgeCount: 2
-  bridgeColor: {r: 0.46, g: 0.42, b: 0.36, a: 1}
-  duneHeight: 0
-  duneWavelength: 95
-  duneWindAngle: 34
-  backdropCount: 34
-  backdropDistance: {x: 620, y: 1150}
-  backdropHeight: {x: 55, y: 190}
-  backdropWidth: {x: 70, y: 260}
-  backdropColor: {r: 0.44, g: 0.36, b: 0.28, a: 1}
-  landmarkCount: 9
-  outpostCount: 7
-  vantageCount: 8
-  coverLineCount: 14
-  scatterClusterCount: 26
+  bridgeColor: {r: 0.26, g: 0.23, b: 0.22, a: 1}
+  duneHeight: 8
+  duneWavelength: 110
+  duneWindAngle: 58
+  backdropCount: 30
+  backdropDistance: {x: 620, y: 1200}
+  backdropHeight: {x: 70, y: 240}
+  backdropWidth: {x: 120, y: 360}
+  backdropColor: {r: 0.2, g: 0.12, b: 0.1, a: 1}
+  landmarkCount: 10
+  outpostCount: 8
+  vantageCount: 9
+  coverLineCount: 20
+  scatterClusterCount: 52
   industrialZone: 0
   zoneWorksCount: 3
   zoneTankFarmCount: 2
@@ -81,29 +82,30 @@ MonoBehaviour:
   pillarCount: 5
   coverHeightRange: {x: 1.1, y: 1.5}
   coverWidthRange: {x: 4, y: 9}
-  floorColor: {r: 0.44, g: 0.26, b: 0.18, a: 1}
-  wallColor: {r: 0.52, g: 0.5, b: 0.49, a: 1}
+  floorColor: {r: 0.25, g: 0.2, b: 0.18, a: 1}
+  wallColor: {r: 0.3, g: 0.26, b: 0.24, a: 1}
   coverColors:
-  - {r: 0.55, g: 0.53, b: 0.52, a: 1}
-  - {r: 0.48, g: 0.3, b: 0.2, a: 1}
-  - {r: 0.62, g: 0.58, b: 0.54, a: 1}
-  floorSmoothness: 0.2
+  - {r: 0.3, g: 0.27, b: 0.26, a: 1}
+  - {r: 0.42, g: 0.24, b: 0.16, a: 1}
+  - {r: 0.22, g: 0.21, b: 0.21, a: 1}
+  floorSmoothness: 0.35
   wallSmoothness: 0.15
-  coverMetallic: 0.35
+  coverMetallic: 0.2
   floorTag: Concrete
   wallTag: Concrete
   parkZone: 0
   snowZone: 0
   iglooCamps: 5
   lakeRadius: 62
+  volcanicZone: 1
   subwayZone: 0
-  floorDetail: Sand
+  floorDetail: Basalt
   wallDetail: Rock
-  floorDetailSize: 7
+  floorDetailSize: 9
   wallDetailSize: 4
-  coverTag: Metal
-  accentLightCount: 6
-  accentLightColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+  coverTag: Concrete
+  accentLightCount: 0
+  accentLightColor: {r: 1, g: 0.45, b: 0.15, a: 1}
   accentLightIntensity: 10
   accentLightRange: 14
   accentLightHeight: 3.5
@@ -114,15 +116,15 @@ MonoBehaviour:
   coverMaterial: {fileID: 0}
   crateMaterial: {fileID: 0}
   propPrefabs: []
-  propCount: 40
+  propCount: 0
   weatherPrefab: {fileID: 0}
   ambienceLoop: {fileID: 0}
   ambienceVolume: 0.35
   enablePostProcessing: 1
-  bloomIntensity: 0.45
+  bloomIntensity: 1.1
   postExposure: 0
-  saturation: 8
-  contrast: 12
-  colorFilter: {r: 1, g: 1, b: 1, a: 1}
-  vignetteIntensity: 0.28
-  filmGrain: 0.2
+  saturation: 10
+  contrast: 14
+  colorFilter: {r: 1, g: 0.93, b: 0.88, a: 1}
+  vignetteIntensity: 0.32
+  filmGrain: 0.18

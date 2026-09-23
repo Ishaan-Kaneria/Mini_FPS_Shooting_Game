@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: NightRooftop
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Night Rooftop
+  displayName: 
   description: City night. Dark sky, warm practicals, heavy bloom.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
@@ -95,6 +96,7 @@ MonoBehaviour:
   snowZone: 0
   iglooCamps: 5
   lakeRadius: 62
+  volcanicZone: 0
   subwayZone: 0
   floorDetail: Concrete
   wallDetail: Concrete

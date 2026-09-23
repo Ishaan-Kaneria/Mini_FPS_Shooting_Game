@@ -91,7 +91,8 @@ namespace FPSKit.EditorTools
         [MenuItem("FPSKit/Build Scene/Abandoned Subway", false, 4)]
         private static void BuildSubway() => BuildScene("Abandoned Subway");
 
-        [MenuItem("FPSKit/Build Scene/Mars Colony", false, 5)]
+        // Filed as Mars Colony, shown as the Unknown Planet -- see LevelTheme.displayName.
+        [MenuItem("FPSKit/Build Scene/Unknown Planet", false, 5)]
         private static void BuildMars() => BuildScene("Mars Colony");
 
         [MenuItem("FPSKit/Build Scene/From Selected Theme Asset", false, 19)]
@@ -526,6 +527,10 @@ namespace FPSKit.EditorTools
         private static Material CreateSkybox()
         {
             if (_theme.skyboxOverride != null) return _theme.skyboxOverride;
+
+            // Painted rather than simulated: see VolcanicSky for why a red sky cannot be
+            // asked of the procedural shader.
+            if (_theme.volcanicZone) return VolcanicSky();
 
             string path = $"{MaterialFolder}/Sky_{SafeName(_theme.themeName)}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);

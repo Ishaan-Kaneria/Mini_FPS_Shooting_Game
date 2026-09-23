@@ -177,7 +177,7 @@ namespace FPSKit.EditorTools
 
                 var row = new Row
                 {
-                    DisplayName = themeName,
+                    DisplayName = theme.Label,
                     SceneName = sceneName,
                     Description = Summarise(theme),
                     ThemePath = AssetDatabase.GetAssetPath(theme),

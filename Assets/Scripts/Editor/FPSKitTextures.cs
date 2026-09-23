@@ -125,6 +125,11 @@ namespace FPSKit.EditorTools
 
             WriteFlake();
 
+            // Basalt, lava and smoke, for the volcanic dressing. Written for every arena
+            // like the rest -- they are a pure function of constants, so an arena that
+            // does not use them costs a few hundred milliseconds and no git churn.
+            WriteVolcanicTextures();
+
             AssetDatabase.Refresh();
         }
 

@@ -247,7 +247,7 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>The names of the things in an open zone that are cut off flat underneath.</summary>
-        static readonly string[] RockNames = { "Rock", "Butte", "Outcrop", "RockSpine", "Rubble" };
+        static readonly string[] RockNames = { "Rock", "Butte", "Outcrop", "RockSpine", "Rubble", "Volcano", "Vent" };
 
         /// <summary>
         /// Every rock has to be buried, and the reason is that every rock is hollow.
@@ -362,7 +362,13 @@ namespace FPSKit.EditorTools
         static void CheckKillVolume(LevelTheme theme, string name, float waterY,
                                     List<string> problems, StringBuilder notes)
         {
-            var kill = UnityEngine.Object.FindAnyObjectByType<KillVolume>();
+            // The gorge's own, by name. A volcanic zone has a small trigger in every vent's
+            // throat as well, and "any KillVolume" handed this check one of those -- a box a
+            // couple of metres across -- and reported the whole river as wadeable.
+            KillVolume kill = null;
+
+            foreach (var candidate in UnityEngine.Object.FindObjectsByType<KillVolume>(FindObjectsSortMode.None))
+                if (candidate.name == "KillVolume") { kill = candidate; break; }
 
             if (kill == null)
             {

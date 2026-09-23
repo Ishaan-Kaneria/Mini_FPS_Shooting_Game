@@ -215,7 +215,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8850175ceaf11fd628af10c1c39e2148, type: 2}
+  - {fileID: 2100000, guid: db82674845029ee4c8a046761f154cdc, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -376,7 +376,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
+  - {fileID: 2100000, guid: 5bee09d1c60321e4abcea5427f06d9a2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -538,7 +538,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
+  - {fileID: 2100000, guid: 5bee09d1c60321e4abcea5427f06d9a2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -668,7 +668,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
+  - {fileID: 2100000, guid: 5bee09d1c60321e4abcea5427f06d9a2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -921,7 +921,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
+  - {fileID: 2100000, guid: 5bee09d1c60321e4abcea5427f06d9a2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1051,7 +1051,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
+  - {fileID: 2100000, guid: 5bee09d1c60321e4abcea5427f06d9a2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1287,7 +1287,7 @@ MonoBehaviour:
   attackWindup: 0.35
   shotsPerAttack: 1
   burstInterval: 0.12
-  detectionRadius: 350
+  detectionRadius: 315
   fieldOfView: 150
   sightBlockers:
     serializedVersion: 2

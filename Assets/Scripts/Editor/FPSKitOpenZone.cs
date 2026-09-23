@@ -138,6 +138,11 @@ namespace FPSKit.EditorTools
 
             // ---- planning ----
             PlanCrossings(half);
+
+            // The town, the oasis, the oil field and the track, before the landmarks and
+            // outposts take the ground (FPSKitDesertLife). Desert only.
+            PlanDesertLife(half);
+
             PlanLandmarks(rng, half);
             PlanOutposts(rng, half);
             PlanVantages(rng, half);
@@ -167,6 +172,7 @@ namespace FPSKit.EditorTools
 
             BuildOutposts(root, layer, rng);
             BuildVantages(root, layer, rng);
+            BuildDesertLife(root, layer, backdrop, half);
             BuildCoverLines(root, layer, rng, half);
             BuildScatter(root, layer, rng, half);
 

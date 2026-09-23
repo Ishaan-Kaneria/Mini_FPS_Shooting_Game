@@ -148,6 +148,7 @@ namespace FPSKit.EditorTools
             _groundReady = false;
             _pads.Clear();
             ResetLavaField();
+            ResetDesertLife();
         }
 
         /// <summary>

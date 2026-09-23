@@ -254,11 +254,15 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Desert Outpost":
-                    t.description = "High sun, bleached sand, heat haze. Long sightlines.";
-                    t.skyTint = new Color(0.72f, 0.66f, 0.52f);
+                    t.description = "A ruined town, an oasis and an oil field on a river of sand. Heat haze and blowing dust.";
+                    // Heat and dust (2026-09-23): a hotter, hazier sky than the clean blue it was, which
+                    // read as a mild day rather than a desert. Thicker air scatters the blue out
+                    // towards the horizon, and the fog is warmer and a little denser so the far
+                    // rock sits in haze -- still well short of hiding it.
+                    t.skyTint = new Color(0.80f, 0.64f, 0.44f);
                     t.skyGroundColor = new Color(0.55f, 0.44f, 0.30f);
-                    t.atmosphereThickness = 0.7f;
-                    t.skyExposure = 1.35f;
+                    t.atmosphereThickness = 1.25f;
+                    t.skyExposure = 1.45f;
                     t.sunColor = new Color(1f, 0.94f, 0.78f);
                     t.sunIntensity = 1.45f;
                     // Mid-afternoon rather than noon, and this is a terrain decision more
@@ -271,7 +275,7 @@ namespace FPSKit.EditorTools
                     // shape of the ground becomes something the player can actually see
                     // from a distance and navigate by.
                     t.sunAngles = new Vector2(42f, 140f);
-                    t.fogColor = new Color(0.78f, 0.71f, 0.56f);
+                    t.fogColor = new Color(0.86f, 0.74f, 0.55f);
                     t.fogDensity = 0.004f;
                     // Lifted for the open zone. One hard sun over a map with
                     // hundred-metre rock on it puts whole faces in shadow, and at the
@@ -305,7 +309,7 @@ namespace FPSKit.EditorTools
 
                     // Thin, because the whole point of this arena is that you can see to
                     // the horizon. At the walled arena's 0.004 the mesas are solid fog.
-                    t.fogDensity = 0.0011f;
+                    t.fogDensity = 0.0016f;
 
                     t.hazard = LevelTheme.Hazard.River;
                     t.hazardWidth = 58f;

@@ -66,12 +66,21 @@ namespace FPSKit.EditorTools
         /// </summary>
         static float GroundUnder(Vector3 p)
         {
-            float best = float.NaN;
+            float best = float.NaN, ground = float.NaN;
 
             foreach (var hit in Physics.RaycastAll(new Vector3(p.x, 600f, p.z), Vector3.down, 1200f,
                                                    ~0, QueryTriggerInteraction.Ignore))
+            {
                 if (float.IsNaN(best) || hit.point.y < best) best = hit.point.y;
 
+                // The terrain itself, when there is some: near the canyon the lowest thing
+                // under a point is the canyon's rock running on under the sand, and a camera
+                // put there looks up at the world from inside it.
+                bool terrain = hit.collider.CompareTag("Sand") || hit.collider.CompareTag("Snow");
+                if (terrain && (float.IsNaN(ground) || hit.point.y > ground)) ground = hit.point.y;
+            }
+
+            if (!float.IsNaN(ground)) return ground;
             return float.IsNaN(best) ? 0f : best;
         }
 
@@ -119,6 +128,8 @@ namespace FPSKit.EditorTools
         {
             if (theme != null && theme.snowZone) return FrameSnow();
             if (theme != null && theme.industrialZone) return FrameIndustrial();
+            if (theme != null && theme.openZone && !theme.volcanicZone)
+                return System.Linq.Enumerable.Concat(FrameDesert(theme), FrameDesertLife());
 
             return FrameDesert(theme);
         }
@@ -416,6 +427,59 @@ namespace FPSKit.EditorTools
                 Name = "09_ground_close", Grounded = true, From = new Vector3(-40f, 1.1f, 30f),
                 Look = new Vector3(10f, 0.2f, 55f), Fov = 60f
             };
+        }
+
+        /// <summary>
+        /// The desert's newer places, found in the scene: they are placed from the seed, so
+        /// there are no coordinates to write down.
+        /// </summary>
+        static IEnumerable<Shot> FrameDesertLife()
+        {
+            Bounds? Of(string name)
+            {
+                var go = FindFirst(name);
+                if (go == null) return null;
+                var r = go.GetComponentInChildren<Renderer>();
+                return r != null ? r.bounds : new Bounds(go.transform.position, Vector3.one);
+            }
+
+            var town = FindFirst("Town");
+            var minaret = Of("Minaret");
+            if (minaret.HasValue)
+            {
+                var m = minaret.Value.center;
+                yield return new Shot { Name = "11_town_street", Grounded = true, From = new Vector3(m.x - 34f, 1.65f, m.z - 22f),
+                                        Look = new Vector3(m.x, 6f, m.z), Fov = 75f };
+                yield return new Shot { Name = "12_town_above", From = new Vector3(m.x - 70f, m.y + 45f, m.z - 70f),
+                                        Look = new Vector3(m.x - 14f, m.y - 10f, m.z - 14f), Fov = 65f };
+            }
+            _ = town;
+
+            var pool = Of("OasisWater");
+            if (pool.HasValue)
+            {
+                var p = pool.Value.center;
+                yield return new Shot { Name = "13_oasis", Grounded = true, From = new Vector3(p.x + 26f, 1.65f, p.z + 20f),
+                                        Look = new Vector3(p.x, 1f, p.z), Fov = 72f };
+            }
+
+            var jack = FindFirst("Pumpjack");
+            if (jack != null)
+            {
+                var p = jack.transform.position;
+                // From the landward side: the river is always to the west of an oil site, and a
+                // grounded camera over the canyon lands on its floor.
+                yield return new Shot { Name = "14_oilfield", Grounded = true, From = p + new Vector3(22f, 1.65f, -18f),
+                                        Look = p + new Vector3(-6f, 3f, 14f), Fov = 72f };
+            }
+
+            var plane = Of("PlaneFuselage");
+            if (plane.HasValue)
+            {
+                var p = plane.Value.center;
+                yield return new Shot { Name = "15_plane", Grounded = true, From = new Vector3(p.x + 24f, 1.65f, p.z + 18f),
+                                        Look = p, Fov = 70f };
+            }
         }
 
         static void Render(Shot shot, string folder)

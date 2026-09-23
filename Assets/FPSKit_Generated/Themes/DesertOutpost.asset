@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Desert Outpost
   displayName: 
-  description: High sun, bleached sand, heat haze. Long sightlines.
+  description: A ruined town, an oasis and an oil field on a river of sand. Heat haze and blowing dust.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
   - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
@@ -25,17 +25,17 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
   - {fileID: 11400000, guid: 6dc741d47098d52029bd0e69551d1e60, type: 2}
   skyboxOverride: {fileID: 0}
-  skyTint: {r: 0.72, g: 0.66, b: 0.52, a: 1}
+  skyTint: {r: 0.8, g: 0.64, b: 0.44, a: 1}
   skyGroundColor: {r: 0.55, g: 0.44, b: 0.3, a: 1}
-  atmosphereThickness: 0.7
-  skyExposure: 1.35
+  atmosphereThickness: 1.25
+  skyExposure: 1.45
   sunColor: {r: 1, g: 0.94, b: 0.78, a: 1}
   sunIntensity: 1.45
   sunAngles: {x: 42, y: 140}
   shadowStrength: 0.85
   fogEnabled: 1
-  fogColor: {r: 0.78, g: 0.71, b: 0.56, a: 1}
-  fogDensity: 0.0011
+  fogColor: {r: 0.86, g: 0.74, b: 0.55, a: 1}
+  fogDensity: 0.0016
   ambientSky: {r: 0.74, g: 0.68, b: 0.56, a: 1}
   ambientEquator: {r: 0.6, g: 0.53, b: 0.42, a: 1}
   ambientGround: {r: 0.44, g: 0.37, b: 0.27, a: 1}

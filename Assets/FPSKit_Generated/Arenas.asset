@@ -21,7 +21,7 @@ MonoBehaviour:
     levels: {fileID: 11400000, guid: dc7b985cf64a425e684e23cd676ce6b1, type: 2}
   - displayName: Desert Outpost
     sceneName: DesertOutpost
-    description: High sun, bleached sand, heat haze. Long sightlines.
+    description: A ruined town, an oasis and an oil field on a river of sand. Heat haze and blowin...
     preview: {fileID: 2800000, guid: b42f08e6557eabbd493d615d75311a9a, type: 3}
     theme: {fileID: 11400000, guid: 6e1c081ad385fbb48b737b71d893f61d, type: 2}
     levels: {fileID: 11400000, guid: 19a21f71669ec452fa1bce4db121bcb6, type: 2}

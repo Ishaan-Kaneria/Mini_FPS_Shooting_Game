@@ -116,7 +116,7 @@ namespace FPSKit.EditorTools
         /// only axis is the ground plane is an arena where every fight is the same fight.
         /// </summary>
         private static void BuildCatwalk(Transform parent, int layer, Vector3 from, Vector3 to,
-                                         float height)
+                                         float height, bool stair = true)
         {
             Vector3 delta = to - from;
             float length = delta.magnitude;
@@ -199,8 +199,40 @@ namespace FPSKit.EditorTools
             // and they look connected from every angle a player will ever see them from.
             // What it cost was a scrap of navmesh on every walkway on the site, joined to
             // nothing, for the spawner to find.
-            BuildStairTower(parent, layer, from - delta.normalized * StairRun(height),
-                            height, yaw);
+            //
+            // Left off for a bridge between two roofs, which are reached by stairs of their own.
+            if (stair)
+            {
+                BuildStairTower(parent, layer, from - delta.normalized * StairRun(height),
+                                height, yaw);
+
+                // And one at the far end, so a walkway is a route rather than a cul-de-sac
+                // with one way up and the same way down. Ishaan: "the catwalk has only one
+                // direction stairs". Only where its flight has clear ground: the far end of
+                // a pipe run can land in a bund or against a stack, and a stair built through
+                // something is a flight the bake cuts in half.
+                var dir = delta.normalized;
+                float flight = StairRun(height) * 2f;
+                // In world space: from and to are the district's own coordinates, and the
+                // ground is asked about in the world's.
+                // From just past the deck's end: the landing itself is four metres up over
+                // the end of whatever the walkway crosses -- a pipe run exactly its length --
+                // and counting that would refuse every stair.
+                var landing = parent.TransformPoint(to + dir * (StairLanding * 0.5f + 0.4f));
+                var foot = parent.TransformPoint(to + dir * (flight + 0.5f));
+
+                var across = Vector3.Cross(Vector3.up, parent.TransformDirection(dir)).normalized * 1.4f;
+                var lo = Vector3.Min(Vector3.Min(landing - across, landing + across), Vector3.Min(foot - across, foot + across));
+                var hi = Vector3.Max(Vector3.Max(landing - across, landing + across), Vector3.Max(foot - across, foot + across));
+                var area = new Rect(lo.x, lo.z, hi.x - lo.x, hi.z - lo.z);
+
+                // Lifted clear of the deck's own end, which the box would otherwise count.
+                bool free = GroundFree(area, height - 0.6f) && !OnCarriageway(foot) && !OnCarriageway(landing);
+                if (free)
+                    BuildStairTower(parent, layer, to + dir * StairRun(height), height, yaw + 180f);
+                else
+                    Debug.Log($"[FPSKit] catwalk at {parent.TransformPoint(to)}: no room for a second stair at its far end.");
+            }
         }
 
         /// <summary>

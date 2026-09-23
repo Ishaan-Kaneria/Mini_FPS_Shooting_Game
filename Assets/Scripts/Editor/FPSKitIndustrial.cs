@@ -211,6 +211,7 @@ namespace FPSKit.EditorTools
             ResolveSurfaceMaterials();
             ResolveZoneMaterials();
             ResolveDenseMaterials();
+            ResolveWorksMaterials();
 
             // The spawn, before anything can be dropped on it. Wide, because the first
             // thing the player sees should be the plant and not the side of a shed.
@@ -233,6 +234,7 @@ namespace FPSKit.EditorTools
             BuildInfill(root, layer, rng);
             BuildCompoundWalls(root, layer, rng);
             BuildStreetscape(root, layer, rng);
+            BuildSiloConveyors(root, layer, rng);
 
             // Last of the ground passes, because the kerbs follow the road tiles and
             // the bay markings follow the blocks, and neither exists until both of those
@@ -240,6 +242,7 @@ namespace FPSKit.EditorTools
             BuildYardDetail(root, layer, rng, half);
 
             BuildPerimeterFence(root, layer, half);
+            BuildRailway(root, layer, backdrop, rng, half);
 
             // The four-metre strip between the fence and the boundary wall is yard slab
             // like everywhere else, so it bakes -- and it is sealed off by the fence, so

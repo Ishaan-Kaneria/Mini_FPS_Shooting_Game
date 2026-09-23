@@ -868,13 +868,14 @@ namespace FPSKit.EditorTools
             build.Box(new Vector3(0f, height + 1.9f, 1.7f), new Vector3(span + 4f, 0.12f, 1.2f),
                       Quaternion.identity);
 
-            float trolley = Rand(rng, -hs * 0.6f, hs * 0.6f);
-            build.Box(new Vector3(trolley, height + 2.2f, 0f), new Vector3(3.2f, 2.2f, 3f),
-                      Quaternion.identity);
-            build.Box(new Vector3(trolley, height - 2.4f, 0f), new Vector3(0.22f, 5f, 0.22f),
-                      Quaternion.identity);
-            build.Box(new Vector3(trolley, height - 5.2f, 0f), new Vector3(2.4f, 0.8f, 1.4f),
-                      Quaternion.identity);
+            // The trolley and its hook are a separate object, because they move: see below.
+            var trolleyBuild = new MeshBuild { UVScale = 0.4f };
+            trolleyBuild.Box(new Vector3(0f, height + 2.2f, 0f), new Vector3(3.2f, 2.2f, 3f),
+                             Quaternion.identity);
+            trolleyBuild.Box(new Vector3(0f, height - 2.4f, 0f), new Vector3(0.22f, 5f, 0.22f),
+                             Quaternion.identity);
+            trolleyBuild.Box(new Vector3(0f, height - 5.2f, 0f), new Vector3(2.4f, 0.8f, 1.4f),
+                             Quaternion.identity);
 
             // The rails it runs on, which is what puts it in a yard rather than on one.
             for (int side = -1; side <= 1; side += 2)
@@ -882,12 +883,32 @@ namespace FPSKit.EditorTools
                           new Vector3(0.7f, 0.16f, span), Quaternion.identity);
 
             var go = MeshObject(parent, "GantryCrane",
-                                ToMesh(build, $"gantry{span:0}_{height:0}_{trolley:0.0}"),
+                                ToMesh(build, $"gantry{span:0}_{height:0}"),
                                 _zoneRust, at, Quaternion.Euler(0f, yaw, 0f), Vector3.one,
                                 layer, "Metal");
 
             NoStanding(go);
             if (go != null) Hide(go);
+
+            // A crane that never moves is a sculpture. The trolley runs along the girder and
+            // waits at each end, as if picking a box up and putting it down. No collider:
+            // it travels overhead, and a moving collider would shove whoever it met.
+            if (go != null)
+            {
+                var trolley = MeshObject(go.transform, "Trolley",
+                                         ToMesh(trolleyBuild, $"gantrytrolley{height:0}"), _zoneSafety ?? _zoneRust,
+                                         Vector3.zero, Quaternion.identity, Vector3.one, layer, null,
+                                         collider: false);
+                Hide(trolley);
+
+                var travel = trolley.AddComponent<MachineTravel>();
+                travel.origin = new Vector3(-hs * 0.6f, 0f, 0f);
+                travel.travel = new Vector3(hs * 1.2f, 0f, 0f);
+                travel.speed = Rand(rng, 1.0f, 1.6f);
+                travel.pause = Rand(rng, 2.5f, 5f);
+                travel.phase = Rand(rng, 0f, 60f);
+                trolley.transform.localPosition = travel.origin;
+            }
         }
     }
 }

@@ -1004,7 +1004,7 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Infill").transform;
             group.SetParent(root, false);
 
-            int count = 0;
+            int count = 0, roofRows = 0, warehouses = 0;
 
             foreach (var c in _compounds)
             {
@@ -1013,11 +1013,21 @@ namespace FPSKit.EditorTools
                 if (middle.magnitude < Tile * 1.6f) continue;
 
                 // ---- along the walls ----
+                bool roofRowBuilt = false;
                 for (int side = 0; side < 4; side++)
                 {
                     SideFrame(c, side, out float from, out float to, out _, out float inward);
 
                     float a = from + Rand(rng, 1f, 5f);
+
+                    // A row of workshops joined over their roofs, on some compounds: see RoofRow.
+                    // Scanned along the whole side, because the ends are where the gates'
+                    // approaches usually are; the frontage below then builds round it.
+                    if (!roofRowBuilt && rng.NextDouble() < 0.6)
+                    {
+                        for (float p = a; p < to - 30f && !roofRowBuilt; p += 4f)
+                            if (RoofRow(group, layer, rng, c, side, p, to - 1f) > p) { roofRowBuilt = true; roofRows++; }
+                    }
 
                     while (a < to - 10f)
                     {
@@ -1043,6 +1053,10 @@ namespace FPSKit.EditorTools
                                 var front = side < 2 ? new Vector3(0f, 0f, inward) : new Vector3(inward, 0f, 0f);
                                 double roll = rng.NextDouble();
                                 int kind = roll < 0.38 ? 0 : roll < 0.72 ? 1 : roll < 0.86 ? 3 : 2;
+
+                                // Backed onto the wall, a warehouse loses its rear door to it and
+                                // keeps the vehicle door and the side door: still two ways out.
+                                if (width >= 22f && depth >= 15f && rng.NextDouble() < 0.4) { kind = 4; warehouses++; }
 
                                 BlockBuilding(group, layer, rng, footprint, front, kind);
                                 count++;
@@ -1096,6 +1110,9 @@ namespace FPSKit.EditorTools
                             double roll = rng.NextDouble();
                             int kind = roll < 0.45 ? 0 : roll < 0.7 ? 2 : roll < 0.85 ? 1 : 3;
 
+                            // The big ones are often a warehouse you can walk into.
+                            if (Mathf.Min(w, d) >= 15f && Mathf.Max(w, d) >= 22f && rng.NextDouble() < 0.75) { kind = 4; warehouses++; }
+
                             BlockBuilding(group, layer, rng, footprint, front, kind);
                             count++;
                             yardBuilt++;
@@ -1104,6 +1121,7 @@ namespace FPSKit.EditorTools
                 }
             }
 
+            Debug.Log($"[FPSKit] industrial zone: {roofRows} roof route(s), {warehouses} enterable warehouse(s).");
             Debug.Log($"[FPSKit] industrial zone: {count} infill building(s), " +
                       $"{_compounds.FindAll(x => x.Walled).Count} of {_compounds.Count} blocks walled, " +
                       $"{_streetTunnels.Count} street tunnel(s).");
@@ -1120,6 +1138,12 @@ namespace FPSKit.EditorTools
         private static void BlockBuilding(Transform parent, int layer, System.Random rng, Rect footprint,
                                           Vector3 front, int kind)
         {
+            if (kind == 4)
+            {
+                OpenWarehouse(parent, layer, rng, footprint, front);
+                return;
+            }
+
             var centre = new Vector3(footprint.center.x, 0f, footprint.center.y);
             float sx = footprint.width, sz = footprint.height;
             bool frontX = Mathf.Abs(front.x) > 0.5f;
@@ -1222,6 +1246,10 @@ namespace FPSKit.EditorTools
                         roof.Box(centre + new Vector3(Rand(rng, -sx * 0.3f, sx * 0.3f), height + 1.1f, Rand(rng, -sz * 0.3f, sz * 0.3f)),
                                  new Vector3(Rand(rng, 2.5f, 5f), 2.2f, Rand(rng, 2.5f, 5f)), Quaternion.identity);
 
+                    // An extract fan that turns: the building is running.
+                    RoofFan(parent, layer, rng, centre + new Vector3(-sx * 0.22f, height, sz * 0.22f),
+                            Rand(rng, 1.1f, 1.6f));
+
                     if (rng.NextDouble() < 0.5)
                         roof.Tube(centre + new Vector3(sx * 0.25f, height, -sz * 0.25f),
                                   centre + new Vector3(sx * 0.25f, height + Rand(rng, 8f, 14f), -sz * 0.25f), 0.8f, 0.6f, 10);
@@ -1297,6 +1325,13 @@ namespace FPSKit.EditorTools
         private static void AddUp(MeshBuild build, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
         {
             if (Vector3.Cross(b - a, c - a).y >= 0f) build.Quad(a, b, c, d);
+            else build.Quad(d, c, b, a);
+        }
+
+        /// <summary>A quad wound to face down: a ceiling.</summary>
+        private static void AddDown(MeshBuild build, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+        {
+            if (Vector3.Cross(b - a, c - a).y <= 0f) build.Quad(a, b, c, d);
             else build.Quad(d, c, b, a);
         }
 

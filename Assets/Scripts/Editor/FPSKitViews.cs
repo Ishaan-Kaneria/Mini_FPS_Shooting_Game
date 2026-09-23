@@ -279,13 +279,60 @@ namespace FPSKit.EditorTools
 
             // A walkway and its stair, found rather than written down: the catwalks go
             // wherever the tank farms and the power house put their pipe runs.
-            var catwalk = FindFirst("Catwalk");
-            if (catwalk != null)
+            // A pipe run's walkway rather than any catwalk: the roof routes' bridges are
+            // catwalks too, and the first one found was behind a compound wall. Seen from
+            // above one side, so both of its stairs are in frame.
+            var pipes = FindFirst("PipeRun");
+            if (pipes != null)
             {
-                var at = catwalk.transform.position;
-                var side = catwalk.transform.right;
-                yield return new Shot { Name = "09_catwalk", From = at + side * 16f + catwalk.transform.forward * -10f + Vector3.up * 1.2f,
-                                        Look = at, Fov = 70f };
+                var r = pipes.GetComponent<Renderer>();
+                var at = r != null ? r.bounds.center : pipes.transform.position;
+                float half = r != null ? Mathf.Max(r.bounds.extents.x, r.bounds.extents.z) : 30f;
+                var across = r != null && r.bounds.extents.x > r.bounds.extents.z ? Vector3.forward : Vector3.right;
+                yield return new Shot { Name = "09_catwalk", From = at + across * (half * 1.1f) + Vector3.up * 16f,
+                                        Look = at + Vector3.up * 2f, Fov = 80f };
+            }
+
+            // These are built in world space on an object at the origin, so where they are is
+            // their renderer's bounds, not their transform.
+            Bounds? BoundsOf(string name)
+            {
+                var go = FindFirst(name);
+                var r = go != null ? go.GetComponent<Renderer>() : null;
+                return r != null ? r.bounds : (Bounds?)null;
+            }
+
+            var row = BoundsOf("RoofRowBuilding");
+            if (row.HasValue)
+            {
+                var b = row.Value;
+                yield return new Shot { Name = "11_roof_route", From = b.center + new Vector3(-30f, b.extents.y + 10f, -30f),
+                                        Look = b.center + Vector3.up * b.extents.y, Fov = 70f };
+            }
+
+            var shed = BoundsOf("WarehouseWalls");
+            if (shed.HasValue)
+            {
+                var b = shed.Value;
+                var from = new Vector3(b.min.x + 2.5f, 1.65f, b.min.z + 2.5f);
+                yield return new Shot { Name = "12_warehouse_inside", From = from,
+                                        Look = new Vector3(b.max.x, 3f, b.max.z), Fov = 80f };
+            }
+
+            var loco = FindFirst("Locomotive");
+            if (loco != null)
+            {
+                var at = loco.transform.position;
+                yield return new Shot { Name = "13_railway", From = at + new Vector3(14f, 3f, 14f),
+                                        Look = at + new Vector3(-30f, 1f, -30f), Fov = 72f };
+            }
+
+            var belt = BoundsOf("ConveyorBelt");
+            if (belt.HasValue)
+            {
+                var b = belt.Value;
+                yield return new Shot { Name = "14_conveyor", From = b.center + new Vector3(18f, -b.extents.y + 2f, 18f),
+                                        Look = b.center, Fov = 70f };
             }
 
             var cooler = FindFirst("CoolingTower");

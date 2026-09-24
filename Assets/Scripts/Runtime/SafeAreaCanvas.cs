@@ -40,7 +40,10 @@ public class SafeAreaCanvas : MonoBehaviour
 
     bool _done;
 
-    void Start() => Apply();
+    // In Awake, not Start: UIBootstrap adds this after every Awake and before any Start, and
+    // a screen's Start may build panels with safe areas of their own onto the canvas --
+    // which, seen first, would make this skip the whole canvas.
+    void Awake() => Apply();
 
     public void Apply()
     {

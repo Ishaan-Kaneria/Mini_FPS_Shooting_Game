@@ -1,218 +1,156 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// One arena on the dashboard: a preview image, a name, and what the player has
-/// managed there.
+/// One arena on the dashboard: a real screenshot of it, its name, one line about it, how far
+/// the player has got ("5/8 CLEARED · 12/24 ★"), how hard it is, and a thin stripe of the
+/// arena's own colour -- the only place that colour appears.
 ///
-/// Built once by the dashboard builder as a hidden template and cloned per catalog
-/// entry at runtime, so adding an arena is an entry in <see cref="ArenaCatalog"/> and
-/// never a rebuild of the menu scene.
+/// <b>Clicking selects; it does not start anything.</b> The selected arena is the one the
+/// CURRENT MISSION card describes, and PLAY MISSION is the one button that launches -- so
+/// the thing the player presses to play is always the big amber one, and a card is only
+/// ever a choice. The selected card wears the amber 2px border.
+///
+/// <b>Locked is drawn, not hidden.</b> A locked zone is dimmed with a lock and says what
+/// opens it. Its button is not interactable, for the reason a locked level tile is not: a
+/// card that lights up and then does nothing reads as broken rather than as locked.
+///
+/// Built by <c>FPSKitMenuBuilder</c> as a template and cloned per arena; everything inside
+/// is anchored in fractions of the card, because the grid sizes it.
 /// </summary>
-public class ArenaCard : HoverCard
+public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, ISelectHandler, IDeselectHandler
 {
     [Header("Parts")]
     public Button button;
-    public Image preview;
-    public Image accentBar;
+    public FlatRect frame;
+    public RawImage thumbnail;
+    public FlatRect stripe;
+    public GameObject lockShade;
+    public TMP_Text lockText;
     public TMP_Text nameText;
     public TMP_Text descriptionText;
-    public TMP_Text bestText;
+    public TMP_Text progressText;
+    public TMP_Text difficultyText;
+    public FlatRect[] difficultyBars = new FlatRect[0];
 
-    [Header("Feel")]
-    [Tooltip("How far the preview is held back from full brightness at rest. The card " +
-             "lighting up under the pointer is most of what says it can be clicked.")]
-    [Range(0f, 0.6f)] public float previewDim = 0.22f;
-
-    /// <summary>The preview's colour before the hover tint. Either white over a
-    /// screenshot, or the theme's own colour when there is no screenshot to show.</summary>
-    Color _previewBase = Color.white;
-
-    /// <summary>The catalog entry this card is showing. Null on the template.</summary>
     public ArenaCatalog.Entry Entry { get; private set; }
-
-    /// <summary>
-    /// Fills the card in. The progress line is the arena's ladder rather than a single
-    /// best run: how many of its levels have been cleared, and how many of the stars
-    /// they were worth have actually been taken. "3/8 LEVELS - 7 STARS" says both what
-    /// there is left to do here and how well it has been done, which one best-ever
-    /// number never could.
-    /// </summary>
-    /// <summary>
-    /// Vertical bands of the card, as fractions of its height: where the name sits on a
-    /// desktop, and where it sits on a phone once the description below it is gone.
-    /// </summary>
-    const float NameBottom = 0.335f, NameTop = 0.448f, DescriptionBottom = 0.115f;
-
-    /// <summary>
-    /// Hands the name the space the description gave up.
-    ///
-    /// <b>Hiding the description does not, on its own, make anything else bigger.</b>
-    /// Every band on this card is a fraction of the card, and the name's band is 11% of
-    /// it whether or not there is anything underneath. The name auto-sizes to the box it
-    /// is given, so the box is the thing that has to change -- leave it alone and the
-    /// phone gets the same small title with a gap under it, which is the worst of both.
-    ///
-    /// Tripling the band is what actually turns the title into something readable at
-    /// arm's length, and it is why the description is hidden rather than merely made
-    /// shorter: the space is worth more spent on the one word that says where you are
-    /// going.
-    /// </summary>
-    void ApplyPhoneLayout()
-    {
-        if (nameText == null || !PhoneUI.Active) return;
-
-        var rect = nameText.rectTransform;
-        rect.anchorMin = new Vector2(rect.anchorMin.x, DescriptionBottom);
-        rect.anchorMax = new Vector2(rect.anchorMax.x, NameTop);
-
-        // The ceiling has to come up with the box, or auto-sizing stops at the number
-        // that was chosen for a band a third the height.
-        nameText.fontSizeMax = nameText.fontSizeMax * ((NameTop - DescriptionBottom) /
-                                                       (NameTop - NameBottom));
-    }
-
-    /// <summary>
-    /// The colour this arena wears on every screen it appears on.
-    ///
-    /// <b>Not the theme's accent, and that distinction is the whole of why this grid used
-    /// to read as one colour.</b> <c>LevelTheme.accentLightColor</c> is a *lighting* value
-    /// -- what the practicals in that arena glow -- so it is muted by the job it actually
-    /// does, and three of the six themes never set it at all and fell back to the same
-    /// orange. A card's colour is an identity: it has to be bright, and it has to be
-    /// unmistakable beside the other five. Those are different requirements and they now
-    /// come from different places.
-    /// </summary>
-    public Color Signal { get; private set; } = UITheme.Hazard;
-
-    /// <summary>
-    /// Whether the campaign has opened this zone yet. A locked card is still drawn in
-    /// full -- seeing where the story goes next is most of the reason to finish where it
-    /// is now -- but it does not light up and it cannot be clicked, the same rule
-    /// <see cref="LevelButton"/> follows for a locked level.
-    /// </summary>
     public bool Unlocked { get; private set; } = true;
 
-    public void Bind(ArenaCatalog.Entry entry, int arenaIndex, bool unlocked, string lockNote,
-                     UnityEngine.Events.UnityAction onChosen)
+    bool _selected, _hover;
+
+    /// <summary>Whether this is the arena the mission card describes. Draws the amber border.</summary>
+    public bool Selected
     {
-        Signal = UITheme.SignalFor(arenaIndex);
-        Unlocked = unlocked;
+        get => _selected;
+        set { _selected = value; Paint(); }
+    }
 
-        ApplyPhoneLayout();
-
+    public void Bind(ArenaCatalog.Entry entry, int arenaIndex, bool unlocked, string lockNote,
+                     UnityEngine.Events.UnityAction onChosen, CampaignData campaign = null)
+    {
+        var t = UITheme.Active;
         Entry = entry;
+        Unlocked = unlocked;
         if (entry == null) return;
-
         name = $"Arena_{entry.Label}";
 
         if (nameText != null)
         {
             nameText.text = entry.Label.ToUpperInvariant();
-            nameText.color = unlocked ? UITheme.Ink : UITheme.InkLocked;
+            nameText.color = unlocked ? t.textPrimary : t.textSecondary;
         }
-
-        if (descriptionText != null) descriptionText.text = entry.description ?? "";
-
-        // The lock note replaces the progress line rather than sitting beside it: there
-        // is no progress to report on a zone nobody has been allowed into, and "0/8
-        // LEVELS" beside "LOCKED" reads as a zone that was played badly.
-        if (bestText != null)
+        if (descriptionText != null)
         {
-            if (unlocked || string.IsNullOrEmpty(lockNote))
-            {
-                bestText.text = ProgressLine(entry);
-            }
-            else
-            {
-                bestText.text = lockNote;
-                bestText.color = UITheme.InkLocked;
-            }
+            descriptionText.text = entry.description ?? "";
+            descriptionText.color = unlocked ? t.textSecondary : t.textDisabled;
         }
-
-        // A locked zone keeps its colour but loses its brightness. The six signal
-        // colours are how a player learns which arena is which, so a locked one drawn
-        // grey would have to be learned twice.
-        if (accentBar != null) accentBar.color = unlocked ? Signal : Dim(Signal);
-
-        if (preview != null)
+        if (progressText != null)
         {
-            if (entry.preview != null)
-            {
-                preview.sprite = Sprite.Create(
-                    entry.preview,
-                    new Rect(0f, 0f, entry.preview.width, entry.preview.height),
-                    new Vector2(0.5f, 0.5f), 100f, 0u, SpriteMeshType.FullRect);
-
-                _previewBase = Color.white;
-            }
-            else
-            {
-                // No screenshot: the theme's own floor colour still says something about
-                // the place, and a card with a blank hole in it reads as broken.
-                preview.sprite = null;
-                _previewBase = entry.theme != null
-                    ? entry.theme.floorColor
-                    : new Color(0.110f, 0.133f, 0.169f);
-            }
-
-            ApplyHover(0f);
+            progressText.text = ProgressLine(entry, t);
+            progressText.color = unlocked ? t.textSecondary : t.textDisabled;
         }
+
+        var difficulty = Missions.ForArena(entry, campaign);
+        if (difficultyText != null)
+        {
+            difficultyText.text = Missions.Label(difficulty);
+            difficultyText.color = unlocked ? Missions.ColorFor(t, difficulty) : t.textDisabled;
+        }
+        for (int i = 0; i < difficultyBars.Length; i++)
+        {
+            if (difficultyBars[i] == null) continue;
+            bool lit = i <= (int)difficulty;
+            difficultyBars[i].color = !lit ? t.border : unlocked ? Missions.ColorFor(t, difficulty) : t.textDisabled;
+        }
+
+        if (stripe != null)
+        {
+            var c = t.StripeFor(entry.sceneName);
+            stripe.color = unlocked ? c : new Color(c.r * 0.45f, c.g * 0.45f, c.b * 0.45f, 1f);
+        }
+
+        if (thumbnail != null)
+        {
+            thumbnail.texture = entry.preview;
+            // No screenshot: the theme's floor colour still says something about the place,
+            // and a card with a hole in it reads as broken.
+            thumbnail.color = entry.preview != null
+                ? (unlocked ? Color.white : new Color(0.38f, 0.38f, 0.38f, 1f))
+                : entry.theme != null ? entry.theme.floorColor : t.panelRaised;
+            Cover();
+        }
+
+        if (lockShade != null) lockShade.SetActive(!unlocked);
+        if (lockText != null) lockText.text = string.IsNullOrEmpty(lockNote) ? "LOCKED" : lockNote.ToUpperInvariant();
 
         if (button != null)
         {
             button.onClick.RemoveAllListeners();
             if (onChosen != null) button.onClick.AddListener(onChosen);
-
-            // Not interactable rather than merely ignored, for the reason a locked level
-            // tile is not: a card that highlights under the pointer and then does
-            // nothing reads as a broken button rather than as a locked one.
             button.interactable = unlocked;
         }
+        Paint();
     }
 
-    static string ProgressLine(ArenaCatalog.Entry entry)
+    /// <summary>"5/8 CLEARED · 12/24 ★", with the star drawn from the icon set.</summary>
+    static string ProgressLine(ArenaCatalog.Entry entry, UITheme t)
     {
         int count = entry.LevelCount;
         if (count <= 0) return "NO LEVELS";
-
         int cleared = LevelProgress.LevelsCleared(entry.ProgressKey, count);
         int stars = LevelProgress.StarsInArena(entry.ProgressKey, count);
-
-        return cleared <= 0
-            ? UIText.Row($"{count} LEVELS", "NOT PLAYED")
-            : UIText.Row($"{cleared}/{count} LEVELS",
-                         $"{stars} STAR{(stars == 1 ? "" : "S")}");
+        return t.Tabular($"{cleared}/{count}", heading: false) + " CLEARED" + UIText.Separator +
+               t.Tabular($"{stars}/{count * 3}", heading: false) + " " + InputPrompts.Glyph("star-filled");
     }
 
-    /// <summary>How far a locked card's colour and preview are held back.</summary>
-    const float LockedDim = 0.38f;
-
-    /// <summary>
-    /// The locked version of a colour. <b>Alpha is left alone</b>: multiplying the whole
-    /// colour would make the preview translucent as well as dark, and what shows through
-    /// a half-transparent preview is the card behind it.
-    /// </summary>
-    static Color Dim(Color c) => new Color(c.r * LockedDim, c.g * LockedDim, c.b * LockedDim, c.a);
-
-    /// <summary>A locked zone does not light up under the pointer.</summary>
-    protected override bool Hoverable => Unlocked;
-
-    /// <summary>Adds the preview brightening and the accent bar to the shared growth.</summary>
-    protected override void ApplyHover(float amount)
+    /// <summary>Crops the 16:9 screenshot to fill whatever shape the card gives it, never stretched.</summary>
+    void Cover()
     {
-        base.ApplyHover(amount);
+        if (thumbnail == null || thumbnail.texture == null) return;
+        var r = thumbnail.rectTransform.rect;
+        if (r.width <= 1f || r.height <= 1f) return;
+        float texAspect = thumbnail.texture.width / (float)thumbnail.texture.height;
+        float boxAspect = r.width / r.height;
+        thumbnail.uvRect = boxAspect > texAspect
+            ? new Rect(0f, (1f - texAspect / boxAspect) * 0.5f, 1f, texAspect / boxAspect)
+            : new Rect((1f - boxAspect / texAspect) * 0.5f, 0f, boxAspect / texAspect, 1f);
+    }
 
-        if (preview != null)
-            preview.color = Unlocked
-                ? Color.Lerp(_previewBase * (1f - previewDim), _previewBase, amount)
-                : Dim(_previewBase);
+    void OnRectTransformDimensionsChange() => Cover();
 
-        if (accentBar != null)
-        {
-            var bar = accentBar.rectTransform;
-            bar.localScale = new Vector3(1f, Mathf.Lerp(1f, 2.4f, amount), 1f);
-        }
+    public void OnPointerEnter(PointerEventData e) { _hover = Unlocked; Paint(); }
+    public void OnPointerExit(PointerEventData e) { _hover = false; Paint(); }
+    public void OnSelect(BaseEventData e) => Paint();
+    public void OnDeselect(BaseEventData e) => Paint();
+
+    void Paint()
+    {
+        if (frame == null) return;
+        var t = UITheme.Active;
+        frame.borderColor = _selected ? t.accent : _hover ? t.borderHover : t.border;
+        frame.borderPixels = _selected ? 2f : t.borderPixels;
+        frame.color = _hover && !_selected ? t.panelRaised : t.panel;
     }
 }

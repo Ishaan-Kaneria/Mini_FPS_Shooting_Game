@@ -1,0 +1,50 @@
+using TMPro;
+using UnityEngine;
+
+/// <summary>
+/// The bar across the top of every menu screen: the logo, the four tabs, the player's rank
+/// and XP, their coins, and Settings, Info and Quit.
+///
+/// It stays up while PLAY, LOADOUT, ACHIEVEMENTS and STORE swap underneath it, so a player
+/// always knows which screen they are on (the amber underline) and how to reach the others.
+/// The tabs are a <see cref="UITabBar"/>; <see cref="MainMenuController"/> listens to it and
+/// opens the screen, and calls <see cref="ShowTab"/> when a screen is opened some other way.
+/// Everything shown is read from the save each time <see cref="Refresh"/> runs.
+/// </summary>
+public class MenuTopBar : MonoBehaviour
+{
+    public enum Tab { Play = 0, Loadout = 1, Achievements = 2, Store = 3 }
+
+    public UITabBar tabs;
+    public TMP_Text rankText;
+    public TMP_Text xpText;
+    public UIProgressBar xpBar;
+    public TMP_Text coinText;
+    public FlatButton settingsButton;
+    public FlatButton infoButton;
+    public FlatButton quitButton;
+    [Tooltip("Hidden on a handset, where the welcome line carries the rank instead.")]
+    public GameObject rankBlock;
+
+    public void ShowTab(Tab tab)
+    {
+        if (tabs != null) tabs.Selected = (int)tab;
+    }
+
+    public void Refresh()
+    {
+        var t = UITheme.Active;
+        int rank = PlayerRank.Rank;
+        PlayerRank.Progress(out int into, out int span);
+        if (rankText != null) rankText.text = $"{PlayerRank.TitleFor(rank).ToUpperInvariant()}  <color=#{ColorUtility.ToHtmlStringRGB(t.textSecondary)}>LV {t.Tabular(rank.ToString())}</color>";
+        if (xpText != null) xpText.text = t.Tabular($"{into:N0} / {span:N0}", heading: false) + " XP";
+        if (xpBar != null)
+        {
+            xpBar.Value = span > 0 ? into / (float)span : 0f;
+            xpBar.Snap();
+        }
+        if (coinText != null) coinText.text = t.Tabular(Wallet.Format(Wallet.Balance));
+    }
+
+    void OnEnable() => Refresh();
+}

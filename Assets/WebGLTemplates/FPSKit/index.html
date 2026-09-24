@@ -396,9 +396,16 @@
         overlay.classList.remove("gone");
       }
 
-      // Unity routes non-fatal warnings here. The stock template answers with alert(),
-      // which drops the pointer lock and stops the game dead for something survivable.
+      // Unity routes non-fatal warnings and errors here. The stock template answers with
+      // alert(), which drops the pointer lock and stops the game dead for something
+      // survivable. They go to the browser console, and onto the page only with ?debug in
+      // the URL: a player was shown a permanent red "NoSubscription" line from an editor
+      // package's service check, which is a developer's message and nothing a player can
+      // act on. A real loading failure still takes the whole screen, below.
+      var showDevBanners = /[?&]debug\b/.test(window.location.search);
       function showBanner(message, type) {
+        (type === "error" ? console.error : console.warn)("[Unity] " + message);
+        if (!showDevBanners) return;
         var line = document.createElement("div");
         line.textContent = message;
         if (type === "error") {

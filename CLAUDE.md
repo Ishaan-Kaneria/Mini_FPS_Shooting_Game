@@ -1581,14 +1581,39 @@ device's resolution. Two traps it hit:
 The bundled simulator devices predate the iPhone 15 and Pixel 7, so those two are typed from
 the manufacturers' specs in `FPSKitDeviceShots`; the iPad is the simulator's own.
 
-## The dashboard has five destinations
+## The dashboard is the PLAY tab under a shared top bar
 
-`HOW TO PLAY`, `THE LIST`, `ACHIEVEMENTS`, `STORE` and `EXIT GAME`, built as a `HorizontalLayoutGroup`
-rather than four anchored offsets -- the old pair sat at fixed pixels from the right edge
-and a third and fourth would have reached 1,120px in, fine at one window width and off the
-screen at a narrower one. Every one of them is in `dashboardOnly`, because an overlay is a
-full-screen raycast target and a button left switched on behind one is drawn and
-unreachable.
+Rebuilt on the UI kit (`FPSKitDashboard.cs`, a partial of `FPSKitMenuBuilder`). The top bar
+(`MenuTopBar`) carries the logo, the tabs PLAY / LOADOUT / ACHIEVEMENTS / STORE, the rank and
+XP, the coins, and Settings, Info and Quit. It stays up while the tabs swap underneath it: the
+store, achievements, instructions, THE LIST and the level select are built into the scene
+**inset below the bar** (`InsetBelowTopBar`), and Loadout, Info and Settings are built at
+runtime from the kit. Only the story covers the bar. HOW TO PLAY and THE LIST are under the
+Info icon; the old bottom button row and its EXIT GAME are gone.
+
+- **A card selects; PLAY MISSION plays.** Clicking an arena makes it the one CURRENT MISSION
+  describes (`Missions.NextLevel`: the first unlocked level with no stars). PLAY MISSION is the
+  only button that loads a level; ALL LEVELS opens the ladder. `MainMenuController.Choose`
+  still opens the ladder, which `VerifyFlow` relies on. The selection is remembered.
+- **Rank and XP are derived, never stored** (`PlayerRank`): kills, stars, bosses and
+  achievements, weighted. Nothing unlocks at a rank yet, so NEXT REWARD falls back to the
+  next thing in the store the player can afford, and says so.
+- **Difficulty is read from the ladder** (`Missions.ForLevel`): the level's roster step,
+  which `FPSKitLevels` already offsets by the arena's campaign position.
+- **The loadout strip shows an empty secondary slot** because the game has no secondary
+  weapon. Grenades are the bomb (locked until the story hands it over), medkits the drink.
+- **The last run's result is a toast**, and it is `lastRunPanel` while it is up, which is
+  what `VerifyFlow` checks after a run.
+
+**The arena thumbnails had a white disc in them.** The bomb aiming ring and pip were saved
+switched on; the indicator hides them in `Awake`, so no one saw them in play, but the
+dashboard renders its cards from the scene in edit mode. The builder saves them off now.
+
+**No developer message reaches a player's screen.** The WebGL page used to print every Unity
+warning and error as a banner, and errors stayed there: a player saw a red "NoSubscription"
+line from an editor package's service check. They go to the browser console now, and onto
+the page only with `?debug` in the URL. Builds are made without `BuildOptions.Development`,
+so native players show no on-screen log either.
 
 **Achievements are derived, never stored.** `Achievements` holds twenty thresholds read
 against `PlayerStats` the moment somebody looks, so nothing can disagree with the counters

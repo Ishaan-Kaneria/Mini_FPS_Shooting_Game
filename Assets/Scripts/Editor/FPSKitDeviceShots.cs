@@ -46,6 +46,8 @@ namespace FPSKit.EditorTools
             public InputScheme Scheme;
             public PadFamily Pad;
             public bool Settings;
+            /// <summary>A dashboard screen to open: loadout, info, quit, store, achievements.</summary>
+            public string Open;
             public bool Pause;
             public bool LeftHanded;
             public float Wait;
@@ -88,6 +90,12 @@ namespace FPSKit.EditorTools
             var list = new List<Shot>
             {
                 new Shot { File = "pc_dashboard", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Wait = 2.5f },
+                new Shot { File = "pc720_dashboard", Scene = MenuScene, Device = Pc(1280, 720), Scheme = InputScheme.KeyboardMouse, Wait = 2.5f },
+                new Shot { File = "pc_dashboard_gamepad", Scene = MenuScene, Device = pc, Scheme = InputScheme.Gamepad, Wait = 2.5f },
+                new Shot { File = "pc_loadout", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "loadout", Wait = 2.5f },
+                new Shot { File = "pc_info", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "info", Wait = 2.5f },
+                new Shot { File = "pc_quit", Scene = MenuScene, Device = pc, Scheme = InputScheme.Gamepad, Open = "quit", Wait = 2.5f },
+                new Shot { File = "pc_store_tab", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "store", Wait = 2.5f },
                 new Shot { File = "pc_settings_gamepad", Scene = MenuScene, Device = pc, Scheme = InputScheme.Gamepad, Settings = true, Wait = 2.5f },
                 new Shot { File = "pc_hud_keyboard", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Wait = 6f },
                 new Shot { File = "pc_hud_xbox", Scene = ArenaScene, Device = pc, Scheme = InputScheme.Gamepad, Pad = PadFamily.Xbox, Wait = 6f },
@@ -212,6 +220,19 @@ namespace FPSKit.EditorTools
                             SettingsPanel.Show(canvas);
                         }
                         if (shot.Pause && GameDirector.Instance != null) GameDirector.Instance.SetPaused(true);
+                        if (!string.IsNullOrEmpty(shot.Open))
+                        {
+                            var menu = Object.FindAnyObjectByType<MainMenuController>();
+                            if (menu == null) throw new Exception("no dashboard to open " + shot.Open + " on");
+                            switch (shot.Open)
+                            {
+                                case "loadout": menu.OpenLoadout(); break;
+                                case "info": menu.OpenInfo(); break;
+                                case "quit": menu.AskToExit(); break;
+                                case "store": menu.OpenStore(); break;
+                                case "achievements": menu.OpenAchievements(); break;
+                            }
+                        }
                         Next(3);
                         return;
 

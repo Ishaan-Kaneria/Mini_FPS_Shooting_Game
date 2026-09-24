@@ -1393,6 +1393,13 @@ namespace FPSKit.EditorTools
 
             indicator.ring = ring.transform;
             indicator.pip = pip.transform;
+
+            // Saved switched off. The indicator hides them in Awake, so in play they were
+            // never seen -- but the dashboard renders its arena cards from the scene in edit
+            // mode, where nothing has run Awake, and every dark arena's card had a white
+            // disc lying on the ground in front of the camera.
+            ring.SetActive(false);
+            pip.SetActive(false);
             indicator.dotTemplate = dot.transform;
 
             return indicator;

@@ -51,10 +51,15 @@ public class GameDirector : MonoBehaviour
 
     public float maxComboMultiplier = 4f;
 
+    /// <summary>The shipped coin rates, as constants so the dashboard can quote what a level
+    /// pays without a director in the scene. The fields below start at these.</summary>
+    public const int DefaultCoinsPerKill = 3;
+    public const int DefaultCoinsPerStar = 60;
+
     [Header("Coins")]
     [Tooltip("Coins for one kill. The store's prices are set against this, so raising it " +
              "is the same thing as making everything cheaper.")]
-    [Min(0)] public int coinsPerKill = 3;
+    [Min(0)] public int coinsPerKill = DefaultCoinsPerKill;
 
     [Tooltip("Extra coins for a headshot, on top of the kill. This is what makes aiming " +
              "worth the time it costs against a crowd -- a headshot is already worth more " +
@@ -67,7 +72,7 @@ public class GameDirector : MonoBehaviour
 
     [Tooltip("Coins per star. The largest single payment in the game, because clearing a " +
              "level outright is what the store is meant to reward.")]
-    [Min(0)] public int coinsPerStar = 60;
+    [Min(0)] public int coinsPerStar = DefaultCoinsPerStar;
 
     [Header("Input")]
     [Tooltip("Pauses and unpauses. Also frees the cursor, because a paused game " +

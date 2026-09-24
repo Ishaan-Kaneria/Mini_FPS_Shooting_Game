@@ -98,11 +98,6 @@ public class TouchProfile : ScriptableObject
              "bought nothing.")]
     public bool showSprintButton;
 
-    [Tooltip("Show a crouch button in the thumb cluster.\n\n" +
-             "Off. It is the least used action on a phone by a wide margin, and every " +
-             "button in the cluster makes the ones beside it harder to hit. Turn it on " +
-             "if a level is ever built around cover that needs it.")]
-    public bool showCrouchButton;
 
     // ==================================================================
     [Header("Aim assist")]

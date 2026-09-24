@@ -325,14 +325,8 @@ public class HUDController : MonoBehaviour
         WireButtons();
 
         // A phone has no Escape key, and a strip listing three of them is three lines of
-        // nonsense over the top of a small screen. TouchControls makes the same call for
-        // the on-screen sticks; see WebDevice.IsTouchOnly for why it is not
-        // Application.isMobilePlatform.
-        if (instructionText != null && (WebDevice.IsTouchOnly || Application.isMobilePlatform))
-        {
-            var strip = instructionText.transform.parent;
-            if (strip != null) strip.gameObject.SetActive(false);
-        }
+        // nonsense over the top of a small screen.
+        ShowStripForScheme();
     }
 
     /// <summary>
@@ -352,9 +346,12 @@ public class HUDController : MonoBehaviour
         KeyCode resume = director != null ? director.resumeKey : KeyCode.R;
         KeyCode quit = director != null ? director.quitKey : KeyCode.Q;
 
-        string pauseLabel = altPause == KeyCode.None || altPause == pause
-            ? Key(pause)
-            : $"{Key(pause)}/{Key(altPause)}";
+        bool pad = GameInput.Scheme == InputScheme.Gamepad;
+        string pauseLabel = pad ? InputPrompts.For(GameAction.Pause)
+            : altPause == KeyCode.None || altPause == pause
+                ? Key(pause)
+                : $"{Key(pause)}/{Key(altPause)}";
+        string resumeLabel = pad ? InputPrompts.Back : Key(resume);
 
         // <color>, not <alpha>. TMP's alpha tag applies from where it appears and has no
         // closing form, so "</alpha>" is not a tag -- it renders as those eight
@@ -367,24 +364,27 @@ public class HUDController : MonoBehaviour
         string equipment = "";
 
         if (bombs != null && bombs.data != null)
-            equipment += $"{Key(BombKey())} {Dim}BOMB</color>     ";
+            equipment += $"{Prompt(GameAction.Bomb, BombKey())} {Dim}BOMB</color>     ";
 
         // "HEAL" rather than "DRINK": the strip has room for one word per key and it
         // should be the one that says what the key is *for*.
         if (belt != null && belt.data != null)
-            equipment += $"{Key(ItemKey())} {Dim}HEAL</color>     ";
+            equipment += $"{Prompt(GameAction.UseItem, ItemKey())} {Dim}HEAL</color>     ";
 
         if (instructionText != null)
             instructionText.text =
                 equipment +
                 $"{pauseLabel} {Dim}PAUSE</color>     " +
-                $"{Key(resume)} {Dim}RESUME</color>     " +
-                $"{Key(quit)} {Dim}QUIT</color>";
+                $"{resumeLabel} {Dim}RESUME</color>" +
+                // On a pad, leaving is a button in the pause menu, reached with the stick.
+                (pad ? "" : $"     {Key(quit)} {Dim}QUIT</color>");
 
         if (pauseHintText != null)
             pauseHintText.text =
-                $"<size=60%>{Key(resume)} resume     {pauseLabel} resume     " +
-                $"{Key(quit)} quit to dashboard</size>";
+                pad
+                    ? $"<size=60%>{resumeLabel} resume     {pauseLabel} resume</size>"
+                    : $"<size=60%>{Key(resume)} resume     {pauseLabel} resume     " +
+                      $"{Key(quit)} quit to dashboard</size>";
     }
 
     /// <summary>
@@ -413,6 +413,35 @@ public class HUDController : MonoBehaviour
     /// </summary>
     static string Key(KeyCode key) => UIText.KeyLabel(key);
 
+    /// <summary>
+    /// An action's prompt for whatever the player is holding: the bound key on a keyboard,
+    /// the pad's own glyph on a gamepad, the on-screen button's icon on a touch screen.
+    /// </summary>
+    static string Prompt(GameAction action, KeyCode key)
+        => GameInput.Scheme == InputScheme.KeyboardMouse ? InputPrompts.KeyText(key) : InputPrompts.For(action);
+
+    void OnSchemeChanged()
+    {
+        // The equipment counters carry a prompt too; forget what they last showed so the
+        // next frame rewrites them for the new device.
+        _shownBombs = _shownBeltCount = Unset;
+        WriteKeyHints();
+        ShowStripForScheme();
+    }
+
+    /// <summary>
+    /// The key strip is for keys. On a touch screen every control is already drawn where the
+    /// thumb goes, and three lines of prompts over a small screen are clutter; on a pad or a
+    /// keyboard it is how the controls are learned. Follows the scheme rather than the
+    /// device, so a phone with a pad paired gets the strip, with pad glyphs in it.
+    /// </summary>
+    void ShowStripForScheme()
+    {
+        if (instructionText == null) return;
+        var strip = instructionText.transform.parent;
+        if (strip != null) strip.gameObject.SetActive(GameInput.Scheme != InputScheme.Touch);
+    }
+
     void OnEnable()
     {
         if (weapon != null)
@@ -433,6 +462,8 @@ public class HUDController : MonoBehaviour
         // Subscribed here rather than in Start, alongside every other source. Started in
         // Start but cancelled in OnDisable, the director's events were gone for good the
         // first time this object was toggled off and on again.
+        GameInput.SchemeChanged += OnSchemeChanged;
+
         if (_director != null)
         {
             _director.GameEnded += OnGameEnded;
@@ -456,6 +487,8 @@ public class HUDController : MonoBehaviour
         if (belt != null) belt.Denied -= OnBeltDenied;
 
         if (progression != null) progression.Upgraded -= OnUpgraded;
+
+        GameInput.SchemeChanged -= OnSchemeChanged;
 
         if (_director != null)
         {
@@ -762,16 +795,18 @@ public class HUDController : MonoBehaviour
         // your head, and a player who guesses wrong concludes the control is broken.
         if (hasBomb)
         {
-            string place = bombs.UsingCursor
-                ? "TO AIM A BOMB, MOVE THE MOUSE TO PLACE IT"
-                : "TO AIM A BOMB, LOOK DOWN TO BRING THE RING IN";
+            string place = GameInput.Scheme == InputScheme.Gamepad
+                ? $"TO AIM A BOMB, {InputPrompts.For(GameAction.Look)} PLACES IT"
+                : bombs.UsingCursor
+                    ? "TO AIM A BOMB, MOVE THE MOUSE TO PLACE IT"
+                    : "TO AIM A BOMB, LOOK DOWN TO BRING THE RING IN";
 
             // Both ways of ending it are named. The tap is the one a laptop player
             // needs -- a held key stops their touchpad reporting motion at all -- and
             // it is the one nobody discovers on their own.
-            hint.Append($"TAP {Key(BombKey())} {Dim}{place}, TAP AGAIN TO THROW</color>" +
-                        $"\n<size=90%>{Dim}OR HOLD </color>{Key(BombKey())}" +
-                        $"{Dim} AND RELEASE, {Key(AimKey())} LOCKS THE RANGE</color></size>");
+            hint.Append($"TAP {Prompt(GameAction.Bomb, BombKey())} {Dim}{place}, TAP AGAIN TO THROW</color>" +
+                        $"\n<size=90%>{Dim}OR HOLD </color>{Prompt(GameAction.Bomb, BombKey())}" +
+                        $"{Dim} AND RELEASE, {Prompt(GameAction.Aim, AimKey())} LOCKS THE RANGE</color></size>");
         }
 
         if (hasBomb && hasDrink) hint.Append("\n");
@@ -785,7 +820,7 @@ public class HUDController : MonoBehaviour
                 ? "A DRINK"
                 : belt.data.displayName.ToUpperInvariant();
 
-            hint.Append($"{Key(ItemKey())} {Dim}DRINKS {name} FOR {Restores(belt.data)}, " +
+            hint.Append($"{Prompt(GameAction.UseItem, ItemKey())} {Dim}DRINKS {name} FOR {Restores(belt.data)}, " +
                         $"{UIText.Count(belt.Count)} LEFT</color>");
         }
 
@@ -875,7 +910,7 @@ public class HUDController : MonoBehaviour
         if (bombText != null && bombs.charges != _shownBombs)
         {
             _shownBombs = bombs.charges;
-            bombText.text = $"{Key(BombKey())} <size=130%>x{_shownBombs}</size>";
+            bombText.text = $"{Prompt(GameAction.Bomb, BombKey())} <size=130%>x{_shownBombs}</size>";
         }
 
         if (bombText != null)
@@ -915,7 +950,7 @@ public class HUDController : MonoBehaviour
 
         bombRangeText.text = bombs.RangeLocked
             ? $"<color=#66F0FF>{range} m  LOCKED</color>"
-            : $"{range} m   <size=70%>{Key(AimKey())} TO LOCK</size>";
+            : $"{range} m   <size=70%>{Prompt(GameAction.Aim, AimKey())} TO LOCK</size>";
     }
 
     void UpdateBelt()
@@ -928,7 +963,7 @@ public class HUDController : MonoBehaviour
         if (beltText != null && belt.Count != _shownBeltCount)
         {
             _shownBeltCount = belt.Count;
-            beltText.text = $"{Key(ItemKey())} <size=130%>x{_shownBeltCount}</size>";
+            beltText.text = $"{Prompt(GameAction.UseItem, ItemKey())} <size=130%>x{_shownBeltCount}</size>";
         }
 
         if (beltText != null)

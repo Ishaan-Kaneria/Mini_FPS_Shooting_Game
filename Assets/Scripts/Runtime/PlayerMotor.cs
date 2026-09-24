@@ -53,6 +53,20 @@ public class PlayerMotor : MonoBehaviour
     public bool invertY;
     public bool lockCursor = true;
 
+    [Header("Gamepad Look")]
+    [Tooltip("Degrees per second the right stick turns you at full push, before the " +
+             "player's sensitivity. About half a turn a second is where console shooters " +
+             "sit: fast enough to turn round, slow enough to hold a target.")]
+    public float padYawSpeed = 200f;
+    public float padPitchSpeed = 130f;
+
+    [Tooltip("Stick look while aiming down sights, as a fraction of the hip-fire speed.")]
+    [Range(0.1f, 1f)] public float padAdsMultiplier = 0.55f;
+
+    [Header("Gyro")]
+    [Tooltip("Degrees of view per degree the device turns, at the player's sensitivity of 1.")]
+    public float gyroScale = 1f;
+
     [Header("Keyboard Look")]
     [Tooltip("Degrees per second the look keys turn you. Bind them in Control Settings; " +
              "by default the arrows move instead of looking, so this is unused.")]
@@ -213,6 +227,8 @@ public class PlayerMotor : MonoBehaviour
     int _jumpsUsed;
     float _lastSprintTapTime = -99f;
     bool _sprintLatched;
+    bool _padSprint;
+    bool _padCrouch;
     float _nextCursorAttempt;
     float _bobTimer, _stepAccumulator;
     Vector3 _bobOffset;
@@ -239,6 +255,7 @@ public class PlayerMotor : MonoBehaviour
 
         if (footstepSource == null) footstepSource = GetComponent<AudioSource>();
         if (controls == null) controls = ControlSettings.CreateDefault();
+        GameInput.Bind(controls);
     }
 
     void Start()
@@ -308,7 +325,7 @@ public class PlayerMotor : MonoBehaviour
     /// </summary>
     bool WantsToPlay()
     {
-        if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) return true;
+        if (GameInput.KeyPressed(KeyCode.Mouse0) || GameInput.KeyPressed(KeyCode.Mouse1)) return true;
         if (controls == null) return false;
 
         return controls.MoveForwardHeld || controls.MoveBackHeld ||
@@ -321,6 +338,9 @@ public class PlayerMotor : MonoBehaviour
                ControlSettings.Held(controls.bomb) ||
                ControlSettings.Held(controls.useItem);
     }
+
+    /// <summary>The inspector's invert and the player's setting, either of which flips it.</summary>
+    bool InvertY => invertY ^ GameSettings.InvertY;
 
     public void SetCursorLocked(bool locked)
     {
@@ -341,7 +361,7 @@ public class PlayerMotor : MonoBehaviour
             if (!LookCaptured)
             {
                 _yaw += LookDeltaDegrees.x;
-                _pitch -= LookDeltaDegrees.y * (invertY ? -1f : 1f);
+                _pitch -= LookDeltaDegrees.y * (InvertY ? -1f : 1f);
                 _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
             }
         }
@@ -353,26 +373,55 @@ public class PlayerMotor : MonoBehaviour
         // Thumb drag from the on-screen look area, in the same degree units.
         if (MobileInput.Active)
         {
-            Vector2 touch = MobileInput.ConsumeLook() * touchSensitivity * LookSensitivityMultiplier;
+            Vector2 touch = MobileInput.ConsumeLook() * touchSensitivity * GameSettings.TouchSensitivity * LookSensitivityMultiplier;
+            touch += ReadGyroDegrees();
 
             // Aim assist adjusts the thumb's degrees before they are applied, so there
             // is still exactly one thing in the project that turns the view. It is
             // skipped while the bomb has the look: those degrees are moving a reticle
             // across the screen, not the head, and pulling them toward an enemy would
             // drag the landing point somewhere the player did not put it.
-            if (aimAssist != null && !LookCaptured)
-                touch = aimAssist.Adjust(touch, MobileInput.Fire, Time.deltaTime);
+            if (aimAssist != null && !LookCaptured && GameSettings.AimAssist && GameInput.Scheme != InputScheme.Gamepad)
+                touch = aimAssist.Adjust(touch, MobileInput.Fire, Time.deltaTime, GameSettings.AimAssistStrength);
 
             if (touch.sqrMagnitude > 0f)
             {
                 if (!LookCaptured)
                 {
                     _yaw += touch.x;
-                    _pitch -= touch.y * (invertY ? -1f : 1f);
+                    _pitch -= touch.y * (InvertY ? -1f : 1f);
                     _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
                 }
 
                 LookDeltaDegrees += touch;
+            }
+        }
+
+        // Right stick. Degrees per second rather than per count, because a stick held
+        // still at half push is a request to keep turning, not a single movement.
+        Vector2 stick = GameInput.PadLook;
+        bool padLive = GameInput.Scheme == InputScheme.Gamepad;
+        if (stick.sqrMagnitude > 0f || (padLive && GameInput.PadHeld(GameAction.Fire)))
+        {
+            float ads = GameInput.PadHeld(GameAction.Aim) ? padAdsMultiplier : 1f;
+            Vector2 pad = new Vector2(stick.x * padYawSpeed, stick.y * padPitchSpeed)
+                          * GameSettings.GamepadSensitivity * ads * LookSensitivityMultiplier * Time.deltaTime;
+
+            // Same assist the thumb gets, and for the same reason: a stick resolves a
+            // target about as coarsely as a thumb does. Slowdown near a target, and a weak
+            // pull only while the player is already turning or firing.
+            if (aimAssist != null && !LookCaptured && GameSettings.AimAssist)
+                pad = aimAssist.Adjust(pad, GameInput.PadHeld(GameAction.Fire), Time.deltaTime, GameSettings.AimAssistStrength);
+
+            if (pad.sqrMagnitude > 0f)
+            {
+                if (!LookCaptured)
+                {
+                    _yaw += pad.x;
+                    _pitch -= pad.y * (InvertY ? -1f : 1f);
+                    _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
+                }
+                LookDeltaDegrees += pad;
             }
         }
 
@@ -470,6 +519,34 @@ public class PlayerMotor : MonoBehaviour
     }
 
     /// <summary>
+    /// Degrees the device itself turned this frame, when the player has gyro aiming on.
+    ///
+    /// Additive to the thumb, not instead of it: gyro is fine correction and the thumb is
+    /// the big turn, which is how every shooter that offers it uses it. The gyroscope is
+    /// enabled on first use and switched off again when the setting is, since a running
+    /// sensor costs battery for nothing. Landscape only -- the game locks to it -- and the
+    /// axes swap sign between the two landscape orientations.
+    /// </summary>
+    Vector2 ReadGyroDegrees()
+    {
+        var gyro = UnityEngine.InputSystem.Gyroscope.current;
+        if (gyro == null) return Vector2.zero;
+        if (!GameSettings.Gyro)
+        {
+            if (gyro.enabled) InputSystem.DisableDevice(gyro);
+            return Vector2.zero;
+        }
+        if (!gyro.enabled)
+        {
+            InputSystem.EnableDevice(gyro);
+            return Vector2.zero;
+        }
+        Vector3 w = gyro.angularVelocity.ReadValue() * Mathf.Rad2Deg * Time.deltaTime;
+        float flip = Screen.orientation == ScreenOrientation.LandscapeRight ? -1f : 1f;
+        return new Vector2(-w.x, w.y) * flip * gyroScale * GameSettings.GyroSensitivity;
+    }
+
+    /// <summary>
     /// Turns the view by an explicit amount, in the same degrees the look uses.
     ///
     /// For a borrower that has taken the look through <see cref="LookCaptured"/> and
@@ -481,7 +558,7 @@ public class PlayerMotor : MonoBehaviour
     public void TurnBy(Vector2 degrees)
     {
         _yaw += degrees.x;
-        _pitch -= degrees.y * (invertY ? -1f : 1f);
+        _pitch -= degrees.y * (InvertY ? -1f : 1f);
         _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
     }
 
@@ -552,6 +629,13 @@ public class PlayerMotor : MonoBehaviour
 
         if (MobileInput.Sprint) return allowed;
 
+        // Left stick click latches a sprint until the stick comes back to centre, which
+        // is what every pad shooter does. Holding a stick down while steering with it is
+        // not a thing thumbs can do for long.
+        if (GameInput.PadPressed(GameAction.Sprint)) _padSprint = !_padSprint;
+        if (_padSprint && (moveInput.sqrMagnitude < 0.04f || IsCrouching)) _padSprint = false;
+        if (_padSprint) return allowed;
+
         if (!controls.sprintByDoubleTap)
             return ControlSettings.Held(controls.sprintKey) && allowed;
 
@@ -586,6 +670,12 @@ public class PlayerMotor : MonoBehaviour
         if (controls.MoveForwardHeld) y += 1f;
 
         Vector2 keyboard = new Vector2(x, y);
+
+        // The stick, where it is pushed further than the keys are -- which is always,
+        // unless the keys are down, so neither can fight the other.
+        Vector2 pad = GameInput.PadMove;
+        if (pad.sqrMagnitude > keyboard.sqrMagnitude) keyboard = pad;
+
         if (!MobileInput.Active) return keyboard;
 
         // Joystick wins when it is being pushed, so the two never fight.
@@ -595,7 +685,10 @@ public class PlayerMotor : MonoBehaviour
     // ======================================================================
     void HandleCrouch()
     {
-        bool wantsCrouch = controls.CrouchHeld || MobileInput.Crouch;
+        // B toggles on a pad: holding a face button pins the thumb that should be aiming.
+        if (GameInput.PadPressed(GameAction.Crouch)) _padCrouch = !_padCrouch;
+        if (_padCrouch && IsSprinting) _padCrouch = false;
+        bool wantsCrouch = controls.CrouchHeld || MobileInput.Crouch || _padCrouch;
 
         // Never stand up into a ceiling.
         if (!wantsCrouch && IsCrouching && BlockedAbove()) wantsCrouch = true;
@@ -630,7 +723,7 @@ public class PlayerMotor : MonoBehaviour
             _jumpsUsed = 0;
         }
 
-        if (ControlSettings.Pressed(controls.jump) || MobileInput.ConsumeJump())
+        if (ControlSettings.Pressed(controls.jump) || MobileInput.ConsumeJump() || GameInput.PadPressed(GameAction.Jump))
             _lastJumpPressedTime = Time.time;
 
         Vector2 input = ReadMoveInput();

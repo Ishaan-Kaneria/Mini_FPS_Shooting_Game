@@ -3154,11 +3154,18 @@ namespace FPSKit.EditorTools
             // without a keyboard. A phone can open this menu and, without them, has no
             // way at all to leave it.
             hud.resumeButton = PanelButton(panel.transform, "ResumeButton", "RESUME",
-                                           new Vector2(-170f, -60f),
+                                           new Vector2(-340f, -60f),
                                            new Color(0.35f, 0.65f, 0.45f, 0.9f));
+            // Where a pad lands when the menu opens: resuming is what a pause is usually for.
+            hud.resumeButton.gameObject.AddComponent<UIDefaultSelection>().priority = 10;
+
+            var settings = PanelButton(panel.transform, "SettingsButton", "SETTINGS",
+                                       new Vector2(0f, -60f),
+                                       new Color(0.24f, 0.30f, 0.38f, 0.9f));
+            settings.gameObject.AddComponent<OpenSettingsButton>();
 
             hud.quitButton = PanelButton(panel.transform, "QuitButton", "QUIT TO DASHBOARD",
-                                          new Vector2(170f, -60f),
+                                          new Vector2(340f, -60f),
                                           new Color(0.55f, 0.25f, 0.24f, 0.9f));
 
             panel.SetActive(false);

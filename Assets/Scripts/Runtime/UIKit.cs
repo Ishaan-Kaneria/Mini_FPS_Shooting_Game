@@ -151,6 +151,7 @@ public static class UIKit
             case TextRole.Number: tmp.fontSize = t.sizeHeading; break;
         }
         tmp.text = role == TextRole.Number ? t.Tabular(text) : text;
+        tmp.gameObject.AddComponent<UITextFloor>();
         return tmp;
     }
 
@@ -350,6 +351,166 @@ public static class UIKit
     }
 
     // ==================================================================
+    // Settings controls.
+    // ==================================================================
+
+    /// <summary>
+    /// A settings row: the label on the left, the control on the right, one line high. The
+    /// row is not itself selectable -- the control is -- so the focus ring outlines the thing
+    /// that changes, and a pad walks straight down the controls.
+    /// </summary>
+    public static RectTransform SettingRow(Transform parent, string name, string label, string hint,
+                                           out RectTransform controlSlot, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var row = Rect(parent, name);
+        var h = Row(row, 24f, new RectOffset(0, 0, 6, 6), TextAnchor.MiddleLeft);
+        h.childForceExpandHeight = false;
+        Size(row, height: string.IsNullOrEmpty(hint) ? 56f : 70f);
+
+        var text = Rect(row, "Text");
+        Column(text, 2f);
+        Size(text, flexWidth: 1f);
+        var l = Text(text, "Label", label, TextRole.Body, t);
+        l.textWrappingMode = TextWrappingModes.NoWrap;
+        if (!string.IsNullOrEmpty(hint))
+        {
+            var c = Text(text, "Hint", hint, TextRole.Caption, t);
+            c.textWrappingMode = TextWrappingModes.NoWrap;
+            c.overflowMode = TextOverflowModes.Ellipsis;
+        }
+
+        controlSlot = Rect(row, "Control");
+        Size(controlSlot, 300f, 44f);
+        return row;
+    }
+
+    public static UISwitch Switch(Transform parent, string name, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var root = Rect(parent, name);
+        Fill(root);
+        var r = Row(root, 12f, null, TextAnchor.MiddleRight);
+        r.childForceExpandHeight = false;
+
+        var state = Text(root, "State", "OFF", TextRole.Label, t);
+        state.alignment = TextAlignmentOptions.MidlineRight;
+        Size(state, 48f);
+
+        var track = Panel(root, "Track", PanelTone.Raised, t);
+        track.raycastTarget = true;
+        Size(track, 64f, 32f);
+        var knob = Rect(track.transform, "Knob").gameObject.AddComponent<FlatRect>();
+        knob.raycastTarget = false;
+
+        var sw = track.gameObject.AddComponent<UISwitch>();
+        sw.track = track;
+        sw.knob = knob;
+        sw.stateLabel = state;
+        sw.targetGraphic = track;
+        sw.IsOn = false;
+        return sw;
+    }
+
+    /// <summary>A flat slider: a thin track, an amber fill, a square handle, and its value to the right.</summary>
+    public static Slider Slider(Transform parent, string name, float min, float max, out TMP_Text valueText, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var root = Rect(parent, name);
+        Fill(root);
+        var r = Row(root, 14f, null, TextAnchor.MiddleRight);
+        r.childForceExpandHeight = false;
+
+        var sliderRect = Rect(root, "Slider");
+        Size(sliderRect, height: 32f, flexWidth: 1f);
+        var hit = sliderRect.gameObject.AddComponent<FlatRect>();
+        hit.color = new Color(0, 0, 0, 0);
+        hit.raycastTarget = true;
+
+        var track = Rect(sliderRect, "Track");
+        track.anchorMin = new Vector2(0, 0.5f); track.anchorMax = new Vector2(1, 0.5f);
+        track.sizeDelta = new Vector2(0, 6f);
+        var tr = track.gameObject.AddComponent<FlatRect>();
+        tr.raycastTarget = false; tr.color = t.background; tr.borderColor = t.border; tr.borderPixels = t.borderPixels;
+
+        var fillArea = Rect(sliderRect, "FillArea");
+        fillArea.anchorMin = new Vector2(0, 0.5f); fillArea.anchorMax = new Vector2(1, 0.5f);
+        fillArea.sizeDelta = new Vector2(0, 6f);
+        var fill = Rect(fillArea, "Fill");
+        fill.sizeDelta = Vector2.zero;
+        var fr = fill.gameObject.AddComponent<FlatRect>();
+        fr.raycastTarget = false; fr.color = t.accent;
+
+        var handleArea = Rect(sliderRect, "HandleArea");
+        Fill(handleArea, 8f, 0f, 8f, 0f);
+        var handle = Rect(handleArea, "Handle");
+        handle.sizeDelta = new Vector2(16f, 24f);
+        var hr = handle.gameObject.AddComponent<FlatRect>();
+        hr.raycastTarget = false; hr.color = t.textPrimary;
+
+        var slider = sliderRect.gameObject.AddComponent<Slider>();
+        slider.transition = Selectable.Transition.None;
+        slider.targetGraphic = hit;
+        slider.fillRect = fill;
+        slider.handleRect = handle;
+        slider.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
+        slider.minValue = min;
+        slider.maxValue = max;
+
+        valueText = Text(root, "Value", "", TextRole.Number, t);
+        valueText.fontSize = t.sizeBody + 2f;
+        valueText.alignment = TextAlignmentOptions.MidlineRight;
+        Size(valueText, 64f);
+        return slider;
+    }
+
+    public static UIChoice Choice(Transform parent, string name, string[] options, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var face = Panel(parent, name, PanelTone.Background, t);
+        face.raycastTarget = true;
+        face.borderColor = t.border;
+        face.borderPixels = t.borderPixels;
+        Fill(face.rectTransform);
+        Row(face, 0f, null, TextAnchor.MiddleCenter);
+
+        Button Arrow(string id, float rotate)
+        {
+            var b = Rect(face.transform, id);
+            Size(b, 44f, 44f);
+            var hit = b.gameObject.AddComponent<FlatRect>();
+            hit.color = new Color(0, 0, 0, 0);
+            hit.raycastTarget = true;
+            var icon = Icon(b, "Icon", "chevron-right", 20f, t.textSecondary, t);
+            icon.rectTransform.anchorMin = icon.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            icon.rectTransform.localEulerAngles = new Vector3(0, 0, rotate);
+            var button = b.gameObject.AddComponent<Button>();
+            button.targetGraphic = hit;
+            button.transition = Selectable.Transition.None;
+            // Clickable, never focusable: the row is the stop.
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            return button;
+        }
+
+        var prev = Arrow("Previous", 180f);
+        var value = Text(face.transform, "Value", "", TextRole.Label, t);
+        value.fontSize = t.sizeLabel + 1f;
+        value.alignment = TextAlignmentOptions.Center;
+        Size(value, flexWidth: 1f);
+        var next = Arrow("Next", 0f);
+
+        var choice = face.gameObject.AddComponent<UIChoice>();
+        choice.face = face;
+        choice.valueLabel = value;
+        choice.previous = prev;
+        choice.next = next;
+        choice.targetGraphic = face;
+        choice.options = options;
+        choice.Index = 0;
+        return choice;
+    }
+
+    // ==================================================================
     // Toasts and tooltips.
     // ==================================================================
 
@@ -428,6 +589,7 @@ public static class UIKit
         label.color = t.textPrimary;
         label.fontSize = t.sizeCaption + 1f;
 
+        face.gameObject.AddComponent<SafeAreaBleed>();
         var view = face.gameObject.AddComponent<UITooltipView>();
         view.label = label;
         view.group = group;

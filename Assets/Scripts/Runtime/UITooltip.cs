@@ -15,10 +15,12 @@ using UnityEngine.UI;
 /// reload off, is the whole bug class CLAUDE.md warns about.
 ///
 /// Touch has no hover, so on a touch device nothing here ever fires; a control that matters
-/// on a phone needs a visible label.
+/// on a phone needs a visible label. A gamepad has no hover either, so there the tooltip
+/// follows the selection instead.
 /// </summary>
 [DisallowMultipleComponent]
-public class UITooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler
+public class UITooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler,
+                         ISelectHandler, IDeselectHandler
 {
     [Tooltip("What the control does, in two or three words.")]
     public string text;
@@ -34,6 +36,15 @@ public class UITooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
     public void OnPointerEnter(PointerEventData e) => _hoverSince = Time.unscaledTime;
     public void OnPointerExit(PointerEventData e) => Hide();
     public void OnPointerDown(PointerEventData e) => Hide();
+
+    // A pad has no hover, so selection stands in for it: resting the focus ring on an icon
+    // button names it, which is the only way a pad player learns what the icon means.
+    public void OnSelect(BaseEventData e)
+    {
+        if (GameInput.UsingGamepad) _hoverSince = Time.unscaledTime;
+    }
+
+    public void OnDeselect(BaseEventData e) => Hide();
 
     void OnDisable() => Hide();
 

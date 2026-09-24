@@ -90,22 +90,25 @@ public static class DeviceProfile
     /// achievements, the desktop's card grid and none of the handset arrangements below.
     /// There is one density reading in the kit now and this is a consumer of it.
     /// </summary>
-    public static float LongEdgeMm => LongEdgeMillimetres(TouchMetrics.ScreenDpi, Screen.width, Screen.height);
+    public static float LongEdgeMm => LongEdgeMillimetres(TouchMetrics.ScreenDpi, ScreenInfo.Width, ScreenInfo.Height);
 
     static float LongEdgeMillimetres(float dpi, int width, int height)
         => IsKnownDensity(dpi) ? Mathf.Max(width, height) / (dpi / 25.4f) : 0f;
 
     /// <summary>Taller than it is wide. Only ever interesting on something held.</summary>
-    public static bool Portrait => Screen.height > Screen.width;
+    public static bool Portrait => ScreenInfo.Height > ScreenInfo.Width;
 
     /// <summary>How the player is reaching this screen right now.</summary>
     public static Reach CurrentReach
-        => ReachFor(MobileInput.Active || WebDevice.IsTouchOnly, Application.isMobilePlatform);
+        => ReachFor(TouchSignal, MobilePlatform);
 
     /// <summary>How much surface there is.</summary>
     public static Form CurrentForm
-        => FormFor(TouchMetrics.ScreenDpi, Screen.width, Screen.height,
-                   MobileInput.Active || WebDevice.IsTouchOnly, Application.isMobilePlatform);
+        => FormFor(TouchMetrics.ScreenDpi, ScreenInfo.Width, ScreenInfo.Height,
+                   TouchSignal, MobilePlatform);
+
+    static bool TouchSignal => ScreenInfo.SimulatedTouch ?? (MobileInput.Active || WebDevice.IsTouchOnly);
+    static bool MobilePlatform => ScreenInfo.SimulatedMobile ?? Application.isMobilePlatform;
 
     /// <summary>Shorthand the gameplay layer wants far more often than the exact form.</summary>
     public static bool Touched => CurrentReach == Reach.Touch;

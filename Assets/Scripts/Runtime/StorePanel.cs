@@ -152,7 +152,7 @@ public class StorePanel : MonoBehaviour
 
         // Escape and Q back out, the same keys the level select takes. A screen with no
         // keyboard way out traps anyone whose pointer is not where they expected it.
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Q)) Close();
+        if (GameInput.BackPressed) Close();
     }
 
     // ======================================================================

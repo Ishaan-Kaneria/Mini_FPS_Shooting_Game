@@ -33,15 +33,46 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 
 `Assets/FPSKit_Generated/` holds tool output: generated scenes, themes, `Levels/` (LevelSet assets), `Enemies/` (EnemyArchetype assets), `Store/` (the catalog plus its WeaponData, BombData and ConsumableData), materials, `Controls.asset`, `TestRifle.asset`, `ImpactLibrary.asset`, `MinimapBlip.png`, `Enemy.prefab`, `Bomb.prefab`, `Explosion.prefab`, `Pickup_*.prefab`, post-FX volume profiles. Treat everything in it as regenerable. Art comes from `Assets/RPG_FPS_game_assets_industrial/`.
 
-## Input: legacy only
+## Input: the Input System, with one legacy read left
 
-Gameplay reads the **legacy `UnityEngine.Input` API** (`Input.GetKey`, `Input.GetAxisRaw("Mouse X")`). Do not port code to the new Input System.
+All input goes through **`GameInput`** (the Input System): a `Gameplay` action map and a `UI`
+map, control schemes `Keyboard&Mouse`, `Gamepad` and `Touch`, and `GameInput.Scheme` -- the
+device the player actuated last, past a threshold so a resting pad cannot flip it. Prompts
+(`InputPrompts`), the focus ring, the key strip, HOW TO PLAY and the touch layer all follow
+`GameInput.SchemeChanged`. This replaced the legacy `UnityEngine.Input` API in September 2026,
+at Ishaan's request; the earlier "legacy only" rule is gone.
 
-Caveats worth knowing before you touch input:
+Five things about it are worth not re-deriving:
 
-- The project's `activeInputHandler` is `2` (**Both**), and `com.unity.inputsystem` is installed as a package dependency. That is deliberate — it keeps the legacy API alive while allowing one optional path.
-- The single exception is `PlayerMotor.ReadMouseCounts()`, which has a `#if ENABLE_INPUT_SYSTEM` branch using `Mouse.current.delta` for raw, unsmoothed mouse look when `rawMouseInput` is on, and falls back to `Input.GetAxisRaw`. Keep both branches working — and note **the fallback is reached on an empty reading, not only on a missing package.** On some platforms, Linux/X11 most reliably, `Mouse.current.delta` reports zero on every frame the cursor is locked while `Mouse.current` itself is present and every other control on it works. Written as an unconditional `return`, that is a game with no mouse look at all: live device, locked cursor, focused window, sixty frames a second, nothing logged. It took a diagnostic reading 296 consecutive frames of `LookDeltaDegrees` at exactly zero to see it, because from the outside it is indistinguishable from a player who is not touching the mouse. Consulting the legacy axis on a frame the Input System says the mouse did not move cannot double-count, and it must stay `GetAxisRaw` — the smoothed axis keeps reporting after the mouse stops, which would turn the view on frames that really were still.
-- `Assets/InputSystem_Actions.inputactions` is leftover from the Unity template and is not referenced by any gameplay code.
+- **The keyboard bindings are written from `ControlSettings`**, not typed into an .inputactions
+  file. The asset's three presets are what the instruction strip and HOW TO PLAY describe, so
+  a second list of keys would be a second answer. `GameInput.Bind(controls)` rewrites them;
+  `ControlSettings.Revision` says when. `ControlSettings.Held/Pressed(KeyCode)` still exist
+  and read the Input System. The pad layout is fixed in `AddPadBindings` and must match
+  `InputPrompts.PadGlyph`.
+- **The one legacy read is `PlayerMotor.ReadMouseCounts()`'s fallback**, and it must stay.
+  It prefers `Mouse.current.delta` and falls back to `Input.GetAxisRaw` **on an empty reading,
+  not only on a missing package.** On Linux/X11 `Mouse.current.delta` reports zero on every
+  frame the cursor is locked while the device is present and every other control on it works.
+  Written as an unconditional `return`, that is a game with no mouse look at all, with nothing
+  logged. It took 296 consecutive frames of `LookDeltaDegrees` at exactly zero to see. It must
+  stay `GetAxisRaw` -- the smoothed axis keeps reporting after the mouse stops. That read is
+  why `activeInputHandler` stays `2` (**Both**).
+- **The mouse rule moved with it.** Unity maps touch 0 onto the mouse in a browser, so
+  `GameInput.Held/Pressed` ignore every mouse control while `MobileInput.Active`, and a mouse
+  event never switches the scheme away from touch. `VerifyInput` presses a virtual mouse to
+  prove it.
+- **Aim assist is for thumbs and sticks.** `TouchAimAssist.Adjust` takes a strength (the
+  player's setting) and the caller decides who gets it: the touch look and the right stick,
+  never the mouse. The stick look has its own deadzone and response curve (`GameInput.Shape`,
+  radial, curve on magnitude only). L3 latches sprint until the stick centres; B toggles crouch.
+- **Escape and B mean "back", and one press closes one thing.** `GameInput.BackPressed` is
+  what every overlay closes on; `OverlayPanel.AnyOpenThisFrame` stops the pause menu under the
+  settings from also resuming on the same press.
+
+`Assets/InputSystem_Actions.inputactions` is leftover from the Unity template and is not
+referenced by anything. Tests can now press real buttons: `InputSystem.AddDevice` plus
+`QueueStateEvent` is how `VerifyInput` drives a pad, a DualShock, a keyboard and a mouse.
 
 **Mouse look is gated on the pointer lock, and losing it is silent.** `PlayerMotor.HandleLook`
 reads no mouse at all unless `Cursor.lockState == Locked`, and the lock is dropped
@@ -1420,14 +1451,19 @@ degrees; it only gains resolution. `VerifyDevices` asserts exactly that invarian
 reference pixels on every device there has ever been, and the shipped code was
 self-consistently 2.6x short of it.
 
-**WebGL's quality tier is chosen at runtime, because it is the one platform that cannot be
-told in advance.** `QualitySettings` has one entry per platform and WebGL's was 0 -- the
-Mobile tier, written to be cheap -- so every desktop browser player was getting reduced
-render scale and no MSAA as well. `RenderPolicy` picks the PC tier for a pointer and the
-Mobile tier for a finger, before the first scene loads, compiled into the player only: calling
-`SetQualityLevel` in the editor writes the project's current tier to disk as a side effect of
-pressing Play. The Mobile tier's own render scale is back at 1.0; the pixel budget now lives
-in the page, where the screen is known.
+**Quality is three tiers, chosen once and then the player's.** `FPSKitQualityTiers` makes
+the levels Low (the old Mobile asset: no real-time shadows, no MSAA, no HDR), Medium (made from
+the PC asset: 60m shadows, 2x MSAA, the mobile renderer so no occlusion) and High (the PC asset
+untouched), with no tier excluded from any platform -- the template excluded PC from Android
+and iOS, which removes it from `QualitySettings.names` there. `QualityTiers` picks Low for a
+phone, a tablet or a browser and High for a desktop on the first launch, writes it to
+`GameSettings.QualityTier`, and never overrides the player afterwards. Post-processing and
+particles are per scene and cut on Low at runtime; fog is deliberately left alone on every
+tier, because it hides the far clip plane on the big arenas and costs almost nothing. A phone
+runs at the player's 30 or 60 with `DynamicResolution` trading sharpness for frame time; a
+desktop uses vsync; a browser is paced by the page. **Low's render scale is 1.0**: the pixel
+budget lives in the page (see above), and a low tier at 0.8 is the "very blurry" build again.
+None of it runs in the editor, where `SetQualityLevel` writes the project's level to disk.
 
 ## A crosshair authored in canvas units disappears on a phone
 
@@ -1501,6 +1537,49 @@ gallery; no existing screen has moved onto it yet.
   ```
   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitUIKit.VerifyGallery -fpskitOut Build/UIKit
   ```
+
+## Every screen works on every device
+
+The rules every screen follows from the UI kit onward, and the pieces that enforce them.
+All of it is applied at runtime by `UIBootstrap`, to every scene, so no screen has to opt in:
+
+- **Safe area on every root canvas** (`SafeAreaCanvas`). Full-screen layers bleed to the
+  physical edge; placed content is moved into a `SafeArea` container fitted to the platform's
+  safe area, one container per run of siblings so draw order is kept. Mark something that must
+  stay put with `SafeAreaBleed`. A canvas that already has a `SafeAreaFitter` is left alone.
+- **Interface scale** (`GameSettings.UiScale`, 80-130%) through `UIScaleBinder`, which keeps
+  the authored reference resolution and combines it with the device form (`PhoneUI`) --
+  `PhoneUI` used to multiply the scaler in place, which compounded on a second call.
+- **A pad can use every screen.** `UINavigator` keeps the selection on something visible and
+  pressable (a raycast at its centre, the test `VerifyFlow` uses for clicks), choosing the
+  highest-priority `UIDefaultSelection`, else a primary button, else the top-left control.
+  `UIFocusRing` draws the amber outline round it while the pad is live. LB/RB step the visible
+  tab bar. Tooltips show on selection as well as on hover.
+- **Touch targets at least 48dp, nothing over the crosshair, nothing outside the safe area.**
+  `FPSKitBatch.CaptureDevices` measures all three and fails on them.
+
+`SettingsPanel` is built at runtime from the kit onto whichever canvas asks
+(`OpenSettingsButton`), so the dashboard and all seven pause menus share one screen without a
+copy in any scene. Each setting is one accessor on `GameSettings`, straight over PlayerPrefs,
+raising `GameSettings.Changed`; whatever owns a setting applies it from that event.
+
+**`ScreenInfo` is where the screen is read, so a phone can be checked without a phone.**
+`Screen` in batch mode is 640x480 with no density, notch or touch. `CaptureDevices` puts the
+iPhone 15, Pixel 7 and iPad in its place (`ScreenInfo.SimulateNextSession`) and renders at each
+device's resolution. Two traps it hit:
+
+- **Canvases must reach the simulated screen before any `Awake`.** The touch buttons size
+  themselves against the canvas scale in `Awake`, and a scaler publishes its factor in its own
+  update. Measured against batch mode's screen, the pause button came out 31mm across and the
+  crosshair 40mm. `ScreenInfo` routes the canvases in `BeforeSceneLoad` -- with scene reload off
+  the scene's objects already exist then -- and toggles each scaler so the factor is current.
+- **The HUD is rendered without the arena's post-processing.** The arena renders through its
+  own camera, and the canvases render on black and on white, which gives exact coverage for
+  compositing without trusting the pipeline's alpha. Tonemapping the HUD would change the
+  colours the shots are meant to check.
+
+The bundled simulator devices predate the iPhone 15 and Pixel 7, so those two are typed from
+the manufacturers' specs in `FPSKitDeviceShots`; the iPad is the simulator's own.
 
 ## The dashboard has five destinations
 

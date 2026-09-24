@@ -274,6 +274,19 @@ namespace FPSKit.EditorTools
         public static void VerifyFlow() => FPSKitFlowTest.VerifyFlow();
 
         /// <summary>
+        /// The Input System layer, with virtual devices: every preset bound, every prompt
+        /// drawn, pad and keyboard switching, B backing out, the mouse rule. Play mode.
+        /// </summary>
+        public static void VerifyInput() => FPSKitInputTest.VerifyInput();
+
+        /// <summary>
+        /// Plays the dashboard, settings and an arena as a PC, iPhone 15, Pixel 7 and iPad,
+        /// renders each at its resolution, and fails on a touch target under 48dp, a button
+        /// over the crosshair or a control outside the safe area. Needs UNITY_GRAPHICS=1.
+        /// </summary>
+        public static void CaptureDevices() => FPSKitDeviceShots.Capture();
+
+        /// <summary>
         /// Checks every open-zone arena for the failures that are invisible in a build:
         /// a gorge that does not block, banks that are not joined, spawn points off the
         /// navmesh and water that is not lethal. Edit mode, so it costs seconds.

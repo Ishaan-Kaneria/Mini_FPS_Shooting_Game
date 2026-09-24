@@ -60,14 +60,25 @@ public class InstructionsPanel : OverlayPanel
             if (row != null) Destroy(row.gameObject);
         _rows.Clear();
 
-        bool touch = DeviceProfile.Touched;
+        // By what the player is holding now, not by what the device is: a phone with a
+        // pad paired is read the pad page, and picking the pad up mid-read rewrites it.
+        var scheme = GameInput.Scheme;
+        if (scheme == InputScheme.KeyboardMouse && DeviceProfile.Touched) scheme = InputScheme.Touch;
 
         if (subtitleText != null)
-            subtitleText.text = touch
-                ? "On-screen controls. Drag the fire button to keep shooting while you aim."
-                : "Keyboard and mouse. Rebind these in the control settings asset.";
+            subtitleText.text = scheme switch
+            {
+                InputScheme.Touch => "On-screen controls. Drag the fire button to keep shooting while you aim.",
+                InputScheme.Gamepad => "Gamepad. Stick sensitivity, deadzone and aim assist are in Settings.",
+                _ => "Keyboard and mouse.",
+            };
 
-        var groups = touch ? TouchPages() : KeyPages();
+        var groups = scheme switch
+        {
+            InputScheme.Touch => TouchPages(),
+            InputScheme.Gamepad => PadPages(),
+            _ => KeyPages(),
+        };
 
         // Same rule as the achievements screen: a handset gets one column and a tablet two,
         // because four columns on a 147mm screen are four strips too narrow to hold a
@@ -185,7 +196,57 @@ public class InstructionsPanel : OverlayPanel
 
     ControlSettings _fallback;
 
-    string K(KeyCode key) => UIText.KeyLabel(key);
+    string K(KeyCode key) => InputPrompts.KeyText(key);
+
+    static string P(GameAction a) => InputPrompts.For(a, InputScheme.Gamepad, GameInput.Pad);
+    static string T(GameAction a) => InputPrompts.For(a, InputScheme.Touch, GameInput.Pad);
+
+    void OnEnable() => GameInput.SchemeChanged += OnSchemeChanged;
+    void OnDisable() => GameInput.SchemeChanged -= OnSchemeChanged;
+
+    void OnSchemeChanged()
+    {
+        if (IsOpen) OnOpened();
+    }
+
+    List<Page> PadPages()
+        => new List<Page>
+        {
+            new Page("Move", new List<Line>
+            {
+                new Line(P(GameAction.Move), "Walk"),
+                new Line(P(GameAction.Look), "Look"),
+                new Line(P(GameAction.Sprint), "Sprint. Click once; it holds until you stop."),
+                new Line(P(GameAction.Jump), "Jump"),
+                new Line(P(GameAction.Crouch), "Crouch. Press again to stand."),
+            }),
+
+            new Page("Fight", new List<Line>
+            {
+                new Line(P(GameAction.Fire), "Fire"),
+                new Line(P(GameAction.Aim), "Aim down sights"),
+                new Line(P(GameAction.Reload), "Reload"),
+            }),
+
+            new Page("Equipment", BombEarned
+                ? new List<Line>
+                {
+                    new Line(P(GameAction.Bomb), "Tap to aim the bomb, tap again to throw."),
+                    new Line(P(GameAction.Look), "Moves the marker while you aim."),
+                    new Line(P(GameAction.UseItem), "Drink. Restores health."),
+                }
+                : new List<Line>
+                {
+                    new Line("BOMB", BombLockLine()),
+                    new Line(P(GameAction.UseItem), "Drink. Restores health."),
+                }),
+
+            new Page("Level", new List<Line>
+            {
+                new Line(P(GameAction.Pause), "Pause"),
+                new Line(InputPrompts.Back, "Back, and resume from pause"),
+            }),
+        };
 
     List<Page> KeyPages()
     {
@@ -245,27 +306,29 @@ public class InstructionsPanel : OverlayPanel
 
             new Page("Fight", new List<Line>
             {
-                new Line("FIRE", "Press and keep dragging -- it keeps firing while you aim."),
-                new Line("AIM", "Down sights."),
-                new Line("RELOAD", "Reload."),
+                new Line(T(GameAction.Fire), "Press and keep dragging -- it keeps firing while you aim."),
+                new Line(T(GameAction.Aim), "Down sights. Tap or hold, in Settings."),
+                new Line(T(GameAction.Reload), "Reload."),
+                new Line(T(GameAction.Jump), "Jump."),
+                new Line(T(GameAction.Crouch), "Crouch."),
             }),
 
             new Page("Equipment", BombEarned
                 ? new List<Line>
                 {
-                    new Line("BOMB", "Hold it. Look further down to throw shorter, up to throw further."),
+                    new Line(T(GameAction.Bomb), "Hold it. Look further down to throw shorter, up to throw further."),
                     new Line("", "Let go to throw."),
-                    new Line("DRINK", "Restores health."),
+                    new Line(T(GameAction.UseItem), "Restores health."),
                 }
                 : new List<Line>
                 {
                     new Line("BOMB", BombLockLine()),
-                    new Line("DRINK", "Restores health."),
+                    new Line(T(GameAction.UseItem), "Restores health."),
                 }),
 
             new Page("Level", new List<Line>
             {
-                new Line("Top right", "Pause. It is the only way out of a level."),
+                new Line(T(GameAction.Pause), "Top right. Pause -- it is the only way out of a level."),
             }),
         };
 }

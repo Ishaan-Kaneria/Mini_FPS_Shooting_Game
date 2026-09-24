@@ -121,7 +121,7 @@ public class LevelSelectPanel : MonoBehaviour
 
         // Escape and Q back out. A screen with no keyboard way out traps anyone whose
         // pointer is not where they expected it to be.
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Q)) Close();
+        if (GameInput.BackPressed) Close();
     }
 
     // ======================================================================

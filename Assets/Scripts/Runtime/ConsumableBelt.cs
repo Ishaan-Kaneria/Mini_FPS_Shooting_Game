@@ -91,7 +91,7 @@ public class ConsumableBelt : MonoBehaviour
     void Update()
     {
         if (PlayerMotor.InputEnabled &&
-            (ControlSettings.Pressed(Bindings.useItem) || MobileInput.ConsumeUseItem()))
+            (ControlSettings.Pressed(Bindings.useItem) || MobileInput.ConsumeUseItem() || GameInput.PadPressed(GameAction.UseItem)))
             TryUse();
 
         // Checked every frame rather than scheduled with a coroutine, because a coroutine

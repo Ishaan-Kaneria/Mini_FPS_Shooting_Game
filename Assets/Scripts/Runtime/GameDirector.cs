@@ -208,6 +208,30 @@ public class GameDirector : MonoBehaviour
 
     void OnApplicationQuit() => _quitting = true;
 
+    /// <summary>
+    /// Pauses when the app goes to the background or the window loses focus, so a phone
+    /// call or a notification does not leave the player standing in a firefight. Never
+    /// resumes on its own -- coming back to a game already running is how a player dies
+    /// before their thumb is on the glass. Not in the editor, where focus moves to the
+    /// Console and the Inspector constantly and a test would pause itself.
+    /// </summary>
+    void OnApplicationPause(bool paused)
+    {
+        if (paused) PauseForFocusLoss();
+    }
+
+    void OnApplicationFocus(bool focused)
+    {
+        if (!focused) PauseForFocusLoss();
+    }
+
+    void PauseForFocusLoss()
+    {
+        if (Application.isEditor || IsGameOver || IsPaused || _quitting) return;
+        if (FindAnyObjectByType<LevelManager>() == null) return;
+        SetPaused(true);
+    }
+
     void Update()
     {
         // Read once at the top, never inside a condition.
@@ -216,8 +240,16 @@ public class GameDirector : MonoBehaviour
         // checks below are short-circuiting: written inline, a frame where the resume
         // key was also down would skip the consume and leave the tap queued to fire
         // again on the very next frame, which reads as the game pausing itself.
+        // An overlay over the pause menu (settings) owns Escape and B while it is up.
+        if (OverlayPanel.AnyOpenThisFrame)
+        {
+            MobileInput.ConsumePause();
+            return;
+        }
+
         bool pause = PausePressed();
-        bool resume = Pressed(resumeKey);
+        // B/Circle is "back" on a pad, and back from a pause menu is the game.
+        bool resume = Pressed(resumeKey) || (IsPaused && GameInput.UsingGamepad && GameInput.UICancel.WasPressedThisFrame());
         bool leave = Pressed(quitKey);
 
         // Only the quit key here. The results screen offers three different things --
@@ -250,10 +282,10 @@ public class GameDirector : MonoBehaviour
     /// A key press that still arrives while the game is frozen.
     ///
     /// Pausing sets Time.timeScale to 0, which stops FixedUpdate but not Update or
-    /// Input -- so this is an ordinary GetKeyDown. It exists as a named method purely so
+    /// input -- so this is an ordinary key press. It exists as a named method purely so
     /// the three call sites above read as intent rather than as plumbing.
     /// </summary>
-    static bool Pressed(KeyCode key) => key != KeyCode.None && Input.GetKeyDown(key);
+    static bool Pressed(KeyCode key) => GameInput.KeyPressed(key);
 
     /// <summary>
     /// Pause asked for by a key or by the on-screen button.
@@ -262,7 +294,9 @@ public class GameDirector : MonoBehaviour
     /// it there is no way to pause, and therefore no way to leave a run or reach the
     /// dashboard at all. Consumed rather than polled, so one tap is one toggle.
     /// </summary>
-    bool PausePressed() => Pressed(pauseKey) || Pressed(altPauseKey) || MobileInput.ConsumePause();
+    /// Start on a pad does the same, like every pad game.
+    bool PausePressed() => Pressed(pauseKey) || Pressed(altPauseKey) || MobileInput.ConsumePause()
+                           || GameInput.PadPressed(GameAction.Pause);
 
     // ======================================================================
     // Scoring

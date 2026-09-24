@@ -303,7 +303,7 @@ public class LevelResultsUI : MonoBehaviour
         if (Pressed(QuitKey)) ToDashboard();
     }
 
-    static bool Pressed(KeyCode key) => key != KeyCode.None && Input.GetKeyDown(key);
+    static bool Pressed(KeyCode key) => GameInput.KeyPressed(key);
 
     /// <summary>
     /// Replay is the director's resume key and dashboard is its quit key, read live

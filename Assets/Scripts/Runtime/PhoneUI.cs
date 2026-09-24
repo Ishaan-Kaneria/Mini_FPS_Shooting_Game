@@ -102,9 +102,9 @@ public static class PhoneUI
     /// <summary>
     /// Grows everything on a canvas by shrinking what it measures itself against.
     ///
-    /// Idempotent per call site rather than per canvas: it reads the scaler's authored
-    /// <see cref="CanvasScaler.referenceResolution"/> and multiplies, so calling it twice
-    /// on one canvas would compound. Each canvas has exactly one caller, at Start.
+    /// Idempotent: <see cref="UIScaleBinder"/> keeps the authored reference and recomputes
+    /// from it, so calling this twice -- or changing the interface scale afterwards -- sets
+    /// the same value rather than compounding.
     /// </summary>
     public static void Apply(Canvas canvas) => Apply(canvas, Surface.Menu);
 
@@ -113,18 +113,16 @@ public static class PhoneUI
         if (canvas == null) return;
 
         float scale = ReferenceScaleFor(DeviceProfile.CurrentForm, surface);
-        if (Mathf.Approximately(scale, 1f)) return;
 
-        var scaler = canvas.GetComponent<CanvasScaler>();
-        if (scaler == null || scaler.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize) return;
-
-        scaler.referenceResolution = scaler.referenceResolution * scale;
-
-        // Match the shorter edge rather than splitting the difference. A landscape phone
-        // is about 2.2:1 against the authored 16:9, so a 0.5 match lets the extra width
-        // pull every unit back down and undoes most of the shrink -- on the one screen
-        // that needed it most.
-        if (DeviceProfile.CurrentForm == DeviceProfile.Form.Handset)
-            scaler.matchWidthOrHeight = 1f;
+        // Through the binder, which keeps the authored reference and combines it with the
+        // player's interface scale -- writing the scaler directly compounded on every call.
+        //
+        // Match the shorter edge on a handset rather than splitting the difference. A
+        // landscape phone is about 2.2:1 against the authored 16:9, so a 0.5 match lets the
+        // extra width pull every unit back down and undoes most of the shrink -- on the one
+        // screen that needed it most.
+        var binder = UIScaleBinder.For(canvas);
+        if (binder == null) return;
+        binder.SetForm(scale, DeviceProfile.CurrentForm == DeviceProfile.Form.Handset ? 1f : (float?)null);
     }
 }

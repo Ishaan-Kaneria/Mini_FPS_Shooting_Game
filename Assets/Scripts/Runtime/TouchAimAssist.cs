@@ -26,9 +26,9 @@ using UnityEngine;
 ///   the player stands still, which feels like the game wrestling them for the mouse and
 ///   is the single fastest way to make assist obvious and hated.
 ///
-/// <b>Touch only.</b> A player on a mouse gets none of it. Assist compensates for an
-/// input device, and handing it to a device that does not need it is both unfair and
-/// worse to play.
+/// <b>Thumbs and sticks only.</b> A player on a mouse gets none of it. Assist compensates
+/// for an input device, and handing it to a device that does not need it is both unfair
+/// and worse to play. The player can turn it down or off (<see cref="GameSettings"/>).
 /// </summary>
 [DisallowMultipleComponent]
 public class TouchAimAssist : MonoBehaviour
@@ -65,10 +65,14 @@ public class TouchAimAssist : MonoBehaviour
     /// there is exactly one thing in the project that turns the view and the assist
     /// cannot fight it. Returning the value also means a caller that does not want
     /// assist simply does not call -- there is no state to switch off.
+    ///
+    /// <paramref name="strength"/> is the player's setting, 0 to 1, scaling both halves;
+    /// 1 is the tuned assist. The caller decides whether the input is one that gets any --
+    /// a thumb or a stick, never a mouse.
     /// </summary>
-    public Vector2 Adjust(Vector2 lookDegrees, bool firing, float deltaTime)
+    public Vector2 Adjust(Vector2 lookDegrees, bool firing, float deltaTime, float strength = 1f)
     {
-        if (profile == null || !profile.aimAssist || !MobileInput.Active) return lookDegrees;
+        if (profile == null || !profile.aimAssist || strength <= 0f) return lookDegrees;
         if (eye == null) return lookDegrees;
 
         var target = FindTarget(out float offAxis);
@@ -77,7 +81,7 @@ public class TouchAimAssist : MonoBehaviour
         // 1 dead centre, 0 at the edge of the cone.
         float closeness = 1f - Mathf.Clamp01(offAxis / Mathf.Max(0.01f, profile.assistAngle));
 
-        Vector2 adjusted = lookDegrees * Mathf.Lerp(1f, profile.assistSlowdown, closeness);
+        Vector2 adjusted = lookDegrees * Mathf.Lerp(1f, profile.assistSlowdown, closeness * strength);
 
         // Adhesion only while the player is doing something. Standing still with a full
         // magazine and watching the camera drift toward a doorway is the moment assist
@@ -85,7 +89,7 @@ public class TouchAimAssist : MonoBehaviour
         bool turning = lookDegrees.sqrMagnitude > 0.0001f;
         if (!turning && !firing) return adjusted;
 
-        return adjusted + Pull(target, closeness, deltaTime);
+        return adjusted + Pull(target, closeness * strength, deltaTime);
     }
 
     /// <summary>

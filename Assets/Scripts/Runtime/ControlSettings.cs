@@ -91,14 +91,14 @@ public class ControlSettings : ScriptableObject
     // ------------------------------------------------------------------
     public static bool Held(KeyCode primary, KeyCode alternate = KeyCode.None)
     {
-        if (Readable(primary) && Input.GetKey(primary)) return true;
-        return Readable(alternate) && Input.GetKey(alternate);
+        if (Readable(primary) && GameInput.KeyHeld(primary)) return true;
+        return Readable(alternate) && GameInput.KeyHeld(alternate);
     }
 
     public static bool Pressed(KeyCode primary, KeyCode alternate = KeyCode.None)
     {
-        if (Readable(primary) && Input.GetKeyDown(primary)) return true;
-        return Readable(alternate) && Input.GetKeyDown(alternate);
+        if (Readable(primary) && GameInput.KeyPressed(primary)) return true;
+        return Readable(alternate) && GameInput.KeyPressed(alternate);
     }
 
     /// <summary>
@@ -159,8 +159,18 @@ public class ControlSettings : ScriptableObject
     }
 
     /// <summary>Overwrites every binding with one of the built-in schemes.</summary>
+    /// <summary>
+    /// Bumped whenever a binding changes, so <see cref="GameInput"/> knows to rewrite the
+    /// actions it built from this asset. Not serialized: after a domain reload the input
+    /// layer rebuilds from scratch anyway.
+    /// </summary>
+    [System.NonSerialized] public int Revision;
+
+    void OnValidate() => Revision++;
+
     public void ApplyPreset(Preset preset)
     {
+        Revision++;
         // Shared across all schemes.
         moveForward = KeyCode.UpArrow;
         moveBack = KeyCode.DownArrow;

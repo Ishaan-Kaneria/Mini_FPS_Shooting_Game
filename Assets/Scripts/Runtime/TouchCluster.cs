@@ -80,6 +80,10 @@ public class TouchCluster : MonoBehaviour
              "runs first is not defined.")]
     [Range(0.1f, 2f)] public float situationalCheckInterval = 0.4f;
 
+    [Tooltip("Lay the cluster from the left edge instead of the right, for a left-handed " +
+             "player. Set by TouchLayout from the player's setting.")]
+    public bool mirrored;
+
     RectTransform _rect;
 
     /// <summary>What the last layout believed the player was carrying.</summary>
@@ -194,7 +198,7 @@ public class TouchCluster : MonoBehaviour
             float size = slot.primary ? primary : secondary;
 
             var rect = (RectTransform)slot.button.transform;
-            rect.anchorMin = rect.anchorMax = new Vector2(1f, 0f);
+            rect.anchorMin = rect.anchorMax = new Vector2(mirrored ? 0f : 1f, 0f);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.sizeDelta = new Vector2(size, size);
 
@@ -204,7 +208,7 @@ public class TouchCluster : MonoBehaviour
             float y = margin + Get(rowHeight, slot.row) * 0.5f;
             for (int r = 0; r < slot.row; r++) y += Get(rowHeight, r) + gap;
 
-            rect.anchoredPosition = new Vector2(-x, y);
+            rect.anchoredPosition = new Vector2(mirrored ? x : -x, y);
 
             Dress(slot.button, size);
             }
@@ -230,6 +234,10 @@ public class TouchCluster : MonoBehaviour
             fill.offsetMin = new Vector2(inset, inset);
             fill.offsetMax = new Vector2(-inset, -inset);
         }
+
+        // The icon: a bit under half the button, which is what shows round a thumb.
+        var icon = button.transform.Find("Icon") as RectTransform;
+        if (icon != null) icon.sizeDelta = new Vector2(size * 0.44f, size * 0.44f);
 
         var label = button.GetComponentInChildren<TMP_Text>(true);
         if (label == null) return;

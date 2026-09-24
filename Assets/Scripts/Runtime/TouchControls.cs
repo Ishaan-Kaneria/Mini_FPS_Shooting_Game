@@ -27,19 +27,22 @@ public class TouchControls : MonoBehaviour
         {
             ShowMode.Always => true,
             ShowMode.Never => false,
-            _ => Application.isMobilePlatform || Application.isEditor ||
-                 WebDevice.IsTouchOnly ||
-                 (Input.touchSupported && !Input.mousePresent)
+            _ => ScreenInfo.SimulatedTouch ??
+                 (Application.isMobilePlatform || Application.isEditor ||
+                  WebDevice.IsTouchOnly ||
+                  (UnityEngine.InputSystem.Touchscreen.current != null &&
+                   UnityEngine.InputSystem.Mouse.current == null))
         };
 
-        // Touch support alone is not a touch device. A touchscreen laptop reports
-        // Input.touchSupported and still has a mouse -- and MobileInput.Active is what
+        // Touch support alone is not a touch device. A touchscreen laptop has a
+        // touchscreen and still has a mouse -- and MobileInput.Active is what
         // gates PlayerMotor's click-to-lock recovery, so claiming that machine is
         // mobile leaves it with on-screen buttons and no mouse look at all. In a
         // browser that is the only path there is: the initial lock in Start always
         // fails, because a browser will not capture the pointer without a gesture.
         MobileInput.Reset();
         MobileInput.Active = show;
+        if (show && GetComponent<TouchLayout>() == null) gameObject.AddComponent<TouchLayout>();
 
         if (group != null)
         {
@@ -70,11 +73,14 @@ public class TouchControls : MonoBehaviour
 
     void Update()
     {
-        // Fold the controls away when input is gated (game over, pause).
+        // Fold the controls away when input is gated (game over, pause), and while the
+        // player is on a gamepad -- a phone with a controller paired has no use for
+        // buttons drawn over the fight, and they come back the moment a thumb touches
+        // the glass, because that switches the scheme back to touch.
         if (group == null || !MobileInput.Active) return;
 
-        bool playable = PlayerMotor.InputEnabled;
-        group.alpha = playable ? 1f : 0f;
+        bool playable = PlayerMotor.InputEnabled && GameInput.Scheme != InputScheme.Gamepad;
+        group.alpha = playable ? GameSettings.TouchOpacity : 0f;
         group.blocksRaycasts = playable;
 
         if (!playable) MobileInput.Reset();

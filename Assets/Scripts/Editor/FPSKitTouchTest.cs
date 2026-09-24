@@ -126,17 +126,14 @@ namespace FPSKit.EditorTools
             foreach (var button in buttons)
                 if (button.profile != null) { profile = button.profile; break; }
 
-            // Sprint and crouch are the two the cluster does not draw by default: the
-            // stick sprints when pushed to its edge, and crouch is the least used action
-            // on a phone. Every button in a cluster makes its neighbours harder to hit,
-            // so neither earns its place twice. They are required only when the profile
-            // asks for them -- and still checked for duplicates, because two controls
-            // answering for one action is a bug either way.
+            // Sprint is the one the cluster does not draw by default: the stick sprints
+            // when pushed to its edge, and a sprint button would want the aiming thumb.
+            // Crouch is always drawn now. Sprint is required only when the profile asks
+            // for it -- and still checked for duplicates, because two controls answering
+            // for one action is a bug either way.
             var optional = new HashSet<TouchButton.ActionKind>();
             if (profile == null || !profile.showSprintButton)
                 optional.Add(TouchButton.ActionKind.Sprint);
-            if (profile == null || !profile.showCrouchButton)
-                optional.Add(TouchButton.ActionKind.Crouch);
 
             foreach (TouchButton.ActionKind kind in Enum.GetValues(typeof(TouchButton.ActionKind)))
             {

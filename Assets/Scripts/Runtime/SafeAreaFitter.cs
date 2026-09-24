@@ -55,40 +55,40 @@ public class SafeAreaFitter : MonoBehaviour
     {
         // Cheap: two struct comparisons against values Unity already has. A rotation or
         // a fold is rare, and noticing it late is a frame of controls in the wrong place.
-        if (Screen.safeArea != _applied ||
-            Screen.width != _appliedResolution.x || Screen.height != _appliedResolution.y)
+        if (ScreenInfo.SafeArea != _applied ||
+            ScreenInfo.Width != _appliedResolution.x || ScreenInfo.Height != _appliedResolution.y)
             Apply();
     }
 
-    void Apply()
+    public void Apply()
     {
         if (_rect == null) _rect = GetComponent<RectTransform>();
-        if (_rect == null || Screen.width <= 0 || Screen.height <= 0) return;
+        if (_rect == null || ScreenInfo.Width <= 0 || ScreenInfo.Height <= 0) return;
 
-        Rect area = Screen.safeArea;
+        Rect area = ScreenInfo.SafeArea;
 
         _applied = area;
-        _appliedResolution = new Vector2Int(Screen.width, Screen.height);
+        _appliedResolution = new Vector2Int(ScreenInfo.Width, ScreenInfo.Height);
 
         float pad = TouchMetrics.MillimetresToPixels(paddingMm);
 
         float xMin = fitHorizontally ? area.xMin + pad : 0f;
-        float xMax = fitHorizontally ? area.xMax - pad : Screen.width;
+        float xMax = fitHorizontally ? area.xMax - pad : ScreenInfo.Width;
         float yMin = fitVertically ? area.yMin + pad : 0f;
-        float yMax = fitVertically ? area.yMax - pad : Screen.height;
+        float yMax = fitVertically ? area.yMax - pad : ScreenInfo.Height;
 
         // A safe area that has eaten the whole screen is a platform reporting nonsense,
         // and obeying it would leave a control layer with no area at all -- which looks
         // exactly like the controls failing to build.
-        if (xMax - xMin < Screen.width * 0.5f || yMax - yMin < Screen.height * 0.5f)
+        if (xMax - xMin < ScreenInfo.Width * 0.5f || yMax - yMin < ScreenInfo.Height * 0.5f)
         {
             _rect.anchorMin = Vector2.zero;
             _rect.anchorMax = Vector2.one;
             return;
         }
 
-        _rect.anchorMin = new Vector2(xMin / Screen.width, yMin / Screen.height);
-        _rect.anchorMax = new Vector2(xMax / Screen.width, yMax / Screen.height);
+        _rect.anchorMin = new Vector2(xMin / ScreenInfo.Width, yMin / ScreenInfo.Height);
+        _rect.anchorMax = new Vector2(xMax / ScreenInfo.Width, yMax / ScreenInfo.Height);
 
         // Anchors carry the inset, so the offsets must be zero or they would add to it.
         _rect.offsetMin = Vector2.zero;

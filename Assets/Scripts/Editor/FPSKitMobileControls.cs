@@ -373,12 +373,12 @@ namespace FPSKit.EditorTools
                 Slot(cluster, run, column: 1, row: 2);
             }
 
-            if (profile != null && profile.showCrouchButton)
-            {
-                var crouch = MakeButton(parent, "CrouchButton", "CROUCH", TouchButton.ActionKind.Crouch,
-                                        true, Neutral, profile);
-                Slot(cluster, crouch, column: 0, row: 2);
-            }
+            // Crouch is always built now: the set is Fire, Aim, Reload, Jump, Crouch, Bomb
+            // and Drink, with sprint coming from pushing the stick to its edge. Above the
+            // reload rather than the jump, to stay clear of the pause button in the corner.
+            var crouch = MakeButton(parent, "CrouchButton", "CROUCH", TouchButton.ActionKind.Crouch,
+                                    true, Neutral, profile);
+            Slot(cluster, crouch, column: 1, row: 2);
 
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no
@@ -427,10 +427,15 @@ namespace FPSKit.EditorTools
         // and the two situational buttons keep a tint so they are recognisable in the
         // corner of the eye.
         // ------------------------------------------------------------------
-        private static readonly Color Accent = new Color(1f, 0.73f, 0.25f);
-        private static readonly Color Neutral = new Color(0.82f, 0.88f, 0.95f);
-        private static readonly Color BombTint = new Color(1f, 0.62f, 0.25f);
-        private static readonly Color DrinkTint = new Color(0.45f, 0.9f, 1f);
+        //
+        // Flat since the UI kit: the ring is the theme's primary text colour and the fill
+        // its background, so a button reads the same over snow and over a subway. Fire keeps
+        // the one accent, because it is the one button found without looking. The whole
+        // layer is drawn at the player's button opacity (TouchControls), 60% by default.
+        private static readonly Color Accent = UITheme.Hex(0xE8A33D);
+        private static readonly Color Neutral = UITheme.Hex(0xE6E8EB);
+        private static readonly Color BombTint = UITheme.Hex(0xE6E8EB);
+        private static readonly Color DrinkTint = UITheme.Hex(0x5FB36A);
 
         /// <summary>
         /// One button: a dark disc, a bright ring around it, and a bright label.
@@ -456,7 +461,7 @@ namespace FPSKit.EditorTools
             // The ring. This is the graphic that gets hit, so it stays the raycast target.
             var ring = go.GetComponent<Image>();
             ring.sprite = Knob();
-            ring.color = new Color(tint.r, tint.g, tint.b, 0.85f * opacity);
+            ring.color = new Color(tint.r, tint.g, tint.b, 0.7f * opacity);
 
             // The fill, inset to leave the ring showing. Dark rather than tinted, because
             // a button sits over whatever the arena happens to be -- bright sand, dark
@@ -474,7 +479,7 @@ namespace FPSKit.EditorTools
 
             var fill = fillGo.GetComponent<Image>();
             fill.sprite = Knob();
-            fill.color = new Color(0.03f, 0.05f, 0.07f, 0.62f * opacity);
+            fill.color = new Color(0.078f, 0.09f, 0.11f, 0.7f * opacity);
             fill.raycastTarget = false;
 
             var button = go.GetComponent<TouchButton>();
@@ -488,33 +493,38 @@ namespace FPSKit.EditorTools
             button.activeColor = new Color(tint.r * 0.55f, tint.g * 0.55f, tint.b * 0.55f,
                                            Mathf.Min(1f, 0.85f * opacity));
 
-            var textGo = new GameObject("Label", typeof(RectTransform));
-            textGo.transform.SetParent(go.transform, false);
+            // An icon rather than a word: the line icons the rest of the interface uses, and
+            // the same ones the prompts point at (InputPrompts.TouchIcon), so "tap the
+            // grenade" names a thing the player can see. Sized by TouchCluster.
+            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+            iconGo.transform.SetParent(go.transform, false);
+            var iconRect = (RectTransform)iconGo.transform;
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.sizeDelta = new Vector2(64f, 64f);
+            var icon = iconGo.GetComponent<Image>();
+            icon.sprite = UITheme.Active.IconSprite(InputPrompts.TouchIcon(ActionFor(action)));
+            icon.preserveAspect = true;
+            icon.color = new Color(tint.r, tint.g, tint.b, 0.96f);
+            icon.raycastTarget = false;
 
-            var textRect = (RectTransform)textGo.transform;
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(10f, 10f);
-            textRect.offsetMax = new Vector2(-10f, -10f);
-
-            var text = textGo.AddComponent<TextMeshProUGUI>();
-            text.text = label;
-            text.alignment = TextAlignmentOptions.Center;
-
-            // Auto-sized, because the cluster decides how big the button is and a fixed
-            // point size would either overflow "RELOAD" or waste half of "II". The floor
-            // is what keeps it legible on a small phone.
-            text.enableAutoSizing = true;
-            text.fontSizeMin = 14f;
-            text.fontSizeMax = 40f;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.color = new Color(1f, 1f, 1f, 0.96f);
-            text.raycastTarget = false;
-
+            _ = label; // kept in the signature: it documents which button is which at the call site
             return go;
         }
 
         // ==================================================================
+        static GameAction ActionFor(TouchButton.ActionKind kind) => kind switch
+        {
+            TouchButton.ActionKind.Fire => GameAction.Fire,
+            TouchButton.ActionKind.Aim => GameAction.Aim,
+            TouchButton.ActionKind.Jump => GameAction.Jump,
+            TouchButton.ActionKind.Sprint => GameAction.Sprint,
+            TouchButton.ActionKind.Crouch => GameAction.Crouch,
+            TouchButton.ActionKind.Reload => GameAction.Reload,
+            TouchButton.ActionKind.Bomb => GameAction.Bomb,
+            TouchButton.ActionKind.UseItem => GameAction.UseItem,
+            _ => GameAction.Pause,
+        };
+
         /// <summary>Unity's built-in circular UI sprite. No art needed.</summary>
         private static Sprite Knob()
             => AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");

@@ -38,6 +38,9 @@ namespace FPSKit.EditorTools
     {
         public const string FontFolder = "Assets/UI/Fonts";
         public const string IconFolder = "Assets/UI/Icons";
+        public const string GlyphFolder = "Assets/UI/Icons/Glyphs";
+        public const string GlyphSpriteAssetPath = "Assets/UI/Resources/Sprite Assets/Glyphs.asset";
+        public const string GlyphAtlasPath = "Assets/UI/Resources/Sprite Assets/Glyphs Atlas.png";
         public const string ThemePath = "Assets/UI/Resources/UITheme.asset";
         public const string FontAssetFolder = "Assets/FPSKit_Generated/UI/Fonts";
         public const string GalleryPath = "Assets/FPSKit_Generated/Scenes/UIKitGallery.unity";
@@ -95,6 +98,7 @@ namespace FPSKit.EditorTools
             theme.hudBodyMaterial = OutlineMaterial(body, theme);
             theme.icons = LoadIcons();
             EditorUtility.SetDirty(theme);
+            BuildGlyphSpriteAsset(theme);
             AssetDatabase.SaveAssets();
 
             Debug.Log($"[UI Kit] theme at {ThemePath}: fonts {Name(heading)}, {Name(body)}, {Name(strong)}; {theme.icons.Length} icons.");
@@ -103,9 +107,15 @@ namespace FPSKit.EditorTools
 
         static string Name(Object o) => o != null ? o.name : "MISSING";
 
+        static IEnumerable<string> IconFiles()
+            => Directory.GetFiles(IconFolder, "*.png").Concat(Directory.Exists(GlyphFolder)
+                   ? Directory.GetFiles(GlyphFolder, "*.png") : Array.Empty<string>())
+               .Select(p => p.Replace('\\', '/'))
+               .OrderBy(p => p, StringComparer.Ordinal);
+
         static void ImportIcons()
         {
-            foreach (var path in Directory.GetFiles(IconFolder, "*.png"))
+            foreach (var path in IconFiles())
             {
                 var p = path.Replace('\\', '/');
                 if (AssetImporter.GetAtPath(p) is not TextureImporter ti) continue;
@@ -128,9 +138,7 @@ namespace FPSKit.EditorTools
 
         static UITheme.Icon[] LoadIcons()
         {
-            return Directory.GetFiles(IconFolder, "*.png")
-                .Select(p => p.Replace('\\', '/'))
-                .OrderBy(p => p, StringComparer.Ordinal)
+            return IconFiles()
                 .Select(p => new UITheme.Icon
                 {
                     id = Path.GetFileNameWithoutExtension(p),
@@ -138,6 +146,94 @@ namespace FPSKit.EditorTools
                 })
                 .Where(i => i.sprite != null)
                 .ToArray();
+        }
+
+        /// <summary>
+        /// Packs every icon and glyph into one TMP sprite asset, so a prompt can sit inside
+        /// a sentence: <c>InputPrompts.Glyph("xbox_a")</c> is rich text, and the instruction
+        /// strip, the bomb tutorial and the pause hint are all sentences.
+        ///
+        /// It lives under <c>Resources/Sprite Assets/</c> because that is where TMP looks a
+        /// sprite asset up by name, which is what lets the text say <c>&lt;sprite="Glyphs"&gt;</c>
+        /// without every text component in the game being wired to it. Rebuilt in place
+        /// rather than recreated, so nothing that holds it loses the reference.
+        ///
+        /// Each sprite is sized to the font's cap height with a little below the baseline,
+        /// so a glyph reads as a word in the line rather than as a picture pasted over it.
+        /// </summary>
+        static void BuildGlyphSpriteAsset(UITheme theme)
+        {
+            var files = IconFiles().ToList();
+            var sources = new List<Texture2D>();
+            foreach (var f in files)
+            {
+                var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                t.LoadImage(File.ReadAllBytes(f));
+                sources.Add(t);
+            }
+
+            var atlas = new Texture2D(1024, 1024, TextureFormat.RGBA32, false);
+            var rects = atlas.PackTextures(sources.ToArray(), 2, 1024, false);
+            Directory.CreateDirectory(Path.GetDirectoryName(GlyphAtlasPath)!);
+            File.WriteAllBytes(GlyphAtlasPath, atlas.EncodeToPNG());
+            int aw = atlas.width, ah = atlas.height;
+            Object.DestroyImmediate(atlas);
+            foreach (var t in sources) Object.DestroyImmediate(t);
+
+            AssetDatabase.ImportAsset(GlyphAtlasPath, ImportAssetOptions.ForceUpdate);
+            if (AssetImporter.GetAtPath(GlyphAtlasPath) is TextureImporter ti)
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.alphaIsTransparency = true;
+                ti.mipmapEnabled = true;
+                ti.filterMode = FilterMode.Trilinear;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.SaveAndReimport();
+            }
+            var sheet = AssetDatabase.LoadAssetAtPath<Texture2D>(GlyphAtlasPath);
+
+            var sa = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(GlyphSpriteAssetPath);
+            bool created = sa == null;
+            if (created)
+            {
+                sa = ScriptableObject.CreateInstance<TMP_SpriteAsset>();
+                // Marked current before a material is attached, or TMP "upgrades" it from
+                // the legacy sprite list -- which is empty -- and wipes the tables below.
+                typeof(TMP_SpriteAsset).GetField("m_Version", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                    ?.SetValue(sa, "1.1.0");
+                AssetDatabase.CreateAsset(sa, GlyphSpriteAssetPath);
+            }
+
+            sa.spriteSheet = sheet;
+            sa.spriteGlyphTable.Clear();
+            sa.spriteCharacterTable.Clear();
+            for (int i = 0; i < files.Count; i++)
+            {
+                var r = rects[i];
+                int x = Mathf.RoundToInt(r.x * aw), y = Mathf.RoundToInt(r.y * ah);
+                int w = Mathf.RoundToInt(r.width * aw), h = Mathf.RoundToInt(r.height * ah);
+                // Advance a touch wider than the glyph, bearing so a fifth sits below the
+                // baseline: centred on the capitals it sits among.
+                var metrics = new UnityEngine.TextCore.GlyphMetrics(w, h, 0f, h * 0.84f, w * 1.08f);
+                var glyph = new TMP_SpriteGlyph((uint)i, metrics, new UnityEngine.TextCore.GlyphRect(x, y, w, h), 1f, 0);
+                sa.spriteGlyphTable.Add(glyph);
+                sa.spriteCharacterTable.Add(new TMP_SpriteCharacter(0xE000u + (uint)i, glyph)
+                {
+                    name = Path.GetFileNameWithoutExtension(files[i]),
+                });
+            }
+
+            var mat = sa.material;
+            if (mat == null)
+            {
+                mat = new Material(Shader.Find("TextMeshPro/Sprite")) { name = "Glyphs Material" };
+                AssetDatabase.AddObjectToAsset(mat, sa);
+                sa.material = mat;
+            }
+            mat.mainTexture = sheet;
+            sa.UpdateLookupTables();
+            EditorUtility.SetDirty(mat);
+            EditorUtility.SetDirty(sa);
         }
 
         static UITheme LoadOrCreateTheme()
@@ -435,10 +531,19 @@ namespace FPSKit.EditorTools
             grid.spacing = new Vector2(16, 14);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 13;
-            int rows = Mathf.CeilToInt(t.icons.Length / 13f);
+            int rows = Mathf.CeilToInt(t.icons.Count(i => !i.id.Contains("_")) / 13f);
             UIKit.Size(icons, height: rows * 28 + (rows - 1) * 14);
             foreach (var i in t.icons)
-                UIKit.Icon(icons, i.id, i.id, 24f, t.textPrimary, t);
+                if (!i.id.Contains("_")) UIKit.Icon(icons, i.id, i.id, 24f, t.textPrimary, t);
+
+            // Prompts, inline in text, for each device family: the same sentence four ways.
+            string G(string id) => InputPrompts.Glyph(id);
+            var prompts = UIKit.Text(body, "Prompts",
+                $"Jump  {InputPrompts.KeyText(KeyCode.Space)}  {G("xbox_a")}  {G("ps_cross")}  {G("pad_south")}      " +
+                $"Fire  {G("mouse_left")}  {G("xbox_rt")}  {G("ps_r2")}  {G("touch_tap")}      " +
+                $"Back  ESC  {G("xbox_b")}  {G("ps_circle")}",
+                UIKit.TextRole.Body, t);
+            prompts.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
             return settings;
         }
 

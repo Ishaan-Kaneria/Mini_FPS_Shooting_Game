@@ -315,7 +315,7 @@ public class MainMenuController : MonoBehaviour
         // Escape backs out of the dialog. A modal with no keyboard way out is a modal
         // that traps anyone whose pointer is not where they expected it to be.
         if (exitConfirmPanel != null && exitConfirmPanel.activeSelf &&
-            (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Q)))
+            GameInput.BackPressed)
             CancelExit();
     }
 
@@ -429,6 +429,14 @@ public class MainMenuController : MonoBehaviour
             // the same reason, on the one screen where a miss means leaving the game.
             navRow.offsetMin = new Vector2(18f, 14f);
             navRow.offsetMax = new Vector2(-18f, 78f);
+
+            // Six destinations at the desktop's 180-unit floor are wider than a landscape
+            // phone's safe area, so the last one ran under the rounded corner. Let them
+            // share the row instead.
+            var row = navRow.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+            if (row != null) row.spacing = 8f;
+            foreach (var element in navRow.GetComponentsInChildren<UnityEngine.UI.LayoutElement>(true))
+                if (element.transform.parent == navRow) element.minWidth = 120f;
         }
 
         // Nothing has been measured yet, but say so anyway: this runs before the first

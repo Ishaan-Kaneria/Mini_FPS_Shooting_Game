@@ -1114,6 +1114,10 @@ namespace FPSKit.EditorTools
             var list = NavButton(navRect, "ListButton", "THE  LIST", UITheme.Alert);
             var career = NavButton(navRect, "CareerButton", "ACHIEVEMENTS", UITheme.Good);
             var store = NavButton(navRect, "StoreButton", "STORE", Accent);
+            // Opens the runtime-built SettingsPanel over this canvas; nothing else here
+            // needs to know how it is made.
+            var settings = NavButton(navRect, "SettingsButton", "SETTINGS", UITheme.Coolant);
+            settings.gameObject.AddComponent<OpenSettingsButton>();
             var exit = NavButton(navRect, "ExitButton", "EXIT  GAME", Danger);
 
             menu.listButton = list;

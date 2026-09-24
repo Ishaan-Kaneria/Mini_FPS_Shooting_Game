@@ -265,11 +265,11 @@ public class Weapon : MonoBehaviour
         var controls = Controls;
 
         IsAiming = inputAllowed && !IsReloading &&
-                   (ControlSettings.Held(controls.aim) || MobileInput.Aim);
+                   (ControlSettings.Held(controls.aim) || MobileInput.Aim || GameInput.PadHeld(GameAction.Aim));
 
         if (inputAllowed) HandleFireInput(controls);
 
-        if (inputAllowed && (ControlSettings.Pressed(controls.reload) || MobileInput.ConsumeReload()))
+        if (inputAllowed && (ControlSettings.Pressed(controls.reload) || MobileInput.ConsumeReload() || GameInput.PadPressed(GameAction.Reload)))
             TryReload();
 
         UpdateSpread();
@@ -318,15 +318,15 @@ public class Weapon : MonoBehaviour
         switch (data.fireMode)
         {
             case FireMode.Auto:
-                if (ControlSettings.Held(controls.fire) || touchHeld) FireOnce();
+                if (ControlSettings.Held(controls.fire) || touchHeld || GameInput.PadHeld(GameAction.Fire)) FireOnce();
                 break;
 
             case FireMode.Single:
-                if (ControlSettings.Pressed(controls.fire) || touchPressed) FireOnce();
+                if (ControlSettings.Pressed(controls.fire) || touchPressed || GameInput.PadPressed(GameAction.Fire)) FireOnce();
                 break;
 
             case FireMode.Burst:
-                if (ControlSettings.Pressed(controls.fire) || touchPressed)
+                if (ControlSettings.Pressed(controls.fire) || touchPressed || GameInput.PadPressed(GameAction.Fire))
                     _burstRoutine = StartCoroutine(BurstRoutine());
                 break;
         }

@@ -254,8 +254,10 @@ public class StoryPanel : OverlayPanel
 
         if (Showing.AsksIdentity) return;
 
-        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return)
-            || Input.GetKeyDown(KeyCode.KeypadEnter))
+        // Keyboard only: on a pad the card's own button has the focus, and A presses it --
+        // reading A here as well would advance two cards for one press.
+        if (GameInput.KeyPressed(KeyCode.Space) || GameInput.KeyPressed(KeyCode.Return)
+            || GameInput.KeyPressed(KeyCode.KeypadEnter))
         {
             Advance();
             return;

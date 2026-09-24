@@ -54,10 +54,11 @@ public static class MobileInput
     /// that was still held down, and letting go of the button cut a tap short. Each owns
     /// its own flag now and this reports either, so neither can answer for the other.
     /// </summary>
-    public static bool Fire => _fireButton || _fireTap;
+    public static bool Fire => _fireButton || _fireTap || _autoFire;
 
     static bool _fireButton;
     static bool _fireTap;
+    static bool _autoFire;
 
     static Vector2 _lookDelta;       // screen pixels accumulated since last read
     static bool _jumpQueued;
@@ -75,6 +76,9 @@ public static class MobileInput
 
     /// <summary>Set while a tap on the look area still counts as a trigger pull.</summary>
     public static void SetFireTap(bool active) => _fireTap = active;
+
+    /// <summary>Set by <see cref="TouchLayout"/> while auto-fire has an enemy under the crosshair.</summary>
+    public static void SetAutoFire(bool active) => _autoFire = active;
 
     public static void AddLook(Vector2 pixels) => _lookDelta += pixels;
 
@@ -147,7 +151,7 @@ public static class MobileInput
         _lookDelta = Vector2.zero;
         Aim = Crouch = BombAim = false;
         _sprintButton = _sprintStick = false;
-        _fireButton = _fireTap = false;
+        _fireButton = _fireTap = _autoFire = false;
         _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = false;
     }
 }

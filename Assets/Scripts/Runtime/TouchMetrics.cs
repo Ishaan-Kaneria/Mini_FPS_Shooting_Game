@@ -57,13 +57,13 @@ public static class TouchMetrics
     {
         get
         {
-            if (WebDevice.InBrowser)
+            if (WebDevice.InBrowser && !ScreenInfo.Simulating)
             {
                 float web = WebDevice.FramebufferDpi;
                 if (web > 0f) return web;
             }
 
-            return Screen.dpi;
+            return ScreenInfo.RawDpi;
         }
     }
 

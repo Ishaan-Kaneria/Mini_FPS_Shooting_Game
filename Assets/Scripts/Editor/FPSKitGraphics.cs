@@ -110,7 +110,7 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static int Apply()
         {
-            int changed = 0;
+            int changed = FPSKitQualityTiers.Ensure() ? 1 : 0;
 
             foreach (var asset in ActivePipelineAssets())
             {
@@ -176,7 +176,11 @@ namespace FPSKit.EditorTools
         /// which build targets a quality level applies to -- is not exposed.
         /// </summary>
         private static bool IsLowEndTier(string assetPath)
-            => assetPath.IndexOf("Mobile", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            => assetPath.IndexOf("Mobile", System.StringComparison.OrdinalIgnoreCase) >= 0
+               // Medium is tuned by FPSKitQualityTiers and shares the mobile renderer; raising
+               // it to the desktop's cascades and adding occlusion to that renderer would make
+               // it High, and give Low ambient occlusion through the shared renderer as well.
+               || assetPath.IndexOf("Medium", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
         // ==================================================================
         // Pipeline asset

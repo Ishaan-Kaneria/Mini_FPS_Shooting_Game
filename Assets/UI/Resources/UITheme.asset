@@ -63,8 +63,92 @@ MonoBehaviour:
   sizeLabel: 16
   sizeCaption: 15
   icons:
+  - id: dpad
+    sprite: {fileID: 21300000, guid: ba5a70a2e001bb350bb808b289bd1296, type: 3}
+  - id: mouse_left
+    sprite: {fileID: 21300000, guid: ae10c1e77455ca5f98d9e5ad18064cdb, type: 3}
+  - id: mouse_middle
+    sprite: {fileID: 21300000, guid: 285394321ca58d4b68d224a97669c140, type: 3}
+  - id: mouse_move
+    sprite: {fileID: 21300000, guid: 346539e62070be814853c43946623037, type: 3}
+  - id: mouse_right
+    sprite: {fileID: 21300000, guid: 90746d786e39547cf9c7555371c4f0f5, type: 3}
+  - id: pad_east
+    sprite: {fileID: 21300000, guid: 0f6a4da6fe2d5e18885f8cf129d628a3, type: 3}
+  - id: pad_l1
+    sprite: {fileID: 21300000, guid: 41faea5f4e9637a5793bf4201b0a88b2, type: 3}
+  - id: pad_l2
+    sprite: {fileID: 21300000, guid: bdc7edbad0c132a6599cf851dfe6c6b7, type: 3}
+  - id: pad_north
+    sprite: {fileID: 21300000, guid: fedfc0327fe4db154b4e71a3d4e74122, type: 3}
+  - id: pad_r1
+    sprite: {fileID: 21300000, guid: 56c13b662bc22cddab743785f6cb419d, type: 3}
+  - id: pad_r2
+    sprite: {fileID: 21300000, guid: c13cab725ecd1dbe2bc195922ba22d55, type: 3}
+  - id: pad_south
+    sprite: {fileID: 21300000, guid: 731a184a6b772d1c2bb5b802b2268c4e, type: 3}
+  - id: pad_start
+    sprite: {fileID: 21300000, guid: c9fe9ed405e44df1394dcf56dfb3282c, type: 3}
+  - id: pad_west
+    sprite: {fileID: 21300000, guid: e39b510c2a9ce0d7c94d3def8e54d5d2, type: 3}
+  - id: ps_circle
+    sprite: {fileID: 21300000, guid: 435dce0425744ab4e8907bb259b720ce, type: 3}
+  - id: ps_cross
+    sprite: {fileID: 21300000, guid: 456516acd960693a8949af031cf9bdfc, type: 3}
+  - id: ps_l1
+    sprite: {fileID: 21300000, guid: 893a8cf021ee97c1197e3c8ff1a45fbe, type: 3}
+  - id: ps_l2
+    sprite: {fileID: 21300000, guid: a90eb61abd381b273bb1fa59bae1b44d, type: 3}
+  - id: ps_l3
+    sprite: {fileID: 21300000, guid: 88b5ada235aab84d2b144193d3eb625b, type: 3}
+  - id: ps_options
+    sprite: {fileID: 21300000, guid: a05b8dd40d75884c2a5880f58ef0f5fd, type: 3}
+  - id: ps_r1
+    sprite: {fileID: 21300000, guid: ce187a75f1a6711da86cf2ac820b82de, type: 3}
+  - id: ps_r2
+    sprite: {fileID: 21300000, guid: 084ebe680d126cce493bb6851c1ea60f, type: 3}
+  - id: ps_r3
+    sprite: {fileID: 21300000, guid: 8a4dc7926f8b964fcb64f91f765dc565, type: 3}
+  - id: ps_square
+    sprite: {fileID: 21300000, guid: 0929a4997472d5026992afb23663dbb9, type: 3}
+  - id: ps_triangle
+    sprite: {fileID: 21300000, guid: 699eea65b1b900f94b7ac45601b80371, type: 3}
+  - id: stick_l
+    sprite: {fileID: 21300000, guid: 93233f63fbfa0bdaabec3cda958b83e3, type: 3}
+  - id: stick_r
+    sprite: {fileID: 21300000, guid: d5725f19b8fa019bd82171a06299611f, type: 3}
+  - id: touch_drag
+    sprite: {fileID: 21300000, guid: 69781e9c6d501b5f794e687482a9c120, type: 3}
+  - id: touch_tap
+    sprite: {fileID: 21300000, guid: ac07407c94246eabe9da23acaa3a91c2, type: 3}
+  - id: xbox_a
+    sprite: {fileID: 21300000, guid: 3c40f78cf83e3004c8ce60f157813eef, type: 3}
+  - id: xbox_b
+    sprite: {fileID: 21300000, guid: 6724a8ec3bfdac19a812289bf36a44f5, type: 3}
+  - id: xbox_lb
+    sprite: {fileID: 21300000, guid: 356c143cfcea1b402a3559ca11d6a96d, type: 3}
+  - id: xbox_ls
+    sprite: {fileID: 21300000, guid: fca542b12b84a629e931664962611919, type: 3}
+  - id: xbox_lt
+    sprite: {fileID: 21300000, guid: 9f4da58a89635b863b42decceab34d5d, type: 3}
+  - id: xbox_menu
+    sprite: {fileID: 21300000, guid: 1f0c75ba5f2279a68af5effc234038bb, type: 3}
+  - id: xbox_rb
+    sprite: {fileID: 21300000, guid: bfb06ceac54159d79930fa04a6d3ea3e, type: 3}
+  - id: xbox_rs
+    sprite: {fileID: 21300000, guid: 73b69ad7a27ab48a1b8c2c09e22f5120, type: 3}
+  - id: xbox_rt
+    sprite: {fileID: 21300000, guid: 881d3d43fc25451c499815742d7887ae, type: 3}
+  - id: xbox_view
+    sprite: {fileID: 21300000, guid: 4845d804074bc2328a48af8e278c296c, type: 3}
+  - id: xbox_x
+    sprite: {fileID: 21300000, guid: 05d819ce68b285aa1a52bb69c5eba36c, type: 3}
+  - id: xbox_y
+    sprite: {fileID: 21300000, guid: 6c051a6af8b5ecdcab9f7128aff7cc19, type: 3}
   - id: alert-triangle
     sprite: {fileID: 21300000, guid: ad3916a29eef9e0afb7952c76ee10b54, type: 3}
+  - id: arrow-bar-to-down
+    sprite: {fileID: 21300000, guid: 24a49cd2ee2df8b34b11249647ab800e, type: 3}
   - id: arrow-left
     sprite: {fileID: 21300000, guid: 9caa9636bfe089c88b8e05cdafa92d91, type: 3}
   - id: arrow-up
@@ -77,6 +161,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: fafd83eb358102678b91c0ab0f63e17a, type: 3}
   - id: bottle
     sprite: {fileID: 21300000, guid: b1043afdc393739abb23a23789325d52, type: 3}
+  - id: bullet
+    sprite: {fileID: 21300000, guid: d6764f78fddc9a2cf8baf1bb28d716e1, type: 3}
   - id: chart-bar
     sprite: {fileID: 21300000, guid: 1ac13b0e2572d50f88c60c2db2c558e5, type: 3}
   - id: check
@@ -89,8 +175,14 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 03801760965fe91f0a7d8a99127d7615, type: 3}
   - id: crosshair
     sprite: {fileID: 21300000, guid: 5b569dfda96fae9d09b24260a6a25996, type: 3}
+  - id: device-gamepad-2
+    sprite: {fileID: 21300000, guid: c2eba8a379b41c6b39dc4c0f4e33c55e, type: 3}
   - id: grenade
     sprite: {fileID: 21300000, guid: 02e157d723965a3fdb2acf4d2340af41, type: 3}
+  - id: hand-finger
+    sprite: {fileID: 21300000, guid: 56a274d316c1ae28faffd0fbb147ccd4, type: 3}
+  - id: hand-move
+    sprite: {fileID: 21300000, guid: 5cb6cd94b8f770b938b172b4012d5656, type: 3}
   - id: heart-filled
     sprite: {fileID: 21300000, guid: 39c9ba1cd619f9919a13748270b785ce, type: 3}
   - id: heart
@@ -99,6 +191,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: ebebdca876f9980c0bf30d64f0ce8e19, type: 3}
   - id: info-circle
     sprite: {fileID: 21300000, guid: 2c8873674c359caf29cd12d3de7cf7be, type: 3}
+  - id: keyboard
+    sprite: {fileID: 21300000, guid: a3f1d4fcf7ad61f6d9d2c9c1c8982275, type: 3}
   - id: list-details
     sprite: {fileID: 21300000, guid: e2ec8d7b92ac8ee3bbfa67029df7fd48, type: 3}
   - id: lock-open
@@ -111,6 +205,10 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: fd5a2f01fd4d47c239aa6eac72402a13, type: 3}
   - id: medkit
     sprite: {fileID: 21300000, guid: 1938bf4bdfb63ae388ae8e1ce6d4a40e, type: 3}
+  - id: mouse
+    sprite: {fileID: 21300000, guid: d98f130f6c10d292bb73624da9aab079, type: 3}
+  - id: player-pause
+    sprite: {fileID: 21300000, guid: 6fd5188e11253e9a9b53b9c4ac91e068, type: 3}
   - id: player-play
     sprite: {fileID: 21300000, guid: dfdb5c88b93dc1daa96d02b2defc3b99, type: 3}
   - id: power

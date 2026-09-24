@@ -30,7 +30,29 @@ public abstract class OverlayPanel : MonoBehaviour
     /// <summary>Raised after the panel closes, so the dashboard can put itself back.</summary>
     public event System.Action Closed;
 
+    static int _open;
+    static int _closedFrame = -1;
+
+    /// <summary>
+    /// True while any overlay is open, and for the rest of the frame one closed in. Read by
+    /// anything else that answers Escape or B -- the pause menu under a settings screen --
+    /// so one press closes one thing rather than the overlay and whatever is behind it.
+    /// </summary>
+    public static bool AnyOpenThisFrame => _open > 0 || _closedFrame == Time.frameCount;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics()
+    {
+        _open = 0;
+        _closedFrame = -1;
+    }
+
     protected virtual void Awake() => HideAtLoad();
+
+    protected virtual void OnDestroy()
+    {
+        if (IsOpen) _open = Mathf.Max(0, _open - 1);
+    }
 
     protected virtual void Start()
     {
@@ -47,13 +69,14 @@ public abstract class OverlayPanel : MonoBehaviour
         // Escape and Q back out. A screen with no keyboard way out traps anyone whose
         // pointer is not where they expected it to be -- and on a browser Escape is also
         // what the player has just pressed to get their cursor back.
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Q)) Close();
+        if (GameInput.BackPressed) Close();
     }
 
     public void Open()
     {
         if (panel == null) return;
 
+        if (!panel.activeSelf) _open++;
         panel.SetActive(true);
         OnOpened();
     }
@@ -62,6 +85,11 @@ public abstract class OverlayPanel : MonoBehaviour
     {
         if (panel == null) return;
 
+        if (panel.activeSelf)
+        {
+            _open = Mathf.Max(0, _open - 1);
+            _closedFrame = Time.frameCount;
+        }
         panel.SetActive(false);
         OnClosed();
         Closed?.Invoke();

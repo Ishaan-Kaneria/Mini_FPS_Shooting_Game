@@ -225,9 +225,9 @@ public class BombThrower : MonoBehaviour
 
         var bindings = Bindings;
 
-        PumpAim(ControlSettings.Held(bindings.bomb) || MobileInput.BombAim,
-                ControlSettings.Pressed(bindings.bomb),
-                ControlSettings.Pressed(bindings.fire),
+        PumpAim(ControlSettings.Held(bindings.bomb) || MobileInput.BombAim || GameInput.PadHeld(GameAction.Bomb),
+                ControlSettings.Pressed(bindings.bomb) || GameInput.PadPressed(GameAction.Bomb),
+                ControlSettings.Pressed(bindings.fire) || GameInput.PadPressed(GameAction.Fire),
                 bindings);
     }
 
@@ -375,7 +375,7 @@ public class BombThrower : MonoBehaviour
     /// </summary>
     void UpdateLockToggle(ControlSettings bindings)
     {
-        bool down = ControlSettings.Held(bindings.aim) || MobileInput.Aim;
+        bool down = ControlSettings.Held(bindings.aim) || MobileInput.Aim || GameInput.PadHeld(GameAction.Aim);
 
         if (down && !_lockWasDown)
         {

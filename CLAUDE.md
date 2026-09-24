@@ -26,7 +26,7 @@ There is no `Core/`, `Player/`, `Weapons/`, `Enemies/` or `UI/` folder — those
 | UI       | the touch stack: `TouchControls.cs`, `TouchButton.cs`, `TouchLookArea.cs`, `VirtualJoystick.cs`, `MobileInput.cs` |
 | Achievements | `Achievements.cs` (twenty thresholds, all derived), `PlayerStats.cs` (the lifetime counters they read), `AchievementsPanel.cs`, `AchievementRow.cs` |
 | Instructions | `InstructionsPanel.cs` (written from the live bindings), `InstructionRow.cs` |
-| Screens  | `OverlayPanel.cs` (the base every overlay shares), `UITheme.cs` (colour, type and motion tokens), `DeviceProfile.cs` (reach, form, orientation), `PhoneUI.cs` (the one-line question, delegating to it) |
+| Screens  | `OverlayPanel.cs` (the base every overlay shares), `UITheme.cs` (the theme ScriptableObject: colour, type, icon and motion tokens), `UIKit.cs` (builds the components below), `FlatRect.cs`, `FlatButton.cs`, `UITooltip.cs`/`UITooltipView.cs`, `UITabBar.cs`, `UIProgressBar.cs`, `UIStatBar.cs`, `UIToast.cs`/`UIToastStack.cs`, `DeviceProfile.cs` (reach, form, orientation), `PhoneUI.cs` (the one-line question, delegating to it) |
 | Campaign | `Campaign.cs` (the player's side: identity, powers, beats read, the one gate), `CampaignData.cs` (ScriptableObject: the zones in order, the eight names, the beats), `SaveMigration.cs` (the one-time wipe), `StoryPanel.cs` (the opening and the beat cards), `DossierPanel.cs` / `DossierRow.cs` (THE LIST) |
 | Objectives | `LevelObjective.cs` (the six, and the invariant that none of them may end a level) |
 | Config   | `ControlSettings.cs`, `LevelTheme.cs` |
@@ -1468,6 +1468,39 @@ is no key, no button and nothing in the HUD -- while HOW TO PLAY still described
 A player who follows written instructions and finds no button concludes the controls are
 broken, which is what was reported: "there is no bomb symbol, so why". The row stays, because
 the answer to *why* has to be somewhere, and it says what it is and how far off it is.
+
+## The UI kit
+
+The interface is being rebuilt screen by screen onto one kit: flat, matte, tactical --
+solid panels, one-pixel borders, square corners, one amber accent, no gradients, glows or
+shadows (a thin dark outline on HUD text is the one exception). Step one is the kit and its
+gallery; no existing screen has moved onto it yet.
+
+- **`UITheme` is a ScriptableObject at `Assets/UI/Resources/UITheme.asset`**, read through
+  `UITheme.Active`. Its field initialisers are the spec: **FPSKit > UI Kit > Import Fonts And
+  Icons** creates the asset from them when missing and afterwards only rewrites the references
+  it owns (fonts, outline materials, icons) -- never a colour. The static colours further down
+  the same file are the previous theme, kept until the last screen has moved.
+- **Components are built by `UIKit` calls, not prefabs**, for the reason scenes are built by
+  the builders: a prefab is one more asset to keep in step, and a hand edit is erased by the
+  next build. `FlatButton` is a `Button`, so `onClick` and `VerifyFlow`'s raycast still apply.
+- **Lines are in screen pixels.** `FlatRect` divides its border and stripe widths by the
+  canvas scale factor, so a one-pixel border is one pixel at 720p and at 1440p.
+- **Barlow has proportional figures and TMP has no `tnum`**, so counters go through
+  `UITheme.Tabular`, which wraps digit runs in `<mspace>`.
+- Fonts are `Assets/UI/Fonts` (OFL); TMP font assets are generated into
+  `FPSKit_Generated/UI/Fonts` once and reused, because recreating one changes its GUID.
+  Icons are `Tools/icons` (Tabler, MIT, plus the game's own drawn on the same 24-unit grid at a
+  2-unit stroke), rasterised by `Tools/rasterize-icons.py` into `Assets/UI/Icons`, white, so the
+  colour is the Image's.
+- `FPSKitUIKit.VerifyGallery` builds `UIKitGallery.unity`, plays it, fails on any console error,
+  an unreachable button, or a hover/press/tab that does not land, and renders the canvas at
+  1920x1080 and 1280x720 by re-pointing it at an offscreen camera -- batch mode's own screen is
+  640x480, so anything placed while the game is running is placed against that:
+
+  ```
+  UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitUIKit.VerifyGallery -fpskitOut Build/UIKit
+  ```
 
 ## The dashboard has five destinations
 

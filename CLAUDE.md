@@ -1618,6 +1618,23 @@ owns for it. Choices go straight to `Loadout`, which the dashboard strip and the
 nothing until `FPSKitBatch.ImportUiKit` runs. The menu item behind it never exits the editor --
 called directly with `-executeMethod` it idles forever.
 
+## A kit control that wires itself in Awake does nothing when built at runtime
+
+`UIKit` adds a component and then assigns its parts, and `Awake` runs inside `AddComponent` --
+so `UITabBar` and `UIChoice`, which hooked their buttons in `Awake`, found empty lists on every
+screen built at runtime and hooked nothing. Settings' Video, Audio and HUD tabs, the HUD
+editor's tabs, the achievement filters and every Settings chooser's arrows did nothing when
+clicked, while the scene-built top bar (whose `Awake` ran with its tabs already assigned) worked
+-- and every check passed, because they all drove the panels through `ShowTab`. Both now have
+an idempotent `Wire()`, called from `Awake`, `OnEnable`, `Start` and by `UIKit` straight after
+assigning. **Any new kit control that listens to its own children follows the same rule.**
+
+`VerifyHudLayout` is the regression test: it clicks every tab and a chooser's arrows through
+their own `onClick`, and then opens each runtime-built screen for real -- every Settings tab,
+the pause menu, the quit confirmation, the HUD editor, Achievements -- and fires a raycast at
+every visible control through every raycaster, failing on anything a click would not reach.
+It was checked against the old code and fails there, naming the dead tabs.
+
 ## Settings, ammunition and the pause menu
 
 **Settings** (the gear in the menus and the pause menu) is Controls, Touch (touch devices),

@@ -285,6 +285,7 @@ public static class UIKit
 
         var tb = bar.gameObject.AddComponent<UITabBar>();
         tb.tabs = tabs;
+        tb.Wire();
         tb.Selected = 0;
         return tb;
     }
@@ -335,6 +336,7 @@ public static class UIKit
 
         var tb = bar.gameObject.AddComponent<UITabBar>();
         tb.tabs = tabs;
+        tb.Wire();
         tb.Selected = 0;
         return tb;
     }
@@ -554,6 +556,7 @@ public static class UIKit
         choice.valueLabel = value;
         choice.previous = prev;
         choice.next = next;
+        choice.Wire();
         choice.targetGraphic = face;
         choice.options = options;
         choice.Index = 0;

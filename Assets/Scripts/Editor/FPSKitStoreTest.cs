@@ -430,6 +430,16 @@ namespace FPSKit.EditorTools
                         // it is still inside the ring when the bomb arrives.
                         Vector3 target = _tracked.transform.position;
 
+                        // Held still for the flight. What this step proves is that the bomb the
+                        // player bought reaches them and hurts what it lands on; a target that
+                        // walks out of the blast during the second the bomb is in the air made
+                        // it fail on where a random enemy happened to be heading.
+                        var agent = _tracked.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                        if (agent != null && agent.isOnNavMesh) { agent.isStopped = true; agent.velocity = Vector3.zero; }
+                        var ai = _tracked.GetComponent<EnemyAI>();
+                        if (ai != null) ai.enabled = false;
+                        target = _tracked.transform.position;
+
                         _trackedPoolBefore = _tracked.Current + _tracked.Shield;
                         _chargesBeforeThrow = bombs.charges;
 

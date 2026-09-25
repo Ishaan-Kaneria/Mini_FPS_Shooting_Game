@@ -26,7 +26,13 @@ namespace FPSKit.EditorTools
         const string ScenePath = "Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity";
         const double HardTimeout = 240.0;
 
-        enum Phase { Enter, Apply, Check, Exit, Reenter, Persisted, Done }
+        enum Phase { Enter, Apply, Check, Audit, Exit, Reenter, Persisted, Done }
+
+        // The screens to open and raycast, one at a time: opened, given a frame so their
+        // graphics are registered with the canvas, then audited.
+        static List<(string name, Action open, Func<Transform> root, Action close)> _screens;
+        static int _screen;
+        static bool _opened;
         static Phase _phase;
         static double _startedAt, _until;
         static readonly List<string> Errors = new List<string>();
@@ -128,9 +134,12 @@ namespace FPSKit.EditorTools
                             int outlines = editor.transform.Find("Sheet/Handles")?.childCount ?? 0;
                             if (outlines < 8) Errors.Add($"the editor outlines {outlines} elements, fewer than the HUD has");
                             Notes.Append($"\n  editor opened with {outlines} outlines");
+                            ClickTabs(editor.GetComponentInChildren<UITabBar>(true), "HUD editor");
                             editor.Close();
                         }
                         CheckApplied("after the editor was cancelled");
+
+                        CheckScreensAnswerClicks(hud);
 
                         // Two fire buttons: lifting one must not stop the other.
                         MobileInput.Reset();
@@ -143,7 +152,37 @@ namespace FPSKit.EditorTools
                         if (MobileInput.Fire) Errors.Add("with both fire buttons lifted, the gun kept firing");
                         MobileInput.Reset();
 
-                        _phase = Phase.Exit;
+                        _screens = Screens(hud);
+                        _screen = 0;
+                        _opened = false;
+                        _phase = Phase.Audit;
+                        return;
+                    }
+
+                    case Phase.Audit:
+                    {
+                        if (Waiting()) return;
+                        if (_screen >= _screens.Count)
+                        {
+                            if (GameDirector.Instance != null) GameDirector.Instance.SetPaused(false);
+                            _phase = Phase.Exit;
+                            return;
+                        }
+                        var step = _screens[_screen];
+                        if (!_opened)
+                        {
+                            step.open();
+                            _opened = true;
+                            Wait(0.4, Phase.Audit);
+                            return;
+                        }
+                        var root = step.root();
+                        if (root == null) Errors.Add($"{step.name} did not open");
+                        else Reach(root, step.name);
+                        step.close?.Invoke();
+                        _opened = false;
+                        _screen++;
+                        Wait(0.2, Phase.Audit);
                         return;
                     }
 
@@ -176,6 +215,131 @@ namespace FPSKit.EditorTools
                 Errors.Add(e.ToString());
                 Finish();
             }
+        }
+
+        /// <summary>
+        /// Clicks -- through each button's own onClick, the way a pointer's click arrives -- every
+        /// tab on the runtime-built screens and a chooser's arrows. They were wired in Awake,
+        /// which ran before UIKit assigned the tabs, so on every screen built at runtime no tab
+        /// answered at all; every check drove the panels through ShowTab and never noticed.
+        /// </summary>
+        static void CheckScreensAnswerClicks(HUDController hud)
+        {
+            var canvas = hud.GetComponentInParent<Canvas>();
+            var settings = SettingsPanel.Show(canvas);
+            if (settings == null) { Errors.Add("Settings did not open"); return; }
+            var bar = settings.panel.GetComponentInChildren<UITabBar>(true);
+            ClickTabs(bar, "Settings");
+
+            // A chooser's arrows: forward then back, on the HUD page's crosshair style.
+            if (bar != null)
+            {
+                for (int i = 0; i < bar.tabs.Length; i++)
+                    if (bar.tabs[i].label != null && bar.tabs[i].label.text.ToUpperInvariant() == "HUD") bar.tabs[i].onClick.Invoke();
+                UIChoice choice = null;
+                foreach (var c in settings.panel.GetComponentsInChildren<UIChoice>(false)) { choice = c; break; }
+                if (choice == null) Errors.Add("Settings' HUD page shows no chooser to click");
+                else
+                {
+                    int before = choice.Index;
+                    choice.next.onClick.Invoke();
+                    int after = choice.Index;
+                    choice.previous.onClick.Invoke();
+                    if (after == before && choice.options.Length > 1)
+                        Errors.Add("a Settings chooser's arrow did nothing when clicked");
+                }
+            }
+            settings.Close();
+
+            var achievements = AchievementsPanel.Create(canvas);
+            achievements.Open();
+            ClickTabs(achievements.panel.GetComponentInChildren<UITabBar>(true), "Achievements filters");
+            achievements.Close();
+        }
+
+        /// <summary>Every screen built at runtime this round, each opened for real.</summary>
+        static List<(string, Action, Func<Transform>, Action)> Screens(HUDController hud)
+        {
+            var canvas = hud.GetComponentInParent<Canvas>();
+            var list = new List<(string, Action, Func<Transform>, Action)>();
+            var probe = SettingsPanel.Show(canvas);
+            int tabs = probe != null ? probe.panel.GetComponentInChildren<UITabBar>(true).tabs.Length : 0;
+            if (probe != null) probe.Close();
+            for (int i = 0; i < tabs; i++)
+            {
+                int tab = i;
+                list.Add(($"Settings tab {tab + 1}", () =>
+                {
+                    var s = SettingsPanel.Show(canvas);
+                    s.panel.GetComponentInChildren<UITabBar>(true).tabs[tab].onClick.Invoke();
+                }, () => SettingsPanel.Show(canvas).panel.transform, () => SettingsPanel.Show(canvas).Close()));
+            }
+            list.Add(("Pause menu", () => GameDirector.Instance.SetPaused(true),
+                      () => Find(canvas, "PauseLayer"), null));
+            list.Add(("Quit confirmation", () => ClickNamed(Find(canvas, "PauseLayer"), "Quit"),
+                      () => canvas.GetComponentInChildren<ConfirmDialog>(true)?.panel.transform,
+                      () => canvas.GetComponentInChildren<ConfirmDialog>(true)?.Close()));
+            list.Add(("HUD editor", () => HudEditor.Open(hud, fromMenu: false),
+                      () => canvas.GetComponentInChildren<HudEditor>(true)?.transform.Find("Sheet/PanelArea"),
+                      () => canvas.GetComponentInChildren<HudEditor>(true)?.Close()));
+            list.Add(("Achievements", () => AchievementsPanel.Create(canvas).Open(),
+                      () => canvas.GetComponentInChildren<AchievementsPanel>(true)?.panel.transform,
+                      () => canvas.GetComponentInChildren<AchievementsPanel>(true)?.Close()));
+            return list;
+        }
+
+        static Transform Find(Canvas canvas, string name)
+        {
+            foreach (var t in canvas.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
+            return null;
+        }
+
+        static void ClickNamed(Transform root, string name)
+        {
+            if (root == null) return;
+            foreach (var b in root.GetComponentsInChildren<UnityEngine.UI.Button>(true))
+                if (b.name == name && b.gameObject.activeInHierarchy) { b.onClick.Invoke(); return; }
+        }
+
+        /// <summary>
+        /// Every visible control under a screen must be what a click at its centre lands on --
+        /// through every raycaster, so a panel from another canvas on top is caught too. A
+        /// control scrolled out of its list's mask is skipped: scrolling is how it is reached.
+        /// </summary>
+        static void Reach(Transform root, string screen)
+        {
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            if (es == null) { Errors.Add("no EventSystem"); return; }
+            int tested = 0;
+            foreach (var sel in root.GetComponentsInChildren<UnityEngine.UI.Selectable>(false))
+            {
+                if (!sel.isActiveAndEnabled || !sel.interactable) continue;
+                var rt = (RectTransform)sel.transform;
+                var canvas = sel.GetComponentInParent<Canvas>().rootCanvas;
+                var cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                Vector2 point = RectTransformUtility.WorldToScreenPoint(cam, rt.TransformPoint(rt.rect.center));
+                var mask = sel.GetComponentInParent<UnityEngine.UI.RectMask2D>();
+                if (mask != null && !RectTransformUtility.RectangleContainsScreenPoint(mask.rectTransform, point, cam)) continue;
+                var hits = new List<UnityEngine.EventSystems.RaycastResult>();
+                es.RaycastAll(new UnityEngine.EventSystems.PointerEventData(es) { position = point }, hits);
+                tested++;
+                if (hits.Count == 0 || !hits[0].gameObject.transform.IsChildOf(rt))
+                    Errors.Add($"{screen}: \"{sel.name}\" cannot be clicked -- a click at it lands on " +
+                               (hits.Count == 0 ? "nothing" : $"\"{hits[0].gameObject.name}\""));
+            }
+            Notes.Append($"\n  {screen}: {tested} controls reachable");
+        }
+
+        static void ClickTabs(UITabBar bar, string screen)
+        {
+            if (bar == null || bar.tabs.Length == 0) { Errors.Add($"{screen} has no tabs to click"); return; }
+            for (int i = bar.tabs.Length - 1; i >= 0; i--)
+            {
+                bar.tabs[i].onClick.Invoke();
+                if (bar.Selected != i)
+                    Errors.Add($"{screen}: clicking the \"{bar.tabs[i].label?.text}\" tab did nothing");
+            }
+            Notes.Append($"\n  {screen}: {bar.tabs.Length} tabs answer a click");
         }
 
         static void CheckApplied(string when)

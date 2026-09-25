@@ -30,16 +30,34 @@ public class UITabBar : MonoBehaviour
         set => Select(value, notify: false);
     }
 
-    void Awake()
+    // Which tabs already have a click listener. Not serialized: runtime listeners do not
+    // survive a domain reload either, so after one both start again from nothing.
+    [NonSerialized] System.Collections.Generic.HashSet<FlatButton> _wired;
+
+    /// <summary>
+    /// Gives every tab its click listener, once. <b>Not only in Awake</b>: UIKit adds this
+    /// component and assigns the tabs afterwards, so for anything built at runtime -- Settings,
+    /// the HUD editor, the achievement filters -- Awake ran on an empty list and no tab ever
+    /// answered a click. Safe to call again; UIKit calls it straight after assigning.
+    /// </summary>
+    public void Wire()
     {
+        if (_wired == null) _wired = new System.Collections.Generic.HashSet<FlatButton>();
         for (int i = 0; i < tabs.Length; i++)
         {
             int index = i;
-            if (tabs[i] != null) tabs[i].onClick.AddListener(() => Select(index, notify: true));
+            if (tabs[i] != null && _wired.Add(tabs[i])) tabs[i].onClick.AddListener(() => Select(index, notify: true));
         }
     }
 
-    void OnEnable() => Refresh();
+    void Awake() => Wire();
+    void Start() => Wire();
+
+    void OnEnable()
+    {
+        Wire();
+        Refresh();
+    }
 
     public void Select(int index, bool notify)
     {

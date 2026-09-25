@@ -47,12 +47,36 @@ public class UIChoice : Selectable, IMoveHandler, ISubmitHandler
         Set(Mathf.Clamp(_index + delta, 0, options.Length - 1), notify: true);
     }
 
+    [System.NonSerialized] Button _wiredPrevious, _wiredNext;
+
+    /// <summary>
+    /// Wires the arrows, once each. Not only in Awake: UIKit adds this component and assigns
+    /// the arrows afterwards, so for a chooser built at runtime -- every one in Settings --
+    /// Awake found no arrows and they did nothing. Safe to call again.
+    /// </summary>
+    public void Wire()
+    {
+        if (previous != null && previous != _wiredPrevious) { previous.onClick.AddListener(() => Step(-1)); _wiredPrevious = previous; }
+        if (next != null && next != _wiredNext) { next.onClick.AddListener(() => Step(1)); _wiredNext = next; }
+    }
+
     protected override void Awake()
     {
         transition = Transition.None;
         base.Awake();
-        if (previous != null) previous.onClick.AddListener(() => Step(-1));
-        if (next != null) next.onClick.AddListener(() => Step(1));
+        Wire();
+    }
+
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+        Wire();
+    }
+
+    protected override void Start()
+    {
+        base.Start();
+        Wire();
     }
 
     public override void OnMove(AxisEventData e)

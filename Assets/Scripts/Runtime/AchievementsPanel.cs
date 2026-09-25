@@ -176,7 +176,10 @@ public class AchievementsPanel : OverlayPanel
         var tc = UIKit.Column(text, 2f);
         tc.childForceExpandHeight = false;
         tc.childControlHeight = true;
-        UIKit.Size(text, flexWidth: 1f);
+        // Text and bar split the free width evenly, with the same fixed floor, so the
+        // split never depends on how long a title is and every row's bar lines up.
+        float column = handset ? 140f : 220f;
+        UIKit.Size(text, column, flexWidth: 1f);
         var name = UIKit.Text(text, "Name", a.Title.ToUpperInvariant(), UIKit.TextRole.Heading, _t);
         name.textWrappingMode = TextWrappingModes.NoWrap;
         var detail = UIKit.Text(text, "Detail", a.Detail, UIKit.TextRole.Caption, _t);
@@ -188,7 +191,7 @@ public class AchievementsPanel : OverlayPanel
         var pc = UIKit.Column(progress, 4f, null, TextAnchor.MiddleRight);
         pc.childForceExpandHeight = false;
         pc.childControlHeight = true;
-        UIKit.Size(progress, handset ? 140f : 220f);
+        UIKit.Size(progress, column, flexWidth: 1f);
         var bar = UIKit.ProgressBar(progress, "Bar", done ? _t.accent : _t.info, 6f, false, _t);
         bar.Value = a.Fraction;
         bar.Snap();
@@ -200,7 +203,7 @@ public class AchievementsPanel : OverlayPanel
         var rc = UIKit.Column(reward, 2f, null, TextAnchor.MiddleLeft);
         rc.childForceExpandHeight = false;
         rc.childControlHeight = true;
-        UIKit.Size(reward, handset ? 90f : 120f);
+        UIKit.Size(reward, handset ? 90f : 120f, flexWidth: 0f);
         var coinRow = UIKit.Rect(reward, "Coins");
         UIKit.Row(coinRow, 6f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
         UIKit.Icon(coinRow, "Coin", "coin", 16f, _t.accent, _t);
@@ -211,7 +214,7 @@ public class AchievementsPanel : OverlayPanel
 
         var state = UIKit.Rect(row.transform, "State");
         UIKit.Row(state, 6f, null, TextAnchor.MiddleCenter).childForceExpandWidth = false;
-        UIKit.Size(state, 120f);
+        UIKit.Size(state, 120f, flexWidth: 0f);
         if (done && !claimed)
         {
             var claim = UIKit.Button(state, "Claim", "Claim", FlatButton.Variant.Primary, "gift", _t);

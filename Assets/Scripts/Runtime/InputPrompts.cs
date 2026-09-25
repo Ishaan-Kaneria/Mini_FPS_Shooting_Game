@@ -134,7 +134,11 @@ public static class InputPrompts
     {
         get
         {
-            if (_defaults == null) _defaults = ControlSettings.CreateDefault();
+            if (_defaults == null)
+            {
+                _defaults = ControlSettings.CreateDefault();
+                KeyBindings.Apply(_defaults);
+            }
             return _defaults;
         }
     }

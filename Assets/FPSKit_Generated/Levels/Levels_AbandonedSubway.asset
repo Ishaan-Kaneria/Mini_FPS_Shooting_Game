@@ -34,6 +34,8 @@ MonoBehaviour:
     speedMultiplier: 1.08
     aggression: 0.16
     rosterStep: 5
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.11
     aggression: 0.28857142
     rosterStep: 7
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
@@ -76,6 +80,8 @@ MonoBehaviour:
     speedMultiplier: 1.14
     aggression: 0.41714284
     rosterStep: 8
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
@@ -97,10 +103,12 @@ MonoBehaviour:
     speedMultiplier: 1.17
     aggression: 0.54571426
     rosterStep: 10
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: The rides are moving. Nobody is operating them. 18 hostiles, one magazine, no reload. Kills resupply you.
+    brief: The rides are moving. Nobody is operating them. 18 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 18
     timeLimit: 73
     maxAliveAtOnce: 8
@@ -118,6 +126,8 @@ MonoBehaviour:
     speedMultiplier: 1.2
     aggression: 0.6742857
     rosterStep: 11
+    reserveMagazines: 0
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -139,6 +149,8 @@ MonoBehaviour:
     speedMultiplier: 1.23
     aggression: 0.8028571
     rosterStep: 13
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
@@ -160,6 +172,8 @@ MonoBehaviour:
     speedMultiplier: 1.26
     aggression: 0.93142855
     rosterStep: 14
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DEV AUGER
@@ -181,5 +195,7 @@ MonoBehaviour:
     speedMultiplier: 1.29
     aggression: 1
     rosterStep: 16
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

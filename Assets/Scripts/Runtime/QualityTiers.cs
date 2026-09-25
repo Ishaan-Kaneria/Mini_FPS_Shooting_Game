@@ -96,7 +96,7 @@ public static class QualityTiers
         }
     }
 
-    static void ApplyFrameRate()
+    public static void ApplyFrameRate()
     {
         if (Web) return;
         if (Handheld)
@@ -106,7 +106,8 @@ public static class QualityTiers
         }
         else
         {
-            QualitySettings.vSyncCount = 1;
+            // The player's choice; off, the frame rate is whatever the machine gives.
+            QualitySettings.vSyncCount = GameSettings.VSync ? 1 : 0;
             Application.targetFrameRate = -1;
         }
     }

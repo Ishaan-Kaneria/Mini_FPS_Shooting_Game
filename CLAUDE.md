@@ -321,9 +321,13 @@ scene, and it refuses a level `LevelProgress` says is locked. The level select a
 results screen both put their choice in `GameSession` and then load, so there is one
 way a level ever begins.
 
-- **Esc or P** pause. Both, because a browser takes Escape to release pointer lock, so a
-  web player pressing it gets their cursor back and no menu.
-- **R** resume. **Q** leaves the level.
+- **Esc or P** pause, and the same key resumes. Both, because a browser takes Escape to
+  release pointer lock, so a web player pressing it gets their cursor back and no menu.
+- **R is RELOAD**, never resume, and **no key leaves a level**: that is the pause menu's
+  QUIT TO MENU, behind a `ConfirmDialog`. A single Q that threw a level away was one key
+  from reload. `GameDirector.resumeKey`/`quitKey` are kept only so scenes that serialized
+  them still load; nothing reads them during play. RESTART is `RestartRun`, which records
+  the attempt first, like leaving does.
 - On the results screen the same keys mean three different things -- **R** replay,
   **Space** next level, **Q** dashboard -- and `LevelResultsUI` owns them.
   `GameDirector` used to take any of its keys as "I have read this" and go back to the
@@ -1563,7 +1567,7 @@ an entry would be undone by the next owner layout. Three traps it hit:
 - **The joystick zone is a zone, not a panel** (`HudLayoutTarget.zone`): it lies under
   everything by design and never counts as an overlap, or every panel on its half is red.
 
-`HudEditor` (Settings > HUD > Customize layout, or the pause card's Customize HUD) is an
+`HudEditor` (Settings > HUD > Customize layout, from the menu or the pause menu) is an
 `OverlayPanel` over the frozen arena: a grid, the safe area, a red crosshair keep-out, an
 outline per element (amber selected, red where two visible ones overlap), and a side panel
 that sits on the side away from the selection and only as tall as its content, so the corners
@@ -1613,6 +1617,39 @@ owns for it. Choices go straight to `Loadout`, which the dashboard strip and the
 `UITheme.IconSprite` finds an icon by id in the theme asset's own list, so a new icon draws
 nothing until `FPSKitBatch.ImportUiKit` runs. The menu item behind it never exits the editor --
 called directly with `-executeMethod` it idles forever.
+
+## Settings, ammunition and the pause menu
+
+**Settings** (the gear in the menus and the pause menu) is Controls, Touch (touch devices),
+Video, Audio and HUD, each a `GameSettings` accessor raising `Changed`, with Reset to defaults
+clearing the lot -- the HUD layouts and the player's keys included, the named custom layouts
+not. Where each lands: mouse sensitivity in `PlayerMotor`, FOV in `Weapon` (read live; the
+sights still zoom from it), vsync in `QualityTiers.ApplyFrameRate`, HUD scale as a multiplier
+in `HudLayoutTarget` for `hud.*` only (touch buttons size in millimetres), minimap rotation in
+`HudView`, the crosshair in `HudLayout` (one source for Settings and the editor). Resolution,
+fullscreen and vsync are only offered on a desktop -- a phone has one resolution and a browser's
+is the page's.
+
+**Audio has no mixer, and does not need one.** Unity cannot create an AudioMixer from code, so
+`SettingsApplier` puts master times effects on `AudioListener.volume`, and the menu's music
+source sets `ignoreListenerVolume` and applies master times music itself (`UISounds`). Exact,
+and nothing per source to keep in step.
+
+**Keys are rebound over the asset, not in it** (`KeyBindings`): overrides in PlayerPrefs are
+written onto every live `ControlSettings` it has been handed, the authored keys are remembered
+and put back when play stops, and `Revision` is bumped so `GameInput.Bind` rewrites the actions
+-- which it only does at spawn, so a rebind rebinds the live motor itself. Rebinding a key
+another action holds swaps them. While a row is listening it owns Escape, or Escape would both
+cancel the listen and close Settings.
+
+**The reserve is finite, per level.** `LevelSet.Level.reserveMagazines` (8; One Magazine 0; -1
+unlimited) and `ammoDropChance` (0.12 on every kill, on top of `EnemyArchetype.ammoDropChance`
+and the objective's bonus) are the knobs, written by `FPSKitLevels.Configure` and applied by
+`LevelManager.ArmReserve` at the start of the fight -- before the objective begins, so One
+Magazine's empty reserve is the last word. The limit is a runtime flag on `Weapon`
+(`reserveLimited`, `InfiniteReserve`), never written into `WeaponData`. One Magazine now allows
+reloading: it starts with nothing spare, and kills are the only resupply. Pickup size is
+`Pickup.ammoAmount` (90, in the scene builder) and the carry cap `WeaponData.maxReserveAmmo`.
 
 ## A crosshair authored in canvas units disappears on a phone
 

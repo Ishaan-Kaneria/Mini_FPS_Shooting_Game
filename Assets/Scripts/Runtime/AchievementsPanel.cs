@@ -37,6 +37,35 @@ public class AchievementsPanel : OverlayPanel
     /// <summary>Raised after a claim, so the balance shown elsewhere moves at once.</summary>
     public event System.Action Claimed;
 
+    /// <summary>
+    /// The screen on any canvas, built at runtime -- how the pause menu opens it in an arena,
+    /// which has no dashboard to own one.
+    /// </summary>
+    public static AchievementsPanel Create(Canvas canvas)
+    {
+        var existing = canvas.GetComponentInChildren<AchievementsPanel>(true);
+        if (existing != null) return existing;
+        var t = UITheme.Active;
+        var host = new GameObject("AchievementsHost", typeof(RectTransform));
+        host.transform.SetParent(canvas.transform, false);
+        UIKit.Fill((RectTransform)host.transform);
+        var own = host.AddComponent<Canvas>();
+        own.overrideSorting = true;
+        own.sortingOrder = 750;
+        host.AddComponent<GraphicRaycaster>();
+        var p = host.AddComponent<AchievementsPanel>();
+        var shade = UIKit.Panel(host.transform, "Achievements", UIKit.PanelTone.Background, t);
+        shade.borderColor = new Color(0, 0, 0, 0);
+        shade.raycastTarget = true;
+        UIKit.Fill(shade.rectTransform);
+        var content = UIKit.Rect(shade.transform, "Content");
+        UIKit.Fill(content);
+        p.panel = shade.gameObject;
+        p.content = content;
+        shade.gameObject.SetActive(false);
+        return p;
+    }
+
     protected override void OnOpened()
     {
         if (!_built) Build();

@@ -56,12 +56,18 @@ public class UISounds : MonoBehaviour
     float _nextHoverTime;
     float _musicTarget;
 
+    /// <summary>The bed's level: its own, times the player's master and music volumes.</summary>
+    float MusicLevel => musicVolume * GameSettings.MasterVolume * GameSettings.MusicVolume;
+
     void Awake()
     {
-        _musicTarget = musicVolume;
+        _musicTarget = MusicLevel;
 
         if (music == null) return;
 
+        // Music does not go through the listener, which carries master times effects; it
+        // applies master times music itself. See SettingsApplier.
+        music.ignoreListenerVolume = true;
         music.loop = true;
         music.spatialBlend = 0f;
         music.volume = musicFadeIn > 0f ? 0f : _musicTarget;
@@ -71,7 +77,10 @@ public class UISounds : MonoBehaviour
 
     void Update()
     {
-        if (music == null || musicFadeIn <= 0f) return;
+        if (music == null) return;
+        _musicTarget = MusicLevel;
+        if (music.volume > _musicTarget) { music.volume = _musicTarget; return; }
+        if (musicFadeIn <= 0f) { music.volume = _musicTarget; return; }
         if (music.volume >= _musicTarget) return;
 
         // Unscaled, because the dashboard is sometimes reached from a frozen game over.

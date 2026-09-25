@@ -34,6 +34,8 @@ MonoBehaviour:
     speedMultiplier: 1.06
     aggression: 0.12
     rosterStep: 4
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.09
     aggression: 0.24857143
     rosterStep: 6
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
@@ -76,6 +80,8 @@ MonoBehaviour:
     speedMultiplier: 1.12
     aggression: 0.37714285
     rosterStep: 7
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
@@ -97,6 +103,8 @@ MonoBehaviour:
     speedMultiplier: 1.15
     aggression: 0.5057143
     rosterStep: 9
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
@@ -118,6 +126,8 @@ MonoBehaviour:
     speedMultiplier: 1.18
     aggression: 0.6342857
     rosterStep: 10
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -139,10 +149,12 @@ MonoBehaviour:
     speedMultiplier: 1.21
     aggression: 0.76285714
     rosterStep: 12
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: Every lift in the block has been called to the top floor. 24 hostiles, one magazine, no reload. Kills resupply you.
+    brief: Every lift in the block has been called to the top floor. 24 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 24
     timeLimit: 94
     maxAliveAtOnce: 10
@@ -160,6 +172,8 @@ MonoBehaviour:
     speedMultiplier: 1.24
     aggression: 0.89142853
     rosterStep: 13
+    reserveMagazines: 0
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ILSA AUGER
@@ -181,5 +195,7 @@ MonoBehaviour:
     speedMultiplier: 1.27
     aggression: 1
     rosterStep: 15
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

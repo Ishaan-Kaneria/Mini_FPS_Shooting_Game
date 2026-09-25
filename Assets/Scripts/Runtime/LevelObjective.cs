@@ -209,7 +209,7 @@ public class LevelObjective : MonoBehaviour
     {
         AmmoDropBonus = 0.55f;
         Satisfied = true;
-        HudLine = "NO RELOAD - KILLS RESUPPLY";
+        HudLine = "ONE MAGAZINE - KILLS DROP AMMO";
 
         var weapon = _manager.player != null
             ? _manager.player.GetComponentInChildren<Weapon>()
@@ -217,8 +217,12 @@ public class LevelObjective : MonoBehaviour
 
         if (weapon == null) return;
 
-        weapon.reloadLocked = true;
+        // One magazine loaded and nothing in reserve: every round from here on is one a kill
+        // dropped. Reloading is allowed -- it is how a dropped box becomes rounds in the gun --
+        // so the limit is the ammunition, not the reload key.
+        weapon.reloadLocked = false;
         weapon.Refill();
+        weapon.SetReserve(0);
     }
 
     // ==================================================================

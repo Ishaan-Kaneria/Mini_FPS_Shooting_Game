@@ -46,6 +46,8 @@ namespace FPSKit.EditorTools
             public InputScheme Scheme;
             public PadFamily Pad;
             public bool Settings;
+            /// <summary>Which settings tab, by name, when Settings is on. Empty is the first.</summary>
+            public string SettingsTab;
             /// <summary>A dashboard screen to open: loadout, info, quit, store, achievements.</summary>
             public string Open;
             public bool Pause;
@@ -128,6 +130,14 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc_achievements", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "achievements", Wait = 2.5f },
                 new Shot { File = "iphone15_achievements", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "achievements", Wait = 2.5f },
                 new Shot { File = "iphone15_loadout", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "loadout", Wait = 2.5f },
+                new Shot { File = "pc_settings_controls", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Settings = true, SettingsTab = "Controls", Wait = 2.5f },
+                new Shot { File = "pc_settings_video", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Settings = true, SettingsTab = "Video", Wait = 2.5f },
+                new Shot { File = "pc_settings_audio", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Settings = true, SettingsTab = "Audio", Wait = 2.5f },
+                new Shot { File = "pc_settings_hud", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Settings = true, SettingsTab = "HUD", Wait = 2.5f },
+                new Shot { File = "iphone15_settings_hud", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Settings = true, SettingsTab = "HUD", Wait = 2.5f },
+                new Shot { File = "pc_about", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "info", Wait = 2.5f },
+                new Shot { File = "pc_pause_keyboard", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Pause = true, Wait = 6f },
+                new Shot { File = "iphone15_pause", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Pause = true, Wait = 6f },
                 new Shot { File = "pc_hudedit", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit", Wait = 8f },
                 new Shot { File = "pc_hudedit_crosshair", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit_crosshair", Wait = 8f },
                 new Shot { File = "iphone15_hudedit", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "hudedit", Wait = 8f },
@@ -294,7 +304,8 @@ namespace FPSKit.EditorTools
                             var canvas = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Exclude)
                                 .Where(c => c.isRootCanvas && c.renderMode != RenderMode.WorldSpace)
                                 .OrderBy(c => c.sortingOrder).FirstOrDefault();
-                            SettingsPanel.Show(canvas);
+                            var settingsPanel = SettingsPanel.Show(canvas);
+                            if (settingsPanel != null && !string.IsNullOrEmpty(shot.SettingsTab)) settingsPanel.ShowTab(shot.SettingsTab);
                         }
                         if (shot.Pause && GameDirector.Instance != null) GameDirector.Instance.SetPaused(true);
                         if (shot.Open == "results")

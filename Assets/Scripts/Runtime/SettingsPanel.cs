@@ -93,7 +93,8 @@ public class SettingsPanel : OverlayPanel
         var names = new List<string> { "Controls" };
         bool touch = DeviceProfile.Touched;
         if (touch) names.Add("Touch");
-        names.Add("Display");
+        names.Add("Video");
+        names.Add("Audio");
         names.Add("HUD");
         _tabs = UIKit.TabBar(card.transform, "Tabs", names.ToArray(), t);
         _tabs.onChanged.AddListener(ShowPage);
@@ -122,7 +123,8 @@ public class SettingsPanel : OverlayPanel
 
         BuildControls(Page(content, "Controls"), t);
         if (touch) BuildTouch(Page(content, "Touch"), t);
-        BuildDisplay(Page(content, "Display"), t);
+        BuildDisplay(Page(content, "Video"), t);
+        BuildAudio(Page(content, "Audio"), t);
         BuildHud(Page(content, "HUD"), t);
 
         // Footer.
@@ -155,16 +157,34 @@ public class SettingsPanel : OverlayPanel
         return page;
     }
 
+    /// <summary>Opens a tab by its name ("Video", "Audio", "HUD"...), for a caller that knows which it wants.</summary>
+    public void ShowTab(string name)
+    {
+        if (_tabs == null) return;
+        for (int i = 0; i < _tabs.tabs.Length; i++)
+            if (_tabs.tabs[i] != null && _tabs.tabs[i].label != null &&
+                string.Equals(_tabs.tabs[i].label.text, name, StringComparison.OrdinalIgnoreCase))
+            {
+                _tabs.Selected = i;
+                ShowPage(i);
+                return;
+            }
+    }
+
     void ShowPage(int index)
     {
         for (int i = 0; i < _pages.Count; i++) _pages[i].gameObject.SetActive(i == index);
 
-        // The pad lands on the first control of the page it is looking at.
-        if (_default != null) Destroy(_default);
+        // The pad lands on the first control of the page it is looking at. Reused when that
+        // control already carries the marker: Destroy is deferred and the component allows
+        // one per object, so re-showing the same page would otherwise add nothing and hand
+        // back null.
         if (index < 0 || index >= _pages.Count) return;
         var first = _pages[index].GetComponentInChildren<Selectable>();
         if (first == null) return;
-        _default = first.gameObject.AddComponent<UIDefaultSelection>();
+        var existing = first.GetComponent<UIDefaultSelection>();
+        if (_default != null && _default != existing) Destroy(_default);
+        _default = existing != null ? existing : first.gameObject.AddComponent<UIDefaultSelection>();
         _default.priority = 100;
         var es = UnityEngine.EventSystems.EventSystem.current;
         if (es != null && GameInput.UsingGamepad) es.SetSelectedGameObject(first.gameObject);
@@ -177,7 +197,15 @@ public class SettingsPanel : OverlayPanel
     void BuildControls(RectTransform page, UITheme t)
     {
         Heading(page, "Look", t);
-        AddSwitch(page, "Invert look", "Push up to look down.", () => GameSettings.InvertY, v => GameSettings.InvertY = v, t);
+        AddSlider(page, "Mouse sensitivity", "How far the view turns for a move of the mouse.", 0.2f, 3f,
+                  () => GameSettings.MouseSensitivity, v => GameSettings.MouseSensitivity = v, v => v.ToString("0.00"), t);
+        AddSwitch(page, "Invert Y", "Push up to look down.", () => GameSettings.InvertY, v => GameSettings.InvertY = v, t);
+
+        if (!DeviceProfile.Touched || !MobileInput.Active)
+        {
+            Heading(page, "Keys", t);
+            foreach (var b in KeyBindings.All()) AddKey(page, b, t);
+        }
 
         Heading(page, "Aim assist", t);
         AddSwitch(page, "Aim assist", "Gamepad and touch only. A mouse never gets any.",
@@ -196,12 +224,29 @@ public class SettingsPanel : OverlayPanel
 
     void BuildHud(RectTransform page, UITheme t)
     {
+        Heading(page, "Crosshair", t);
+        AddCrosshairPreview(page, t);
+        var names = new string[HudLayout.Colors.Length];
+        for (int i = 0; i < names.Length; i++) names[i] = HudLayout.Colors[i].name;
+        AddChoice(page, "Style", null, new[] { "Cross", "Dot", "Circle" },
+                  () => (int)HudLayout.Current.crosshair.style, i => { Crosshair(c => c.style = (HudLayout.CrosshairStyle)i); DrawPreview(); }, t);
+        AddChoice(page, "Colour", null, names, () => HudLayout.Current.crosshair.color, i => { Crosshair(c => c.color = i); DrawPreview(); }, t);
+        AddSlider(page, "Size", null, 0.5f, 2f, () => HudLayout.Current.crosshair.size, v => { Crosshair(c => c.size = v); DrawPreview(); }, Percent, t);
+        AddSlider(page, "Gap", null, 0f, 2f, () => HudLayout.Current.crosshair.gap, v => { Crosshair(c => c.gap = v); DrawPreview(); }, Percent, t);
+
+        Heading(page, "Panels", t);
+        AddChoice(page, "Minimap", "Rotating keeps your facing up; fixed keeps north up.", new[] { "Rotating", "Fixed" },
+                  () => GameSettings.MinimapRotates ? 0 : 1, i => GameSettings.MinimapRotates = i == 0, t);
+        AddSlider(page, "HUD scale", "The in-game panels only; menus follow the interface scale.", 0.7f, 1.3f,
+                  () => GameSettings.HudScale, v => GameSettings.HudScale = v, Percent, t);
+
         Heading(page, "Layout", t);
         UIKit.SettingRow(page, "Customize", "Customize layout",
             DeviceProfile.Touched ? "Move, resize and hide every panel and button, and style the crosshair."
                                   : "Move, resize and hide every panel, and style the crosshair.",
             out var slot, t);
-        var open = UIKit.Button(slot, "Customize", "Customize layout", FlatButton.Variant.Primary, "layout", t);
+        var open = UIKit.Button(slot, "Customize", "Customize", FlatButton.Variant.Primary, "layout", t);
+        UIKit.Fill((RectTransform)open.transform);
         open.onClick.AddListener(() =>
         {
             // The editor needs the HUD under it: in an arena it opens there, from the menu it
@@ -210,7 +255,8 @@ public class SettingsPanel : OverlayPanel
             HudEditor.OpenAnywhere();
         });
         UIKit.SettingRow(page, "ResetLayout", "Reset layout", "Put every element back where it started, on this device.", out var slot2, t);
-        var reset = UIKit.Button(slot2, "Reset", "Reset layout", FlatButton.Variant.Secondary, "refresh", t);
+        var reset = UIKit.Button(slot2, "Reset", "Reset", FlatButton.Variant.Secondary, "refresh", t);
+        UIKit.Fill((RectTransform)reset.transform);
         reset.onClick.AddListener(HudLayout.Clear);
     }
 
@@ -245,6 +291,25 @@ public class SettingsPanel : OverlayPanel
                   Array.ConvertAll(scales, s => Mathf.RoundToInt(s * 100) + "%"),
                   () => Nearest(scales, GameSettings.UiScale), i => GameSettings.UiScale = scales[i], t);
 
+        Heading(page, "View", t);
+        AddSlider(page, "Field of view", "Wider sees more at the edges and makes everything smaller.", 70f, 110f,
+                  () => GameSettings.FieldOfView, v => GameSettings.FieldOfView = v, v => Mathf.RoundToInt(v) + "°", t);
+
+        // A desktop's own window: a phone has one resolution and a browser is the page's.
+        bool desktop = !QualityTiers.Handheld && ScreenInfo.SimulatedMobile != true && Application.platform != RuntimePlatform.WebGLPlayer;
+        if (desktop)
+        {
+            Heading(page, "Display", t);
+            var sizes = Resolutions();
+            if (sizes.Count > 0)
+                AddChoice(page, "Resolution", null, sizes.ConvertAll(r => $"{r.x} x {r.y}").ToArray(),
+                          () => Mathf.Max(0, sizes.FindIndex(r => r.x == Screen.width && r.y == Screen.height)),
+                          i => Screen.SetResolution(sizes[i].x, sizes[i].y, Screen.fullScreenMode), t);
+            AddSwitch(page, "Fullscreen", null, () => Screen.fullScreen, v => Screen.fullScreen = v, t);
+            AddSwitch(page, "VSync", "Waits for the display; off can tear and runs as fast as it can.",
+                      () => GameSettings.VSync, v => GameSettings.VSync = v, t);
+        }
+
         Heading(page, "Performance", t);
         AddChoice(page, "Quality", "Low turns off shadows and post-processing.", new[] { "Low", "Medium", "High" },
                   () => (int)QualityTiers.Current, i => GameSettings.QualityTier = i, t);
@@ -255,6 +320,125 @@ public class SettingsPanel : OverlayPanel
             AddSwitch(page, "Battery saver", "30fps, lower resolution, no post-processing.",
                       () => GameSettings.BatterySaver, v => GameSettings.BatterySaver = v, t);
         }
+    }
+
+    void BuildAudio(RectTransform page, UITheme t)
+    {
+        Heading(page, "Volume", t);
+        AddSlider(page, "Master", null, 0f, 1f, () => GameSettings.MasterVolume, v => GameSettings.MasterVolume = v, Percent, t);
+        AddSlider(page, "Music", "The menu's music.", 0f, 1f, () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v, Percent, t);
+        AddSlider(page, "Effects", "Guns, explosions, footsteps and the interface.", 0f, 1f,
+                  () => GameSettings.SfxVolume, v => GameSettings.SfxVolume = v, Percent, t);
+    }
+
+    /// <summary>The distinct window sizes the display offers, largest first, at most twelve.</summary>
+    static List<Vector2Int> Resolutions()
+    {
+        var list = new List<Vector2Int>();
+        foreach (var r in Screen.resolutions)
+        {
+            var v = new Vector2Int(r.width, r.height);
+            if (v.x >= 1024 && !list.Contains(v)) list.Add(v);
+        }
+        list.Sort((a, b) => (b.x * b.y).CompareTo(a.x * a.y));
+        if (list.Count > 12) list.RemoveRange(12, list.Count - 12);
+        return list;
+    }
+
+    // ---- keys ------------------------------------------------------------------
+
+    string _listening;
+    FlatButton _listeningButton;
+
+    /// <summary>One action and the key it is on. Pressing the button listens for the next key.</summary>
+    void AddKey(RectTransform page, KeyBindings.Binding b, UITheme t)
+    {
+        UIKit.SettingRow(page, "Key_" + b.Id, b.Label, null, out var slot, t);
+        var button = UIKit.Button(slot, "Key", "", FlatButton.Variant.Secondary, null, t);
+        UIKit.Fill((RectTransform)button.transform);
+        string id = b.Id;
+        button.onClick.AddListener(() =>
+        {
+            _listening = id;
+            _listeningButton = button;
+            button.label.text = "PRESS A KEY";
+        });
+        _refreshers.Add(() => button.label.text = UIText.KeyLabel(KeyBindings.Current(id)).ToUpperInvariant());
+    }
+
+    protected override void Update()
+    {
+        if (_listening != null)
+        {
+            // Listening owns every key, Escape included: Escape cancels the listen rather than
+            // closing Settings, which would be the second thing it did with one press.
+            var key = KeyBindings.PressedThisFrame();
+            if (key == KeyCode.None) return;
+            if (key != KeyCode.Escape) KeyBindings.Set(_listening, key);
+            _listening = null;
+            _listeningButton = null;
+            foreach (var r in _refreshers) r();
+            return;
+        }
+        base.Update();
+    }
+
+    // ---- crosshair preview -----------------------------------------------------------
+
+    RectTransform[] _previewArms;
+    Image _previewDot;
+
+    /// <summary>A small crosshair drawn from the saved values, updated as they change.</summary>
+    void AddCrosshairPreview(RectTransform page, UITheme t)
+    {
+        var box = UIKit.Panel(page, "CrosshairPreview", UIKit.PanelTone.Raised, t);
+        UIKit.Size(box, height: 120f);
+        var centre = UIKit.Rect(box.transform, "Centre");
+        centre.anchorMin = centre.anchorMax = centre.pivot = new Vector2(0.5f, 0.5f);
+        _previewArms = new RectTransform[4];
+        for (int i = 0; i < 4; i++)
+        {
+            var arm = UIKit.Rect(centre, "Arm" + i).gameObject.AddComponent<Image>();
+            arm.raycastTarget = false;
+            arm.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.85f);
+            _previewArms[i] = arm.rectTransform;
+        }
+        _previewDot = UIKit.Rect(centre, "Dot").gameObject.AddComponent<Image>();
+        _previewDot.raycastTarget = false;
+        _previewDot.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.85f);
+        _refreshers.Add(DrawPreview);
+    }
+
+    void DrawPreview()
+    {
+        if (_previewArms == null) return;
+        var c = HudLayout.Current.crosshair;
+        var colour = HudLayout.Colors[Mathf.Clamp(c.color, 0, HudLayout.Colors.Length - 1)].color;
+        bool cross = c.style == HudLayout.CrosshairStyle.Cross;
+        float len = 14f * c.size, thick = 3f * c.thickness, gap = 8f * c.gap + thick;
+        var dirs = new[] { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
+        for (int i = 0; i < 4; i++)
+        {
+            var a = _previewArms[i];
+            a.gameObject.SetActive(cross);
+            bool vertical = i < 2;
+            a.sizeDelta = vertical ? new Vector2(thick, len) : new Vector2(len, thick);
+            a.anchoredPosition = dirs[i] * (gap + len * 0.5f);
+            a.GetComponent<Image>().color = colour;
+            a.GetComponent<Outline>().enabled = c.outline;
+        }
+        _previewDot.gameObject.SetActive(!cross);
+        _previewDot.rectTransform.sizeDelta = Vector2.one * (c.style == HudLayout.CrosshairStyle.Dot ? 6f * c.size : (gap + len) * 2f);
+        _previewDot.color = c.style == HudLayout.CrosshairStyle.Circle ? new Color(colour.r, colour.g, colour.b, 0.35f) : colour;
+        _previewDot.GetComponent<Outline>().enabled = c.outline;
+    }
+
+    /// <summary>Changes the crosshair in the kept layout; the HUD, if there is one, follows at once.</summary>
+    static void Crosshair(Action<HudLayout.Crosshair> change)
+    {
+        var d = HudLayout.Current.Clone();
+        change(d.crosshair);
+        HudLayout.Save(d);
     }
 
     // ==================================================================

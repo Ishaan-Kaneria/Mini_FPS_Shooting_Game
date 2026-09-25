@@ -34,6 +34,8 @@ MonoBehaviour:
     speedMultiplier: 1.1
     aggression: 0.19999999
     rosterStep: 6
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.13
     aggression: 0.3285714
     rosterStep: 8
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
@@ -76,10 +80,12 @@ MonoBehaviour:
     speedMultiplier: 1.16
     aggression: 0.45714286
     rosterStep: 9
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: The crews out here were told you are a contractor. They know better now. 15 hostiles, one magazine, no reload. Kills resupply you.
+    brief: The crews out here were told you are a contractor. They know better now. 15 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 15
     timeLimit: 63
     maxAliveAtOnce: 7
@@ -97,6 +103,8 @@ MonoBehaviour:
     speedMultiplier: 1.1899999
     aggression: 0.5857143
     rosterStep: 11
+    reserveMagazines: 0
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
@@ -118,6 +126,8 @@ MonoBehaviour:
     speedMultiplier: 1.22
     aggression: 0.7142857
     rosterStep: 12
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -139,6 +149,8 @@ MonoBehaviour:
     speedMultiplier: 1.25
     aggression: 0.8428571
     rosterStep: 14
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
@@ -160,6 +172,8 @@ MonoBehaviour:
     speedMultiplier: 1.28
     aggression: 0.9714286
     rosterStep: 15
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ROAN AUGER
@@ -181,5 +195,7 @@ MonoBehaviour:
     speedMultiplier: 1.31
     aggression: 1
     rosterStep: 17
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

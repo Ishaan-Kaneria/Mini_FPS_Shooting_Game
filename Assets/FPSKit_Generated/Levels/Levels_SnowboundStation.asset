@@ -16,7 +16,7 @@ MonoBehaviour:
   stakes: The storm closes the pass on a schedule the weather does not negotiate. Be finished before it shuts, or the station keeps you until spring, and it will not be keeping you alive.
   levels:
   - displayName: ONE MAGAZINE
-    brief: Kestrel lit the yard a week ago and has kept it lit. 6 hostiles, one magazine, no reload. Kills resupply you.
+    brief: Kestrel lit the yard a week ago and has kept it lit. 6 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 6
     timeLimit: 32
     maxAliveAtOnce: 4
@@ -34,6 +34,8 @@ MonoBehaviour:
     speedMultiplier: 1.02
     aggression: 0.04
     rosterStep: 2
+    reserveMagazines: 0
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.05
     aggression: 0.16857143
     rosterStep: 4
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE FOREMAN
@@ -76,6 +80,8 @@ MonoBehaviour:
     speedMultiplier: 1.08
     aggression: 0.29714286
     rosterStep: 5
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
@@ -97,6 +103,8 @@ MonoBehaviour:
     speedMultiplier: 1.11
     aggression: 0.42571428
     rosterStep: 7
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
@@ -118,6 +126,8 @@ MonoBehaviour:
     speedMultiplier: 1.14
     aggression: 0.5542857
     rosterStep: 8
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE SHOTFIRER
@@ -139,6 +149,8 @@ MonoBehaviour:
     speedMultiplier: 1.17
     aggression: 0.6828571
     rosterStep: 10
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
@@ -160,6 +172,8 @@ MonoBehaviour:
     speedMultiplier: 1.2
     aggression: 0.81142855
     rosterStep: 11
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: KESTREL AUGER
@@ -181,5 +195,7 @@ MonoBehaviour:
     speedMultiplier: 1.23
     aggression: 0.94
     rosterStep: 13
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

@@ -364,15 +364,14 @@ public class HUDController : MonoBehaviour
 
         KeyCode pause = director != null ? director.pauseKey : KeyCode.Escape;
         KeyCode altPause = director != null ? director.altPauseKey : KeyCode.P;
-        KeyCode resume = director != null ? director.resumeKey : KeyCode.R;
-        KeyCode quit = director != null ? director.quitKey : KeyCode.Q;
+
 
         bool pad = GameInput.Scheme == InputScheme.Gamepad;
         string pauseLabel = pad ? InputPrompts.For(GameAction.Pause)
             : altPause == KeyCode.None || altPause == pause
                 ? Key(pause)
                 : $"{Key(pause)}/{Key(altPause)}";
-        string resumeLabel = pad ? InputPrompts.Back : Key(resume);
+        string resumeLabel = pad ? InputPrompts.Back : pauseLabel;
 
         // <color>, not <alpha>. TMP's alpha tag applies from where it appears and has no
         // closing form, so "</alpha>" is not a tag -- it renders as those eight
@@ -395,17 +394,13 @@ public class HUDController : MonoBehaviour
         if (instructionText != null)
             instructionText.text =
                 equipment +
-                $"{pauseLabel} {Dim}PAUSE</color>     " +
-                $"{resumeLabel} {Dim}RESUME</color>" +
-                // On a pad, leaving is a button in the pause menu, reached with the stick.
-                (pad ? "" : $"     {Key(quit)} {Dim}QUIT</color>");
+                $"{pauseLabel} {Dim}PAUSE</color>";
 
+        // One key pauses and resumes; leaving is the menu's QUIT, which asks first.
         if (pauseHintText != null)
-            pauseHintText.text =
-                pad
-                    ? $"<size=60%>{resumeLabel} resume     {pauseLabel} resume</size>"
-                    : $"<size=60%>{Key(resume)} resume     {pauseLabel} resume     " +
-                      $"{Key(quit)} quit to dashboard</size>";
+            pauseHintText.text = pad
+                ? $"{resumeLabel}  RESUME"
+                : $"{pauseLabel}  RESUME";
     }
 
     /// <summary>
@@ -624,7 +619,7 @@ public class HUDController : MonoBehaviour
 
         AmmoDisplay mode = weapon.IsReloading ? AmmoDisplay.Reloading
                          : data != null && data.infiniteAmmo ? AmmoDisplay.InfiniteMagazine
-                         : data != null && data.infiniteReserve ? AmmoDisplay.InfiniteReserve
+                         : weapon.InfiniteReserve ? AmmoDisplay.InfiniteReserve
                          : AmmoDisplay.Counted;
 
         int ammo = weapon.CurrentAmmo;

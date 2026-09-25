@@ -168,6 +168,65 @@ public static class GameSettings
         set => SetFloat("touchOpacity", Mathf.Clamp(value, 0.25f, 1f));
     }
 
+    // ---- controls, video, audio, HUD ----------------------------------------------
+
+    /// <summary>Mouse look speed, a multiple of the rig's own, 0.2 to 3.</summary>
+    public static float MouseSensitivity
+    {
+        get => Mathf.Clamp(GetFloat("mouseSens", 1f), 0.2f, 3f);
+        set => SetFloat("mouseSens", Mathf.Clamp(value, 0.2f, 3f));
+    }
+
+    /// <summary>Horizontal-ish field of view in degrees, 70 to 110. Aiming down sights still zooms from it.</summary>
+    public static float FieldOfView
+    {
+        get => Mathf.Clamp(GetFloat("fov", 75f), 70f, 110f);
+        set => SetFloat("fov", Mathf.Clamp(Mathf.Round(value), 70f, 110f));
+    }
+
+    /// <summary>Wait for the display's refresh on a desktop. Phones and browsers pace themselves.</summary>
+    public static bool VSync
+    {
+        get => GetBool("vsync", true);
+        set => SetBool("vsync", value);
+    }
+
+    public static float MasterVolume
+    {
+        get => Mathf.Clamp01(GetFloat("volMaster", 1f));
+        set => SetFloat("volMaster", Mathf.Clamp01(value));
+    }
+
+    public static float MusicVolume
+    {
+        get => Mathf.Clamp01(GetFloat("volMusic", 0.8f));
+        set => SetFloat("volMusic", Mathf.Clamp01(value));
+    }
+
+    public static float SfxVolume
+    {
+        get => Mathf.Clamp01(GetFloat("volSfx", 1f));
+        set => SetFloat("volSfx", Mathf.Clamp01(value));
+    }
+
+    /// <summary>
+    /// The in-game HUD's panels, as a multiple of their size, 0.7 to 1.3. Separate from the
+    /// interface scale, which is every menu too, and multiplied with each panel's own size
+    /// from the HUD layout.
+    /// </summary>
+    public static float HudScale
+    {
+        get => Mathf.Clamp(GetFloat("hudScale", 1f), 0.7f, 1.3f);
+        set => SetFloat("hudScale", Mathf.Clamp(value, 0.7f, 1.3f));
+    }
+
+    /// <summary>The minimap turns so the player's forward is up (true), or keeps north up and turns the arrow.</summary>
+    public static bool MinimapRotates
+    {
+        get => GetBool("minimapRotates", true);
+        set => SetBool("minimapRotates", value);
+    }
+
     // ==================================================================
 
     /// <summary>Puts every setting back to its default.</summary>
@@ -178,11 +237,13 @@ public static class GameSettings
                      "uiScale", "quality", "fps", "battery", "touchSens", "padSens", "deadzone", "curve",
                      "invertY", "assist", "assistStrength", "autoFire", "gyro", "gyroSens", "aimMode",
                      "leftHanded", "touchOpacity",
+                     "mouseSens", "fov", "vsync", "volMaster", "volMusic", "volSfx", "hudScale", "minimapRotates",
                  })
             PlayerPrefs.DeleteKey(Prefix + key);
         // The HUD layout is a setting like the rest and goes with them; the named layouts the
         // player saved are theirs, not settings, and stay.
         HudLayout.ForgetAllForms();
+        KeyBindings.ResetAll();
         PlayerPrefs.Save();
         Changed?.Invoke("*");
     }

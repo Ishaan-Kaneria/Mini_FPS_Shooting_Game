@@ -380,6 +380,20 @@ public class LevelManager : MonoBehaviour
         _playerHealth.Damaged -= OnPlayerDamaged;
     }
 
+    /// <summary>
+    /// Gives the player's gun this level's reserve. At the start of the fight rather than in
+    /// Start, because PlayerLoadout equips the gun in its own Start and equipping resets the
+    /// reserve to the gun's default.
+    /// </summary>
+    void ArmReserve()
+    {
+        if (Level == null || player == null || Level.reserveMagazines < 0) return;
+        var weapon = player.GetComponentInChildren<Weapon>();
+        if (weapon == null) return;
+        weapon.Refill();
+        weapon.SetReserve(Level.reserveMagazines * weapon.MagazineSize);
+    }
+
     void Update()
     {
         RecoverLevelLoop();
@@ -536,6 +550,9 @@ public class LevelManager : MonoBehaviour
         if (Objective != null) Objective.End();
         Destroy(Objective);
 
+        // The reserve first, so an objective that changes it (One Magazine empties it) has
+        // the last word rather than being overwritten by the level's default.
+        ArmReserve();
         Objective = LevelObjective.Begin(this, Level);
 
         IsBriefing = true;
@@ -1305,6 +1322,7 @@ public class LevelManager : MonoBehaviour
         // EnemyArchetype is one shared asset, so a level that raised a drop chance on it
         // would raise it for every other level using that enemy, on disk, for good.
         float ammoChance = (archetype != null ? archetype.ammoDropChance : 0f)
+                           + (Level != null ? Level.ammoDropChance : 0f)
                            + (Objective != null ? Objective.AmmoDropBonus : 0f);
 
         TrySpawnDrop(ammoPickupPrefab, ammoChance, spot);

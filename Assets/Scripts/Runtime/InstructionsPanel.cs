@@ -55,6 +55,8 @@ public class InstructionsPanel : OverlayPanel
     protected override void OnOpened()
     {
         if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
+        // The player's own keys, not the asset's: this page describes what they will press.
+        KeyBindings.Apply(controls);
 
         foreach (var row in _rows)
             if (row != null) Destroy(row.gameObject);

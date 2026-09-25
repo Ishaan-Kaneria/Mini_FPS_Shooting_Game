@@ -82,7 +82,7 @@ public class HudLayoutTarget : MonoBehaviour
         _applied = e;
         var r = Rect;
         r.anchorMin = _dMin; r.anchorMax = _dMax; r.pivot = _dPivot;
-        r.sizeDelta = _dSizeDelta; r.anchoredPosition = _dPos; r.localScale = _dScale;
+        r.sizeDelta = _dSizeDelta; r.anchoredPosition = _dPos; r.localScale = _dScale * GlobalScale;
 
         if (e == null)
         {
@@ -101,7 +101,7 @@ public class HudLayoutTarget : MonoBehaviour
             if (stretched) r.sizeDelta = _dSize;
             r.anchoredPosition = new Vector2(e.x, e.y);
         }
-        r.localScale = _dScale * Mathf.Clamp(e.scale, 0.6f, 1.5f);
+        r.localScale = _dScale * Mathf.Clamp(e.scale, 0.6f, 1.5f) * GlobalScale;
         Group.alpha = e.hidden ? 0f : Mathf.Clamp(e.opacity, 0.2f, 1f);
         Group.blocksRaycasts = !e.hidden;
     }
@@ -136,7 +136,10 @@ public class HudLayoutTarget : MonoBehaviour
     }
 
     /// <summary>The scale the player has chosen, relative to the owner's.</summary>
-    public float PlayerScale => _dScale.x > 0.0001f ? Rect.localScale.x / _dScale.x : 1f;
+    public float PlayerScale => _dScale.x > 0.0001f ? Rect.localScale.x / (_dScale.x * GlobalScale) : 1f;
+
+    /// <summary>Settings' HUD scale, for the HUD's own panels; touch buttons size themselves in millimetres.</summary>
+    float GlobalScale => id != null && id.StartsWith("hud.") ? GameSettings.HudScale : 1f;
 
     /// <summary>Moves the element's rect by a delta in its parent's units, keeping its current anchoring.</summary>
     public void Nudge(Vector2 delta) => Rect.anchoredPosition += delta;

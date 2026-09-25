@@ -34,10 +34,12 @@ MonoBehaviour:
     speedMultiplier: 1
     aggression: 0
     rosterStep: 1
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 9 hostiles, one magazine, no reload. Kills resupply you.
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 9 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 9
     timeLimit: 43
     maxAliveAtOnce: 5
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.03
     aggression: 0.12857142
     rosterStep: 3
+    reserveMagazines: 0
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
@@ -76,6 +80,8 @@ MonoBehaviour:
     speedMultiplier: 1.06
     aggression: 0.25714284
     rosterStep: 4
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
@@ -97,6 +103,8 @@ MonoBehaviour:
     speedMultiplier: 1.09
     aggression: 0.38571426
     rosterStep: 6
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
@@ -118,6 +126,8 @@ MonoBehaviour:
     speedMultiplier: 1.12
     aggression: 0.5142857
     rosterStep: 7
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -139,6 +149,8 @@ MonoBehaviour:
     speedMultiplier: 1.15
     aggression: 0.64285713
     rosterStep: 9
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
@@ -160,6 +172,8 @@ MonoBehaviour:
     speedMultiplier: 1.18
     aggression: 0.7714285
     rosterStep: 10
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: TOVE AUGER
@@ -181,5 +195,7 @@ MonoBehaviour:
     speedMultiplier: 1.21
     aggression: 0.9
     rosterStep: 12
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

@@ -285,9 +285,12 @@ namespace FPSKit.EditorTools
                         : null;
 
                     if (weapon == null) Errors.Add("OneMagazine: the player has no weapon to lock");
-                    else if (!weapon.reloadLocked)
-                        Errors.Add("OneMagazine: the gun can still reload, so the level asks for " +
-                                   "nothing at all");
+                    // One magazine and nothing spare: the limit is the ammunition, so the
+                    // reserve must be limited and empty at the start. Reloading is allowed --
+                    // it is how a dropped box becomes rounds in the gun.
+                    else if (!weapon.reserveLimited || weapon.ReserveAmmo > 0)
+                        Errors.Add($"OneMagazine: the gun starts with {(weapon.InfiniteReserve ? "an unlimited" : weapon.ReserveAmmo.ToString())} " +
+                                   "rounds in reserve, so the level asks for nothing at all");
 
                     if (objective.AmmoDropBonus <= 0f)
                         Errors.Add("OneMagazine: kills do not resupply, so a player who misses " +

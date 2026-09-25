@@ -84,14 +84,15 @@ public class GameDirector : MonoBehaviour
              "gets their cursor back and no menu. P is the one that always arrives.")]
     public KeyCode altPauseKey = KeyCode.P;
 
-    [Tooltip("Unpauses from the pause menu. Pause toggles too, so this is the key the " +
-             "menu can advertise as meaning one thing.")]
-    public KeyCode resumeKey = KeyCode.R;
+    [Tooltip("No longer read during play: R is RELOAD, and pause toggles on the pause " +
+             "keys. Kept so scenes that serialized it still load; the results screen's R " +
+             "(replay) is its own.")]
+    public KeyCode resumeKey = KeyCode.None;
 
-    [Tooltip("Leaves the run and goes back to the dashboard, from the pause menu or the " +
-             "results screen. This is a scene load, so unlike quitting the application " +
-             "it works everywhere -- including in a browser, which has nowhere to quit to.")]
-    public KeyCode quitKey = KeyCode.Q;
+    [Tooltip("No longer read during play. Leaving a run is the pause menu's Quit, behind a " +
+             "confirmation: a single key that threw away a level mid-fight was one press " +
+             "from the reload key. Kept so scenes that serialized it still load.")]
+    public KeyCode quitKey = KeyCode.None;
 
     [Tooltip("Scene the dashboard lives in. Loaded when a run ends, however it ended.")]
     public string menuScene = "Menu";
@@ -272,24 +273,18 @@ public class GameDirector : MonoBehaviour
 
         bool pause = PausePressed();
         // B/Circle is "back" on a pad, and back from a pause menu is the game.
-        bool resume = Pressed(resumeKey) || (IsPaused && GameInput.UsingGamepad && GameInput.UICancel.WasPressedThisFrame());
-        bool leave = Pressed(quitKey);
+        // Resume is the pause key again, or B on a pad. No key leaves the run: that is the
+        // pause menu's Quit, which asks first.
+        bool resume = IsPaused && GameInput.UsingGamepad && GameInput.UICancel.WasPressedThisFrame();
 
         // Only the quit key here. The results screen offers three different things --
         // replay, next level, dashboard -- and LevelResultsUI owns the keys for them,
         // so taking any key as "back to the menu" would steal two of the three.
-        if (IsGameOver)
-        {
-            if (leave) ReturnToMenu();
-            return;
-        }
+        if (IsGameOver) return;
 
         if (IsPaused)
         {
-            // Quit is checked first: it is the only one of the three that leaves, so a
-            // key that happens to be bound to two things should still get you out.
-            if (leave) ReturnToMenu();
-            else if (resume || pause) SetPaused(false);
+            if (resume || pause) SetPaused(false);
             return;
         }
 
@@ -594,6 +589,16 @@ public class GameDirector : MonoBehaviour
     /// what the results screen's Replay and Next Level do: same scene, different level,
     /// no trip through the dashboard.
     /// </summary>
+    /// <summary>
+    /// Starts the level again from the pause menu. The attempt being thrown away is recorded
+    /// first, exactly as leaving is, so a restart cannot be used to make a bad run vanish.
+    /// </summary>
+    public void RestartRun()
+    {
+        if (!IsGameOver && !GameSession.EditingHud) GameSession.RecordResult(AbandonedResult());
+        Restart();
+    }
+
     public void Restart()
     {
         Time.timeScale = 1f;

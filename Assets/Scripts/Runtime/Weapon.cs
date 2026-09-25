@@ -92,6 +92,28 @@ public class Weapon : MonoBehaviour
     /// </summary>
     [System.NonSerialized] public bool reloadLocked;
 
+    /// <summary>
+    /// The level has put a limit on the reserve, whatever the gun's data says. Held here and
+    /// never written into <see cref="WeaponData"/>: that is one shared asset, and a limit
+    /// stored there would follow the gun into every other level and survive a restart.
+    /// </summary>
+    [System.NonSerialized] public bool reserveLimited;
+
+    /// <summary>The reserve never runs out: the gun's data says so and no level has limited it.</summary>
+    public bool InfiniteReserve => data != null && data.infiniteReserve && !reserveLimited;
+
+    /// <summary>
+    /// Sets the reserve for a level: limited from now on, to this many rounds, capped at what
+    /// the gun can carry.
+    /// </summary>
+    public void SetReserve(int rounds)
+    {
+        reserveLimited = true;
+        int cap = data != null && data.maxReserveAmmo > 0 ? data.maxReserveAmmo : int.MaxValue;
+        ReserveAmmo = Mathf.Clamp(rounds, 0, cap);
+        AmmoChanged?.Invoke(this);
+    }
+
     [System.NonSerialized] public float BoostFireRateMultiplier = 1f;
 
     /// <summary>Temporary reload multiplier from a consumable. Below 1 is faster.</summary>
@@ -465,7 +487,7 @@ public class Weapon : MonoBehaviour
     {
         if (reloadLocked || IsReloading || data.infiniteAmmo) return;
         if (CurrentAmmo >= MagazineSize) return;
-        if (ReserveAmmo <= 0 && !data.infiniteReserve) return;
+        if (ReserveAmmo <= 0 && !InfiniteReserve) return;
 
         _reloadRoutine = StartCoroutine(ReloadRoutine());
     }
@@ -481,7 +503,7 @@ public class Weapon : MonoBehaviour
 
         int needed = MagazineSize - CurrentAmmo;
 
-        if (data.infiniteReserve)
+        if (InfiniteReserve)
         {
             CurrentAmmo = MagazineSize;
         }
@@ -509,7 +531,7 @@ public class Weapon : MonoBehaviour
         if (amount <= 0) return 0;
 
         // Infinite reserve means ammo pickups have nothing to give.
-        if (data != null && (data.infiniteReserve || data.infiniteAmmo)) return 0;
+        if (data != null && (InfiniteReserve || data.infiniteAmmo)) return 0;
 
         int cap = data != null && data.maxReserveAmmo > 0 ? data.maxReserveAmmo : int.MaxValue;
         int before = ReserveAmmo;
@@ -596,7 +618,10 @@ public class Weapon : MonoBehaviour
         // the key goes down, standing still included, so keying the FOV off it alone
         // would pull the view out while the player has not moved a step.
         bool running = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f;
-        float sprintFov = running ? _baseFieldOfView * 1.05f : _baseFieldOfView;
+        // The player's field of view, read live so the setting takes as it is dragged. The
+        // sights still zoom to their own fixed value from it.
+        float baseFov = GameSettings.FieldOfView;
+        float sprintFov = running ? baseFov * 1.05f : baseFov;
         float targetFov = Mathf.Lerp(sprintFov, data.adsFieldOfView, AimProgress);
 
         fpsCamera.fieldOfView = Mathf.Lerp(fpsCamera.fieldOfView, targetFov,

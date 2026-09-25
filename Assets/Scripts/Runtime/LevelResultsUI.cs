@@ -398,8 +398,8 @@ public class LevelResultsUI : MonoBehaviour
     {
         get
         {
-            var director = GameDirector.Instance;
-            return director != null ? director.resumeKey : KeyCode.R;
+            // The level is over, so R can mean replay here without taking reload away.
+            return KeyCode.R;
         }
     }
 
@@ -407,8 +407,8 @@ public class LevelResultsUI : MonoBehaviour
     {
         get
         {
-            var director = GameDirector.Instance;
-            return director != null ? director.quitKey : KeyCode.Q;
+            // Q to the menu is safe once the level is scored -- nothing is thrown away.
+            return KeyCode.Q;
         }
     }
 

@@ -34,6 +34,8 @@ MonoBehaviour:
     speedMultiplier: 1.04
     aggression: 0.08
     rosterStep: 3
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.07
     aggression: 0.20857142
     rosterStep: 5
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
@@ -76,6 +80,8 @@ MonoBehaviour:
     speedMultiplier: 1.1
     aggression: 0.33714285
     rosterStep: 6
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
@@ -97,6 +103,8 @@ MonoBehaviour:
     speedMultiplier: 1.13
     aggression: 0.46571428
     rosterStep: 8
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
@@ -118,6 +126,8 @@ MonoBehaviour:
     speedMultiplier: 1.16
     aggression: 0.5942857
     rosterStep: 9
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
@@ -139,6 +149,8 @@ MonoBehaviour:
     speedMultiplier: 1.1899999
     aggression: 0.7228571
     rosterStep: 11
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
@@ -160,6 +172,8 @@ MonoBehaviour:
     speedMultiplier: 1.22
     aggression: 0.85142857
     rosterStep: 12
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: AUREL AUGER
@@ -181,5 +195,7 @@ MonoBehaviour:
     speedMultiplier: 1.25
     aggression: 0.97999996
     rosterStep: 14
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

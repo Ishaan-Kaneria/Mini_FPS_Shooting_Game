@@ -164,6 +164,13 @@ public class HudView : MonoBehaviour
     }
 
     bool _built, _subscribed;
+    Minimap _map;
+
+    void OnSetting(string key)
+    {
+        if (_map != null) _map.rotateWithPlayer = GameSettings.MinimapRotates;
+        if (key == "*" || key.StartsWith("key")) OnScheme();
+    }
 
     /// <summary>
     /// Subscribes once the sources are known. Not simply in OnEnable: that runs inside
@@ -211,6 +218,8 @@ public class HudView : MonoBehaviour
         if (_bombs != null) _bombs.ChargesChanged += OnBombs;
         if (_belt != null) _belt.Changed += OnBelt;
         GameInput.SchemeChanged += OnScheme;
+        GameSettings.Changed += OnSetting;
+        KeyBindings.Changed += OnScheme;
     }
 
     void OnDisable()
@@ -248,6 +257,8 @@ public class HudView : MonoBehaviour
         if (_bombs != null) _bombs.ChargesChanged -= OnBombs;
         if (_belt != null) _belt.Changed -= OnBelt;
         GameInput.SchemeChanged -= OnScheme;
+        GameSettings.Changed -= OnSetting;
+        KeyBindings.Changed -= OnScheme;
     }
 
     /// <summary>
@@ -432,6 +443,8 @@ public class HudView : MonoBehaviour
             }
         }
 
+        _map = map;
+        map.rotateWithPlayer = GameSettings.MinimapRotates;
         map.uniformEnemyColor = true;
         map.enemyColor = _t.danger;
         map.bossColor = _t.accent;
@@ -695,16 +708,20 @@ public class HudView : MonoBehaviour
         var hint = Label(card.transform, "Hint", "", UIKit.TextRole.Label, _t.textSecondary);
         var resume = UIKit.Button(card.transform, "Resume", "Resume", FlatButton.Variant.Primary, "player-play", _t);
         resume.gameObject.AddComponent<UIDefaultSelection>().priority = 10;
+        var restart = UIKit.Button(card.transform, "Restart", "Restart", FlatButton.Variant.Secondary, "refresh", _t);
+        restart.onClick.AddListener(() => { if (_director != null) _director.RestartRun(); });
         var settings = UIKit.Button(card.transform, "Settings", "Settings", FlatButton.Variant.Secondary, "settings", _t);
         settings.gameObject.AddComponent<OpenSettingsButton>();
-        var customize = UIKit.Button(card.transform, "CustomizeHud", "Customize HUD", FlatButton.Variant.Secondary, "layout", _t);
-        customize.onClick.AddListener(() => HudEditor.Open(_hud, fromMenu: false));
-        var quit = UIKit.Button(card.transform, "Quit", "Quit to dashboard", FlatButton.Variant.Secondary, "power", _t);
+        var achievements = UIKit.Button(card.transform, "Achievements", "Achievements", FlatButton.Variant.Secondary, "trophy", _t);
+        achievements.onClick.AddListener(() => AchievementsPanel.Create(_canvas).Open());
+        // Its own button, not the HUDController's quit: leaving asks first.
+        var quit = UIKit.Button(card.transform, "Quit", "Quit to menu", FlatButton.Variant.Secondary, "power", _t);
+        quit.onClick.AddListener(AskToQuit);
 
         if (_hud.pausePanel != null) _hud.pausePanel.SetActive(false);
         _hud.pausePanel = _pauseShade;
         _hud.resumeButton = resume;
-        _hud.quitButton = quit;
+        _hud.quitButton = null;
         _hud.pauseHintText = hint;
 
         BuildPauseIcons(layer);
@@ -725,7 +742,7 @@ public class HudView : MonoBehaviour
         var stats = UIKit.IconButton(row, "Stats", "chart-bar", "This run", UIKit.ControlHeight, _t);
         stats.onClick.AddListener(ShowRunStats);
         var quit = UIKit.IconButton(row, "Quit", "power", "Quit to dashboard", UIKit.ControlHeight, _t);
-        quit.onClick.AddListener(() => { if (_director != null) _director.ReturnToMenu(); });
+        quit.onClick.AddListener(AskToQuit);
         _pauseIcons = row.gameObject;
         _pauseIcons.SetActive(false);
     }
@@ -858,7 +875,7 @@ public class HudView : MonoBehaviour
             return;
         }
         bool infiniteMag = data != null && data.infiniteAmmo;
-        bool infiniteReserve = data != null && data.infiniteReserve;
+        bool infiniteReserve = w.InfiniteReserve;
         _magText.text = infiniteMag ? "∞" : _t.Tabular(w.CurrentAmmo.ToString());
         _reserveText.text = infiniteMag ? "" : "/ " + (infiniteReserve ? "∞" : _t.Tabular(w.ReserveAmmo.ToString()));
         _magText.color = !infiniteMag && w.MagazineSize > 0 && w.CurrentAmmo <= w.MagazineSize / 5 ? _t.danger : _t.textPrimary;
@@ -1000,6 +1017,14 @@ public class HudView : MonoBehaviour
     // ======================================================================
     // Pause cards.
     // ======================================================================
+
+    /// <summary>Leaving a level mid-fight throws it away, so it asks first.</summary>
+    void AskToQuit()
+    {
+        ConfirmDialog.Show(_canvas, "Quit to menu?",
+            "This level ends here. Your kills still count, and you keep the coins they paid.",
+            "Quit", () => { if (_director != null) _director.ReturnToMenu(); });
+    }
 
     void ShowLevelInfo()
     {

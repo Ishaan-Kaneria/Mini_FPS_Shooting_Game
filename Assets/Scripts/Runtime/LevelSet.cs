@@ -156,6 +156,18 @@ public class LevelSet : ScriptableObject
                  "step of 1 is the opening roster and a step of 10 is all of it.")]
         [Min(1)] public int rosterStep = 1;
 
+        [Header("Ammunition")]
+        [Tooltip("Spare magazines the gun starts the level with, on top of the one loaded. " +
+                 "-1 leaves the reserve unlimited. A reserve that never runs out makes every " +
+                 "miss free; eight magazines is plenty for a player who aims, and the drops " +
+                 "below keep a long level fed. One Magazine levels start at 0.")]
+        [Min(-1)] public int reserveMagazines = 8;
+
+        [Tooltip("Chance any kill drops an ammunition pickup, on top of the enemy's own " +
+                 "(EnemyArchetype.ammoDropChance) and the objective's. Most of the roster " +
+                 "drops none, so with a finite reserve this is what keeps a level supplied.")]
+        [Range(0f, 1f)] public float ammoDropChance = 0.12f;
+
         [Header("Stars")]
         [Tooltip("Fraction of the level's weight that has to be killed for two stars. " +
                  "Three is only ever awarded for clearing the level outright.")]

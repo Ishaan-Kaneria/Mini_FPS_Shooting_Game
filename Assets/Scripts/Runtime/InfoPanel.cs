@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// INFO, behind the top bar's info icon: HOW TO PLAY, THE LIST, and what the game is -- its
@@ -33,14 +34,17 @@ public class InfoPanel : OverlayPanel
         var card = UIKit.Panel(shade.transform, "Card", UIKit.PanelTone.Panel, t);
         var rt = card.rectTransform;
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(640f, 440f);
-        var col = UIKit.Column(card, 14f, new RectOffset(32, 32, 28, 28));
+        rt.sizeDelta = new Vector2(680f, 0f);
+        card.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        card.gameObject.AddComponent<FitInsideParent>();
+        var col = UIKit.Column(card, 12f, new RectOffset(32, 32, 26, 28));
         col.childForceExpandHeight = false;
+        col.childControlHeight = true;
 
         var header = UIKit.Rect(card.transform, "Header");
         UIKit.Row(header, 12f, null, TextAnchor.MiddleLeft);
         UIKit.Size(header, height: 48f);
-        var title = UIKit.Text(header, "Title", "Info", UIKit.TextRole.Title, t);
+        var title = UIKit.Text(header, "Title", "About", UIKit.TextRole.Title, t);
         UIKit.Size(title, flexWidth: 1f);
         var close = UIKit.IconButton(header, "Close", "x", "Close", UIKit.ControlHeight, t);
         close.onClick.AddListener(Close);
@@ -55,14 +59,29 @@ public class InfoPanel : OverlayPanel
         var list = UIKit.Button(buttons, "TheList", "The list", FlatButton.Variant.Secondary, "list-details", t);
         list.onClick.AddListener(() => ListRequested?.Invoke());
 
-        UIKit.Text(card.transform, "AboutHeading", "About", UIKit.TextRole.Label, t);
-        UIKit.Text(card.transform, "About",
-            $"MINI FPS{UIText.Separator}Single player campaign{UIText.Separator}Version {Application.version}",
-            UIKit.TextRole.Body, t);
-        UIKit.Text(card.transform, "Credits",
-            "Type: Barlow, by Jeremy Tribby, under the SIL Open Font License.\nIcons: Tabler Icons, under the MIT License.",
-            UIKit.TextRole.Caption, t);
+        var name = UIKit.Text(card.transform, "Game", "Mini FPS", UIKit.TextRole.Display, t);
+        name.color = t.textPrimary;
+        UIKit.Text(card.transform, "Version",
+            UIText.Row("SINGLE PLAYER CAMPAIGN", $"VERSION {Application.version}"), UIKit.TextRole.Label, t).color = t.textSecondary;
+
+        Section(card.transform, "Credits",
+            "Made by Ishaan Kaneria.\n" +
+            "Engine: Unity 6 with the Universal Render Pipeline.\n" +
+            "Industrial art: the RPG FPS Game Assets industrial pack.\n" +
+            "Sound: placeholder effects synthesised for the game.", t);
+        Section(card.transform, "Licences",
+            "Barlow and Barlow Condensed, by Jeremy Tribby, under the SIL Open Font License 1.1.\n" +
+            "Tabler Icons, under the MIT License; the game-specific icons are drawn to match.", t);
+
         panel.SetActive(false);
+    }
+
+    static void Section(Transform parent, string heading, string body, UITheme t)
+    {
+        UIKit.Text(parent, heading + "Heading", heading, UIKit.TextRole.Label, t).color = t.textSecondary;
+        var text = UIKit.Text(parent, heading, body, UIKit.TextRole.Caption, t);
+        text.textWrappingMode = TMPro.TextWrappingModes.Normal;
+        text.lineSpacing = 8f;
     }
 
     protected override void OnOpened() { }

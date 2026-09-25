@@ -34,10 +34,12 @@ MonoBehaviour:
     speedMultiplier: 1.12
     aggression: 0.24
     rosterStep: 7
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: The gate is open and nobody is on it. 36 hostiles, one magazine, no reload. Kills resupply you.
+    brief: The gate is open and nobody is on it. 36 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 36
     timeLimit: 134
     maxAliveAtOnce: 10
@@ -55,6 +57,8 @@ MonoBehaviour:
     speedMultiplier: 1.15
     aggression: 0.69
     rosterStep: 9
+    reserveMagazines: 0
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: MARIT AUGER
@@ -76,5 +80,7 @@ MonoBehaviour:
     speedMultiplier: 1.18
     aggression: 1
     rosterStep: 10
+    reserveMagazines: 8
+    ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

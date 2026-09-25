@@ -255,6 +255,8 @@ public class PlayerMotor : MonoBehaviour
 
         if (footstepSource == null) footstepSource = GetComponent<AudioSource>();
         if (controls == null) controls = ControlSettings.CreateDefault();
+        // The player's own keys first, so the actions are bound to them and not to the asset's.
+        KeyBindings.Apply(controls);
         GameInput.Bind(controls);
     }
 
@@ -354,7 +356,7 @@ public class PlayerMotor : MonoBehaviour
         if (Cursor.lockState == CursorLockMode.Locked)
         {
             Vector2 counts = ReadMouseCounts();
-            float scale = sensitivity * DegreesPerCount * LookSensitivityMultiplier;
+            float scale = sensitivity * GameSettings.MouseSensitivity * DegreesPerCount * LookSensitivityMultiplier;
 
             LookDeltaDegrees = counts * scale;
 

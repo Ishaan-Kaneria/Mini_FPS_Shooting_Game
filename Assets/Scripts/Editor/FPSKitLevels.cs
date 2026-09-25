@@ -284,6 +284,11 @@ namespace FPSKit.EditorTools
 
                     rosterStep = RosterStep(i) + arenaIndex,
 
+                    // Eight spare magazines everywhere but One Magazine, which starts dry and is
+                    // fed by kills. The drop chance is on top of each enemy's own.
+                    reserveMagazines = objective == LevelSet.Objective.OneMagazine ? 0 : 8,
+                    ammoDropChance = 0.12f,
+
                     twoStarScore = 0.8f,
                     oneStarScore = 0.5f
                 };
@@ -442,7 +447,7 @@ namespace FPSKit.EditorTools
                     return $"{enemies} hostiles. One of them runs -- that one is the level.";
 
                 case LevelSet.Objective.OneMagazine:
-                    return $"{enemies} hostiles, one magazine, no reload. Kills resupply you.";
+                    return $"{enemies} hostiles and one magazine, nothing spare. Kills drop ammunition.";
 
                 case LevelSet.Objective.Hold:
                     return $"{enemies} hostiles. Stand on the marked ground and keep standing.";

@@ -937,7 +937,9 @@ namespace FPSKit.EditorTools
                 problems.Append("\n  - the dashboard never loaded an arena");
 
             string strip = Plain(_strip);
-            foreach (string word in new[] { "PAUSE", "RESUME", "QUIT" })
+            // PAUSE only: one key pauses and resumes, and leaving is the pause menu's QUIT --
+            // there is no quit key for the strip to name any more.
+            foreach (string word in new[] { "PAUSE" })
                 if (strip.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0)
                     problems.Append($"\n  - the instruction strip never mentions {word}: \"{strip}\"");
 

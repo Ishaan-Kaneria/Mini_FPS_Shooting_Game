@@ -1499,6 +1499,47 @@ desktop uses vsync; a browser is paced by the page. **Low's render scale is 1.0*
 budget lives in the page (see above), and a low tier at 0.8 is the "very blurry" build again.
 None of it runs in the editor, where `SetQualityLevel` writes the project's level to disk.
 
+## The HUD is `HudView`, built at runtime and driven by events
+
+`HUDController` creates it in `Awake` (`useKitHud`) and hands over: the mission panel and
+objective strip (top centre), the run panel (top right; beside the minimap on a touch screen),
+the kill feed (under the minimap), the player card (bottom left), the ability slots (bottom
+centre) and the weapon panel (bottom right; in the bottom-centre row on a touch screen), the
+hit marker, the flat pause card and the paused icon row. `HUDController` keeps the crosshair,
+briefing, banner, boss bar, bomb cursor, damage indicators, vignette, and the logic of pausing
+-- its `pausePanel`, `resumeButton`, `quitButton` and `pauseHintText` are pointed at the kit
+card. The builder-made readouts are still in the seven arena scenes, hidden, and
+`legacyReadouts` stops them updating. Built at runtime for the reason the results screen is:
+the same in every arena and in a level the kit did not build, with no rebuild of seven scenes.
+
+**Nothing in it polls.** Each readout is written when its source raises: `Health.Changed` and
+`Healed`, `Weapon.AmmoChanged` and the reload events, `GameDirector.ScoreChanged`,
+`CoinsChanged` and `KillRegistered` (the kill feed's who, how and boss), `LevelManager.
+ProgressChanged`, `ObjectiveChanged` and `ClockTicked` (compared once, in the manager, so the
+line's moving distance is not re-laid out by every reader), `BombThrower.ChargesChanged` and
+`ConsumableBelt.Changed`. Two traps it hit:
+
+- **A view that subscribes in `OnEnable` and is configured after `AddComponent` subscribes to
+  nothing.** `OnEnable` runs inside `AddComponent`. The panels still showed the right numbers
+  once, from `Start`, and then never moved -- found only because the pause icons never came up.
+  Subscribe at the end of the build, and from `OnEnable` only once built.
+- **`UIProgressBar` never laid out a bar that started at zero.** It snapped in `OnEnable`, before
+  `UIKit` had assigned its fill, so a bar at 0 matched its target and drew the fill as Unity's
+  default 100x100 rectangle -- a solid block of amber over the run panel. It lays out on its
+  first `Update` now.
+
+Achievements only move in the save when a level is scored, so a toast mid-level is the
+lifetime counter plus this run's live delta (kills, headshots, bomb kills, bosses, chain,
+coins), at each quarter of a target and at the finish -- not per kill. The ability slots are the
+bomb and the belt's one drink: the game has no flash, and a slot for an item that does not
+exist would be a control that does nothing. On a touch screen a slot shows no key -- the prompt
+there is the on-screen button's icon, which under the slot's own icon read as the icon twice.
+
+`CaptureDevices` stages a real fight for `*_hud_combat` (two enemies killed through their own
+`Health`, the player hurt, healed and re-armoured) and shoots it `After` 0.45s, while the
+pop-ups and feed rows are still up; the results shots hand a made-up result straight to the
+screen, never to `GameSession`, so a capture never writes the save of whoever ran it.
+
 ## A crosshair authored in canvas units disappears on a phone
 
 The HUD's crosshair is four 2x10 arms against a 1920-wide reference. On a monitor that is a

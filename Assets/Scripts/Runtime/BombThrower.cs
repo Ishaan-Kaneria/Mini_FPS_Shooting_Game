@@ -172,6 +172,9 @@ public class BombThrower : MonoBehaviour
     /// <summary>Raised when the key is pressed with nothing to throw. The HUD flashes on it.</summary>
     public event Action<BombThrower> Denied;
 
+    /// <summary>Raised whenever the charges or the bomb itself change: armed for a level, or one thrown.</summary>
+    public event Action<BombThrower> ChargesChanged;
+
     float _nextThrowTime;
     float _lockedRange;
 
@@ -649,6 +652,7 @@ public class BombThrower : MonoBehaviour
             audioSource.PlayOneShot(data.throwClip, 1f);
 
         Thrown?.Invoke(this, charges);
+        ChargesChanged?.Invoke(this);
     }
 
     /// <summary>
@@ -693,6 +697,7 @@ public class BombThrower : MonoBehaviour
 
         data = bomb;
         charges = Mathf.Max(0, chargeCount);
+        ChargesChanged?.Invoke(this);
         _nextThrowTime = 0f;
         _latched = false;
 

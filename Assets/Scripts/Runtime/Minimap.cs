@@ -121,6 +121,21 @@ public class Minimap : MonoBehaviour
              "a building at a glance rather than by colour alone.")]
     public Sprite blipSprite;
 
+    [Tooltip("What an enemy is drawn as: a triangle pointing where it faces. Made at runtime " +
+             "when empty, so a scene built before it existed still gets one.")]
+    public Sprite enemySprite;
+
+    [Tooltip("Draw every ordinary enemy in the enemy colour rather than its archetype's own. " +
+             "The HUD wants one colour that means \"hostile\" at a glance; the boss keeps its own.")]
+    public bool uniformEnemyColor = true;
+
+    [Tooltip("The smallest a pip is drawn, in canvas pixels, however far out the map is zoomed. " +
+             "A metre-sized enemy on a map covering a hundred and fifty metres is two pixels.")]
+    [Min(0f)] public float minPipPixels = 11f;
+
+    [Tooltip("East, south and west, riding the rim like the north pip. Optional.")]
+    public RectTransform eastPip, southPip, westPip;
+
 
     [Min(0.5f)] public float enemyRadius = 2.1f;
     [Min(0.5f)] public float eliteRadius = 2.8f;
@@ -241,7 +256,7 @@ public class Minimap : MonoBehaviour
         int terrain = DrawStructures(centre, cos, sin, yaw, scale, halfPx);
         Hide(_terrainPool, terrain);
 
-        int blips = DrawActors(centre, cos, sin, scale, halfPx);
+        int blips = DrawActors(centre, cos, sin, yaw, scale, halfPx);
         Hide(_blipPool, blips);
 
         if (playerMarker != null)
@@ -254,6 +269,13 @@ public class Minimap : MonoBehaviour
             var dir = new Vector2(-sin, cos);
             northPip.anchoredPosition = dir * (halfPx - 10f);
         }
+
+        // The other three are north turned a quarter at a time, so they cannot disagree
+        // with it either.
+        var east = new Vector2(cos, sin);
+        if (eastPip != null) eastPip.anchoredPosition = east * (halfPx - 10f);
+        if (southPip != null) southPip.anchoredPosition = new Vector2(sin, -cos) * (halfPx - 10f);
+        if (westPip != null) westPip.anchoredPosition = -east * (halfPx - 10f);
     }
 
     // ======================================================================
@@ -300,7 +322,7 @@ public class Minimap : MonoBehaviour
         return used;
     }
 
-    int DrawActors(Vector2 centre, float cos, float sin, float scale, float halfPx)
+    int DrawActors(Vector2 centre, float cos, float sin, float yaw, float scale, float halfPx)
     {
         int used = 0;
         bool finished = levelManager != null && levelManager.IsFinished;
@@ -331,8 +353,8 @@ public class Minimap : MonoBehaviour
             bool elite = type != null && type.role == EnemyArchetype.Role.Elite;
 
             Color tint = boss ? bossColor
-                       : type != null ? Legible(type.bodyColor)
-                       : enemyColor;
+                       : uniformEnemyColor || type == null ? enemyColor
+                       : Legible(type.bodyColor);
 
             float size = boss ? bossRadius : elite ? eliteRadius : enemyRadius;
 
@@ -342,8 +364,11 @@ public class Minimap : MonoBehaviour
                 size *= 1f + Mathf.Sin(Time.unscaledTime * 3.4f) * bossPulse;
 
             Vector3 wp = ai.transform.position;
-            Blip(new Vector2(wp.x, wp.z) - centre, cos, sin, scale, halfPx,
-                 size, tint, ref used, clamp: clampOffMapEnemies);
+            // Turned the way the structures are: by the player's yaw less the enemy's own,
+            // so a triangle points where that enemy is facing on the map as drawn.
+            if (Blip(new Vector2(wp.x, wp.z) - centre, cos, sin, scale, halfPx,
+                     size, tint, ref used, clamp: clampOffMapEnemies, sprite: EnemySprite))
+                _blipPool[used - 1].rectTransform.localRotation = Quaternion.Euler(0f, 0f, yaw - YawOf(ai.transform));
         }
 
         return used;
@@ -354,7 +379,7 @@ public class Minimap : MonoBehaviour
     /// worth holding at the rim.
     /// </summary>
     bool Blip(Vector2 delta, float cos, float sin, float scale, float halfPx,
-              float metres, Color tint, ref int used, bool clamp)
+              float metres, Color tint, ref int used, bool clamp, Sprite sprite = null)
     {
         Vector2 uv = Project(delta, cos, sin) * scale;
         float limit = halfPx - metres * scale;
@@ -375,15 +400,62 @@ public class Minimap : MonoBehaviour
 
         var rect = image.rectTransform;
         rect.anchoredPosition = uv;
-        rect.sizeDelta = Vector2.one * (metres * 2f * scale);
+        rect.sizeDelta = Vector2.one * Mathf.Max(minPipPixels, metres * 2f * scale);
         rect.localRotation = Quaternion.identity;
 
+        image.sprite = sprite != null ? sprite : blipSprite;
         image.color = tint;
         image.enabled = true;
         used++;
 
         return true;
     }
+
+    Sprite EnemySprite
+    {
+        get
+        {
+            if (enemySprite == null) enemySprite = Triangle();
+            return enemySprite;
+        }
+    }
+
+    static Sprite _triangle;
+
+    /// <summary>Domain reload is off, so the cached sprite is dropped by hand between play sessions.</summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => _triangle = null;
+
+    /// <summary>
+    /// A white triangle, point up, antialiased by coverage. Made once per session; white so
+    /// the pip's colour is the Image's, as it is for every other icon in the kit.
+    /// </summary>
+    static Sprite Triangle()
+    {
+        if (_triangle != null) return _triangle;
+        const int n = 64;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "MinimapTriangle", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[n * n];
+        Vector2 a = new Vector2(n * 0.5f, n - 4f), b = new Vector2(8f, 6f), c = new Vector2(n - 8f, 6f);
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            int inside = 0;
+            for (int sy = 0; sy < 4; sy++)
+            for (int sx = 0; sx < 4; sx++)
+            {
+                var p = new Vector2(x + (sx + 0.5f) / 4f, y + (sy + 0.5f) / 4f);
+                if (Side(a, b, p) >= 0 && Side(b, c, p) >= 0 && Side(c, a, p) >= 0) inside++;
+            }
+            px[y * n + x] = new Color32(255, 255, 255, (byte)(inside * 255 / 16));
+        }
+        tex.SetPixels32(px);
+        tex.Apply();
+        _triangle = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f);
+        return _triangle;
+    }
+
+    static float Side(Vector2 a, Vector2 b, Vector2 p) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
 
     /// <summary>
     /// World XZ, relative to the player, turned so the player's forward points up.

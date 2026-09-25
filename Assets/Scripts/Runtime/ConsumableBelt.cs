@@ -61,6 +61,9 @@ public class ConsumableBelt : MonoBehaviour
     /// <summary>Raised when the key is pressed with an empty belt. The HUD flashes on it.</summary>
     public event Action<ConsumableBelt> Denied;
 
+    /// <summary>Raised when the belt's item or its count changes: equipped for a level, or one used.</summary>
+    public event Action<ConsumableBelt> Changed;
+
     float _boostUntil;
     float _boostDuration;
     bool _boostApplied;
@@ -137,6 +140,7 @@ public class ConsumableBelt : MonoBehaviour
             audioSource.PlayOneShot(data.useClip, 0.9f);
 
         Used?.Invoke(this, Count);
+        Changed?.Invoke(this);
         return true;
     }
 
@@ -190,5 +194,6 @@ public class ConsumableBelt : MonoBehaviour
 
         data = item;
         itemId = id ?? "";
+        Changed?.Invoke(this);
     }
 }

@@ -162,6 +162,25 @@ public class HUDController : MonoBehaviour
     public Color headshotColor = new Color(1f, 0.85f, 0.2f);
     public float hitmarkerDuration = 0.12f;
 
+    [Tooltip("Tint the crosshair's arms on a hit. Off when a separate hit marker draws the " +
+             "hit instead -- HudView's, which is white on a hit and red on a kill -- so the two " +
+             "never say different things at once.")]
+    public bool tintOnHit = true;
+
+    [Header("Kit HUD")]
+    [Tooltip("Build the flat HUD (HudView) at runtime and hand it the readouts: mission, run, " +
+             "player card, abilities, weapon, kill feed. Off keeps the builder-made HUD.")]
+    public bool useKitHud = true;
+
+    [Tooltip("Whether this component still writes its own score, ammo, health, objective and " +
+             "equipment readouts every frame. HudView switches it off, because it shows the same " +
+             "things from events and a hidden label updated sixty times a second is waste.")]
+    public bool legacyReadouts = true;
+
+    [Tooltip("The key strip across the top. HudView switches it off: the pause key moved to a " +
+             "small hint in the corner, and the rest is taught by the briefing and HOW TO PLAY.")]
+    public bool showInstructionStrip = true;
+
     [Header("Damage Feedback")]
     public Image damageVignette;
     public float vignetteFadeSpeed = 1.6f;
@@ -310,6 +329,8 @@ public class HUDController : MonoBehaviour
 
         // The template is a source object, not something that should render.
         if (damageIndicatorPrefab != null) damageIndicatorPrefab.gameObject.SetActive(false);
+
+        if (useKitHud) HudView.Create(this, _director);
     }
 
     void Start()
@@ -439,7 +460,7 @@ public class HUDController : MonoBehaviour
     {
         if (instructionText == null) return;
         var strip = instructionText.transform.parent;
-        if (strip != null) strip.gameObject.SetActive(GameInput.Scheme != InputScheme.Touch);
+        if (strip != null) strip.gameObject.SetActive(showInstructionStrip && GameInput.Scheme != InputScheme.Touch);
     }
 
     void OnEnable()
@@ -501,7 +522,7 @@ public class HUDController : MonoBehaviour
     void Update()
     {
         UpdateTexts();
-        UpdateHealthBars();
+        if (legacyReadouts) UpdateHealthBars();
         if (!_crosshairFitted) FitCrosshairToDevice();
 
         UpdateCrosshair();
@@ -509,8 +530,11 @@ public class HUDController : MonoBehaviour
         UpdateVignette();
         UpdateBanner();
         UpdateBossBar();
-        UpdateObjectiveBar();
-        UpdateEquipment();
+        if (legacyReadouts)
+        {
+            UpdateObjectiveBar();
+            UpdateEquipment();
+        }
         UpdateIndicators();
     }
 
@@ -563,6 +587,14 @@ public class HUDController : MonoBehaviour
 
     void UpdateTexts()
     {
+        if (!legacyReadouts)
+        {
+            // The kit view shows everything else, from events. The briefing is still this
+            // component's: it is the countdown in the middle of the screen.
+            if (levelManager != null) UpdateBriefingText();
+            return;
+        }
+
         if (ammoText != null && weapon != null) UpdateAmmoText();
         if (healthText != null && playerHealth != null) UpdateHealthText();
 
@@ -1213,12 +1245,31 @@ public class HUDController : MonoBehaviour
     {
         _crosshairFitted = true;
 
-        if (!DeviceProfile.Touched) return;
         if (crosshairArms == null || crosshairArms.Length < 4) return;
 
         var canvas = GetComponentInParent<Canvas>();
         float scale = canvas != null ? canvas.scaleFactor : 1f;
         if (scale <= 0.0001f) scale = 1f;
+
+        if (!DeviceProfile.Touched)
+        {
+            // A pointer keeps the hairline, but outlined one screen pixel in black: a white
+            // hairline over snow, sand or sky was the one crosshair that could vanish. The
+            // outline is in screen pixels, so it is one pixel at every resolution.
+            foreach (var arm in crosshairArms)
+            {
+                if (arm == null) continue;
+                var image = arm.GetComponent<Image>();
+                if (image == null) continue;
+                image.color = crosshairColor;
+                var edge = image.GetComponent<Outline>();
+                if (edge == null) edge = image.gameObject.AddComponent<Outline>();
+                edge.effectColor = new Color(0f, 0f, 0f, 0.85f);
+                edge.effectDistance = Vector2.one / scale;
+                edge.useGraphicAlpha = true;
+            }
+            return;
+        }
 
         // Canvas units per millimetre of glass.
         float unit = TouchMetrics.MillimetresToPixels(1f) / scale;
@@ -1323,7 +1374,7 @@ public class HUDController : MonoBehaviour
         SetArm(2, new Vector2(-_currentGap, 0f));   // Left
         SetArm(3, new Vector2(_currentGap, 0f));    // Right
 
-        Color tint = Time.unscaledTime < _hitmarkerUntil ? _hitmarkerTint : crosshairColor;
+        Color tint = tintOnHit && Time.unscaledTime < _hitmarkerUntil ? _hitmarkerTint : crosshairColor;
         foreach (var image in CrosshairImages())
             if (image != null) image.color = tint;
 

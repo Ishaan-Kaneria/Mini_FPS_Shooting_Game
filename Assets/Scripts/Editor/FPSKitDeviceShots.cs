@@ -51,6 +51,8 @@ namespace FPSKit.EditorTools
             public bool Pause;
             public bool LeftHanded;
             public float Wait;
+            /// <summary>Seconds between opening what the shot needs and taking it. Zero means half of Wait.</summary>
+            public float After;
         }
 
         const string MenuScene = "Assets/FPSKit_Generated/Scenes/Menu.unity";
@@ -119,6 +121,8 @@ namespace FPSKit.EditorTools
                 new Shot { File = "ipad_levels", Scene = MenuScene, Device = IPad, Scheme = InputScheme.Touch, Open = "levels", Wait = 2.5f },
                 new Shot { File = "pc_results", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "results", Wait = 6f },
                 new Shot { File = "pc720_results", Scene = ArenaScene, Device = Pc(1280, 720), Scheme = InputScheme.KeyboardMouse, Open = "results", Wait = 6f },
+                new Shot { File = "pc_hud_combat", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "combat", Wait = 18f, After = 0.45f },
+                new Shot { File = "iphone15_hud_combat", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "combat", Wait = 18f, After = 0.45f },
                 new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
             };
             string only = Arg("-fpskitOnly");
@@ -190,6 +194,33 @@ namespace FPSKit.EditorTools
         /// Handed straight to the screen, never to the director: a result that went through
         /// GameSession would be written into the save of whoever ran the capture.
         /// </summary>
+        /// <summary>
+        /// A moment of a real fight, for the HUD: two enemies killed through their own Health,
+        /// so the level, the director and every HUD event run exactly as they do in play; the
+        /// player hurt, then healed and re-armoured, so both pop-ups are up when the shot is taken.
+        /// </summary>
+        static void StageCombat()
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            int killed = 0;
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+            {
+                if (killed >= 2) break;
+                var h = ai.GetComponent<Health>();
+                if (h == null || h.IsDead) continue;
+                h.Kill(new DamageInfo(9999f, ai.transform.position, Vector3.up, Vector3.down, player) { isHeadshot = killed == 0 });
+                killed++;
+            }
+            if (killed == 0) throw new Exception("no enemy had spawned to kill for the combat shot");
+            var health = player != null ? player.GetComponent<Health>() : null;
+            if (health != null)
+            {
+                health.ApplyDamage(new DamageInfo(60f, player.transform.position, Vector3.up, Vector3.forward, null));
+                health.Heal(25f);
+                health.RestoreShield(20f);
+            }
+        }
+
         static void OpenResults()
         {
             var ui = Object.FindAnyObjectByType<LevelResultsUI>();
@@ -262,6 +293,10 @@ namespace FPSKit.EditorTools
                         {
                             OpenResults();
                         }
+                        else if (shot.Open == "combat")
+                        {
+                            StageCombat();
+                        }
                         else if (!string.IsNullOrEmpty(shot.Open))
                         {
                             var menu = Object.FindAnyObjectByType<MainMenuController>();
@@ -287,7 +322,7 @@ namespace FPSKit.EditorTools
                         return;
 
                     case 3:
-                        if (Since < shot.Wait * 0.5) return;
+                        if (Since < (shot.After > 0f ? shot.After : shot.Wait * 0.5)) return;
                         Render(shot);
                         Measure(shot);
                         if (_uiCam != null) Object.Destroy(_uiCam.gameObject);

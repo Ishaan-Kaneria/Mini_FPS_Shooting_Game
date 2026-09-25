@@ -159,6 +159,24 @@ public class GameDirector : MonoBehaviour
     /// <summary>Raised whenever the coin tally moves, so the HUD can pop its counter.</summary>
     public event Action<GameDirector, int> CoinsChanged;
 
+    /// <summary>One kill as the HUD's kill feed tells it: who, how, and whether it was the boss.</summary>
+    public struct KillInfo
+    {
+        public EnemyArchetype archetype;
+        public bool headshot;
+        public bool byBomb;
+        public bool boss;
+        public int points;
+        public Vector3 position;
+    }
+
+    /// <summary>
+    /// Raised for every kill, after the score and coins have moved. A second event beside
+    /// <see cref="Killed"/> rather than a change to it, because that one is subscribed to
+    /// with three arguments across the kit and a new field there would break every caller.
+    /// </summary>
+    public event Action<KillInfo> KillRegistered;
+
     float _comboExpiry;
 
     // ======================================================================
@@ -348,6 +366,15 @@ public class GameDirector : MonoBehaviour
         ScoreChanged?.Invoke(this);
         ComboChanged?.Invoke(this);
         Killed?.Invoke(archetype, awarded, position);
+        KillRegistered?.Invoke(new KillInfo
+        {
+            archetype = archetype,
+            headshot = headshot,
+            byBomb = byBomb,
+            boss = archetype != null && archetype.role == EnemyArchetype.Role.Boss,
+            points = awarded,
+            position = position,
+        });
 
         return awarded;
     }

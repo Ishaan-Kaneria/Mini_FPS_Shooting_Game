@@ -28,6 +28,12 @@ public class UIProgressBar : MonoBehaviour
 
     float _shown = -1f;
 
+    // Whether the fill has ever been laid out. OnEnable runs the moment the component is
+    // added -- before UIKit has assigned the fill -- so a bar that starts at zero used to
+    // match its target on the first frame, never lay out, and draw its fill as Unity's
+    // default 100x100 rectangle: a solid block of accent colour over the panel.
+    bool _applied;
+
     UITheme Theme => theme != null ? theme : UITheme.Active;
 
     /// <summary>The fraction filled, 0 to 1. Animates towards it.</summary>
@@ -63,6 +69,7 @@ public class UIProgressBar : MonoBehaviour
 
     void Update()
     {
+        if (!_applied) { Snap(); return; }
         if (Mathf.Approximately(_shown, _value)) return;
         // Covers the whole bar in one standard duration, so a big change and a small one
         // both settle in about the same time the rest of the interface moves in.
@@ -74,6 +81,7 @@ public class UIProgressBar : MonoBehaviour
     void Apply()
     {
         if (fill == null) return;
+        _applied = true;
         var rt = fill.rectTransform;
         rt.anchorMin = new Vector2(0f, 0f);
         rt.anchorMax = new Vector2(Mathf.Clamp01(_shown), 1f);

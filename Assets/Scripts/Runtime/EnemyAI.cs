@@ -36,6 +36,13 @@ public class EnemyAI : MonoBehaviour
              "leave empty on a hand-placed enemy and it simply uses the fields below.")]
     public EnemyArchetype archetype;
 
+    /// <summary>
+    /// Whether this enemy has seen the player at least once. It never goes back: an enemy
+    /// that has found you is hunting you whether or not it can see you this frame, and the
+    /// HUD's marker over it says exactly that.
+    /// </summary>
+    public bool HasSpotted => _hasAlerted;
+
     [Header("Behaviour")]
     public bool ranged;
     public float attackRange = 2f;

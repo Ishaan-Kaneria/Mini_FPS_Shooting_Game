@@ -240,6 +240,21 @@ public class LevelManager : MonoBehaviour
     public event Action<LevelManager> LevelStarted;
     public event Action<LevelResult> LevelFinished;
 
+    /// <summary>Raised when the kill count moves -- a kill, or a new level starting at zero.</summary>
+    public event Action<LevelManager> ProgressChanged;
+
+    /// <summary>
+    /// Raised when the objective's HUD line reads differently. The line carries a distance
+    /// and a fuse, so it is compared here, once, rather than by everything that shows it.
+    /// </summary>
+    public event Action<LevelManager> ObjectiveChanged;
+
+    /// <summary>Raised when the clock's whole seconds change, with the seconds left (-1 when not running).</summary>
+    public event Action<LevelManager, int> ClockTicked;
+
+    string _shownObjectiveLine = "";
+    int _shownSecond = int.MinValue;
+
     /// <summary>
     /// One live enemy plus the bookkeeping the leash needs. A class rather than a
     /// struct so the stranded clock can be updated in place while it sits in the list.
@@ -369,6 +384,25 @@ public class LevelManager : MonoBehaviour
     {
         RecoverLevelLoop();
         SweepEnemies();
+        PublishChanges();
+    }
+
+    /// <summary>Raises the clock and objective events when what they would show has changed.</summary>
+    void PublishChanges()
+    {
+        int second = IsRunning && !IsFinished ? Mathf.CeilToInt(TimeRemaining) : -1;
+        if (second != _shownSecond)
+        {
+            _shownSecond = second;
+            ClockTicked?.Invoke(this, second);
+        }
+
+        string line = IsRunning && !IsFinished ? ObjectiveLine ?? "" : "";
+        if (line != _shownObjectiveLine)
+        {
+            _shownObjectiveLine = line;
+            ObjectiveChanged?.Invoke(this);
+        }
     }
 
     /// <summary>
@@ -493,6 +527,7 @@ public class LevelManager : MonoBehaviour
     IEnumerator RunLevel()
     {
         Killed = 0;
+        ProgressChanged?.Invoke(this);
         _killedWeight = 0f;
         BossKilled = false;
 
@@ -1234,6 +1269,7 @@ public class LevelManager : MonoBehaviour
 
         Killed++;
         _killedWeight += wasBoss ? Level.bossWeight : 1f;
+        ProgressChanged?.Invoke(this);
 
         var ai = health.GetComponent<EnemyAI>();
         var archetype = ai != null ? ai.archetype : null;

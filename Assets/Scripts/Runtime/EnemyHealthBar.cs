@@ -39,6 +39,14 @@ public class EnemyHealthBar : MonoBehaviour
     public Color shieldColor = new Color(0.4f, 0.75f, 1f);
     public Color backgroundColor = new Color(0.05f, 0.05f, 0.06f, 1f);
 
+    [Header("Marker")]
+    [Tooltip("A small red diamond over any enemy that has spotted the player or been hit, " +
+             "shown even while the bar itself is hidden. It answers \"which of these is " +
+             "coming for me\" from across the arena, where a bar is too small to read.")]
+    public bool showMarker = true;
+    public Color markerColor = new Color(0.851f, 0.325f, 0.310f, 1f);
+    [Min(0.01f)] public float markerSize = 0.2f;
+
     [Header("Wiring")]
     [Tooltip("Unlit material for the bar quads. Left empty, one is found at runtime -- " +
              "assign the generated asset instead so the shader survives a player build.")]
@@ -51,6 +59,9 @@ public class EnemyHealthBar : MonoBehaviour
     Renderer _fillRenderer;
     Renderer _shieldRenderer;
     Renderer _backgroundRenderer;
+    Renderer _markerRenderer;
+    EnemyAI _ai;
+    bool _barShown = true;
     MaterialPropertyBlock _block;
     Camera _camera;
 
@@ -89,6 +100,12 @@ public class EnemyHealthBar : MonoBehaviour
         _shieldRenderer = MakeQuad("Shield", material, size, -0.002f, out _shield);
 
         SetColor(_backgroundRenderer, backgroundColor);
+
+        _ai = GetComponent<EnemyAI>();
+        _markerRenderer = MakeQuad("Marker", material, Vector2.one * markerSize, -0.003f, out var marker);
+        marker.localPosition = new Vector3(0f, size.y * 0.5f + markerSize, 0f);
+        marker.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        SetColor(_markerRenderer, markerColor);
     }
 
     void OnEnable()
@@ -124,9 +141,22 @@ public class EnemyHealthBar : MonoBehaviour
             if (_camera == null) return;
         }
 
-        bool visible = ShouldShow();
+        bool bar = ShouldShow();
+        bool mark = ShouldMark();
+        bool visible = bar || mark;
         if (_root.gameObject.activeSelf != visible) _root.gameObject.SetActive(visible);
         if (!visible) return;
+
+        if (bar != _barShown)
+        {
+            _barShown = bar;
+            _backgroundRenderer.gameObject.SetActive(bar);
+            _fillRenderer.gameObject.SetActive(bar);
+            if (!bar) _shieldRenderer.gameObject.SetActive(false);
+            else Refresh();
+        }
+        if (_markerRenderer != null && _markerRenderer.gameObject.activeSelf != mark)
+            _markerRenderer.gameObject.SetActive(mark);
 
         // Face the camera plane rather than the camera's position: pointing each bar
         // at the eye makes the row of them fan outwards at the screen edges.
@@ -159,6 +189,17 @@ public class EnemyHealthBar : MonoBehaviour
 
     static float SafeInverse(float value) => Mathf.Abs(value) < 0.0001f ? 1f : 1f / value;
 
+    /// <summary>Spotted the player, or been hit -- and alive, and near enough to matter.</summary>
+    bool ShouldMark()
+    {
+        if (!showMarker || _markerRenderer == null || _health == null || _health.IsDead) return false;
+        if (_camera != null && maxVisibleDistance > 0f &&
+            (transform.position - _camera.transform.position).sqrMagnitude >
+            maxVisibleDistance * maxVisibleDistance)
+            return false;
+        return (_ai != null && _ai.HasSpotted) || !_health.IsFull;
+    }
+
     bool ShouldShow()
     {
         if (_health == null || _health.IsDead) return false;
@@ -180,7 +221,7 @@ public class EnemyHealthBar : MonoBehaviour
         SetFill(_fill, _fillRenderer, health01, HealthColor(health01));
 
         bool hasShield = _health.maxShield > 0f;
-        if (_shield != null) _shield.gameObject.SetActive(hasShield && _health.Shield > 0f);
+        if (_shield != null) _shield.gameObject.SetActive(_barShown && hasShield && _health.Shield > 0f);
 
         if (hasShield) SetFill(_shield, _shieldRenderer, _health.ShieldNormalized, shieldColor);
     }

@@ -289,6 +289,56 @@ public static class UIKit
         return tb;
     }
 
+    /// <summary>
+    /// The same tabs as <see cref="TabBar"/>, stacked down the side with an icon over each
+    /// caption. For a landscape handset, where height is the scarce dimension and the left
+    /// edge is under a thumb. The selection line is on each tab's left edge.
+    /// </summary>
+    public static UITabBar TabRail(Transform parent, string name, string[] captions, string[] iconIds,
+                                   float tabHeight, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var bar = Rect(parent, name);
+        var col = Column(bar, 4f, new RectOffset(0, 0, 8, 8), TextAnchor.UpperCenter);
+        col.childForceExpandWidth = true;
+        col.childForceExpandHeight = false;
+        col.childControlWidth = true;
+
+        var tabs = new FlatButton[captions.Length];
+        for (int i = 0; i < captions.Length; i++)
+        {
+            var face = Panel(bar, "Tab_" + captions[i], PanelTone.Raised, t);
+            face.raycastTarget = true;
+            Column(face, 6f, new RectOffset(6, 6, 10, 8), TextAnchor.MiddleCenter);
+            Size(face, height: tabHeight);
+
+            Image icon = null;
+            if (iconIds != null && i < iconIds.Length && !string.IsNullOrEmpty(iconIds[i]))
+                icon = Icon(face.transform, "Icon", iconIds[i], 28f, t.textSecondary, t);
+
+            var label = Text(face.transform, "Label", captions[i], TextRole.Label, t);
+            label.alignment = TextAlignmentOptions.Center;
+            // Fixed at label size, not auto-sized: a rail is for a handset, where anything
+            // smaller falls under the 12dp text floor. The rail is sized for the longest caption.
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.fontSize = t.sizeLabel;
+
+            var b = face.gameObject.AddComponent<FlatButton>();
+            b.face = face;
+            b.label = label;
+            b.icon = icon;
+            b.targetGraphic = face;
+            b.tabEdge = FlatRect.Side.Left;
+            b.variant = FlatButton.Variant.Tab;
+            tabs[i] = b;
+        }
+
+        var tb = bar.gameObject.AddComponent<UITabBar>();
+        tb.tabs = tabs;
+        tb.Selected = 0;
+        return tb;
+    }
+
     // ==================================================================
     // Bars.
     // ==================================================================

@@ -1594,6 +1594,12 @@ store, achievements, instructions, THE LIST and the level select are built into 
 runtime from the kit. Only the story covers the bar. HOW TO PLAY and THE LIST are under the
 Info icon; the old bottom button row and its EXIT GAME are gone.
 
+- **On a handset the tabs are a rail down the left edge, not a bar.** The game is
+  landscape-only, so height is what a phone lacks and the left edge is under a thumb; a
+  bottom bar spends the wrong dimension. The builder makes both (`TabRail` is off),
+  `ApplyFormLayout` swaps them, and every screen under the bar is inset by
+  `MenuTopBar.railWidth` -- the runtime Loadout and Info screens included, which are
+  created after the swap and inset as they are made.
 - **A card selects; PLAY MISSION plays.** Clicking an arena makes it the one CURRENT MISSION
   describes (`Missions.NextLevel`: the first unlocked level with no stars). PLAY MISSION is the
   only button that loads a level; ALL LEVELS opens the ladder. `MainMenuController.Choose`

@@ -81,6 +81,7 @@ public class MainMenuController : MonoBehaviour
     [HideInInspector] public GameObject lastRunPanel;
 
     readonly List<ArenaCard> _cards = new List<ArenaCard>();
+    readonly HashSet<RectTransform> _railInset = new HashSet<RectTransform>();
     GridLayoutGroup _layout;
     Vector2 _fitted = new Vector2(-1f, -1f);
     bool[] _dashboardWasShown;
@@ -128,6 +129,8 @@ public class MainMenuController : MonoBehaviour
         _loadout.StoreRequested += () => { _loadout.Close(); OpenStore(); };
         _info = InfoPanel.Create(canvas, topBarHeight);
         _info.Closed += OnOverlayClosed;
+        InsetForRail(_loadout.panel);
+        InsetForRail(_info.panel);
         _info.HowToPlayRequested += () => { _info.Close(); OpenInstructions(); };
         _info.ListRequested += () => { _info.Close(); OpenDossier(); };
 
@@ -149,6 +152,7 @@ public class MainMenuController : MonoBehaviour
         if (topBar != null)
         {
             if (topBar.tabs != null) topBar.tabs.onChanged.AddListener(OnTab);
+            if (topBar.railTabs != null) topBar.railTabs.onChanged.AddListener(OnTab);
             Wire(topBar.settingsButton, () => SettingsPanel.Show(canvas));
             Wire(topBar.infoButton, OpenInfo);
             Wire(topBar.quitButton, AskToExit);
@@ -563,7 +567,7 @@ public class MainMenuController : MonoBehaviour
     /// </summary>
     void ShowDashboard(bool shown, bool hideTopBar = false)
     {
-        if (topBar != null) topBar.gameObject.SetActive(shown || !hideTopBar);
+        if (topBar != null) topBar.SetShown(shown || !hideTopBar);
         if (dashboardOnly == null) return;
 
         if (!shown)
@@ -596,23 +600,47 @@ public class MainMenuController : MonoBehaviour
     // ======================================================================
 
     /// <summary>
-    /// A handset gets its own arrangement, not this one smaller: the rank moves from the bar
-    /// into the welcome line, the loadout strip and next-reward card go (both are a tab away),
-    /// the arenas become one row that scrolls sideways, and the mission card keeps its column
-    /// so PLAY MISSION stays under the right thumb. Tablets and desktops keep what the builder
-    /// authored, and this does nothing on them.
+    /// A handset gets its own arrangement, not this one smaller: the tabs move from the bar
+    /// onto a rail down the left edge, the rank moves from the bar into the welcome line, the
+    /// loadout strip and next-reward card go (both are a tab away), the arenas become one row
+    /// that scrolls sideways, and the mission card keeps its column so PLAY MISSION stays
+    /// under the right thumb. Tablets and desktops keep what the builder authored, and this
+    /// does nothing on them.
     /// </summary>
     void ApplyFormLayout()
     {
         bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
-        if (topBar != null && topBar.rankBlock != null) topBar.rankBlock.SetActive(!handset);
+        if (topBar != null)
+        {
+            if (topBar.rankBlock != null) topBar.rankBlock.SetActive(!handset);
+            topBar.UseRail(handset);
+        }
         if (rankLine != null) rankLine.gameObject.SetActive(handset);
         if (hideOnHandset != null)
             foreach (var go in hideOnHandset) if (go != null) go.SetActive(!handset);
         if (mission != null) mission.SetCompact(handset);
         if (!handset) return;
-        if (leftColumn != null) leftColumn.anchorMax = new Vector2(0.60f, leftColumn.anchorMax.y);
-        if (rightColumn != null) rightColumn.anchorMin = new Vector2(0.61f, rightColumn.anchorMin.y);
+        if (leftColumn != null) leftColumn.anchorMax = new Vector2(0.57f, leftColumn.anchorMax.y);
+        if (rightColumn != null) rightColumn.anchorMin = new Vector2(0.58f, rightColumn.anchorMin.y);
+
+        if (dashboardOnly != null) foreach (var go in dashboardOnly) InsetForRail(go);
+        if (store != null) InsetForRail(store.panel);
+        if (achievements != null) InsetForRail(achievements.panel);
+        if (instructions != null) InsetForRail(instructions.panel);
+        if (dossier != null) InsetForRail(dossier.panel);
+        if (levelSelect != null) InsetForRail(levelSelect.panel);
+    }
+
+    /// <summary>
+    /// Moves a screen's left edge clear of the rail. A no-op when the rail is not in use, and
+    /// only ever applied once per screen, because it adds to whatever inset was authored.
+    /// </summary>
+    void InsetForRail(GameObject go)
+    {
+        if (go == null || topBar == null || !topBar.RailInUse) return;
+        if (!(go.transform is RectTransform rt) || _railInset.Contains(rt)) return;
+        _railInset.Add(rt);
+        rt.offsetMin = new Vector2(rt.offsetMin.x + topBar.railWidth, rt.offsetMin.y);
     }
 
     // ======================================================================

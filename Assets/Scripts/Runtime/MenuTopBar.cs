@@ -10,6 +10,11 @@ using UnityEngine;
 /// The tabs are a <see cref="UITabBar"/>; <see cref="MainMenuController"/> listens to it and
 /// opens the screen, and calls <see cref="ShowTab"/> when a screen is opened some other way.
 /// Everything shown is read from the save each time <see cref="Refresh"/> runs.
+///
+/// <b>A landscape handset gets the tabs as a rail down the left edge instead.</b> Height is
+/// the scarce dimension there and the left edge is under a thumb, so a row across the top or
+/// the bottom spends the wrong one. Both sets are built; <see cref="UseRail"/> shows one, and
+/// <see cref="ShowTab"/> keeps them agreeing so a form change never shows a stale tab.
 /// </summary>
 public class MenuTopBar : MonoBehaviour
 {
@@ -26,9 +31,40 @@ public class MenuTopBar : MonoBehaviour
     [Tooltip("Hidden on a handset, where the welcome line carries the rank instead.")]
     public GameObject rankBlock;
 
+    [Header("Handset rail")]
+    [Tooltip("The panel down the left edge that holds the rail. Shown only on a handset.")]
+    public GameObject rail;
+    public UITabBar railTabs;
+    [Tooltip("How wide the rail is, in canvas units. Screens under the bar start this far in.")]
+    public float railWidth = 152f;
+
+    bool _useRail;
+
+    /// <summary>Whether the tabs are on the rail. Screens under the bar inset by <see cref="railWidth"/> when they are.</summary>
+    public bool RailInUse => _useRail && rail != null && railTabs != null;
+
+    /// <summary>The tabs the player can see.</summary>
+    public UITabBar VisibleTabs => RailInUse ? railTabs : tabs;
+
     public void ShowTab(Tab tab)
     {
         if (tabs != null) tabs.Selected = (int)tab;
+        if (railTabs != null) railTabs.Selected = (int)tab;
+    }
+
+    /// <summary>Moves the tabs onto the rail, or back into the bar.</summary>
+    public void UseRail(bool on)
+    {
+        _useRail = on;
+        if (tabs != null) tabs.gameObject.SetActive(!RailInUse);
+        if (rail != null) rail.SetActive(RailInUse && gameObject.activeSelf);
+    }
+
+    /// <summary>Shows or hides the bar, and the rail with it when the rail is in use.</summary>
+    public void SetShown(bool shown)
+    {
+        gameObject.SetActive(shown);
+        if (rail != null) rail.SetActive(shown && RailInUse);
     }
 
     public void Refresh()

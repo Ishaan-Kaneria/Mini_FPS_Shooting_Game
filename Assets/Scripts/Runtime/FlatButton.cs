@@ -42,6 +42,11 @@ public class FlatButton : Button
     [Tooltip("Tabs only: this is the tab that is showing.")]
     [SerializeField] bool _selected;
 
+    [Tooltip("Tabs only: which edge carries the selection line. The bottom for a bar across " +
+             "the top, the left for a rail down the side, so the line always faces the screen " +
+             "the tab opens.")]
+    public FlatRect.Side tabEdge = FlatRect.Side.Bottom;
+
     [Tooltip("Hold one look whatever the pointer does. For the component gallery, which has " +
              "to show all four states side by side.")]
     public bool holdLook;
@@ -180,7 +185,7 @@ public class FlatButton : Button
             face.borderColor = _border;
             if (_variant == Variant.Tab)
             {
-                face.stripeSide = FlatRect.Side.Bottom;
+                face.stripeSide = tabEdge;
                 face.stripePixels = Theme.selectionPixels;
                 face.stripeColor = _stripe;
             }

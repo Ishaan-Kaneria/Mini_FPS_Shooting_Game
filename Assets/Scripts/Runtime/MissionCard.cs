@@ -36,8 +36,12 @@ public class MissionCard : MonoBehaviour
     /// <summary>The handset layout: the name, the level, the numbers and the button.</summary>
     public void SetCompact(bool compact)
     {
+        _compact = compact;
+        if (Entry != null) Bind(Entry);
         foreach (var go in compactHidden) if (go != null) go.SetActive(!compact);
     }
+
+    bool _compact;
 
     public ArenaCatalog.Entry Entry { get; private set; }
     public int LevelIndex { get; private set; }
@@ -81,7 +85,10 @@ public class MissionCard : MonoBehaviour
         }
 
         int enemies = level.enemyCount + (level.hasBoss ? 1 : 0);
-        if (enemiesText != null) enemiesText.text = t.Tabular(enemies.ToString(), heading: false) + (level.hasBoss ? " ENEMIES · BOSS" : " ENEMIES");
+        // Compact drops the word: the skull beside the number already says what it counts,
+        // and the handset column has no room for the stats row with it spelled out.
+        string counted = _compact ? "" : " ENEMIES";
+        if (enemiesText != null) enemiesText.text = t.Tabular(enemies.ToString(), heading: false) + counted + (level.hasBoss ? " · BOSS" : "");
         if (timeText != null)
         {
             int s = Mathf.RoundToInt(level.timeLimit);

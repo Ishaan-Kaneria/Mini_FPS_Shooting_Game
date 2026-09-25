@@ -23,6 +23,7 @@ namespace FPSKit.EditorTools
     public static partial class FPSKitMenuBuilder
     {
         const float TopBarHeight = 88f;
+        const float RailWidth = 152f;
 
         static void BuildDashboard(RectTransform root, MainMenuController menu)
         {
@@ -68,6 +69,7 @@ namespace FPSKit.EditorTools
             menu.footerText = footer;
 
             BuildTopBar(root, menu, t);
+            BuildTabRail(root, menu, t);
             BuildToasts(root, menu, t);
             BuildQuitConfirm(root, menu, t);
 
@@ -154,6 +156,40 @@ namespace FPSKit.EditorTools
             top.quitButton = quit;
             top.rankBlock = rank.gameObject;
             menu.topBar = top;
+        }
+
+        /// <summary>
+        /// The same four tabs as a rail down the left edge, for a landscape handset. Built
+        /// switched off; <see cref="MainMenuController.ApplyFormLayout"/> swaps it in. Each tab
+        /// takes a quarter of whatever height is left under the bar, which on a phone is well
+        /// over the nine millimetres a thumb needs.
+        /// </summary>
+        static void BuildTabRail(RectTransform root, MainMenuController menu, UITheme t)
+        {
+            var rail = UIKit.Panel(root, "TabRail", UIKit.PanelTone.Panel, t);
+            rail.borderColor = new Color(0, 0, 0, 0);
+            rail.stripeSide = FlatRect.Side.Right;
+            rail.stripeColor = t.border;
+            rail.stripePixels = t.borderPixels;
+            rail.raycastTarget = true;
+            var rt = rail.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 0.5f);
+            rt.offsetMin = new Vector2(0f, 0f);
+            rt.offsetMax = new Vector2(RailWidth, -TopBarHeight);
+
+            var tabs = UIKit.TabRail(rail.transform, "Tabs", new[] { "Play", "Loadout", "Achievements", "Store" },
+                                     new[] { "player-play", "rifle", "trophy", "shopping-cart" }, 96f, t);
+            var trt = (RectTransform)tabs.transform;
+            UIKit.Fill(trt);
+            // Stretch the tabs to share the rail rather than sit at a fixed height at the top.
+            var col = tabs.GetComponent<VerticalLayoutGroup>();
+            col.childControlHeight = true;
+            col.childForceExpandHeight = true;
+
+            menu.topBar.rail = rail.gameObject;
+            menu.topBar.railTabs = tabs;
+            menu.topBar.railWidth = RailWidth;
+            rail.gameObject.SetActive(false);
         }
 
         // ==================================================================

@@ -174,6 +174,7 @@ public class HudView : MonoBehaviour
     void OnSetting(string key)
     {
         if (_map != null) _map.rotateWithPlayer = GameSettings.MinimapRotates;
+        if (DeviceProfile.Touched && (key == "*" || key == "leftHanded")) PlaceRunPanelForTouch();
         if (key == "*" || key.StartsWith("key")) OnScheme();
     }
 
@@ -635,13 +636,13 @@ public class HudView : MonoBehaviour
     /// <summary>
     /// A touch screen has its controls where the pointer layout has panels: the pause button
     /// in the top-right corner and the fire cluster down the right edge (the left, mirrored).
-    /// So the run panel moves beside the minimap, into the top-left space a phone leaves free,
-    /// and the weapon joins the ability slots in one row along the bottom centre, under the
-    /// thumbs rather than beneath one of them.
+    /// So the run panel moves into the top corner the buttons leave free (see
+    /// <see cref="PlaceRunPanelForTouch"/>), and the weapon joins the ability slots in one row
+    /// along the bottom centre, under the thumbs rather than beneath one of them.
     /// </summary>
     void ArrangeForTouch()
     {
-        if (_runPanel != null) Corner(_runPanel, new Vector2(0f, 1f), new Vector2(Margin + 225f + 12f, -Margin));
+        PlaceRunPanelForTouch();
         // Beside the slots rather than inside their row: a child of a layout group is placed
         // by the group, and the player has to be able to move the two apart.
         if (_weaponPanel != null)
@@ -651,6 +652,29 @@ public class HudView : MonoBehaviour
             _weaponPanel.pivot = new Vector2(1f, 0f);
             _weaponPanel.anchoredPosition = new Vector2(-(76f + 10f + 10f), Margin);
         }
+    }
+
+    /// <summary>
+    /// The run panel on a touch screen goes in the top corner opposite the button cluster:
+    /// beside the minimap for a right-handed player, and top right for a left-handed one,
+    /// the same distance in from the edge, which keeps it clear of the pause button.
+    ///
+    /// Left-handed, the cluster mirrors to the left edge and its top row -- the crouch
+    /// button -- lands right where the panel sits beside the minimap. The footer corners
+    /// already swap with the hands (TouchLayout.MirrorHudFooter); this is the top one.
+    /// The player's own placement, if any, comes off first and goes back on after.
+    /// </summary>
+    void PlaceRunPanelForTouch()
+    {
+        if (_runPanel == null) return;
+        var target = _runPanel.GetComponent<HudLayoutTarget>();
+        if (target != null) target.Apply(null);
+
+        float inset = Margin + 225f + 12f;
+        if (GameSettings.LeftHanded) Corner(_runPanel, new Vector2(1f, 1f), new Vector2(-inset, -Margin));
+        else Corner(_runPanel, new Vector2(0f, 1f), new Vector2(inset, -Margin));
+
+        if (target != null) target.Settle();
     }
 
     void BuildHitMarker()

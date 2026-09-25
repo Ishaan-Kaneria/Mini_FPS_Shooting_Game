@@ -92,6 +92,14 @@ public class CampaignData : ScriptableObject
                  "one paragraph would bury the second under the first.")]
         public int extraBeatSibling = -1;
 
+        [Tooltip("Stars the player must hold across the whole campaign before this zone " +
+                 "opens, on top of the holder of the zone before it being down. Zero for no " +
+                 "star gate.\n\n" +
+                 "Both, not either: the story alone let a player scrape one star per level " +
+                 "to the end, and stars alone would let them meet a later sibling before an " +
+                 "earlier one, which the beat cards cannot survive.")]
+        [Min(0)] public int starsToUnlock;
+
         [Tooltip("The id of the power handed over when this zone falls, or empty. Same " +
                  "kind of permanent key as a store item's id: renaming one forgets that " +
                  "the player ever earned it.")]

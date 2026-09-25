@@ -226,7 +226,7 @@ namespace FPSKit.EditorTools
                 {
                     displayName = last && !string.IsNullOrEmpty(holder)
                         ? holder.ToUpperInvariant()
-                        : LevelName(number, boss, objective),
+                        : LevelName(themeName, number, boss, objective),
 
                     brief = Brief(themeName, i, enemies, boss, objective, last, holder),
 
@@ -234,7 +234,9 @@ namespace FPSKit.EditorTools
                     // banner when the boss walks in says who it is rather than which
                     // chassis it was built on. A level with none falls back to the
                     // archetype exactly as before.
-                    bossName = last && !string.IsNullOrEmpty(holder) ? holder : "",
+                    bossName = last && !string.IsNullOrEmpty(holder)
+                        ? holder
+                        : boss ? FPSKitCampaign.LieutenantFor(themeName, number / 3) : "",
 
                     objective = objective,
 
@@ -381,9 +383,13 @@ namespace FPSKit.EditorTools
             return rotation[(fought + arenaIndex) % rotation.Length];
         }
 
-        static string LevelName(int number, bool boss, LevelSet.Objective objective)
+        static string LevelName(string themeName, int number, bool boss, LevelSet.Objective objective)
         {
-            if (boss) return $"BOSS {number / 3}";
+            if (boss)
+            {
+                string named = FPSKitCampaign.LieutenantFor(themeName, number / 3);
+                return string.IsNullOrEmpty(named) ? $"BOSS {number / 3}" : named.ToUpperInvariant();
+            }
 
             // Named for what it asks, because the name is on the tile the player is
             // choosing from and "NO COVER" says nothing that "BLACKOUT" does not say

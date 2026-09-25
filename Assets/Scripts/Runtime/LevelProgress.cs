@@ -23,6 +23,9 @@ public static class LevelProgress
     /// <summary>Best score on one level, so a tile can show what beating it was worth.</summary>
     static string ScoreKey(string arena, int index) => $"FPSKit.Level.{arena}.{index}.Score";
 
+    /// <summary>Fastest clear of one level, in seconds. Only a clear is timed.</summary>
+    static string TimeKey(string arena, int index) => $"FPSKit.Level.{arena}.{index}.BestTime";
+
     /// <summary>Stars on one level, 0 through 3. 0 means it has never been passed.</summary>
     public static int StarsIn(string arena, int index)
         => string.IsNullOrEmpty(arena) || index < 0
@@ -34,14 +37,25 @@ public static class LevelProgress
             ? 0
             : PlayerPrefs.GetInt(ScoreKey(arena, index), 0);
 
+    /// <summary>Fastest clear in seconds, or 0 when the level has never been cleared.</summary>
+    public static float BestTimeIn(string arena, int index)
+        => string.IsNullOrEmpty(arena) || index < 0
+            ? 0f
+            : PlayerPrefs.GetFloat(TimeKey(arena, index), 0f);
+
     /// <summary>
     /// True when the player is allowed into this level. The first is always open; the
     /// rest need a star on the level before, which is what makes the ladder a ladder.
+    ///
+    /// <b>A level the player already has stars on is open whatever is below it.</b> Saves
+    /// from before the gate held, and saves played with the editor's Unlock All switch,
+    /// have stars scattered up a ladder with gaps under them; locking a level somebody has
+    /// already beaten would take away something they earned.
     /// </summary>
     public static bool IsUnlocked(string arena, int index)
     {
         if (index <= 0 || DebugUnlock.Active) return true;
-        return StarsIn(arena, index - 1) > 0;
+        return StarsIn(arena, index - 1) > 0 || StarsIn(arena, index) > 0;
     }
 
     /// <summary>
@@ -49,7 +63,7 @@ public static class LevelProgress
     /// a level the player already three-starred must never be able to take stars away --
     /// that would make practising a punishment.
     /// </summary>
-    public static void Record(string arena, int index, int stars, int score)
+    public static void Record(string arena, int index, int stars, int score, float clearTime = 0f)
     {
         if (string.IsNullOrEmpty(arena) || index < 0) return;
 
@@ -57,6 +71,9 @@ public static class LevelProgress
 
         if (stars > StarsIn(arena, index)) PlayerPrefs.SetInt(StarsKey(arena, index), stars);
         if (score > BestScoreIn(arena, index)) PlayerPrefs.SetInt(ScoreKey(arena, index), score);
+
+        float best = BestTimeIn(arena, index);
+        if (clearTime > 0f && (best <= 0f || clearTime < best)) PlayerPrefs.SetFloat(TimeKey(arena, index), clearTime);
 
         PlayerPrefs.Save();
     }

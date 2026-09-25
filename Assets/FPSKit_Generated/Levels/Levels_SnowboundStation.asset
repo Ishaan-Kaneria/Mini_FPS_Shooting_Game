@@ -57,7 +57,7 @@ MonoBehaviour:
     rosterStep: 4
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 1
+  - displayName: THE FOREMAN
     brief: Kestrel lit the yard a week ago and has kept it lit. 12 hostiles and a boss. The boss is most of the score.
     enemyCount: 12
     timeLimit: 69
@@ -68,7 +68,7 @@ MonoBehaviour:
     objectiveWeight: 5
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
-    bossName: 
+    bossName: The Foreman
     bossWeight: 5.5
     bossHealthMultiplier: 1.3
     healthMultiplier: 1.25
@@ -120,7 +120,7 @@ MonoBehaviour:
     rosterStep: 8
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
+  - displayName: THE SHOTFIRER
     brief: Her people know the ground and are letting you have the open part of it. 21 hostiles and a boss. The boss is most of the score.
     enemyCount: 21
     timeLimit: 99
@@ -131,7 +131,7 @@ MonoBehaviour:
     objectiveWeight: 9
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Shotfirer
     bossWeight: 7
     bossHealthMultiplier: 1.6
     healthMultiplier: 1.55

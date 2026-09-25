@@ -96,4 +96,55 @@ public static class Missions
         LevelSet.Objective.Disposal => "DISPOSAL",
         _ => "CLEAR THE ARENA",
     };
+
+    // ---- the three stars, in words ------------------------------------------------
+
+    /// <summary>
+    /// What each star asks for on this level, one line per star, read off the same numbers
+    /// <see cref="LevelResult.StarsFor"/> cuts with -- so the card that promises a star and
+    /// the screen that awards it cannot disagree.
+    ///
+    /// One and two stars are a share of the level's <i>weight</i>, not of its head count:
+    /// the boss and any objective are worth more than one enemy, which
+    /// <see cref="WeightNote"/> spells out underneath. Three is all of it, and the task, before
+    /// the clock -- the one result a fraction cannot buy.
+    /// </summary>
+    public static string[] StarConditions(LevelSet.Level level)
+    {
+        if (level == null) return new[] { "", "", "" };
+        string everything = UIText.Row(
+            $"KILL ALL {level.enemyCount}",
+            level.hasBoss ? "THE BOSS" : "",
+            level.ObjectiveWeight > 0f ? ObjectiveTask(level.objective) : "");
+        return new[]
+        {
+            $"DOWN {Percent(level.oneStarScore)} OF THE LEVEL",
+            $"DOWN {Percent(level.twoStarScore)} OF THE LEVEL",
+            everything.Replace(UIText.Separator, ", ") + " IN TIME",
+        };
+    }
+
+    /// <summary>
+    /// How the level is weighed, when it is not simply a head count: "EACH ENEMY 1 · BOSS 6 ·
+    /// OBJECTIVE 5". Empty for a plain clear, where the percentages already mean enemies.
+    /// </summary>
+    public static string WeightNote(LevelSet.Level level)
+    {
+        if (level == null || (!level.hasBoss && level.ObjectiveWeight <= 0f)) return "";
+        return UIText.Row("EACH ENEMY 1",
+                          level.hasBoss ? $"BOSS {level.bossWeight:0.#}" : "",
+                          level.ObjectiveWeight > 0f ? $"{ObjectiveTask(level.objective)} {level.ObjectiveWeight:0.#}" : "");
+    }
+
+    /// <summary>The task a weighted objective adds, as a short imperative.</summary>
+    public static string ObjectiveTask(LevelSet.Objective o) => o switch
+    {
+        LevelSet.Objective.Hunt => "CATCH THE RUNNER",
+        LevelSet.Objective.Hold => "HOLD THE GROUND",
+        LevelSet.Objective.Extraction => "REACH THE WAY OUT",
+        LevelSet.Objective.Disposal => "REACH A CHARGE",
+        _ => "",
+    };
+
+    static string Percent(float fraction) => Mathf.RoundToInt(fraction * 100f) + "%";
 }

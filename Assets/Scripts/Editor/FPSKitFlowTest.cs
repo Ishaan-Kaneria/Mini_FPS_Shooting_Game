@@ -647,20 +647,34 @@ namespace FPSKit.EditorTools
             if (!Campaign.ZoneUnlocked(data, 0))
                 return "the campaign's first zone is locked, so the game cannot be started";
 
+            // The rule, restated from the save rather than asked of the gate: a zone is open
+            // when the player has already fought in it, or when the child before it is down
+            // AND the campaign's star total reaches what the zone asks. Every zone before the
+            // one being checked is held by a sibling in the shipped campaign, so the story
+            // half is ChildDefeated directly.
+            int stars = 0;
+            for (int i = 0; i < data.ZoneCount; i++)
+            {
+                var z = data.ZoneAt(i);
+                if (z != null) stars += LevelProgress.StarsInArena(z.ProgressKey, z.LevelCount);
+            }
+
             for (int i = 1; i < data.ZoneCount; i++)
             {
+                var zone = data.ZoneAt(i);
+                string where = zone != null ? zone.displayName : $"zone {i + 1}";
+                bool played = zone != null && LevelProgress.StarsInArena(zone.ProgressKey, zone.LevelCount) > 0;
+                bool story = Campaign.ChildDefeated(data, i - 1);
+                int need = zone != null ? zone.starsToUnlock : 0;
+                bool earned = played || (story && stars >= need);
                 bool open = Campaign.ZoneUnlocked(data, i);
-                bool earned = Campaign.ChildDefeated(data, i - 1);
 
                 if (open != earned)
-                {
-                    var zone = data.ZoneAt(i);
-                    string where = zone != null ? zone.displayName : $"zone {i + 1}";
-
                     return open
-                        ? $"\"{where}\" is open although the child before it is still standing"
-                        : $"\"{where}\" is locked although the child before it is down";
-                }
+                        ? $"\"{where}\" is open although it is unplayed and " +
+                          (story ? $"the player holds {stars} of the {need} stars it asks" : "the child before it is still standing")
+                        : $"\"{where}\" is locked although " +
+                          (played ? "the player has already fought in it" : $"the child before it is down and {stars}/{need} stars are held");
             }
 
             return "";

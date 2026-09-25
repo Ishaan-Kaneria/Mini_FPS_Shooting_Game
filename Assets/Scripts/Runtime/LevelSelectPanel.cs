@@ -12,6 +12,11 @@ using UnityEngine.UI;
 /// the ladder is the progress: what is unlocked, what is still locked, and how many of
 /// the three stars each cleared level gave up.
 ///
+/// The header says how far the player has got here -- stars out of the ladder's and levels
+/// cleared, the same words the arena card uses so the two screens cannot be read as
+/// disagreeing -- and the zone's story opening sits under it at reading size, because this
+/// is where somebody who skipped the card is standing when they wonder what it said.
+///
 /// Built into the dashboard scene by the menu builder and driven by
 /// <see cref="MainMenuController"/>, which owns the catalog. The tiles are cloned from
 /// a template per level in the arena's <see cref="LevelSet"/>, so an arena that grows a
@@ -32,9 +37,17 @@ public class LevelSelectPanel : MonoBehaviour
 
     public Button backButton;
 
-    [Header("Text")]
+    [Header("Header")]
     public TMP_Text arenaNameText;
-    public TMP_Text progressText;
+    [Tooltip("The arena's own colour, as a 3px stripe beside its name -- the only place it appears.")]
+    public FlatRect arenaStripe;
+    public TMP_Text starsText;
+    public TMP_Text clearedText;
+
+    [Header("Story")]
+    [Tooltip("The panel the zone's opening sits in. Hidden when the zone has none.")]
+    public GameObject storyBlock;
+    public TMP_Text storyTitleText;
     public TMP_Text hintText;
 
     [Tooltip("The campaign, so the hint line under the header can be this zone's own " +
@@ -43,21 +56,28 @@ public class LevelSelectPanel : MonoBehaviour
              "way into a zone, which is exactly where somebody who skipped a card is " +
              "standing when they wonder what it said.")]
     public CampaignData campaign;
+    [Tooltip("Where something is wrong with the ladder itself, in words. Empty when all is well.")]
     public TMP_Text statusText;
 
     [Header("Grid")]
-    [Tooltip("Columns. The cell size is worked out from this and the space actually " +
+    [Tooltip("Columns at most. The cell size is worked out from this and the space actually " +
              "available, for the same reason the arena grid does it: a fixed cell is " +
              "only ever right at one window shape.")]
     [Min(1)] public int gridColumns = 4;
 
     [Tooltip("Tile height as a fraction of its width.")]
-    [Min(0.1f)] public float tileAspect = 0.72f;
+    [Min(0.1f)] public float tileAspect = 0.78f;
+
+    [Tooltip("Scrolls the tiles sideways on a handset, where eight cards of this much text " +
+             "cannot share one screen at a size anybody can read.")]
+    public ScrollRect scroll;
 
     // ======================================================================
     readonly List<LevelButton> _tiles = new List<LevelButton>();
 
     GridLayoutGroup _layout;
+    Transform _storyHome;
+    int _storyIndex = 1;
     float _fittedWidth = -1f;
     float _fittedHeight = -1f;
 
@@ -107,6 +127,8 @@ public class LevelSelectPanel : MonoBehaviour
 
     void Start()
     {
+        if (storyBlock != null) _storyIndex = storyBlock.transform.GetSiblingIndex();
+
         if (backButton == null) return;
 
         backButton.onClick.RemoveAllListeners();
@@ -172,47 +194,65 @@ public class LevelSelectPanel : MonoBehaviour
             Report($"\"{entry.Label}\" has no levels. Run FPSKit > Reset Level Sets, then " +
                    "FPSKit > Build Dashboard.");
 
-            if (progressText != null) progressText.text = "";
+            if (starsText != null) starsText.text = "";
+            if (clearedText != null) clearedText.text = "";
             return;
         }
 
         Report("");
 
-        int unlockedCount = 0;
+        var t = UITheme.Active;
+        string key = entry.ProgressKey;
+        int next = Missions.NextLevel(entry);
+        // The same level CURRENT MISSION names: the first open one without a star, else the
+        // first open one short of three. Nothing is NEXT once the ladder is all three-star.
+        bool nextIsNew = LevelProgress.StarsIn(key, next) < 3 && LevelProgress.IsUnlocked(key, next);
+        Color arenaColor = t.StripeFor(entry.sceneName);
 
         for (int i = 0; i < set.Count; i++)
         {
-            var level = set.At(i);
-
-            bool unlocked = LevelProgress.IsUnlocked(entry.ProgressKey, i);
-            int stars = LevelProgress.StarsIn(entry.ProgressKey, i);
-
-            if (unlocked) unlockedCount++;
-
             var tile = Instantiate(tileTemplate, tileParent);
             tile.gameObject.SetActive(true);
 
             int index = i;
-            tile.Bind(index, level, stars, unlocked, () => Choose(index));
+            tile.Bind(index, set.Count, set.At(i), key, entry.preview, arenaColor,
+                      LevelProgress.IsUnlocked(key, i), nextIsNew && i == next, () => Choose(index));
 
             _tiles.Add(tile);
         }
 
-        int earned = LevelProgress.StarsInArena(entry.ProgressKey, set.Count);
-        int possible = set.Count * 3;
+        int earned = LevelProgress.StarsInArena(key, set.Count);
+        int cleared = LevelProgress.LevelsCleared(key, set.Count);
 
-        if (progressText != null)
-            progressText.text = $"{earned} / {possible} STARS     " +
-                                $"{unlockedCount} / {set.Count} UNLOCKED";
+        if (arenaStripe != null) arenaStripe.color = arenaColor;
+        if (starsText != null)
+            starsText.text = t.Tabular($"{earned}/{set.Count * 3}") + " " + InputPrompts.Glyph("star-filled");
+        if (clearedText != null)
+            clearedText.text = t.Tabular($"{cleared}/{set.Count}") + " CLEARED";
 
-        if (hintText != null)
+        // On a handset the story is the first card of the sideways row rather than a panel
+        // over it: a landscape phone has no height to give a paragraph above the cards, and
+        // the cards' star conditions were what got squeezed out. It is read first, then
+        // swiped past.
+        if (storyBlock != null && _storyHome == null) _storyHome = storyBlock.transform.parent;
+        if (storyBlock != null)
         {
-            var zone = campaign != null ? campaign.ZoneForArena(entry.ProgressKey) : null;
+            bool inRow = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+            storyBlock.transform.SetParent(inRow ? tileParent : _storyHome, false);
+            if (inRow) storyBlock.transform.SetAsFirstSibling();
+            else storyBlock.transform.SetSiblingIndex(_storyIndex);
+        }
 
-            hintText.text = zone != null && !string.IsNullOrWhiteSpace(zone.opening)
-                ? Campaign.Expand(zone.opening)
-                : "Clear a level to unlock the next. Kill everything before the clock " +
-                  "runs out for three stars.";
+        var zone = campaign != null ? campaign.ZoneForArena(key) : null;
+        bool story = zone != null && !string.IsNullOrWhiteSpace(zone.opening);
+        if (storyBlock != null) storyBlock.SetActive(story);
+        if (hintText != null) hintText.text = story ? Campaign.Expand(zone.opening) : "";
+        if (storyTitleText != null)
+        {
+            var holder = story ? campaign.HolderOf(zone) : null;
+            storyTitleText.text = holder != null && !string.IsNullOrWhiteSpace(holder.displayName)
+                ? holder.displayName.ToUpperInvariant()
+                : "THE STORY";
         }
     }
 
@@ -244,8 +284,9 @@ public class LevelSelectPanel : MonoBehaviour
         if (_layout == null) _layout = tileParent.GetComponent<GridLayoutGroup>();
         if (_layout == null) return;
 
-        float width = tileParent.rect.width;
-        float height = tileParent.rect.height;
+        var box = scroll != null && scroll.viewport != null ? scroll.viewport : tileParent;
+        float width = box.rect.width;
+        float height = box.rect.height;
 
         if (width <= 1f || height <= 1f) return;
         if (Mathf.Abs(width - _fittedWidth) < 0.5f &&
@@ -254,11 +295,30 @@ public class LevelSelectPanel : MonoBehaviour
         _fittedWidth = width;
         _fittedHeight = height;
 
-        int cap = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset
-            ? 4
-            : Mathf.Max(1, gridColumns);
+        bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
 
-        UIGrid.Fit(_layout, tileParent, _tiles.Count, tileAspect, 70f, cap);
+        // Centred over the view on a screen that holds the whole ladder; pinned to the
+        // left edge when it scrolls, or the first card would start off screen.
+        var anchor = handset ? new Vector2(0f, 1f) : new Vector2(0.5f, 1f);
+        tileParent.anchorMin = tileParent.anchorMax = tileParent.pivot = anchor;
+        tileParent.anchoredPosition = Vector2.zero;
+
+        if (handset)
+        {
+            // One row the height of the view, scrolling sideways: a landscape phone has
+            // width to spare and no height, the same call the arena row makes.
+            _layout.startAxis = GridLayoutGroup.Axis.Vertical;
+            _layout.constraint = GridLayoutGroup.Constraint.FixedRowCount;
+            _layout.constraintCount = 1;
+            float h = height - _layout.padding.top - _layout.padding.bottom;
+            _layout.cellSize = new Vector2(h / tileAspect, h);
+            if (scroll != null) { scroll.horizontal = true; scroll.vertical = false; }
+            return;
+        }
+
+        _layout.startAxis = GridLayoutGroup.Axis.Horizontal;
+        if (scroll != null) { scroll.horizontal = false; scroll.vertical = false; }
+        UIGrid.Fit(_layout, box, _tiles.Count, tileAspect, 200f, Mathf.Max(1, gridColumns));
     }
 
     void Report(string message)

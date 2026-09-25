@@ -76,36 +76,42 @@ MonoBehaviour:
     siblingIndex: 0
     opening: The town had one employer and one gate. You were eleven the night this place burned, and the report that called it a gas fault was signed by Halvard Auger's daughter. Twenty years on, Tove still runs the plant.
     extraBeatSibling: -1
+    starsToUnlock: 0
     grantsPower: bomb
   - displayName: Snowbound Station
     levels: {fileID: 11400000, guid: f2375f859674c5c87b35e3756c5a0327, type: 2}
     siblingIndex: 1
     opening: Kestrel took the quarry and everything in its magazine. She has known you were coming since the plant went quiet, and she has been lighting the yard for it.
     extraBeatSibling: -1
+    starsToUnlock: 10
     grantsPower: 
   - displayName: Desert Outpost
     levels: {fileID: 11400000, guid: 19a21f71669ec452fa1bce4db121bcb6, type: 2}
     siblingIndex: 2
     opening: Everything the company ever moved went down this road, and Aurel signed for all of it. Including, once, a manifest with a child on it.
     extraBeatSibling: -1
+    starsToUnlock: 24
     grantsPower: 
   - displayName: Night Rooftop
     levels: {fileID: 11400000, guid: eafd0b974f354d6e09074c7a1181b549, type: 2}
     siblingIndex: 3
     opening: Ilsa runs what the company calls security, which is every camera in the city and the decision about which recordings exist. She has watched you for twenty years and filed none of it.
     extraBeatSibling: -1
+    starsToUnlock: 38
     grantsPower: 
   - displayName: Abandoned Subway
     levels: {fileID: 11400000, guid: 2103e99d5365a121ca63d3aa4e9a6695, type: 2}
     siblingIndex: 4
     opening: Dev ran the works into the ground and then moved into what was left. The rides still turn when the wind is behind them. He kept the lights on over the shafts, which is either a courtesy or a trap.
     extraBeatSibling: -1
+    starsToUnlock: 52
     grantsPower: 
   - displayName: Unknown Planet
     levels: {fileID: 11400000, guid: 33a84de879134139cb2d8effe32ab3e3, type: 2}
     siblingIndex: 5
     opening: Roan left before any of this happened, for a world nobody bothered to name, and has spent every year since being the one who was not there. The ground there is still being made. He is the last name on the list that still lives somewhere with a door on it.
     extraBeatSibling: -1
+    starsToUnlock: 66
     grantsPower: 
   - displayName: The Auger House
     levels: {fileID: 11400000, guid: 56c727975b20158a382c9c547a6fc23d, type: 2}
@@ -115,4 +121,5 @@ MonoBehaviour:
 
       The house is where it always was. The gate is open.'
     extraBeatSibling: 7
+    starsToUnlock: 84
     grantsPower: 

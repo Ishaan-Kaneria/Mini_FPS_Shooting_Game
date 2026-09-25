@@ -94,7 +94,8 @@ public static class GameSession
         bool flawless = result.damageTaken <= 0f;
         bool fast = result.timeLimit > 0f && result.TimeRemaining >= result.timeLimit * 0.5f;
         PlayerStats.RecordRun(result, flawless, fast);
-        LevelProgress.Record(result.arena, result.levelIndex, result.stars, result.score);
+        LevelProgress.Record(result.arena, result.levelIndex, result.stars, result.score,
+                             result.ending == LevelResult.Ending.Cleared ? result.timeTaken : 0f);
 
         // The one place coins are ever banked. Every ending routes through here --
         // cleared, timed out, died, walked out -- so there is a single line that can pay

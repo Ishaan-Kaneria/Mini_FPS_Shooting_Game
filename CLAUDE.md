@@ -1322,6 +1322,37 @@ Two other rules hold the ladder together:
 - **Unlocking is one line and lives in `LevelProgress.IsUnlocked`.** Level 0 is always
   open; every level after it needs a star on the one before. Nothing else may decide it —
   the menu, the results screen and `LevelManager` all ask that method.
+- **A level with stars on it is open whatever is below it.** Saves played with the editor's
+  **FPSKit > Debug > Unlock All** switched on -- Ishaan's was -- have stars scattered up a
+  ladder with gaps under them, and locking a level somebody already beat takes back what
+  they earned. The same rule holds for zones. And when somebody reports "everything is
+  unlocked", check that switch before the code: it is an EditorPrefs toggle, it survives
+  restarts, and it bypasses both gates.
+
+**The level select states each star's rule, and the results screen marks it MET or MISSED.**
+`Missions.StarConditions` writes the three from the level's own `oneStarScore`,
+`twoStarScore` and objective, so the card that promises a star and the screen that awards it
+read one method. One and two stars are a share of the level's *weight* (the boss and a task
+objective count for more than one enemy, which `Missions.WeightNote` spells out); three is
+every enemy, the boss and the task before the clock. There is **no par time**: the seconds on
+a card are the clock that ends the level, labelled TIME LIMIT, because a bare "32s" was read
+as a target. Best clear time is stored beside best score (`LevelProgress.BestTimeIn`), only
+for a clear, so saves from before it have scores and no times -- the card shows what exists.
+
+**The results screen is `ResultsView`, built at runtime from the kit.** `LevelResultsUI` still
+owns the keys, the audio, the stars landing in turn and where each button goes, and points
+its fields at the view in `Awake`; the builder-made panel is still in the seven arena scenes
+and stays hidden. Built at runtime for the reason Loadout and Info are: the screen is the same
+everywhere and a builder edit would mean rebuilding every arena. It has **its own canvas at
+sort order 500**, because the touch layer is a separate canvas above the HUD and drew the move
+stick and fire button over the card. XP for the level is counted from the result -- kills,
+stars above the previous best, the boss, new achievements -- rather than as XP after minus XP
+before, because `PlayerStats`' star total is only recomputed on the dashboard.
+
+**TMP with `Ellipsis` draws nothing when one line does not fit the height.** A row authored at
+20 units rendered its text on a monitor and was blank on a phone, where the text floor makes
+the line taller -- the star conditions on the level cards simply vanished, with the star icons
+beside them still drawn. Give such rows a `minHeight` and let the layout grow them.
 
 Progress is keyed by `ArenaCatalog.Entry.ProgressKey`, which is the `LevelSet`'s
 `arenaScene`, **not** the scene name. A WebGL build stages every arena as a renamed copy
@@ -1851,7 +1882,12 @@ Four rules hold it together:
   the two come to disagree -- silently. Same rule `Achievements` follows. What *is* stored
   is whether the player has **read** a beat, because that is a fact about the player.
 - **The gate is one method.** `Campaign.ArenaUnlocked`, exactly like
-  `LevelProgress.IsUnlocked` and for the same reason. A zone the campaign does not list,
+  `LevelProgress.IsUnlocked` and for the same reason. It asks two things: the holder of
+  the zone before is down (the story), **and** the player holds `Zone.starsToUnlock` stars
+  across the campaign -- 10/24/38/52/66/84 for Snowbound onward, Ishaan's pick, written in
+  `FPSKitCampaign.StarsToUnlock`. Both, because stars alone would let a player meet a later
+  sibling before an earlier one and the beat cards cannot survive that. `LockNote` says only
+  what is still missing. A zone the campaign does not list,
   or a missing campaign asset, is **open** -- the kit runs in arenas it did not build, and
   a gate that failed closed would be a game with one playable arena and no way to find out
   why. The dashboard says so on screen when the asset is missing.

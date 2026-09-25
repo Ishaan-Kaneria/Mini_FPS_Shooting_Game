@@ -112,6 +112,14 @@ namespace FPSKit.EditorTools
                 new Shot { File = "ipad_dashboard", Scene = MenuScene, Device = IPad, Scheme = InputScheme.Touch, Wait = 2.5f },
                 new Shot { File = "ipad_settings", Scene = MenuScene, Device = IPad, Scheme = InputScheme.Touch, Settings = true, Wait = 2.5f },
                 new Shot { File = "ipad_hud", Scene = ArenaScene, Device = IPad, Scheme = InputScheme.Touch, Wait = 6f },
+
+                new Shot { File = "pc_levels", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "levels", Wait = 2.5f },
+                new Shot { File = "pc720_levels", Scene = MenuScene, Device = Pc(1280, 720), Scheme = InputScheme.KeyboardMouse, Open = "levels", Wait = 2.5f },
+                new Shot { File = "iphone15_levels", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "levels", Wait = 2.5f },
+                new Shot { File = "ipad_levels", Scene = MenuScene, Device = IPad, Scheme = InputScheme.Touch, Open = "levels", Wait = 2.5f },
+                new Shot { File = "pc_results", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "results", Wait = 6f },
+                new Shot { File = "pc720_results", Scene = ArenaScene, Device = Pc(1280, 720), Scheme = InputScheme.KeyboardMouse, Open = "results", Wait = 6f },
+                new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
             };
             string only = Arg("-fpskitOnly");
             if (!string.IsNullOrEmpty(only))
@@ -177,6 +185,36 @@ namespace FPSKit.EditorTools
             _phaseStart = EditorApplication.timeSinceStartup;
         }
 
+        /// <summary>
+        /// Shows the results screen for a made-up two-star clear of the level that is loaded.
+        /// Handed straight to the screen, never to the director: a result that went through
+        /// GameSession would be written into the save of whoever ran the capture.
+        /// </summary>
+        static void OpenResults()
+        {
+            var ui = Object.FindAnyObjectByType<LevelResultsUI>();
+            var manager = Object.FindAnyObjectByType<LevelManager>();
+            if (ui == null || manager == null) throw new Exception("no results screen or level manager in the arena");
+            var level = manager.Level;
+            int total = level != null ? level.enemyCount + (level.hasBoss ? 1 : 0) : 10;
+            ui.Show(new LevelResult
+            {
+                arena = manager.Arena,
+                levelIndex = manager.LevelIndex,
+                levelName = manager.LevelName,
+                ending = LevelResult.Ending.TimeUp,
+                stars = 2,
+                killed = Mathf.Max(0, total - 1),
+                total = total,
+                scoreFraction = 0.85f,
+                hadBoss = level != null && level.hasBoss,
+                timeTaken = level != null ? level.timeLimit : 40f,
+                timeLimit = level != null ? level.timeLimit : 40f,
+                score = 8420,
+                coins = 186,
+            });
+        }
+
         static void Tick()
         {
             try
@@ -220,7 +258,11 @@ namespace FPSKit.EditorTools
                             SettingsPanel.Show(canvas);
                         }
                         if (shot.Pause && GameDirector.Instance != null) GameDirector.Instance.SetPaused(true);
-                        if (!string.IsNullOrEmpty(shot.Open))
+                        if (shot.Open == "results")
+                        {
+                            OpenResults();
+                        }
+                        else if (!string.IsNullOrEmpty(shot.Open))
                         {
                             var menu = Object.FindAnyObjectByType<MainMenuController>();
                             if (menu == null) throw new Exception("no dashboard to open " + shot.Open + " on");
@@ -231,6 +273,14 @@ namespace FPSKit.EditorTools
                                 case "quit": menu.AskToExit(); break;
                                 case "store": menu.OpenStore(); break;
                                 case "achievements": menu.OpenAchievements(); break;
+                                case "levels":
+                                    // Straight to the panel rather than through Choose, which reads
+                                    // a zone's opening card first; Snowbound, because its bosses
+                                    // have names and its story panel has a holder.
+                                    var entry = menu.catalog.arenas.FirstOrDefault(a => a != null && a.sceneName == "SnowboundStation")
+                                                ?? menu.catalog.arenas.FirstOrDefault(a => a != null);
+                                    menu.levelSelect.Open(entry);
+                                    break;
                             }
                         }
                         Next(3);
@@ -387,7 +437,9 @@ namespace FPSKit.EditorTools
             foreach (var s in Selectable.allSelectablesArray)
             {
                 if (s == null || !Visible(s) || Clipped(s)) continue;
-                var r = ScreenRect((RectTransform)s.transform);
+                // A card half scrolled out of a masked row is only drawn where the mask is,
+                // so that is the part that has to be inside the safe area.
+                var r = VisiblePart(s);
                 if (r.width < 1f || r.height < 1f) continue;
                 if (!Inside(safe, r)) _failures.Add($"{shot.File}: {Path(s.transform)} reaches outside the safe area");
             }
@@ -435,6 +487,16 @@ namespace FPSKit.EditorTools
             var m = ScreenRect(mask.rectTransform);
             var r = ScreenRect((RectTransform)c.transform);
             return !m.Overlaps(r) || r.yMin < m.yMin - 1f || r.yMax > m.yMax + 1f;
+        }
+
+        static Rect VisiblePart(Component c)
+        {
+            var r = ScreenRect((RectTransform)c.transform);
+            var mask = c.GetComponentInParent<RectMask2D>();
+            if (mask == null) return r;
+            var m = ScreenRect(mask.rectTransform);
+            return Rect.MinMaxRect(Mathf.Max(r.xMin, m.xMin), Mathf.Max(r.yMin, m.yMin),
+                                   Mathf.Min(r.xMax, m.xMax), Mathf.Min(r.yMax, m.yMax));
         }
 
         static bool Inside(Rect safe, Rect r) =>

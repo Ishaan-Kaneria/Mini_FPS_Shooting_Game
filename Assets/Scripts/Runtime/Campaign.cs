@@ -256,13 +256,51 @@ public static class Campaign
         if (zoneIndex >= data.ZoneCount) return true;
         if (DebugUnlock.Active) return true;
 
-        // A zone nobody holds cannot gate the one after it -- otherwise a zone added
-        // without a sibling would seal the rest of the campaign behind a fight that
-        // does not exist.
+        // Played is open. A save from before the star gate, or one played with the
+        // editor's Unlock All, may hold stars in a zone it would not reach today, and
+        // locking somebody out of a zone they have already fought in takes something back.
+        if (ZonePlayed(data, zoneIndex)) return true;
+
+        return StoryOpens(data, zoneIndex) && StarsInCampaign(data) >= StarsNeeded(data, zoneIndex);
+    }
+
+    /// <summary>
+    /// The story half of the gate: the holder of the zone before is down. A zone nobody
+    /// holds cannot gate the one after it -- otherwise a zone added without a sibling would
+    /// seal the rest of the campaign behind a fight that does not exist.
+    /// </summary>
+    static bool StoryOpens(CampaignData data, int zoneIndex)
+    {
+        if (zoneIndex <= 0) return true;
         var previous = data.ZoneAt(zoneIndex - 1);
         if (previous == null || previous.siblingIndex < 0) return ZoneUnlocked(data, zoneIndex - 1);
-
         return ChildDefeated(data, zoneIndex - 1);
+    }
+
+    /// <summary>Stars a zone asks for across the campaign, or 0.</summary>
+    public static int StarsNeeded(CampaignData data, int zoneIndex)
+    {
+        var zone = data != null ? data.ZoneAt(zoneIndex) : null;
+        return zone != null ? Mathf.Max(0, zone.starsToUnlock) : 0;
+    }
+
+    /// <summary>Every star the player holds in the zones the campaign lists.</summary>
+    public static int StarsInCampaign(CampaignData data)
+    {
+        if (data == null) return 0;
+        int stars = 0;
+        for (int i = 0; i < data.ZoneCount; i++)
+        {
+            var zone = data.ZoneAt(i);
+            if (zone != null) stars += LevelProgress.StarsInArena(zone.ProgressKey, zone.LevelCount);
+        }
+        return stars;
+    }
+
+    static bool ZonePlayed(CampaignData data, int zoneIndex)
+    {
+        var zone = data.ZoneAt(zoneIndex);
+        return zone != null && LevelProgress.StarsInArena(zone.ProgressKey, zone.LevelCount) > 0;
     }
 
     /// <summary>Whether the arena filed under this progress key may be entered.</summary>
@@ -292,9 +330,13 @@ public static class Campaign
             ? previous.displayName.ToUpperInvariant()
             : "THE ZONE BEFORE";
 
-        return holder != null && !string.IsNullOrWhiteSpace(holder.displayName)
-            ? $"LOCKED  -  FINISH {where}"
-            : $"LOCKED  -  CLEAR {where}";
+        // Says only what is still missing, so a player who has beaten the holder is told
+        // how many stars to go and not told to do something they have already done.
+        string story = StoryOpens(data, index) ? ""
+            : holder != null && !string.IsNullOrWhiteSpace(holder.displayName) ? $"FINISH {where}" : $"CLEAR {where}";
+        int need = StarsNeeded(data, index), have = StarsInCampaign(data);
+        string stars = have >= need ? "" : $"{have}/{need} STARS";
+        return "LOCKED  -  " + UIText.Row(story, stars);
     }
 
     // ---- stars across the whole campaign ---------------------------------------

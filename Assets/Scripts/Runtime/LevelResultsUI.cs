@@ -12,6 +12,13 @@ using UnityEngine.UI;
 /// note each, which is the entire point of a star rating -- awarded silently and all
 /// at once they are a number, and a number is not a thing anybody replays a level for.
 ///
+/// <b>What it looks like is <see cref="ResultsView"/></b>, built from the UI kit when this
+/// wakes and pointed at by the fields below, so the logic here -- keys, audio, stars landing
+/// in turn, where each button goes -- is unchanged and the old builder-made panel stays
+/// hidden in the scene. The view adds what a star count alone never said: each star's
+/// condition, met or missed; time against the limit; the XP this level earned; and the
+/// achievements it moved.
+///
 /// Everything here runs on unscaled time. The level ends with Time.timeScale at zero,
 /// so an animation driven by the scaled clock would never move at all.
 /// </summary>
@@ -91,9 +98,21 @@ public class LevelResultsUI : MonoBehaviour
 
     readonly List<Vector3> _starRest = new List<Vector3>();
 
+    ResultsView _view;
+    bool _missedMarked;
+
+    // What the level started from, so the screen can say what this level changed.
+    bool _snapshotTaken;
+    int _starsBefore;
+    int _xpBefore;
+    int _earnedBefore;
+    float _bestTimeBefore;
+    readonly Dictionary<string, int> _progressBefore = new Dictionary<string, int>();
+
     void Awake()
     {
         HideAtLoad(panel, this);
+        AdoptView();
 
         if (stars != null)
         {
@@ -130,6 +149,47 @@ public class LevelResultsUI : MonoBehaviour
 
         panel.SetActive(false);
         return true;
+    }
+
+    /// <summary>
+    /// Builds the kit view on this canvas and points the fields at it. The scene's old panel
+    /// has already been hidden above, and nothing refers to it after this.
+    /// </summary>
+    void AdoptView()
+    {
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+        _view = ResultsView.Create(canvas.transform);
+        panel = _view.root;
+        titleText = _view.title;
+        summaryText = _view.summary;
+        detailText = null;
+        hintText = _view.hint;
+        stars = _view.starIcons;
+        retryButton = _view.retryButton;
+        nextButton = _view.nextButton;
+        dashboardButton = _view.menuButton;
+
+        _starRest.Clear();
+        foreach (var star in stars)
+            if (star != null) _starRest.Add(star.rectTransform.localScale);
+    }
+
+    /// <summary>
+    /// Takes the before-picture on the level's first running frame. Not in Start: the
+    /// manager decides which level and arena this is in its own Start, and the order of two
+    /// Starts is not defined.
+    /// </summary>
+    void Snapshot()
+    {
+        if (_snapshotTaken || levelManager == null || string.IsNullOrEmpty(levelManager.Arena)) return;
+        _snapshotTaken = true;
+        _starsBefore = LevelProgress.StarsIn(levelManager.Arena, levelManager.LevelIndex);
+        _bestTimeBefore = LevelProgress.BestTimeIn(levelManager.Arena, levelManager.LevelIndex);
+        _xpBefore = PlayerRank.Xp;
+        _earnedBefore = Achievements.EarnedCount;
+        _progressBefore.Clear();
+        foreach (var a in Achievements.Catalogue) _progressBefore[a.Id] = a.Progress;
     }
 
     void Start()
@@ -220,6 +280,17 @@ public class LevelResultsUI : MonoBehaviour
                   $"{Key(QuitKey)} dashboard</size>"
                 : $"<size=80%>{Key(ReplayKey)} try again     {Key(QuitKey)} dashboard</size>";
 
+        if (_view != null)
+        {
+            Snapshot();
+            _view.transform.SetAsLastSibling();
+            _view.Fill(result, levelManager != null ? levelManager.Level : null, ArenaLabel(),
+                       XpGained(result), _xpBefore, NewBest(result), AchievementLines(),
+                       _nextAvailable,
+                       // Keys mean nothing to a thumb; the three buttons say it all.
+                       hintText != null && !MobileInput.Active ? hintText.text : "");
+        }
+
         if (panel != null) panel.SetActive(true);
 
         Play(result.Passed ? clearedClip : failedClip);
@@ -233,7 +304,17 @@ public class LevelResultsUI : MonoBehaviour
 
     void Update()
     {
-        if (!_shown) return;
+        if (!_shown)
+        {
+            if (levelManager != null && levelManager.IsRunning) Snapshot();
+            return;
+        }
+
+        if (_view != null && !_missedMarked && _starsShown >= _result.stars && Time.unscaledTime >= _nextStarAt)
+        {
+            _missedMarked = true;
+            _view.MarkMissed();
+        }
 
         AnimateStars();
         ReadKeys();
@@ -258,6 +339,7 @@ public class LevelResultsUI : MonoBehaviour
                 stars[index].color = starEarnedColor;
                 stars[index].rectTransform.localScale = RestScale(index) * starPunch;
             }
+            if (_view != null) _view.Land(index);
 
             // Each star a fifth higher than the last, so three of them is a rising
             // figure rather than the same note three times.
@@ -340,6 +422,50 @@ public class LevelResultsUI : MonoBehaviour
     };
 
     // ======================================================================
+    /// <summary>
+    /// XP this level earned, counted the way <see cref="PlayerRank.Xp"/> counts it: kills,
+    /// stars that beat this level's previous best, the boss, and achievements newly earned.
+    /// Worked out from the result rather than as XP-after minus XP-before, because the star
+    /// total PlayerRank reads is recomputed on the dashboard, not here.
+    /// </summary>
+    int XpGained(LevelResult r)
+    {
+        if (r.ending == LevelResult.Ending.Abandoned) return r.killed * PlayerRank.XpPerKill;
+        int starGain = Mathf.Max(0, r.stars - _starsBefore);
+        int newAchievements = Mathf.Max(0, Achievements.EarnedCount - _earnedBefore);
+        return r.killed * PlayerRank.XpPerKill + starGain * PlayerRank.XpPerStar +
+               (r.bossKilled ? PlayerRank.XpPerBoss : 0) + newAchievements * PlayerRank.XpPerAchievement;
+    }
+
+    bool NewBest(LevelResult r)
+        => r.ending == LevelResult.Ending.Cleared && (_bestTimeBefore <= 0f || r.timeTaken < _bestTimeBefore);
+
+    /// <summary>Achievements this level moved: earned ones first, then the closest to done.</summary>
+    List<string> AchievementLines()
+    {
+        var earned = new List<string>();
+        var moved = new List<(float, string)>();
+        foreach (var a in Achievements.Catalogue)
+        {
+            if (!_progressBefore.TryGetValue(a.Id, out int before) || a.Progress <= before) continue;
+            if (a.Earned && before < a.Target) earned.Add($"{a.Title.ToUpperInvariant()}  -  COMPLETE");
+            else if (!a.Earned) moved.Add((a.Fraction, $"{a.Title.ToUpperInvariant()}  -  {a.Progress} / {a.Target}"));
+        }
+        moved.Sort((x, y) => y.Item1.CompareTo(x.Item1));
+        foreach (var m in moved) earned.Add(m.Item2);
+        return earned;
+    }
+
+    string ArenaLabel()
+    {
+        var label = GameSession.SelectedArenaLabel;
+        if (!string.IsNullOrEmpty(label)) return label;
+        // Played straight from the editor, with no menu to have named it: the scene's name,
+        // spaced at its capitals so SnowboundStation reads as Snowbound Station.
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        return System.Text.RegularExpressions.Regex.Replace(scene, "(?<=[a-z])(?=[A-Z])", " ");
+    }
+
     public void Retry() => Load(_result.levelIndex);
 
     public void NextLevel()

@@ -66,6 +66,28 @@ namespace FPSKit.EditorTools
             "Dev Auger", "Roan Auger", "Marit Auger", "the eighth name"
         };
 
+        /// <summary>
+        /// Stars needed across the campaign to open each zone, in <see cref="ZoneOrder"/>
+        /// order, on top of the story gate. A ladder is 24 stars; these ask for a little over
+        /// half of everything before each zone -- a player who passes every level at one
+        /// star has to go back for some of the second and third, and one who plays well
+        /// never notices the gate. Chosen by Ishaan, 2026-09-25.
+        /// </summary>
+        public static readonly int[] StarsToUnlock = { 0, 10, 24, 38, 52, 66, 84 };
+
+        /// <summary>
+        /// Who a zone's two mid-ladder bosses are, by theme: rung 3 and rung 6, the Warden
+        /// and the Harbinger wearing a name that belongs to this zone's story. A theme not
+        /// listed keeps "BOSS 1" / "BOSS 2". Kestrel's pair was chosen by Ishaan; the rest
+        /// are unwritten, not forgotten.
+        /// </summary>
+        public static string LieutenantFor(string themeName, int ordinal) => (themeName, ordinal) switch
+        {
+            ("Snowbound Station", 1) => "The Foreman",
+            ("Snowbound Station", 2) => "The Shotfirer",
+            _ => ""
+        };
+
         public static readonly string[] SiblingHoldings =
         {
             "the plant", "the quarry", "the convoy road", "the cameras",
@@ -388,7 +410,10 @@ namespace FPSKit.EditorTools
                 siblingIndex = siblingIndex,
                 grantsPower = grantsPower,
                 opening = opening,
-                extraBeatSibling = extraBeat
+                extraBeatSibling = extraBeat,
+                starsToUnlock = IndexOfTheme(themeName) is int z && z >= 0 && z < StarsToUnlock.Length
+                    ? StarsToUnlock[z]
+                    : 0
             };
         }
 

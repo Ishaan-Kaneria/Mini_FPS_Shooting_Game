@@ -61,6 +61,11 @@ namespace FPSKit.EditorTools
              "progress from PlayerStats when it is asked, so what it reports is live even " +
              "though the array itself survives a play session"),
 
+            ("PlayerRank", "Titles",
+             "a readonly array of rank names, written once where it is declared and " +
+             "never again: TitleFor only indexes it, and the rank itself is derived from " +
+             "PlayerStats every time it is asked"),
+
             ("EnemyAI", "NeighbourBuffer",
              "scratch buffer: OverlapSphereNonAlloc rewrites it before every read and " +
              "the loop is bounded by the returned count, so nothing stale is ever read"),

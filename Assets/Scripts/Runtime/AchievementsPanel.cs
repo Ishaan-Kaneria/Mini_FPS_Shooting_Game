@@ -1,218 +1,204 @@
-using System.Text;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// What the player has done, grouped, with how far along each unfinished one is.
+/// ACHIEVEMENTS, on the UI kit:
 ///
-/// <b>Rebuilt every time it opens, never cached.</b> <see cref="Achievements"/> derives
-/// everything from the lifetime counters rather than storing an earned flag, so a row built
-/// once and kept would be the only thing in the game that could disagree with the counters
-/// -- and it would disagree silently, which is the worst kind.
+///   header   "X / Y COMPLETED" and one bar for the whole list
+///   filters  ALL, COMBAT, PROGRESSION, CHALLENGE, ECONOMY
+///   rows     a flat icon in one colour, the name, what it asks, a bar with "28 / 50", the
+///            reward (coins and XP), and -- once done -- a check, and CLAIM while the coins wait
 ///
-/// <b>Progress is shown on the ones not yet earned, and only on those.</b> A finished
-/// achievement showing "500 / 500" is spending a line to say something the tick already
-/// said; an unfinished one showing nothing is a locked box with no indication whether it is
-/// close or hopeless, which is what makes a list of achievements feel like a list of things
-/// somebody else did.
+/// Every achievement is derived (see <see cref="Achievements"/>): progress is read from the
+/// lifetime counters the moment the screen opens, so nothing here can disagree with them. The
+/// XP is automatic, because rank reads it off the earned count; the coins are claimed, because
+/// a reward arriving silently is a reward nobody notices.
+///
+/// The builder makes only the screen (the shade this switches on); what is on it is built
+/// here, at runtime, from the kit -- the same as the Loadout and Settings screens -- so the
+/// layout lives in one file.
 /// </summary>
 public class AchievementsPanel : OverlayPanel
 {
-    [Header("Content")]
-    [Tooltip("Hidden row cloned once per achievement.")]
-    public AchievementRow rowTemplate;
+    [Tooltip("Where the screen's content goes. Built into on first open.")]
+    public RectTransform content;
 
-    [Tooltip("Where rows are parented. One per category, in Achievements.Category order.")]
-    public RectTransform[] categoryColumns;
+    UITheme _t;
+    bool _built;
+    TMP_Text _tally;
+    UIProgressBar _overall;
+    UITabBar _filters;
+    RectTransform _list;
+    int _filter;
+    readonly List<GameObject> _rows = new List<GameObject>();
 
-    [Tooltip("Heading above each column. Used only when every category has a column to itself.")]
-    public TMP_Text[] categoryHeadings;
-
-    [Tooltip("Hidden heading cloned into the row stream when categories share a column.")]
-    public InstructionRow headingTemplate;
-
-    [Tooltip("\"7 / 20 COMPLETE\" across the top.")]
-    public TMP_Text tallyText;
-
-    readonly System.Collections.Generic.List<AchievementRow> _rows = new();
-    readonly System.Collections.Generic.List<InstructionRow> _headings = new();
-
-    /// <summary>
-    /// How many columns this screen should be read in.
-    ///
-    /// <b>Not the desktop layout at a smaller size.</b> Four columns on a 147mm handset is
-    /// four strips too narrow to hold "Clear 10 levels with half the clock left", and
-    /// scrolling them makes that survivable rather than good. A handset gets one column of
-    /// full-width rows and scrolls through the lot; a tablet gets two. The categories stack
-    /// in the same order either way, so a player who learns the screen on a monitor finds
-    /// the same list in the same sequence on a phone.
-    /// </summary>
-    static int ColumnsForThisScreen(int categories) => DeviceProfile.CurrentForm switch
-    {
-        DeviceProfile.Form.Handset => 1,
-        DeviceProfile.Form.Tablet => 2,
-        _ => categories,
-    };
-
-    /// <summary>Switches a whole column off, scroll view and all.</summary>
-    void SetColumnShown(int index, bool shown)
-    {
-        var column = categoryColumns[index];
-
-        // The column the rows are parented to is the scroll view's content, so the object
-        // to switch is its grandparent -- the viewport is in between.
-        var viewport = column.parent as RectTransform;
-        var root = viewport != null ? viewport.parent as RectTransform : null;
-
-        (root != null ? root.gameObject : column.gameObject).SetActive(shown);
-    }
-
-    /// <summary>
-    /// Below this a row stops being readable, so the screen would rather scroll than shrink
-    /// past it -- except it cannot scroll, which is why the catalogue is kept to what fits.
-    /// </summary>
-    const float MinRowHeight = 56f;
-
-    /// <summary>What the row template was authored at. Never exceeded.</summary>
-    const float MaxRowHeight = 92f;
+    /// <summary>Raised after a claim, so the balance shown elsewhere moves at once.</summary>
+    public event System.Action Claimed;
 
     protected override void OnOpened()
     {
-        if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
+        if (!_built) Build();
+        Refresh();
+    }
 
-        foreach (var row in _rows)
-            if (row != null) Destroy(row.gameObject);
+    void Build()
+    {
+        _built = true;
+        _t = UITheme.Active;
+        var root = content != null ? content : (RectTransform)panel.transform;
+        // Added now, not by the builder: SafeAreaCanvas skips any canvas that already holds a
+        // fitter when it wakes, so one baked into the scene took the whole dashboard's top bar
+        // and rail out of the safe area.
+        var fit = root.gameObject.AddComponent<SafeAreaFitter>();
+        fit.paddingMm = 0f;
+        fit.fitVertically = false;
+        fit.Apply();
+        var col = UIKit.Column(root, 14f, new RectOffset(40, 40, 24, 24));
+        col.childForceExpandHeight = false;
+        col.childControlHeight = true;
+
+        var header = UIKit.Rect(root, "Header");
+        UIKit.Row(header, 16f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Size(header).minHeight = 52f;
+        var title = UIKit.Text(header, "Title", "Achievements", UIKit.TextRole.Title, _t);
+        UIKit.Size(title, flexWidth: 1f);
+        _tally = UIKit.Text(header, "Tally", "", UIKit.TextRole.Heading, _t);
+        _tally.color = _t.accent;
+        var back = UIKit.Button(header, "Back", "Back", FlatButton.Variant.Quiet, "arrow-left", _t);
+        back.onClick.AddListener(Close);
+        backButton = back;
+
+        _overall = UIKit.ProgressBar(root, "Overall", _t.accent, 8f, false, _t);
+
+        _filters = UIKit.TabBar(root, "Filters", new[] { "All", "Combat", "Progression", "Challenge", "Economy" }, _t);
+        UIKit.Size(_filters).minHeight = 48f;
+        _filters.onChanged.AddListener(i => { _filter = i; Refresh(); });
+
+        var viewport = UIKit.Rect(root, "Rows");
+        UIKit.Size(viewport, flexHeight: 1f);
+        viewport.gameObject.AddComponent<RectMask2D>();
+        var hit = viewport.gameObject.AddComponent<FlatRect>();
+        hit.color = new Color(0, 0, 0, 0);
+        hit.raycastTarget = true;
+        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = viewport;
+        scroll.horizontal = false;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 40f;
+        _list = UIKit.Rect(viewport, "List");
+        _list.anchorMin = new Vector2(0f, 1f); _list.anchorMax = new Vector2(1f, 1f); _list.pivot = new Vector2(0.5f, 1f);
+        _list.offsetMin = _list.offsetMax = Vector2.zero;
+        var lcol = UIKit.Column(_list, 8f);
+        lcol.childForceExpandHeight = false;
+        lcol.childControlHeight = true;
+        _list.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scroll.content = _list;
+    }
+
+    void Refresh()
+    {
+        foreach (var r in _rows) if (r != null) Destroy(r);
         _rows.Clear();
 
-        foreach (var heading in _headings)
-            if (heading != null) Destroy(heading.gameObject);
-        _headings.Clear();
+        int earned = Achievements.EarnedCount, total = Achievements.Total;
+        _tally.text = _t.Tabular($"{earned} / {total}") + " COMPLETED";
+        _overall.Value = total > 0 ? earned / (float)total : 0f;
+        _overall.Snap();
 
-        if (tallyText != null)
-            tallyText.text = $"{Achievements.EarnedCount} <size=60%>OF</size> {Achievements.Total}";
-
-        var groups = (Achievements.Category[])System.Enum.GetValues(typeof(Achievements.Category));
-
-        int wide = ColumnsForThisScreen(groups.Length);
-
-        // With a column each, the heading sits above its column. Sharing a column, it has
-        // to travel with its rows instead -- a heading pinned above a column that now holds
-        // two categories would label only the first of them.
-        bool headingsAbove = wide >= groups.Length;
-
-        if (categoryColumns != null)
-            for (int c = 0; c < categoryColumns.Length; c++)
-                if (categoryColumns[c] != null)
-                    SetColumnShown(c, c < wide);
-
-        if (categoryHeadings != null)
-            for (int h = 0; h < categoryHeadings.Length; h++)
-                if (categoryHeadings[h] != null)
-                    categoryHeadings[h].gameObject.SetActive(headingsAbove && h < wide);
-
-        for (int g = 0; g < groups.Length; g++)
+        foreach (var a in Achievements.Catalogue)
         {
-            int target = wide <= 0 ? 0 : g % wide;
-
-            if (categoryColumns == null || target >= categoryColumns.Length ||
-                categoryColumns[target] == null)
-                continue;
-
-            if (headingsAbove)
-            {
-                if (categoryHeadings != null && g < categoryHeadings.Length &&
-                    categoryHeadings[g] != null)
-                    categoryHeadings[g].text = groups[g].ToString().ToUpperInvariant();
-            }
-            else if (headingTemplate != null)
-            {
-                var heading = Instantiate(headingTemplate, categoryColumns[target]);
-                heading.gameObject.SetActive(true);
-                heading.Bind("", groups[g].ToString().ToUpperInvariant());
-                if (heading.saysText != null) heading.saysText.color = UITheme.Hazard;
-                _headings.Add(heading);
-            }
-
-            foreach (var entry in Achievements.In(groups[g]))
-            {
-                var row = Instantiate(rowTemplate, categoryColumns[target]);
-                row.gameObject.SetActive(true);
-                row.Bind(entry);
-                _rows.Add(row);
-            }
+            if (_filter > 0 && (int)a.Group != _filter - 1) continue;
+            Row(a);
         }
-
-        // Not fitted here. A rect enabled this frame has not been through a layout pass,
-        // so its height is still zero and dividing by it sizes every row to the minimum.
-        // Update does it once the canvas has measured itself, the same way the level
-        // select fits its grid.
     }
 
-    protected override void Update()
+    static string IconFor(Achievements.Category c) => c switch
     {
-        base.Update();
+        Achievements.Category.Combat => "crosshair",
+        Achievements.Category.Progression => "star",
+        Achievements.Category.Challenge => "bolt",
+        _ => "coin",
+    };
 
-        if (IsOpen) FitRows();
-    }
-
-    /// <summary>
-    /// Sizes every row so the longest column fits the height it was given.
-    ///
-    /// <b>A VerticalLayoutGroup neither clips nor scrolls</b> -- content that does not fit
-    /// is simply drawn past the edge, which is how the eighth combat achievement ended up
-    /// half off the bottom of the screen. Same failure as the arena grid, and the same fix:
-    /// divide a measured box rather than trusting a fixed size authored at one window
-    /// height.
-    ///
-    /// One height for every column, taken from the longest, because rows that differ in
-    /// height between columns read as four unrelated lists rather than one screen.
-    ///
-    /// Shrinking stops at <see cref="MinRowHeight"/> and the scroll view takes over from
-    /// there. The two compose on purpose: on a monitor everything fits and nothing scrolls,
-    /// and on a handset -- where twenty rows were never going to fit -- it scrolls rather
-    /// than shrinking the text past reading.
-    /// </summary>
-    void FitRows()
+    void Row(Achievements.Entry a)
     {
-        if (_rows.Count == 0 || categoryColumns == null) return;
+        bool done = a.Earned;
+        bool claimed = Achievements.Claimed(a.Id);
+        bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
 
-        int longest = 0;
-        float available = 0f;
-
-        foreach (var column in categoryColumns)
+        var row = UIKit.Panel(_list, "Row_" + a.Id, UIKit.PanelTone.Panel, _t);
+        if (done)
         {
-            if (column == null) continue;
-
-            longest = Mathf.Max(longest, column.childCount);
-
-            // The viewport, not the column. The column now carries a ContentSizeFitter, so
-            // its own height *is* the height of its rows -- measuring it and then dividing
-            // by the row count would size every row to a fraction of itself, shrinking a
-            // little more on every frame.
-            var viewport = column.parent as RectTransform;
-            if (viewport != null) available = Mathf.Max(available, viewport.rect.height);
+            row.stripeSide = FlatRect.Side.Left;
+            row.stripeColor = _t.accent;
+            row.stripePixels = _t.stripePixels;
         }
+        var h = UIKit.Row(row, 16f, new RectOffset(18, 18, 10, 10), TextAnchor.MiddleLeft);
+        h.childForceExpandWidth = false;
+        h.childControlHeight = true;
+        UIKit.Size(row).minHeight = 76f;
 
-        if (longest == 0 || available <= 1f) return;
+        // One flat icon in one colour: amber once earned, grey until then.
+        UIKit.Icon(row.transform, "Icon", IconFor(a.Group), 28f, done ? _t.accent : _t.textSecondary, _t);
 
-        var stack = categoryColumns[0] != null
-            ? categoryColumns[0].GetComponent<VerticalLayoutGroup>()
-            : null;
-        float spacing = stack != null ? stack.spacing : 0f;
+        var text = UIKit.Rect(row.transform, "Text");
+        var tc = UIKit.Column(text, 2f);
+        tc.childForceExpandHeight = false;
+        tc.childControlHeight = true;
+        UIKit.Size(text, flexWidth: 1f);
+        var name = UIKit.Text(text, "Name", a.Title.ToUpperInvariant(), UIKit.TextRole.Heading, _t);
+        name.textWrappingMode = TextWrappingModes.NoWrap;
+        var detail = UIKit.Text(text, "Detail", a.Detail, UIKit.TextRole.Caption, _t);
+        detail.color = _t.textSecondary;
+        detail.textWrappingMode = TextWrappingModes.NoWrap;
+        detail.overflowMode = TextOverflowModes.Ellipsis;
 
-        float height = Mathf.Clamp((available - spacing * (longest - 1)) / longest,
-                                   MinRowHeight, MaxRowHeight);
+        var progress = UIKit.Rect(row.transform, "Progress");
+        var pc = UIKit.Column(progress, 4f, null, TextAnchor.MiddleRight);
+        pc.childForceExpandHeight = false;
+        pc.childControlHeight = true;
+        UIKit.Size(progress, handset ? 140f : 220f);
+        var bar = UIKit.ProgressBar(progress, "Bar", done ? _t.accent : _t.info, 6f, false, _t);
+        bar.Value = a.Fraction;
+        bar.Snap();
+        var count = UIKit.Text(progress, "Count", _t.Tabular($"{a.Progress:N0} / {a.Target:N0}", heading: false), UIKit.TextRole.Label, _t);
+        count.alignment = TextAlignmentOptions.Right;
+        count.color = done ? _t.textPrimary : _t.textSecondary;
 
-        foreach (var row in _rows)
+        var reward = UIKit.Rect(row.transform, "Reward");
+        var rc = UIKit.Column(reward, 2f, null, TextAnchor.MiddleLeft);
+        rc.childForceExpandHeight = false;
+        rc.childControlHeight = true;
+        UIKit.Size(reward, handset ? 90f : 120f);
+        var coinRow = UIKit.Rect(reward, "Coins");
+        UIKit.Row(coinRow, 6f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Icon(coinRow, "Coin", "coin", 16f, _t.accent, _t);
+        var coins = UIKit.Text(coinRow, "Amount", _t.Tabular(Wallet.Format(Achievements.CoinReward(a.Id)), heading: false), UIKit.TextRole.Label, _t);
+        coins.color = _t.accent;
+        var xp = UIKit.Text(reward, "Xp", $"+{Achievements.XpReward} XP", UIKit.TextRole.Caption, _t);
+        xp.color = _t.textSecondary;
+
+        var state = UIKit.Rect(row.transform, "State");
+        UIKit.Row(state, 6f, null, TextAnchor.MiddleCenter).childForceExpandWidth = false;
+        UIKit.Size(state, 120f);
+        if (done && !claimed)
         {
-            if (row == null) continue;
-
-            var element = row.GetComponent<LayoutElement>();
-            if (element == null) continue;
-
-            element.preferredHeight = height;
-            element.minHeight = height;
+            var claim = UIKit.Button(state, "Claim", "Claim", FlatButton.Variant.Primary, "gift", _t);
+            string id = a.Id;
+            claim.onClick.AddListener(() =>
+            {
+                if (Achievements.Claim(id) > 0) Claimed?.Invoke();
+                Refresh();
+            });
         }
+        else if (done)
+        {
+            UIKit.Icon(state, "Check", "check", 22f, _t.success, _t);
+            var c = UIKit.Text(state, "Claimed", "CLAIMED", UIKit.TextRole.Label, _t);
+            c.color = _t.success;
+        }
+        _rows.Add(row.gameObject);
     }
 }

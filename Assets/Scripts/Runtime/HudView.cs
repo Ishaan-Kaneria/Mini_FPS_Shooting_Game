@@ -157,6 +157,8 @@ public class HudView : MonoBehaviour
 
         foreach (var a in Achievements.Catalogue) _achievementStep[a.Id] = Step(a.Progress, a.Target);
 
+        MarkTargets();
+
         _built = true;
         if (isActiveAndEnabled) Subscribe();
     }
@@ -266,6 +268,13 @@ public class HudView : MonoBehaviour
         OnBelt(_belt);
         OnScheme();
         OnPause(_director, _director != null && _director.IsPaused);
+
+        // Loaded from the menu's Settings only to lay the HUD out: freeze it and open the editor.
+        if (GameSession.EditingHud && _director != null)
+        {
+            _director.SetPaused(true);
+            HudEditor.Open(_hud, fromMenu: true);
+        }
     }
 
     // ======================================================================
@@ -336,9 +345,13 @@ public class HudView : MonoBehaviour
         _clockText = Label(panel.transform, "Clock", "0:00", UIKit.TextRole.Number, _t.textPrimary);
         _clockText.fontSize = _t.sizeHeading;
 
+        _mission = stack;
+
         // The task, on its own strip under the panel -- never behind a progress bar, which
-        // is where the old HUD drew the star thresholds over it.
-        var strip = HudPanel(stack, "Objective");
+        // is where the old HUD drew the star thresholds over it. Its own root, so a layout
+        // can move it away from the mission panel.
+        var strip = HudPanel(transform, "Objective");
+        Corner(strip.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -(Margin + 58f)));
         strip.stripeSide = FlatRect.Side.Left;
         strip.stripeColor = _t.accent;
         strip.stripePixels = _t.stripePixels;
@@ -398,6 +411,7 @@ public class HudView : MonoBehaviour
     {
         var map = FindAnyObjectByType<Minimap>();
         if (map == null || !(map.transform is RectTransform group)) return;
+        _minimap = group;
 
         // A quarter smaller, into the corner margin every other panel keeps.
         group.localScale = Vector3.one * 0.75f;
@@ -479,6 +493,7 @@ public class HudView : MonoBehaviour
     void BuildPlayerCard()
     {
         var panel = HudPanel(transform, "Player");
+        _playerCard = panel.rectTransform;
         Corner(panel.rectTransform, Vector2.zero, new Vector2(Margin, Margin));
         panel.rectTransform.sizeDelta = new Vector2(360f, 0f);
         var col = UIKit.Column(panel, 8f, new RectOffset(16, 16, 12, 12));
@@ -552,6 +567,7 @@ public class HudView : MonoBehaviour
     void BuildWeapon()
     {
         var stack = UIKit.Rect(transform, "WeaponStack");
+        _weaponStack = stack;
         Corner(stack, new Vector2(1f, 0f), new Vector2(-Margin, Margin));
         var col = UIKit.Column(stack, 6f, null, TextAnchor.LowerRight);
         col.childForceExpandWidth = false;
@@ -594,7 +610,7 @@ public class HudView : MonoBehaviour
         _modeText.alignment = TextAlignmentOptions.Right;
     }
 
-    RectTransform _abilities, _weaponPanel, _runPanel;
+    RectTransform _abilities, _weaponPanel, _runPanel, _mission, _minimap, _playerCard, _weaponStack;
 
     /// <summary>
     /// A touch screen has its controls where the pointer layout has panels: the pause button
@@ -606,10 +622,14 @@ public class HudView : MonoBehaviour
     void ArrangeForTouch()
     {
         if (_runPanel != null) Corner(_runPanel, new Vector2(0f, 1f), new Vector2(Margin + 225f + 12f, -Margin));
-        if (_weaponPanel != null && _abilities != null)
+        // Beside the slots rather than inside their row: a child of a layout group is placed
+        // by the group, and the player has to be able to move the two apart.
+        if (_weaponPanel != null)
         {
-            _weaponPanel.SetParent(_abilities, false);
-            _weaponPanel.SetAsFirstSibling();
+            _weaponPanel.SetParent(transform, false);
+            _weaponPanel.anchorMin = _weaponPanel.anchorMax = new Vector2(0.5f, 0f);
+            _weaponPanel.pivot = new Vector2(1f, 0f);
+            _weaponPanel.anchoredPosition = new Vector2(-(76f + 10f + 10f), Margin);
         }
     }
 
@@ -677,6 +697,8 @@ public class HudView : MonoBehaviour
         resume.gameObject.AddComponent<UIDefaultSelection>().priority = 10;
         var settings = UIKit.Button(card.transform, "Settings", "Settings", FlatButton.Variant.Secondary, "settings", _t);
         settings.gameObject.AddComponent<OpenSettingsButton>();
+        var customize = UIKit.Button(card.transform, "CustomizeHud", "Customize HUD", FlatButton.Variant.Secondary, "layout", _t);
+        customize.onClick.AddListener(() => HudEditor.Open(_hud, fromMenu: false));
         var quit = UIKit.Button(card.transform, "Quit", "Quit to dashboard", FlatButton.Variant.Secondary, "power", _t);
 
         if (_hud.pausePanel != null) _hud.pausePanel.SetActive(false);
@@ -706,6 +728,28 @@ public class HudView : MonoBehaviour
         quit.onClick.AddListener(() => { if (_director != null) _director.ReturnToMenu(); });
         _pauseIcons = row.gameObject;
         _pauseIcons.SetActive(false);
+    }
+
+    /// <summary>
+    /// Names every panel for the HUD editor and settles it where this view put it, which
+    /// applies the player's saved layout on top.
+    /// </summary>
+    void MarkTargets()
+    {
+        Settle(_minimap, "hud.minimap", "Minimap");
+        Settle(_mission, "hud.mission", "Mission panel");
+        Settle(_objectiveStrip != null ? _objectiveStrip.transform : null, "hud.objective", "Objective strip");
+        Settle(_feed, "hud.feed", "Kill feed");
+        Settle(_playerCard, "hud.player", "Player card");
+        Settle(_abilities, "hud.abilities", "Ability slots");
+        Settle(_weaponPanel != null && _weaponPanel.parent == transform ? _weaponPanel : _weaponStack, "hud.weapon", "Weapon panel");
+        Settle(_runPanel, "hud.run", "Run panel");
+    }
+
+    static void Settle(Component c, string id, string label)
+    {
+        if (c == null) return;
+        HudLayoutTarget.Mark(c, id, label).Settle();
     }
 
     // ======================================================================
@@ -901,6 +945,56 @@ public class HudView : MonoBehaviour
         _pauseIcons.SetActive(false);
         _pauseLayer.SetActive(false);
         foreach (var row in _feedRows) if (row.group != null) row.group.alpha = 0f;
+    }
+
+    // ======================================================================
+    // The HUD editor.
+    // ======================================================================
+
+    /// <summary>The editor sits on the paused arena; the pause menu steps out from under it and back.</summary>
+    public void SetPauseMenuShown(bool shown)
+    {
+        bool paused = _director != null && _director.IsPaused;
+        if (_pauseShade != null) _pauseShade.SetActive(shown && paused);
+        if (_pauseLayer != null) _pauseLayer.SetActive(shown && paused);
+        if (_runPanel != null && !DeviceProfile.Touched) _runPanel.gameObject.SetActive(!(shown && paused));
+    }
+
+    GameObject _feedSample;
+
+    /// <summary>
+    /// While the editor is open every element has something in it, so it can be seen and
+    /// picked up: the objective strip says OBJECTIVE when the level has none, and the kill
+    /// feed shows one sample row. Both go the moment the editor closes.
+    /// </summary>
+    public void SetEditing(bool editing)
+    {
+        if (editing)
+        {
+            // The briefing and banner are words over the middle of the screen, which is where the
+            // player is arranging things; they come back when the editor closes.
+            if (_hud.briefingText != null) _hud.briefingText.gameObject.SetActive(false);
+            if (_hud.bannerGroup != null) _hud.bannerGroup.gameObject.SetActive(false);
+            if (string.IsNullOrEmpty(_objectiveText.text)) _objectiveText.text = "OBJECTIVE";
+            _objectiveStrip.SetActive(true);
+            if (_feedSample == null && _feedRows.Count == 0)
+            {
+                var row = HudPanel(_feed, "Sample");
+                UIKit.Row(row, 8f, new RectOffset(10, 12, 4, 4), TextAnchor.MiddleLeft).childControlHeight = true;
+                Hug(row);
+                Label(row.transform, "You", "YOU", UIKit.TextRole.Label, _t.textSecondary);
+                Icon(row.transform, "rifle", 18f, _t.textPrimary);
+                Label(row.transform, "Who", "KILL FEED", UIKit.TextRole.Label, _t.textPrimary);
+                _feedSample = row.gameObject;
+            }
+            Canvas.ForceUpdateCanvases();
+            return;
+        }
+        if (_feedSample != null) Destroy(_feedSample);
+        _feedSample = null;
+        if (_hud.briefingText != null) _hud.briefingText.gameObject.SetActive(true);
+        if (_hud.bannerGroup != null) _hud.bannerGroup.gameObject.SetActive(true);
+        OnObjective(_level);
     }
 
     // ======================================================================

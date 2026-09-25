@@ -54,7 +54,15 @@ public static class MobileInput
     /// that was still held down, and letting go of the button cut a tap short. Each owns
     /// its own flag now and this reports either, so neither can answer for the other.
     /// </summary>
-    public static bool Fire => _fireButton || _fireTap || _autoFire;
+    public static bool Fire => _fireButton || _fireHolds > 0 || _fireTap || _autoFire;
+
+    // How many on-screen fire buttons are held. A count rather than a flag because the
+    // layout can add a second fire button: with one bool, lifting either thumb switched the
+    // gun off while the other was still pressing.
+    static int _fireHolds;
+
+    /// <summary>One fire button pressed (true) or released (false).</summary>
+    public static void PressFire(bool down) => _fireHolds = Mathf.Max(0, _fireHolds + (down ? 1 : -1));
 
     static bool _fireButton;
     static bool _fireTap;
@@ -152,6 +160,7 @@ public static class MobileInput
         Aim = Crouch = BombAim = false;
         _sprintButton = _sprintStick = false;
         _fireButton = _fireTap = _autoFire = false;
+        _fireHolds = 0;
         _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = false;
     }
 }

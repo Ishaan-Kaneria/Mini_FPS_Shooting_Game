@@ -123,6 +123,14 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc720_results", Scene = ArenaScene, Device = Pc(1280, 720), Scheme = InputScheme.KeyboardMouse, Open = "results", Wait = 6f },
                 new Shot { File = "pc_hud_combat", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "combat", Wait = 18f, After = 0.45f },
                 new Shot { File = "iphone15_hud_combat", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "combat", Wait = 18f, After = 0.45f },
+                new Shot { File = "pc_store", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "store", Wait = 2.5f },
+                new Shot { File = "iphone15_store", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "store", Wait = 2.5f },
+                new Shot { File = "pc_achievements", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "achievements", Wait = 2.5f },
+                new Shot { File = "iphone15_achievements", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "achievements", Wait = 2.5f },
+                new Shot { File = "iphone15_loadout", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "loadout", Wait = 2.5f },
+                new Shot { File = "pc_hudedit", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit", Wait = 8f },
+                new Shot { File = "pc_hudedit_crosshair", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit_crosshair", Wait = 8f },
+                new Shot { File = "iphone15_hudedit", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "hudedit", Wait = 8f },
                 new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
             };
             string only = Arg("-fpskitOnly");
@@ -296,6 +304,16 @@ namespace FPSKit.EditorTools
                         else if (shot.Open == "combat")
                         {
                             StageCombat();
+                        }
+                        else if ((shot.Open ?? "").StartsWith("hudedit"))
+                        {
+                            // Frozen, as it is from the pause menu, with the editor over it.
+                            var hud = Object.FindAnyObjectByType<HUDController>();
+                            if (hud == null) throw new Exception("no HUD to edit");
+                            if (GameDirector.Instance != null) GameDirector.Instance.SetPaused(true);
+                            var editor = HudEditor.Open(hud, fromMenu: false);
+                            if (shot.Open.EndsWith("crosshair")) editor.ShowTab(1);
+                            else editor.SelectById(shot.Device.touch ? "touch.fire" : "hud.minimap");
                         }
                         else if (!string.IsNullOrEmpty(shot.Open))
                         {

@@ -384,6 +384,20 @@ namespace FPSKit.EditorTools
         public static void VerifyDevices() => Run(FPSKitDeviceTest.VerifyDevices);
 
         /// <summary>
+        /// FPSKit > UI Kit > Import Fonts And Icons, headless. Run after rasterising new icons
+        /// (Tools/rasterize-icons.py): the theme finds an icon by id in its own list, and a PNG
+        /// on disk that is not in the list draws nothing and warns "no icon". The menu item
+        /// itself never exits, so called directly with -executeMethod the editor idles forever.
+        /// </summary>
+        public static void ImportUiKit() => Run(FPSKitUIKit.ImportFontsAndIcons);
+
+        /// <summary>Renders each store item's model for its card. Needs UNITY_GRAPHICS=1.</summary>
+        public static void RenderStoreItems() => Run(FPSKitItemRenders.RenderAll);
+
+        /// <summary>A saved HUD layout moves, sizes, fades and hides the real HUD, and lasts a restart.</summary>
+        public static void VerifyHudLayout() => FPSKitHudLayoutTest.VerifyHudLayout();
+
+        /// <summary>
         /// Builds one scene and then asserts it is actually playable.
         ///
         /// A build that throws no exception still proves very little: the builder wires

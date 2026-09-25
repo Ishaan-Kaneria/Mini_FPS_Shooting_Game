@@ -501,7 +501,8 @@ public class GameDirector : MonoBehaviour
         // A level abandoned mid-fight still counts as an attempt. Reported here rather
         // than in ReportLevelFinished so the quit path is covered without
         // double-counting a scored one, which has already banked its result by now.
-        if (!IsGameOver) GameSession.RecordResult(AbandonedResult());
+        if (!IsGameOver && !GameSession.EditingHud) GameSession.RecordResult(AbandonedResult());
+        GameSession.EndHudEditing();
 
         Time.timeScale = 1f;
         IsPaused = false;

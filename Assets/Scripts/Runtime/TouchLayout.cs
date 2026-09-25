@@ -44,12 +44,14 @@ public class TouchLayout : MonoBehaviour
     void OnEnable()
     {
         GameSettings.Changed += OnSettingChanged;
+        HudLayout.Changed += OnLayoutChanged;
         Apply();
     }
 
     void OnDisable()
     {
         GameSettings.Changed -= OnSettingChanged;
+        HudLayout.Changed -= OnLayoutChanged;
         MobileInput.SetAutoFire(false);
     }
 
@@ -75,6 +77,21 @@ public class TouchLayout : MonoBehaviour
             _cluster.mirrored = mirror;
             _cluster.Rebuild();
         }
+
+        // The joystick zone and the buttons outside the cluster (pause) are movable too.
+        if (_stick != null)
+        {
+            var zone = HudLayoutTarget.Mark(_stick, "touch.move", "Joystick zone");
+            zone.zone = true;
+            zone.Settle();
+        }
+        foreach (var b in GetComponentsInChildren<TouchButton>(true))
+        {
+            if (b == _secondFire || b.GetComponent<HudLayoutTarget>() != null) continue;
+            HudLayoutTarget.Mark(b, TargetId(b.action), TargetLabel(b.action)).Settle();
+        }
+        if (_secondFire != null) { Destroy(_secondFire.gameObject); _secondFire = null; }
+        SyncSecondFire();
     }
 
     /// <summary>
@@ -82,6 +99,60 @@ public class TouchLayout : MonoBehaviour
     /// bottom-right because that is where the thumbs are not; move the buttons to the left
     /// and the health readout is under the fire button unless it moves too.
     /// </summary>
+    /// <summary>The key a touch button is saved under in a HUD layout.</summary>
+    public static string TargetId(TouchButton.ActionKind a) => "touch." + a.ToString().ToLowerInvariant();
+
+    /// <summary>What the HUD editor calls a touch button.</summary>
+    public static string TargetLabel(TouchButton.ActionKind a) => a switch
+    {
+        TouchButton.ActionKind.Bomb => "Grenade button",
+        TouchButton.ActionKind.UseItem => "Medkit button",
+        _ => a + " button",
+    };
+
+    const string SecondFireId = "touch.fire2";
+    TouchButton _secondFire;
+
+    /// <summary>
+    /// The optional fire button on the other thumb's side, cloned from the real one so it is
+    /// the same size, look and behaviour. Not a cluster slot: the cluster lays out one hand,
+    /// and this belongs to the other.
+    /// </summary>
+    void SyncSecondFire()
+    {
+        bool want = HudLayout.Current.secondFire && _cluster != null;
+        if (!want)
+        {
+            if (_secondFire != null) Destroy(_secondFire.gameObject);
+            _secondFire = null;
+            return;
+        }
+        if (_secondFire != null) return;
+
+        TouchButton fire = null;
+        foreach (var b in GetComponentsInChildren<TouchButton>(true))
+            if (b.action == TouchButton.ActionKind.Fire) { fire = b; break; }
+        if (fire == null) return;
+
+        _secondFire = Instantiate(fire, fire.transform.parent);
+        _secondFire.name = "FireButton2";
+        var existing = _secondFire.GetComponent<HudLayoutTarget>();
+        if (existing != null) DestroyImmediate(existing);
+        var rt = (RectTransform)_secondFire.transform;
+        var src = (RectTransform)fire.transform;
+        // Opposite the cluster, a third of the way up: above where the moving thumb rests.
+        bool left = !GameSettings.LeftHanded;
+        rt.anchorMin = rt.anchorMax = new Vector2(left ? 0f : 1f, 0f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = src.sizeDelta;
+        var parent = (RectTransform)rt.parent;
+        float x = src.sizeDelta.x * 0.9f;
+        rt.anchoredPosition = new Vector2(left ? x : -x, parent.rect.height * 0.55f);
+        HudLayoutTarget.Mark(_secondFire, SecondFireId, "Second fire button").Settle();
+    }
+
+    void OnLayoutChanged() => SyncSecondFire();
+
     static void MirrorHudFooter()
     {
         var hud = FindAnyObjectByType<HUDController>();
@@ -95,9 +166,18 @@ public class TouchLayout : MonoBehaviour
             // anchored to a bottom corner -- not everything anchored low somewhere inside.
             if (parent == null || (parent != canvas.transform && parent.parent != canvas.transform)) continue;
             if (rt.GetComponent<SafeAreaFitter>() != null) continue;
-            if (rt.anchorMax.y > 0.35f) continue;
-            bool corner = rt.anchorMax.x <= 0.4f || rt.anchorMin.x >= 0.6f;
-            if (!corner) continue;
+
+            // A movable element is judged, and mirrored, from where its owner put it -- the
+            // player's layout comes off first and goes back on afterwards (Settle), so it is
+            // applied to the mirrored placement rather than undone by it.
+            var target = rt.GetComponent<HudLayoutTarget>();
+            if (target != null) target.Apply(null);
+            bool corner = rt.anchorMax.y <= 0.35f && (rt.anchorMax.x <= 0.4f || rt.anchorMin.x >= 0.6f);
+            if (!corner)
+            {
+                if (target != null) target.Settle();
+                continue;
+            }
             var min = rt.anchorMin; var max = rt.anchorMax;
             rt.anchorMin = new Vector2(1f - max.x, min.y);
             rt.anchorMax = new Vector2(1f - min.x, max.y);
@@ -110,6 +190,7 @@ public class TouchLayout : MonoBehaviour
                 else if (text.alignment == TMPro.TextAlignmentOptions.BottomLeft) text.alignment = TMPro.TextAlignmentOptions.BottomRight;
                 else if (text.alignment == TMPro.TextAlignmentOptions.BottomRight) text.alignment = TMPro.TextAlignmentOptions.BottomLeft;
             }
+            if (target != null) target.Settle();
         }
     }
 
@@ -117,11 +198,14 @@ public class TouchLayout : MonoBehaviour
     static void Flip(RectTransform rt)
     {
         if (rt == null) return;
+        var target = rt.GetComponent<HudLayoutTarget>();
+        if (target != null) target.Apply(null);
         var min = rt.anchorMin;
         var max = rt.anchorMax;
         rt.anchorMin = new Vector2(1f - max.x, min.y);
         rt.anchorMax = new Vector2(1f - min.x, max.y);
         rt.offsetMin = rt.offsetMax = Vector2.zero;
+        if (target != null) target.Settle();
     }
 
     void Update()

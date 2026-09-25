@@ -1,0 +1,236 @@
+#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.Text;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace FPSKit.EditorTools
+{
+    /// <summary>
+    /// The HUD layout regression test: a layout saved through <see cref="HudLayout"/> must move,
+    /// resize, fade and hide the real elements, restyle the real crosshair, survive a second
+    /// play session, and come back untouched from a cancelled preview. The editor has to open
+    /// over the arena with an outline per element, and two fire buttons held at once must not
+    /// be released by lifting one of them.
+    ///
+    /// Written against the data path rather than by dragging, for the reason VerifyBomb drives
+    /// PumpAim: batch mode has no pointer, and a check that needs one would be a check that
+    /// never runs. What the drag produces is an entry; what this checks is that an entry lands.
+    /// The player's own layouts are backed up first and put back in Detach.
+    /// </summary>
+    public static class FPSKitHudLayoutTest
+    {
+        const string ScenePath = "Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity";
+        const double HardTimeout = 240.0;
+
+        enum Phase { Enter, Apply, Check, Exit, Reenter, Persisted, Done }
+        static Phase _phase;
+        static double _startedAt, _until;
+        static readonly List<string> Errors = new List<string>();
+        static readonly StringBuilder Notes = new StringBuilder();
+        static readonly Dictionary<string, string> _backup = new Dictionary<string, string>();
+
+        static readonly string[] Keys =
+        {
+            "settings.hud.desktop", "settings.hud.tablet", "settings.hud.handset",
+        };
+
+        public static void VerifyHudLayout()
+        {
+            try
+            {
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                SaveMigration.Apply();
+                Errors.Clear();
+                Notes.Clear();
+                _backup.Clear();
+                foreach (var k in Keys) _backup[k] = PlayerPrefs.GetString(k, null);
+                foreach (var k in Keys) PlayerPrefs.DeleteKey(k);
+                _phase = Phase.Enter;
+                _startedAt = EditorApplication.timeSinceStartup;
+                FPSKitPlayMode.SuspendStartScene();
+                EditorApplication.update += Tick;
+                Debug.Log("[FPSKitBatch] hud layout test: a saved layout must move, size, fade and hide the real HUD and last a restart");
+            }
+            catch (Exception e)
+            {
+                Detach();
+                Debug.LogError($"[FPSKitBatch] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
+        static void Wait(double seconds, Phase next) { _until = EditorApplication.timeSinceStartup + seconds; _phase = next; }
+        static bool Waiting() => EditorApplication.timeSinceStartup < _until;
+
+        static HudLayout.Data Layout()
+        {
+            var d = new HudLayout.Data();
+            var map = d.Ensure("hud.minimap");
+            map.placed = true; map.ax = 1f; map.ay = 0f; map.x = -30f; map.y = 30f; map.scale = 1.3f; map.opacity = 0.5f;
+            d.Ensure("hud.feed").hidden = true;
+            d.crosshair.style = HudLayout.CrosshairStyle.Dot;
+            d.crosshair.color = 5;
+            return d;
+        }
+
+        static void Tick()
+        {
+            try
+            {
+                if (EditorApplication.timeSinceStartup - _startedAt > HardTimeout)
+                    throw new Exception($"hud layout test exceeded {HardTimeout}s in {_phase}");
+
+                switch (_phase)
+                {
+                    case Phase.Enter:
+                        if (!EditorApplication.isPlaying) { EditorApplication.EnterPlaymode(); return; }
+                        Wait(2.5, Phase.Apply);
+                        return;
+
+                    case Phase.Apply:
+                    {
+                        if (Waiting()) return;
+                        int marked = 0;
+                        foreach (var id in new[] { "hud.minimap", "hud.mission", "hud.objective", "hud.feed", "hud.player", "hud.abilities", "hud.weapon", "hud.run" })
+                            if (HudLayout.TargetById(id) != null) marked++; else Errors.Add($"no movable element \"{id}\"");
+                        Notes.Append($"\n  {marked}/8 HUD elements movable");
+
+                        HudLayout.Save(Layout());
+                        Wait(0.5, Phase.Check);
+                        return;
+                    }
+
+                    case Phase.Check:
+                    {
+                        if (Waiting()) return;
+                        CheckApplied("after saving");
+
+                        // A preview must be cancellable: shown, then put back exactly.
+                        var other = new HudLayout.Data();
+                        other.Ensure("hud.minimap").hidden = true;
+                        HudLayout.Preview(other);
+                        var map = HudLayout.TargetById("hud.minimap");
+                        if (map != null && map.GetComponent<CanvasGroup>().alpha > 0.01f)
+                            Errors.Add("a previewed layout that hides the minimap left it showing");
+                        HudLayout.Revert();
+                        CheckApplied("after a cancelled preview");
+
+                        // The editor opens over the arena with an outline for each element.
+                        var hud = UnityEngine.Object.FindAnyObjectByType<HUDController>();
+                        var editor = HudEditor.Open(hud, fromMenu: false);
+                        if (editor == null || !editor.IsOpen) Errors.Add("the HUD editor did not open");
+                        else
+                        {
+                            int outlines = editor.transform.Find("Sheet/Handles")?.childCount ?? 0;
+                            if (outlines < 8) Errors.Add($"the editor outlines {outlines} elements, fewer than the HUD has");
+                            Notes.Append($"\n  editor opened with {outlines} outlines");
+                            editor.Close();
+                        }
+                        CheckApplied("after the editor was cancelled");
+
+                        // Two fire buttons: lifting one must not stop the other.
+                        MobileInput.Reset();
+                        MobileInput.PressFire(true);
+                        MobileInput.PressFire(true);
+                        MobileInput.PressFire(false);
+                        bool stillFiring = MobileInput.Fire;
+                        MobileInput.PressFire(false);
+                        if (!stillFiring) Errors.Add("with two fire buttons held, lifting one stopped the gun");
+                        if (MobileInput.Fire) Errors.Add("with both fire buttons lifted, the gun kept firing");
+                        MobileInput.Reset();
+
+                        _phase = Phase.Exit;
+                        return;
+                    }
+
+                    case Phase.Exit:
+                        EditorApplication.ExitPlaymode();
+                        _phase = Phase.Reenter;
+                        return;
+
+                    case Phase.Reenter:
+                        if (EditorApplication.isPlaying) return;
+                        EditorApplication.EnterPlaymode();
+                        Wait(3.0, Phase.Persisted);
+                        return;
+
+                    case Phase.Persisted:
+                        if (Waiting() || !EditorApplication.isPlaying) return;
+                        CheckApplied("in a second play session");
+                        EditorApplication.ExitPlaymode();
+                        _phase = Phase.Done;
+                        return;
+
+                    case Phase.Done:
+                        if (EditorApplication.isPlaying) return;
+                        Finish();
+                        return;
+                }
+            }
+            catch (Exception e)
+            {
+                Errors.Add(e.ToString());
+                Finish();
+            }
+        }
+
+        static void CheckApplied(string when)
+        {
+            var map = HudLayout.TargetById("hud.minimap");
+            if (map == null) { Errors.Add($"{when}: no minimap to check"); return; }
+            var r = map.Rect;
+            if (r.anchorMin != new Vector2(1f, 0f) || r.anchoredPosition != new Vector2(-30f, 30f))
+                Errors.Add($"{when}: the minimap is anchored at {r.anchorMin} {r.anchoredPosition}, not the bottom-right corner the layout put it in");
+            if (Mathf.Abs(r.localScale.x - 0.75f * 1.3f) > 0.01f)
+                Errors.Add($"{when}: the minimap is at scale {r.localScale.x:0.00}, not its own 0.75 times the layout's 1.3");
+            var g = map.GetComponent<CanvasGroup>();
+            if (g == null || Mathf.Abs(g.alpha - 0.5f) > 0.01f) Errors.Add($"{when}: the minimap is not at the layout's 50% opacity");
+
+            var feed = HudLayout.TargetById("hud.feed");
+            if (feed == null || feed.GetComponent<CanvasGroup>().alpha > 0.01f) Errors.Add($"{when}: the kill feed the layout hides is still showing");
+
+            var hud = UnityEngine.Object.FindAnyObjectByType<HUDController>();
+            if (hud != null)
+            {
+                bool armsShown = false;
+                foreach (var arm in hud.crosshairArms) if (arm != null && arm.gameObject.activeSelf) armsShown = true;
+                if (armsShown) Errors.Add($"{when}: the crosshair is a dot in the layout and its arms are still drawn");
+                if ((hud.crosshairColor - HudLayout.Colors[5].color).maxColorComponent > 0.01f)
+                    Errors.Add($"{when}: the crosshair is not the layout's red");
+            }
+        }
+
+        static void Finish()
+        {
+            Detach();
+            if (Errors.Count > 0)
+            {
+                var report = new StringBuilder();
+                foreach (var e in Errors) report.Append($"\n  - {e}");
+                Debug.LogError($"[FPSKitBatch] FAILED: the HUD layout does not hold:{report}{Notes}");
+                EditorApplication.Exit(1);
+                return;
+            }
+            Debug.Log($"[FPSKitBatch] verify hud layout passed: moved, sized, faded and hid the real HUD, restyled the crosshair, " +
+                      $"cancelled a preview cleanly, and kept the layout into a second session.{Notes}");
+            EditorApplication.Exit(0);
+        }
+
+        static void Detach()
+        {
+            EditorApplication.update -= Tick;
+            foreach (var kv in _backup)
+            {
+                if (string.IsNullOrEmpty(kv.Value)) PlayerPrefs.DeleteKey(kv.Key);
+                else PlayerPrefs.SetString(kv.Key, kv.Value);
+            }
+            PlayerPrefs.Save();
+            FPSKitPlayMode.RestoreStartScene();
+        }
+    }
+}
+#endif

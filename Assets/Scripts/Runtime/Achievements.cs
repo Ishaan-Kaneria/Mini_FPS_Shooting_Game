@@ -119,4 +119,69 @@ public static class Achievements
     /// <summary>"7 / 20".</summary>
     public static string Readout => $"{EarnedCount} / {Total}";
 
+    // ---- rewards ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Coins an achievement pays when it is claimed, by how far it sits up its ladder: the
+    /// first tier of a set lands in a session or two and pays like a good level, the last is a
+    /// real target and pays like several. Priced against the store (see FPSKitStore): a whole
+    /// catalogue is roughly fifty levels of pay, and every achievement together is about four.
+    /// </summary>
+    public static int CoinReward(string id) => id switch
+    {
+        "kills.100" => 150, "kills.1000" => 600,
+        "head.50" => 200, "head.500" => 600,
+        "bomb.100" => 400,
+        "combo.10" => 150, "combo.25" => 400,
+        "boss.10" => 400,
+        "clear.10" => 200, "clear.48" => 1000,
+        "star.24" => 250, "star.144" => 1500,
+        "three.10" => 300,
+        "arena.6" => 800,
+        "flaw.1" => 150, "flaw.10" => 500,
+        "fast.10" => 300,
+        "coin.10k" => 300, "coin.100k" => 1000,
+        "buy.10" => 200,
+        _ => 100,
+    };
+
+    /// <summary>XP an achievement is worth. Not claimed: rank reads it straight off the earned count.</summary>
+    public static int XpReward => PlayerRank.XpPerAchievement;
+
+    const string ClaimedPrefix = "FPSKit.Achievement.Claimed.";
+
+    /// <summary>
+    /// Whether the coins for an achievement have been taken. This one thing is stored: that
+    /// the achievement is earned is still derived, but whether the player pressed CLAIM is a
+    /// fact about them and nothing else knows it -- the same line Campaign draws for a beat read.
+    /// </summary>
+    public static bool Claimed(string id) => PlayerPrefs.GetInt(ClaimedPrefix + id, 0) == 1;
+
+    /// <summary>Pays an earned, unclaimed achievement's coins. Returns what it paid, 0 if nothing.</summary>
+    public static int Claim(string id)
+    {
+        foreach (var e in All)
+        {
+            if (e.Id != id) continue;
+            if (!e.Earned || Claimed(id)) return 0;
+            PlayerPrefs.SetInt(ClaimedPrefix + id, 1);
+            int coins = CoinReward(id);
+            Wallet.Add(coins);
+            PlayerPrefs.Save();
+            return coins;
+        }
+        return 0;
+    }
+
+    /// <summary>Earned achievements whose coins are still waiting.</summary>
+    public static int Unclaimed
+    {
+        get
+        {
+            int n = 0;
+            foreach (var e in All) if (e.Earned && !Claimed(e.Id)) n++;
+            return n;
+        }
+    }
+
 }

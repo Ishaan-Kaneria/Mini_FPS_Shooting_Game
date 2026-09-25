@@ -153,6 +153,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 9caa9636bfe089c88b8e05cdafa92d91, type: 3}
   - id: arrow-up
     sprite: {fileID: 21300000, guid: be443c73e3b706b72894e20277206ada, type: 3}
+  - id: backpack
+    sprite: {fileID: 21300000, guid: fac841c6d2941be8c91d6341e0e8a453, type: 3}
   - id: bolt
     sprite: {fileID: 21300000, guid: 43fef608c8dcea8f28bec9aac91f4b73, type: 3}
   - id: bomb
@@ -177,6 +179,12 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 5b569dfda96fae9d09b24260a6a25996, type: 3}
   - id: device-gamepad-2
     sprite: {fileID: 21300000, guid: c2eba8a379b41c6b39dc4c0f4e33c55e, type: 3}
+  - id: flash
+    sprite: {fileID: 21300000, guid: cfd03fdfe4bcf09f289511b50969a4a3, type: 3}
+  - id: flask
+    sprite: {fileID: 21300000, guid: 8c0e3bf5bc50168dc8e8969072769f76, type: 3}
+  - id: gift
+    sprite: {fileID: 21300000, guid: 0be7c87a7d8731777958b42366c172e9, type: 3}
   - id: grenade
     sprite: {fileID: 21300000, guid: 02e157d723965a3fdb2acf4d2340af41, type: 3}
   - id: hand-finger
@@ -193,6 +201,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 2c8873674c359caf29cd12d3de7cf7be, type: 3}
   - id: keyboard
     sprite: {fileID: 21300000, guid: a3f1d4fcf7ad61f6d9d2c9c1c8982275, type: 3}
+  - id: layout
+    sprite: {fileID: 21300000, guid: ce88a9a58a693a6b69cdca8d94f2ece7, type: 3}
   - id: list-details
     sprite: {fileID: 21300000, guid: e2ec8d7b92ac8ee3bbfa67029df7fd48, type: 3}
   - id: lock-open
@@ -207,6 +217,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 1938bf4bdfb63ae388ae8e1ce6d4a40e, type: 3}
   - id: mouse
     sprite: {fileID: 21300000, guid: d98f130f6c10d292bb73624da9aab079, type: 3}
+  - id: paint
+    sprite: {fileID: 21300000, guid: 4951d90f9fbc12a5780e3d4e37f286be, type: 3}
   - id: player-pause
     sprite: {fileID: 21300000, guid: 6fd5188e11253e9a9b53b9c4ac91e068, type: 3}
   - id: player-play
@@ -235,6 +247,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: b8ee1c49e1a882a3593124ec9c70f8bb, type: 3}
   - id: trophy
     sprite: {fileID: 21300000, guid: 58311a025f517ae5f8b77a08d9595d34, type: 3}
+  - id: user
+    sprite: {fileID: 21300000, guid: f36b143fda5db67af9cc5ccd3037c767, type: 3}
   - id: x
     sprite: {fileID: 21300000, guid: 95b90cb69632ead009e5a66bdfc4cf95, type: 3}
   iconSize: 24

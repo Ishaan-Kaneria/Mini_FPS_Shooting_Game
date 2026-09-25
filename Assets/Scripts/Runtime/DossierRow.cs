@@ -7,7 +7,7 @@ using UnityEngine.UI;
 /// held, and what happened to them.
 ///
 /// Cloned from a hidden template per sibling at runtime, the same way
-/// <see cref="AchievementRow"/> and <see cref="LevelButton"/> are, so the number of
+/// <see cref="StoreItemCard"/> and <see cref="LevelButton"/> are, so the number of
 /// names is a property of <see cref="CampaignData"/> and never of the menu scene.
 /// </summary>
 public class DossierRow : MonoBehaviour

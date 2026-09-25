@@ -211,6 +211,10 @@ public class TouchCluster : MonoBehaviour
             rect.anchoredPosition = new Vector2(mirrored ? x : -x, y);
 
             Dress(slot.button, size);
+
+            // Where the cluster put it is the default; the player's layout goes on top.
+            HudLayoutTarget.Mark(slot.button, TouchLayout.TargetId(slot.button.action),
+                                 TouchLayout.TargetLabel(slot.button.action)).Settle();
             }
         }
 

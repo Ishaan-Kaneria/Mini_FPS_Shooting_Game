@@ -484,6 +484,7 @@ public class HUDController : MonoBehaviour
         // Start but cancelled in OnDisable, the director's events were gone for good the
         // first time this object was toggled off and on again.
         GameInput.SchemeChanged += OnSchemeChanged;
+        HudLayout.Changed += OnHudLayoutChanged;
 
         if (_director != null)
         {
@@ -510,6 +511,7 @@ public class HUDController : MonoBehaviour
         if (progression != null) progression.Upgraded -= OnUpgraded;
 
         GameInput.SchemeChanged -= OnSchemeChanged;
+        HudLayout.Changed -= OnHudLayoutChanged;
 
         if (_director != null)
         {
@@ -523,7 +525,11 @@ public class HUDController : MonoBehaviour
     {
         UpdateTexts();
         if (legacyReadouts) UpdateHealthBars();
-        if (!_crosshairFitted) FitCrosshairToDevice();
+        if (!_crosshairFitted)
+        {
+            FitCrosshairToDevice();
+            ApplyCrosshairStyle(HudLayout.Shown.crosshair);
+        }
 
         UpdateCrosshair();
         UpdateBombCursor();
@@ -1377,6 +1383,8 @@ public class HUDController : MonoBehaviour
         Color tint = tintOnHit && Time.unscaledTime < _hitmarkerUntil ? _hitmarkerTint : crosshairColor;
         foreach (var image in CrosshairImages())
             if (image != null) image.color = tint;
+        if (_styleDot != null) _styleDot.color = tint;
+        if (_styleRing != null) _styleRing.color = tint;
 
         // Hidden entirely while a bomb is being placed. Firing is suppressed anyway,
         // so it marks a shot that cannot be taken -- and a second reticle in the middle
@@ -1423,6 +1431,139 @@ public class HUDController : MonoBehaviour
                 _crosshairImages[i] = crosshairArms[i].GetComponent<Image>();
 
         return _crosshairImages;
+    }
+
+    // ---- the player's crosshair ---------------------------------------------------
+
+    bool _styleCaptured;
+    Vector2[] _armBase;
+    float _gapBase, _kickBase;
+    Image _styleDot, _styleRing;
+    float _ringThickness = -1f;
+
+    void OnHudLayoutChanged() => ApplyCrosshairStyle(HudLayout.Shown.crosshair);
+
+    /// <summary>
+    /// The crosshair the player chose in the HUD editor: cross, dot or circle, in a colour,
+    /// at a size, thickness and gap, outlined or not. Everything is a multiple of what
+    /// <see cref="FitCrosshairToDevice"/> worked out for this screen, so a size of 1 on a phone
+    /// is still the millimetre-sized crosshair and on a monitor still the hairline.
+    /// </summary>
+    public void ApplyCrosshairStyle(HudLayout.Crosshair c)
+    {
+        if (c == null || crosshairArms == null || crosshairArms.Length < 4) return;
+        if (!_crosshairFitted) FitCrosshairToDevice();
+
+        if (!_styleCaptured)
+        {
+            _armBase = new Vector2[crosshairArms.Length];
+            for (int i = 0; i < crosshairArms.Length; i++)
+                if (crosshairArms[i] != null) _armBase[i] = crosshairArms[i].sizeDelta;
+            _gapBase = crosshairBaseGap;
+            _kickBase = crosshairKick;
+            _styleCaptured = true;
+        }
+
+        crosshairColor = HudLayout.Colors[Mathf.Clamp(c.color, 0, HudLayout.Colors.Length - 1)].color;
+        float size = Mathf.Clamp(c.size, 0.5f, 2f);
+        float thick = Mathf.Clamp(c.thickness, 0.5f, 3f);
+        bool cross = c.style == HudLayout.CrosshairStyle.Cross;
+
+        var canvas = GetComponentInParent<Canvas>();
+        float px = 1f / Mathf.Max(0.0001f, canvas != null ? canvas.scaleFactor : 1f);
+
+        float armLength = 10f, armThick = 2f;
+        for (int i = 0; i < crosshairArms.Length; i++)
+        {
+            var arm = crosshairArms[i];
+            if (arm == null) continue;
+            var b = _armBase[i];
+            bool vertical = b.y >= b.x;
+            armLength = Mathf.Max(b.x, b.y);
+            armThick = Mathf.Min(b.x, b.y);
+            arm.sizeDelta = vertical ? new Vector2(armThick * thick, armLength * size)
+                                     : new Vector2(armLength * size, armThick * thick);
+            arm.gameObject.SetActive(cross);
+            Edge(arm.GetComponent<Image>(), c.outline, px);
+        }
+        crosshairBaseGap = _gapBase * Mathf.Clamp(c.gap, 0f, 2f);
+        crosshairKick = _kickBase * size;
+
+        if (crosshairGroup == null) return;
+        var parent = (RectTransform)crosshairGroup.transform;
+
+        // The dot: the whole crosshair for Dot, and on a touch screen the centre of the
+        // cross as well (FitCrosshairToDevice builds that one; this reuses it).
+        var dot = parent.Find("Dot") as RectTransform;
+        bool wantDot = c.style == HudLayout.CrosshairStyle.Dot || (cross && dot != null && DeviceProfile.Touched);
+        if (wantDot && dot == null)
+        {
+            dot = new GameObject("Dot", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+            dot.SetParent(parent, false);
+            dot.anchorMin = dot.anchorMax = dot.pivot = new Vector2(0.5f, 0.5f);
+            dot.GetComponent<Image>().raycastTarget = false;
+        }
+        if (dot != null)
+        {
+            dot.gameObject.SetActive(wantDot);
+            dot.sizeDelta = Vector2.one * Mathf.Max(3f, armThick * 2f) * thick * (c.style == HudLayout.CrosshairStyle.Dot ? size : 1f);
+            _styleDot = dot.GetComponent<Image>();
+            Edge(_styleDot, c.outline, px);
+        }
+
+        // The circle: a ring the size of the cross's reach.
+        bool wantRing = c.style == HudLayout.CrosshairStyle.Circle;
+        var ring = parent.Find("Ring") as RectTransform;
+        if (wantRing && ring == null)
+        {
+            ring = new GameObject("Ring", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+            ring.SetParent(parent, false);
+            ring.anchorMin = ring.anchorMax = ring.pivot = new Vector2(0.5f, 0.5f);
+            ring.GetComponent<Image>().raycastTarget = false;
+        }
+        if (ring != null)
+        {
+            ring.gameObject.SetActive(wantRing);
+            float diameter = (Mathf.Max(6f, _gapBase * Mathf.Clamp(c.gap, 0.3f, 2f)) + armLength) * 2f * size * 0.8f;
+            ring.sizeDelta = Vector2.one * diameter;
+            _styleRing = ring.GetComponent<Image>();
+            // The stroke is a fraction of the texture, so it is redrawn for the thickness
+            // asked, as the same few pixels on screen whatever the ring's size.
+            float stroke = Mathf.Clamp01(armThick * thick / Mathf.Max(1f, diameter)) * 2f;
+            if (!Mathf.Approximately(stroke, _ringThickness)) { _styleRing.sprite = RingSprite(stroke); _ringThickness = stroke; }
+            Edge(_styleRing, c.outline, px);
+        }
+    }
+
+    static void Edge(Image image, bool on, float px)
+    {
+        if (image == null) return;
+        var edge = image.GetComponent<Outline>();
+        if (!on) { if (edge != null) edge.enabled = false; return; }
+        if (edge == null) edge = image.gameObject.AddComponent<Outline>();
+        edge.enabled = true;
+        edge.effectColor = new Color(0f, 0f, 0f, 0.85f);
+        if (edge.effectDistance.x < px) edge.effectDistance = new Vector2(px, px);
+        edge.useGraphicAlpha = true;
+    }
+
+    /// <summary>A white ring whose stroke is the given fraction of its radius. Made per thickness.</summary>
+    static Sprite RingSprite(float stroke)
+    {
+        const int n = 128;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "CrosshairRing", wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[n * n];
+        float r = n * 0.5f - 1f, inner = r * (1f - Mathf.Clamp(stroke, 0.03f, 0.6f));
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(n * 0.5f, n * 0.5f));
+            float a = Mathf.Clamp01(r - d + 0.5f) * Mathf.Clamp01(d - inner + 0.5f);
+            px[y * n + x] = new Color32(255, 255, 255, (byte)(a * 255));
+        }
+        tex.SetPixels32(px);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f);
     }
 
     void SetArm(int index, Vector2 position)

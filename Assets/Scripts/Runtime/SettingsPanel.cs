@@ -94,6 +94,7 @@ public class SettingsPanel : OverlayPanel
         bool touch = DeviceProfile.Touched;
         if (touch) names.Add("Touch");
         names.Add("Display");
+        names.Add("HUD");
         _tabs = UIKit.TabBar(card.transform, "Tabs", names.ToArray(), t);
         _tabs.onChanged.AddListener(ShowPage);
 
@@ -122,6 +123,7 @@ public class SettingsPanel : OverlayPanel
         BuildControls(Page(content, "Controls"), t);
         if (touch) BuildTouch(Page(content, "Touch"), t);
         BuildDisplay(Page(content, "Display"), t);
+        BuildHud(Page(content, "HUD"), t);
 
         // Footer.
         var footer = UIKit.Rect(card.transform, "Footer");
@@ -190,6 +192,26 @@ public class SettingsPanel : OverlayPanel
                   () => GameSettings.StickDeadzone, v => GameSettings.StickDeadzone = v, Percent, t);
         AddSlider(page, "Response curve", "Higher is finer near the centre.", 1f, 3f,
                   () => GameSettings.StickCurve, v => GameSettings.StickCurve = v, v => v.ToString("0.0"), t);
+    }
+
+    void BuildHud(RectTransform page, UITheme t)
+    {
+        Heading(page, "Layout", t);
+        UIKit.SettingRow(page, "Customize", "Customize layout",
+            DeviceProfile.Touched ? "Move, resize and hide every panel and button, and style the crosshair."
+                                  : "Move, resize and hide every panel, and style the crosshair.",
+            out var slot, t);
+        var open = UIKit.Button(slot, "Customize", "Customize layout", FlatButton.Variant.Primary, "layout", t);
+        open.onClick.AddListener(() =>
+        {
+            // The editor needs the HUD under it: in an arena it opens there, from the menu it
+            // loads the current mission's arena frozen.
+            Close();
+            HudEditor.OpenAnywhere();
+        });
+        UIKit.SettingRow(page, "ResetLayout", "Reset layout", "Put every element back where it started, on this device.", out var slot2, t);
+        var reset = UIKit.Button(slot2, "Reset", "Reset layout", FlatButton.Variant.Secondary, "refresh", t);
+        reset.onClick.AddListener(HudLayout.Clear);
     }
 
     void BuildTouch(RectTransform page, UITheme t)

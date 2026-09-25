@@ -1540,6 +1540,80 @@ there is the on-screen button's icon, which under the slot's own icon read as th
 pop-ups and feed rows are still up; the results shots hand a made-up result straight to the
 screen, never to `GameSession`, so a capture never writes the save of whoever ran it.
 
+## The player can move the HUD, and a layout is anchored to edges
+
+`HudLayout` is the player's layout: per element an anchor (0, 0.5 or 1 on each axis, chosen by
+which third of the screen its centre is in), an offset from it, a scale (60-150%), an opacity
+(20-100%) and hidden; plus the crosshair (cross/dot/circle, colour, size, thickness, gap,
+outline) and a phone's second fire button. **Kept per device form** (handset, tablet, desktop)
+as JSON under `settings.hud.<form>`, with three named custom layouts beside it; Settings'
+reset clears the layouts and keeps the named ones.
+
+Every movable element carries a `HudLayoutTarget`. **The owner places it and calls `Settle()`**,
+which records that placement as the default and re-applies the entry on top -- `HudView` after
+it builds, `TouchCluster` after every `Rebuild` (it re-lays whenever the canvas rescales or
+equipment arrives), `TouchLayout` for the joystick zone and pause after mirroring. Applied once,
+an entry would be undone by the next owner layout. Three traps it hit:
+
+- **Mirroring for a left-handed player moves settled elements.** `MirrorHudFooter` and `Flip`
+  drop an element back to its owner's placement, mirror that, and `Settle` again; judging
+  "is this in a bottom corner" from a layout's point anchors mirrored the wrong things.
+- **The player's scale is captured once**, because owners re-lay position and size but never
+  scale -- re-capturing it compounded the player's scale on every rebuild.
+- **The joystick zone is a zone, not a panel** (`HudLayoutTarget.zone`): it lies under
+  everything by design and never counts as an overlap, or every panel on its half is red.
+
+`HudEditor` (Settings > HUD > Customize layout, or the pause card's Customize HUD) is an
+`OverlayPanel` over the frozen arena: a grid, the safe area, a red crosshair keep-out, an
+outline per element (amber selected, red where two visible ones overlap), and a side panel
+that sits on the side away from the selection and only as tall as its content, so the corners
+stay grabbable. It edits a copy and previews live; Cancel (and Escape/B, which come through
+the base `Close`) reverts in `OnClosed`, Save keeps. Pad: D-pad selects, left stick moves,
+triggers size, right stick fades, Y hides, X resets, Start saves -- with the EventSystem's
+navigation off while it is open, or the D-pad would also walk the side panel. From the menu it
+loads the selected arena frozen (`GameSession.EditingHud`), and leaving records no run.
+
+Two fire buttons share `MobileInput.PressFire`, a hold count: with one bool, lifting either
+thumb stopped the gun while the other was still pressing. `VerifyHudLayout` is the regression
+test (moved, sized, faded, hidden, crosshair restyled, preview cancelled, kept across a second
+play session, two fire buttons).
+
+## Store, achievements and loadout
+
+**The store is five shelves on a left rail**: FEATURED (the cheapest things not yet owned, read
+from the catalog), WEAPONS, CHARACTERS (empty, and says so: there are none), GEAR (the bombs and
+Vitality -- `Tab.Bombs` and `Tab.Health` both open it) and CONSUMABLES. `StorePanel`'s purchase
+logic is unchanged -- refuse, take the money, grant -- and **every spend now asks first**
+(`Ask`, a confirm dialog built at runtime; `VerifyStore` confirms through its BUY button).
+`Purchased` refreshes the top bar's coins at once. A price the player cannot pay is red with its
+button off. `StoreAlerts` puts the amber dot on STORE for an affordable item not yet seen, kept
+as a set of ids so it survives a restart and clears on opening.
+
+**The card pictures are renders of per-item models built by `FPSKitItemRenders`** (FPSKit >
+Render Store Items, `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.RenderStoreItems`),
+from primitives in the style of the first-person gun, onto a transparent background, into
+`ItemRenders.asset`. **Every gun in the game uses one shared viewmodel**, so rendering "the"
+model would have been six identical pictures; the renders are the only place the guns look
+different. Framed by the model's projected width and height, not a bounding sphere, which left
+a long gun a thin line in an empty card.
+
+**Achievements pay coins on CLAIM** (`Achievements.CoinReward`, 150 for a first tier to 1,500
+for every star); the XP is automatic because rank reads it off the earned count. Earned is
+still derived; whether it was claimed is stored, like a beat read. `AchievementsPanel` builds
+its kit content at runtime; the builder makes only the screen. **A `SafeAreaFitter` baked into
+a menu screen by the builder takes the whole canvas out of the safe area**: `SafeAreaCanvas`
+skips any canvas that already holds one when it wakes, so the top bar and rail went to the
+physical edges -- add screen-level fitters at runtime.
+
+**Loadout is four slots** -- PRIMARY, SECONDARY (empty: the game carries one gun; Ishaan chose
+to show it), GRENADE, CONSUMABLE -- each with the item's render; a slot opens what the player
+owns for it. Choices go straight to `Loadout`, which the dashboard strip and the next level read.
+
+**Rasterised icons need the theme's list refreshed.** `Tools/rasterize-icons.py` writes PNGs;
+`UITheme.IconSprite` finds an icon by id in the theme asset's own list, so a new icon draws
+nothing until `FPSKitBatch.ImportUiKit` runs. The menu item behind it never exits the editor --
+called directly with `-executeMethod` it idles forever.
+
 ## A crosshair authored in canvas units disappears on a phone
 
 The HUD's crosshair is four 2x10 arms against a 1920-wide reference. On a monitor that is a

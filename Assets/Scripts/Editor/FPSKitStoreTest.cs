@@ -225,6 +225,11 @@ namespace FPSKit.EditorTools
                         // Through the same call the Store button is wired to.
                         menu.OpenStore();
 
+                        // The store opens on FEATURED; the gun this test buys is on WEAPONS.
+                        // Switched here, before the wait, so the cards exist a frame before
+                        // they are raycast at.
+                        menu.store.ShowTab(StorePanel.Tab.Guns);
+
                         // A frame before anything is raycast at it: a graphic enabled this
                         // frame is not in the canvas yet.
                         Wait(0.5, Phase.InspectStore);
@@ -542,6 +547,16 @@ namespace FPSKit.EditorTools
                                     $"{Wallet.Format(Wallet.Balance)} coins in hand");
 
             button.onClick.Invoke();
+
+            // A purchase asks first. Confirmed through the dialog's own button, like a
+            // player, so a dialog that never wires its BUY would fail here.
+            var store = Menu().store;
+            if (store != null && store.Confirming)
+            {
+                if (store.ConfirmBuyButton == null || !store.ConfirmBuyButton.interactable)
+                    throw new Exception("the purchase dialog has no BUY button to confirm with");
+                store.ConfirmBuyButton.onClick.Invoke();
+            }
         }
 
         static ArenaCatalog.Entry FirstPlayable(MainMenuController menu)

@@ -180,6 +180,9 @@ public static class GameSettings
                      "leftHanded", "touchOpacity",
                  })
             PlayerPrefs.DeleteKey(Prefix + key);
+        // The HUD layout is a setting like the rest and goes with them; the named layouts the
+        // player saved are theirs, not settings, and stay.
+        HudLayout.ForgetAllForms();
         PlayerPrefs.Save();
         Changed?.Invoke("*");
     }

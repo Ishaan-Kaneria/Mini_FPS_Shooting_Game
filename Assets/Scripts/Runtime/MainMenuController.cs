@@ -124,7 +124,8 @@ public class MainMenuController : MonoBehaviour
         PlayerStats.RefreshFromCatalog(catalog);
 
         var canvas = GetComponentInParent<Canvas>();
-        _loadout = LoadoutPanel.Create(canvas, store != null ? store.catalog : null, topBarHeight);
+        _loadout = LoadoutPanel.Create(canvas, store != null ? store.catalog : null, topBarHeight,
+                                      store != null ? store.renders : null);
         _loadout.Closed += OnOverlayClosed;
         _loadout.StoreRequested += () => { _loadout.Close(); OpenStore(); };
         _info = InfoPanel.Create(canvas, topBarHeight);
@@ -143,8 +144,18 @@ public class MainMenuController : MonoBehaviour
             levelSelect.LevelChosen += Launch;
             levelSelect.Closed += OnOverlayClosed;
         }
-        if (store != null) store.Closed += OnOverlayClosed;
-        if (achievements != null) achievements.Closed += OnOverlayClosed;
+        if (store != null)
+        {
+            store.Closed += OnOverlayClosed;
+            // Coins move the moment something is bought, in the bar as well as the store.
+            store.Purchased += () => { if (topBar != null) topBar.Refresh(); };
+        }
+        if (topBar != null && store != null) topBar.storeCatalog = store.catalog;
+        if (achievements != null)
+        {
+            achievements.Closed += OnOverlayClosed;
+            achievements.Claimed += () => { if (topBar != null) topBar.Refresh(); };
+        }
         if (instructions != null) instructions.Closed += OnOverlayClosed;
         if (story != null) story.Closed += OnOverlayClosed;
         if (dossier != null) dossier.Closed += OnOverlayClosed;
@@ -365,6 +376,22 @@ public class MainMenuController : MonoBehaviour
     // ======================================================================
 
     /// <summary>PLAY MISSION: the selected arena's next level, after its opening if unread.</summary>
+    /// <summary>
+    /// Settings' "Customize layout" from the menu: the HUD editor needs a HUD under it, so the
+    /// selected arena's current mission is loaded frozen, the editor opens on arrival, and
+    /// leaving it comes straight back here without the visit being recorded as a run.
+    /// </summary>
+    public void LaunchHudEditor()
+    {
+        var entry = _selected;
+        if (entry == null && catalog != null)
+            foreach (var a in catalog.arenas)
+                if (a != null && Campaign.ArenaUnlocked(campaign, a.ProgressKey)) { entry = a; break; }
+        if (entry == null) { Report("There is no arena to lay the HUD out over."); return; }
+        GameSession.BeginHudEditing();
+        Launch(entry, Missions.NextLevel(entry));
+    }
+
     public void PlayMission()
     {
         if (_selected == null || mission == null) return;
@@ -476,6 +503,8 @@ public class MainMenuController : MonoBehaviour
         ShowDashboard(false);
         if (topBar != null) topBar.ShowTab(MenuTopBar.Tab.Store);
         store.Open();
+        // Looking is what clears the dot.
+        if (topBar != null) topBar.RefreshStoreDot();
     }
 
     public void OpenAchievements()

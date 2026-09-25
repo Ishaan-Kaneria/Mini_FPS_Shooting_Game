@@ -40,6 +40,11 @@ public class MenuTopBar : MonoBehaviour
 
     bool _useRail;
 
+    [Header("Store alert")]
+    [Tooltip("What the STORE tab's dot asks about: is anything newly affordable?")]
+    public StoreCatalog storeCatalog;
+    readonly System.Collections.Generic.List<GameObject> _storeDots = new System.Collections.Generic.List<GameObject>();
+
     /// <summary>Whether the tabs are on the rail. Screens under the bar inset by <see cref="railWidth"/> when they are.</summary>
     public bool RailInUse => _useRail && rail != null && railTabs != null;
 
@@ -80,6 +85,34 @@ public class MenuTopBar : MonoBehaviour
             xpBar.Snap();
         }
         if (coinText != null) coinText.text = t.Tabular(Wallet.Format(Wallet.Balance));
+        RefreshStoreDot();
+    }
+
+    /// <summary>
+    /// A small amber dot on STORE -- on the bar and on the rail -- while something the player
+    /// can now afford has not been seen in the store. Opening the store clears it.
+    /// </summary>
+    public void RefreshStoreDot()
+    {
+        if (_storeDots.Count == 0)
+        {
+            foreach (var bar in new[] { tabs, railTabs })
+            {
+                if (bar == null || bar.tabs.Length <= (int)Tab.Store) continue;
+                var tab = bar.tabs[(int)Tab.Store];
+                var dot = UIKit.Rect(tab.transform, "NewDot").gameObject.AddComponent<FlatRect>();
+                dot.raycastTarget = false;
+                dot.color = UITheme.Active.accent;
+                var rt = dot.rectTransform;
+                rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
+                rt.anchoredPosition = new Vector2(-8f, -12f);
+                rt.sizeDelta = new Vector2(8f, 8f);
+                dot.gameObject.AddComponent<UnityEngine.UI.LayoutElement>().ignoreLayout = true;
+                _storeDots.Add(dot.gameObject);
+            }
+        }
+        bool show = StoreAlerts.HasNew(storeCatalog);
+        foreach (var d in _storeDots) if (d != null) d.SetActive(show);
     }
 
     void OnEnable() => Refresh();

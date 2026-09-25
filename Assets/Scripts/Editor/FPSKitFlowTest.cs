@@ -715,6 +715,13 @@ namespace FPSKit.EditorTools
                     position = RectTransformUtility.WorldToScreenPoint(null, centre)
                 };
 
+                // A button scrolled out of its list is clipped by the list's mask, so a raycast
+                // at it rightly hits nothing -- and scrolling is how it is reached. Only a
+                // button the player can see has to answer.
+                var mask = button.GetComponentInParent<UnityEngine.UI.RectMask2D>();
+                if (mask != null && !RectTransformUtility.RectangleContainsScreenPoint(mask.rectTransform, pointer.position, null))
+                    continue;
+
                 var hits = new List<UnityEngine.EventSystems.RaycastResult>();
                 raycaster.Raycast(pointer, hits);
 

@@ -27,7 +27,12 @@ using UnityEngine.UI;
 public class StorePanel : MonoBehaviour
 {
     /// <summary>Which shelf is on screen.</summary>
-    public enum Tab { Guns, Bombs, Items, Health }
+    /// <summary>
+    /// The shelves. The first four keep their numbers because tests and older code name them;
+    /// what the rail shows is FEATURED, WEAPONS, CHARACTERS, GEAR and CONSUMABLES, where GEAR
+    /// is the explosives and Vitality together (Bombs and Health both open it).
+    /// </summary>
+    public enum Tab { Guns, Bombs, Items, Health, Featured, Characters }
 
     [Header("Wiring")]
     [Tooltip("What is for sale. Wired by the dashboard builder.")]
@@ -47,6 +52,22 @@ public class StorePanel : MonoBehaviour
     [Header("Tabs")]
     [Tooltip("In the order of the Tab enum: guns, bombs, items, health.")]
     public Button[] tabButtons;
+
+    [Tooltip("Which shelf each rail button opens, in the order they are drawn.")]
+    public Tab[] tabOrder = { Tab.Featured, Tab.Guns, Tab.Characters, Tab.Bombs, Tab.Items };
+
+    [Tooltip("Renders of each item's model, keyed by the item's id. Written by FPSKit > Render Store Items.")]
+    public ItemRenders renders;
+
+    [Tooltip("Shown instead of the grid when a shelf has nothing on it.")]
+    public GameObject emptyState;
+    public TMP_Text emptyText;
+
+    [Tooltip("The scroll the grid sits in. The grid is sized to its width and scrolls down.")]
+    public ScrollRect scroll;
+
+    /// <summary>Raised after every purchase, so whatever shows the balance can show the new one at once.</summary>
+    public event System.Action Purchased;
 
     [Tooltip("The edge of the tab that is open. This tints the button's border rather " +
              "than its face -- the face stays dark so the caption on it stays legible, " +
@@ -132,13 +153,12 @@ public class StorePanel : MonoBehaviour
             backButton.onClick.AddListener(Close);
         }
 
+        BuildConfirm();
         if (tabButtons == null) return;
-
         for (int i = 0; i < tabButtons.Length; i++)
         {
             if (tabButtons[i] == null) continue;
-
-            var tab = (Tab)i;
+            var tab = i < tabOrder.Length ? tabOrder[i] : (Tab)i;
             tabButtons[i].onClick.RemoveAllListeners();
             tabButtons[i].onClick.AddListener(() => ShowTab(tab));
         }
@@ -158,7 +178,8 @@ public class StorePanel : MonoBehaviour
     // ======================================================================
     public void Open()
     {
-        _tab = Tab.Guns;
+        _tab = Tab.Featured;
+        StoreAlerts.MarkSeen(catalog);
 
         if (panel != null) panel.SetActive(true);
 
@@ -184,6 +205,7 @@ public class StorePanel : MonoBehaviour
         // reachable from Open and from anything that remembers the last shelf, and an
         // empty EXPLOSIVES page reads as a broken store rather than as a locked one.
         _tab = TabAvailable(tab) ? tab : Tab.Guns;
+        if (_confirm != null) _confirm.SetActive(false);
 
         Report("");
         Rebuild();
@@ -200,34 +222,25 @@ public class StorePanel : MonoBehaviour
     /// held. Hiding the tab is the honest version: the store sells better bombs, and the
     /// story is what gives you a bomb in the first place.
     /// </summary>
-    public static bool TabAvailable(Tab tab)
-        => tab != Tab.Bombs || Campaign.HasPower(Campaign.BombPower);
+    public static bool TabAvailable(Tab tab) => true;
+
+    /// <summary>The explosives are the campaign's to hand over; before that GEAR is Vitality alone.</summary>
+    static bool BombsOpen => Campaign.HasPower(Campaign.BombPower);
 
     void PaintTabs()
     {
         if (tabButtons == null) return;
-
         for (int i = 0; i < tabButtons.Length; i++)
         {
             if (tabButtons[i] == null) continue;
-
-            bool open = TabAvailable((Tab)i);
-            tabButtons[i].gameObject.SetActive(open);
-            if (!open) continue;
-
-            bool active = (Tab)i == _tab;
-
-            var colors = tabButtons[i].colors;
-            colors.normalColor = active ? tabActiveColor : tabIdleColor;
-            colors.selectedColor = colors.normalColor;
-            tabButtons[i].colors = colors;
-
-            // The caption too, because the border alone is a thin line and which shelf is
-            // open is the one thing this row exists to say.
-            var caption = tabButtons[i].GetComponentInChildren<TMP_Text>(true);
-            if (caption != null) caption.color = active ? tabActiveInk : tabIdleInk;
+            var tab = i < tabOrder.Length ? tabOrder[i] : (Tab)i;
+            bool active = Shelf(tab) == Shelf(_tab);
+            if (tabButtons[i] is FlatButton flat) flat.Selected = active;
         }
     }
+
+    /// <summary>Bombs and Health are one shelf, GEAR.</summary>
+    static Tab Shelf(Tab tab) => tab == Tab.Health ? Tab.Bombs : tab;
 
     // ======================================================================
 
@@ -264,23 +277,55 @@ public class StorePanel : MonoBehaviour
 
         switch (_tab)
         {
+            case Tab.Featured: BuildFeatured(); break;
             case Tab.Guns: BuildGuns(); break;
-            case Tab.Bombs: BuildBombs(); break;
+            case Tab.Bombs:
+            case Tab.Health:
+                if (BombsOpen) BuildBombs();
+                BuildHealth();
+                break;
             case Tab.Items: BuildItems(); break;
-            case Tab.Health: BuildHealth(); break;
+            case Tab.Characters: break;
         }
 
-        if (_cards.Count == 0)
-            Report($"Nothing in {HeadingFor(_tab)} yet. Add an entry to the store catalog.");
+        // An empty shelf says why, rather than being a blank panel.
+        bool empty = _cards.Count == 0;
+        if (emptyState != null) emptyState.SetActive(empty);
+        if (emptyText != null)
+            emptyText.text = _tab == Tab.Characters
+                ? "No characters yet. Every operative looks the same for now; this shelf is where new ones will go."
+                : _tab == Tab.Featured ? "You own everything worth featuring. Upgrades are on each item's own shelf."
+                : $"Nothing in {HeadingFor(_tab)} yet.";
+
     }
 
     static string HeadingFor(Tab tab) => tab switch
     {
+        Tab.Featured => "FEATURED",
         Tab.Guns => "WEAPONS",
-        Tab.Bombs => "EXPLOSIVES",
-        Tab.Items => "SUPPLIES",
-        _ => "UPGRADES"
+        Tab.Characters => "CHARACTERS",
+        Tab.Items => "CONSUMABLES",
+        _ => "GEAR"
     };
+
+    /// <summary>
+    /// FEATURED: what the player would most sensibly buy next -- the cheapest few things
+    /// they do not own yet, guns and explosives together. Read from the catalog and the save
+    /// each time, so it moves as they buy; nothing is chosen by hand.
+    /// </summary>
+    void BuildFeatured()
+    {
+        var picks = new List<(int price, System.Action build)>();
+        foreach (var gun in catalog.guns)
+            if (gun != null && gun.data != null && !Loadout.OwnsGun(gun))
+            { var g = gun; picks.Add((gun.price, () => BuildGun(g))); }
+        if (BombsOpen)
+            foreach (var bomb in catalog.bombs)
+                if (bomb != null && bomb.data != null && !Loadout.OwnsBomb(bomb))
+                { var b = bomb; picks.Add((bomb.price, () => BuildBomb(b))); }
+        picks.Sort((a, b) => a.price.CompareTo(b.price));
+        for (int i = 0; i < picks.Count && i < 4; i++) picks[i].build();
+    }
 
     StoreItemCard Spawn()
     {
@@ -294,11 +339,14 @@ public class StorePanel : MonoBehaviour
     // ======================================================================
     void BuildGuns()
     {
-        var equipped = Loadout.SelectedGun(catalog);
-
         foreach (var gun in catalog.guns)
+            if (gun != null && gun.data != null) BuildGun(gun);
+    }
+
+    void BuildGun(StoreCatalog.GunEntry gun)
+    {
+        var equipped = Loadout.SelectedGun(catalog);
         {
-            if (gun == null || gun.data == null) continue;
 
             bool owned = Loadout.OwnsGun(gun);
             bool isEquipped = owned && equipped == gun;
@@ -323,13 +371,16 @@ public class StorePanel : MonoBehaviour
                 primaryLabel = owned ? "EQUIP" : "BUY",
                 primaryPrice = owned ? 0 : gun.price,
                 primaryEnabled = owned || Wallet.CanAfford(gun.price),
-                primaryAction = owned ? () => EquipGun(captured) : () => BuyGun(captured),
+                primaryAction = owned ? () => EquipGun(captured)
+                                      : () => Ask(captured.Label, captured.price, () => BuyGun(captured)),
+                render = renders != null ? renders.For(gun.id) : null,
+                iconId = "rifle",
 
                 upgradeShown = owned,
                 upgradeLabel = canUpgrade ? "UPGRADE" : "MAXED",
                 upgradePrice = canUpgrade ? upgradePrice : 0,
                 upgradeEnabled = canUpgrade && Wallet.CanAfford(upgradePrice),
-                upgradeAction = () => UpgradeGun(captured)
+                upgradeAction = () => Ask($"{captured.Label} upgrade", upgradePrice, () => UpgradeGun(captured))
             };
 
             Spawn().Bind(content);
@@ -357,11 +408,14 @@ public class StorePanel : MonoBehaviour
     // ======================================================================
     void BuildBombs()
     {
-        var equipped = Loadout.SelectedBomb(catalog);
-
         foreach (var bomb in catalog.bombs)
+            if (bomb != null && bomb.data != null) BuildBomb(bomb);
+    }
+
+    void BuildBomb(StoreCatalog.BombEntry bomb)
+    {
+        var equipped = Loadout.SelectedBomb(catalog);
         {
-            if (bomb == null || bomb.data == null) continue;
 
             bool owned = Loadout.OwnsBomb(bomb);
             bool isEquipped = owned && equipped == bomb;
@@ -386,13 +440,16 @@ public class StorePanel : MonoBehaviour
                 primaryLabel = owned ? "EQUIP" : "BUY",
                 primaryPrice = owned ? 0 : bomb.price,
                 primaryEnabled = owned || Wallet.CanAfford(bomb.price),
-                primaryAction = owned ? () => EquipBomb(captured) : () => BuyBomb(captured),
+                primaryAction = owned ? () => EquipBomb(captured)
+                                      : () => Ask(captured.Label, captured.price, () => BuyBomb(captured)),
+                render = renders != null ? renders.For(bomb.id) : null,
+                iconId = "grenade",
 
                 upgradeShown = owned,
                 upgradeLabel = canUpgrade ? "UPGRADE" : "MAXED",
                 upgradePrice = canUpgrade ? upgradePrice : 0,
                 upgradeEnabled = canUpgrade && Wallet.CanAfford(upgradePrice),
-                upgradeAction = () => UpgradeBomb(captured)
+                upgradeAction = () => Ask($"{captured.Label} upgrade", upgradePrice, () => UpgradeBomb(captured))
             };
 
             Spawn().Bind(content);
@@ -444,7 +501,9 @@ public class StorePanel : MonoBehaviour
                 primaryLabel = full ? "BELT FULL" : $"BUY x{item.packSize}",
                 primaryPrice = full ? 0 : item.price,
                 primaryEnabled = !full && Wallet.CanAfford(item.price),
-                primaryAction = () => BuyItem(captured),
+                primaryAction = () => Ask($"{captured.Label} x{captured.packSize}", captured.price, () => BuyItem(captured)),
+                render = renders != null ? renders.For(item.id) : null,
+                iconId = "flask",
 
                 // Only one kind goes into a level, so the second button picks which. A
                 // player who owns two of these is being asked a real question, and the
@@ -501,7 +560,9 @@ public class StorePanel : MonoBehaviour
             primaryLabel = canUpgrade ? "UPGRADE" : "MAXED",
             primaryPrice = canUpgrade ? price : 0,
             primaryEnabled = canUpgrade && Wallet.CanAfford(price),
-            primaryAction = UpgradeHealth
+            primaryAction = () => Ask("Vitality upgrade", price, UpgradeHealth),
+            render = renders != null ? renders.For("vitality") : null,
+            iconId = "medkit"
         };
 
         Spawn().Bind(content);
@@ -676,9 +737,9 @@ public class StorePanel : MonoBehaviour
         // payout in GameSession.RecordResult rather than at each of six spend sites, where
         // a seventh added later would silently count nothing.
         PlayerStats.RecordPurchase();
-
         Report(message);
         Rebuild();
+        Purchased?.Invoke();
     }
 
     void Deny(string message)
@@ -710,29 +771,107 @@ public class StorePanel : MonoBehaviour
     /// whether the sentence can be read -- and on a 155mm screen the answer past two
     /// columns is no, whatever the measurement prefers.
     /// </summary>
+    /// <summary>
+    /// Cards as wide as the columns allow, in a grid that scrolls down. A shelf of six guns
+    /// fitted to one screen made every card too small to read on a phone.
+    /// </summary>
     void FitGrid()
     {
         if (cardParent == null) return;
         if (_layout == null) _layout = cardParent.GetComponent<GridLayoutGroup>();
         if (_layout == null) return;
-
-        float width = cardParent.rect.width;
-        float height = cardParent.rect.height;
-
+        var box = scroll != null && scroll.viewport != null ? scroll.viewport : cardParent;
+        float width = box.rect.width;
+        float height = box.rect.height;
         if (width <= 1f || height <= 1f) return;
-        if (Mathf.Abs(width - _fittedWidth) < 0.5f &&
-            Mathf.Abs(height - _fittedHeight) < 0.5f) return;
-
+        if (Mathf.Abs(width - _fittedWidth) < 0.5f && Mathf.Abs(height - _fittedHeight) < 0.5f) return;
         _fittedWidth = width;
         _fittedHeight = height;
-
-        int cap = DeviceProfile.CurrentForm switch
+        int columns = DeviceProfile.CurrentForm switch
         {
             DeviceProfile.Form.Handset => 2,
             DeviceProfile.Form.Tablet => 3,
             _ => Mathf.Max(1, gridColumns),
         };
+        float cell = (width - _layout.padding.left - _layout.padding.right - _layout.spacing.x * (columns - 1)) / columns;
+        _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        _layout.constraintCount = columns;
+        _layout.cellSize = new Vector2(cell, cell * cardAspect);
+    }
 
-        UIGrid.Fit(_layout, cardParent, _cards.Count, cardAspect, 90f, cap);
+    // ======================================================================
+    // Confirmation.
+    // ======================================================================
+
+    GameObject _confirm;
+    TMP_Text _confirmTitle, _confirmBody;
+    System.Action _pending;
+
+    /// <summary>The dialog's BUY button, for the store test, which confirms like a player does.</summary>
+    public FlatButton ConfirmBuyButton { get; private set; }
+
+    public bool Confirming => _confirm != null && _confirm.activeSelf;
+
+    /// <summary>
+    /// Every purchase asks first: coins take a level to earn, and a mis-tap on a phone should
+    /// not spend them. Equipping is free and does not ask.
+    /// </summary>
+    void Ask(string what, int price, System.Action buy)
+    {
+        if (buy == null) return;
+        if (_confirm == null) BuildConfirm();
+        if (_confirm == null) { buy(); return; }
+        var t = UITheme.Active;
+        _pending = buy;
+        _confirmTitle.text = $"Buy {what}?";
+        int after = Wallet.Balance - price;
+        _confirmBody.text = UIText.Row($"{t.Tabular(Wallet.Format(price), heading: false)} COINS",
+                                       $"{t.Tabular(Wallet.Format(Mathf.Max(0, after)), heading: false)} LEFT AFTER");
+        _confirm.SetActive(true);
+        _confirm.transform.SetAsLastSibling();
+        if (ConfirmBuyButton != null) ConfirmBuyButton.Select();
+    }
+
+    void BuildConfirm()
+    {
+        if (panel == null || _confirm != null) return;
+        var t = UITheme.Active;
+        var shade = UIKit.Panel(panel.transform, "Confirm", UIKit.PanelTone.Background, t);
+        shade.color = new Color(t.background.r, t.background.g, t.background.b, 0.85f);
+        shade.borderColor = new Color(0, 0, 0, 0);
+        shade.raycastTarget = true;
+        UIKit.Fill(shade.rectTransform);
+        var card = UIKit.Panel(shade.transform, "Dialog", UIKit.PanelTone.Panel, t);
+        card.stripeSide = FlatRect.Side.Top;
+        card.stripeColor = t.accent;
+        card.stripePixels = t.stripePixels;
+        var rt = card.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(520f, 0f);
+        card.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        card.gameObject.AddComponent<FitInsideParent>();
+        var col = UIKit.Column(card, 14f, new RectOffset(28, 28, 24, 24));
+        col.childForceExpandHeight = false;
+        col.childControlHeight = true;
+        _confirmTitle = UIKit.Text(card.transform, "Title", "", UIKit.TextRole.Title, t);
+        _confirmBody = UIKit.Text(card.transform, "Body", "", UIKit.TextRole.Label, t);
+        _confirmBody.color = t.textSecondary;
+        var row = UIKit.Rect(card.transform, "Buttons");
+        var r = UIKit.Row(row, 10f, null, TextAnchor.MiddleRight);
+        r.childForceExpandWidth = false;
+        UIKit.Size(row).minHeight = UIKit.ControlHeight;
+        var cancel = UIKit.Button(row, "Cancel", "Cancel", FlatButton.Variant.Secondary, null, t);
+        cancel.onClick.AddListener(() => { _pending = null; _confirm.SetActive(false); });
+        var buy = UIKit.Button(row, "Buy", "Buy", FlatButton.Variant.Primary, "coin", t);
+        buy.onClick.AddListener(() =>
+        {
+            var act = _pending;
+            _pending = null;
+            _confirm.SetActive(false);
+            act?.Invoke();
+        });
+        ConfirmBuyButton = buy;
+        _confirm = shade.gameObject;
+        _confirm.SetActive(false);
     }
 }

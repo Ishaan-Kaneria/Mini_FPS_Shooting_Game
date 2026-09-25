@@ -50,7 +50,18 @@ public static class GameSession
         HasSelectedLevel = false;
         LastResult = default;
         ReturnedFromRun = false;
+        EditingHud = false;
     }
+
+    /// <summary>
+    /// The arena was loaded only to lay the HUD out over it, from the menu's Settings. The
+    /// level stays frozen, the editor opens on arrival, and leaving records nothing: a run
+    /// the player never played is not an attempt.
+    /// </summary>
+    public static bool EditingHud { get; private set; }
+
+    public static void BeginHudEditing() => EditingHud = true;
+    public static void EndHudEditing() => EditingHud = false;
 
     public static void ChooseArena(string sceneName, string label)
     {

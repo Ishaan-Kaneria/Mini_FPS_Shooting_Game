@@ -287,6 +287,10 @@ namespace FPSKit.EditorTools
                                     Look = new Vector3(-60f, 0f, -60f), Fov = 70f };
             yield return new Shot { Name = "08_overhead", From = new Vector3(40f, 110f, -60f),
                                     Look = new Vector3(60f, 0f, 60f), Fov = 75f };
+            // The spawn junction from a few metres up one arm: its road markings, the stop
+            // lines and the clear box between them, as the player first meets them.
+            yield return new Shot { Name = "08b_junction", From = new Vector3(-3f, 3.2f, -17f),
+                                    Look = new Vector3(0f, 0f, 2f), Fov = 72f };
 
             // A walkway and its stair, found rather than written down: the catwalks go
             // wherever the tank farms and the power house put their pipe runs.

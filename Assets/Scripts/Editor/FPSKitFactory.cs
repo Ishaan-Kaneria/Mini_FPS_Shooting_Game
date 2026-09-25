@@ -705,14 +705,34 @@ namespace FPSKit.EditorTools
 
                 if (neighbours >= 3)
                 {
-                    // Hatching, at some junctions and not all -- and kept to the middle
-                    // of the box rather than run corner to corner. Laid across the whole
-                    // tile at close spacing it covers the junction completely, and a
-                    // player standing on one is looking at nothing but paint.
-                    if (rng.NextDouble() > 0.4f) continue;
+                    // A stop line across the incoming lane of every arm, with the lane
+                    // dashes carried up to it, and a clean box in the middle. This used
+                    // to be diagonal hatching on a random few junctions: three stray bars
+                    // across the box that read as a mistake, not as a marking.
+                    //
+                    // The draw is kept so everything placed after this (bays, spills)
+                    // lands where it always has.
+                    rng.NextDouble();
 
-                    for (float o = -CarriageHalf * 0.6f; o < CarriageHalf * 0.6f; o += 2.6f)
-                        Paint(paint, centre + new Vector3(o, 0f, 0f), 0.3f, CarriageHalf * 1.3f, 45f);
+                    for (int arm = 0; arm < 4; arm++)
+                    {
+                        bool open = arm switch { 0 => n, 1 => s, 2 => e, _ => w };
+                        if (!open) continue;
+
+                        var d = arm switch
+                        {
+                            0 => Vector3.forward, 1 => Vector3.back, 2 => Vector3.right, _ => Vector3.left,
+                        };
+                        bool alongX = arm >= 2;
+                        // Traffic comes in along -d and keeps right: its lane is to the
+                        // right of that heading.
+                        var inLane = new Vector3(-d.z, 0f, d.x) * (CarriageHalf * 0.5f);
+
+                        Paint(paint, centre + d * (CarriageHalf + 0.5f) + inLane,
+                              0.4f, CarriageHalf - 0.4f, alongX ? 0f : 90f);
+                        Paint(paint, centre + d * ((CarriageHalf + edge) * 0.5f),
+                              0.18f, 2f, alongX ? 90f : 0f);
+                    }
                 }
                 else
                 {

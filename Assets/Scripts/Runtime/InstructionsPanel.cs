@@ -228,6 +228,7 @@ public class InstructionsPanel : OverlayPanel
                 new Line(P(GameAction.Fire), "Fire"),
                 new Line(P(GameAction.Aim), "Aim down sights"),
                 new Line(P(GameAction.Reload), "Reload"),
+                new Line(P(GameAction.Melee), "Punch, up close. Saves a round."),
             }),
 
             new Page("Equipment", BombEarned
@@ -271,6 +272,7 @@ public class InstructionsPanel : OverlayPanel
                 new Line(K(c.fire), "Fire"),
                 new Line(K(c.aim), "Aim down sights"),
                 new Line(K(c.reload), "Reload"),
+                new Line(K(c.melee), "Punch, up close. Saves a round."),
             }),
 
             // The two nobody finds by experiment, and the reason this panel exists.
@@ -311,6 +313,7 @@ public class InstructionsPanel : OverlayPanel
                 new Line(T(GameAction.Fire), "Press and keep dragging -- it keeps firing while you aim."),
                 new Line(T(GameAction.Aim), "Down sights. Tap or hold, in Settings."),
                 new Line(T(GameAction.Reload), "Reload."),
+                new Line(T(GameAction.Melee), "Punch, up close. Saves a round."),
                 new Line(T(GameAction.Jump), "Jump."),
                 new Line(T(GameAction.Crouch), "Crouch."),
             }),

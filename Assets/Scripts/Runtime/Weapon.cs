@@ -211,6 +211,17 @@ public class Weapon : MonoBehaviour
     public event Action<Weapon> ReloadStarted;
     public event Action<Weapon> ReloadFinished;
 
+    /// <summary>
+    /// Added to the model's pose every frame, on top of the hip/sights blend and the
+    /// kick. <see cref="MeleeStrike"/> dips the gun out of the fist's way with it.
+    /// </summary>
+    [NonSerialized] public Vector3 HandsOffset;
+
+    /// <summary>True while the gun is lowered for something else the hands are doing.</summary>
+    public bool IsLowered => Time.time < _loweredUntil;
+
+    float _loweredUntil;
+
     PlayerMotor _motor;
     BombThrower _bombs;
     ControlSettings _fallbackControls;
@@ -282,7 +293,7 @@ public class Weapon : MonoBehaviour
         // would empty a magazine into the floor the player is placing a ring on.
         bool aimingBomb = _bombs != null && _bombs.IsAiming;
 
-        bool inputAllowed = PlayerMotor.InputEnabled && !aimingBomb;
+        bool inputAllowed = PlayerMotor.InputEnabled && !aimingBomb && !IsLowered;
 
         var controls = Controls;
 
@@ -544,6 +555,30 @@ public class Weapon : MonoBehaviour
         return taken;
     }
 
+    /// <summary>
+    /// Takes the gun out of the player's hands for a moment: no fire, no sights, no
+    /// reload key. A reload already running carries on. Only ever extends.
+    /// </summary>
+    public void Lower(float seconds)
+    {
+        _loweredUntil = Mathf.Max(_loweredUntil, Time.time + seconds);
+        _nextFireTime = Mathf.Max(_nextFireTime, _loweredUntil);
+    }
+
+    /// <summary>
+    /// Reports damage the player dealt without a bullet, so it gets the same hitmarker a
+    /// shot does. The HUD listens to this weapon, and a second source of hits it had to
+    /// be taught about would be a hit it forgot to show.
+    ///
+    /// No floating number: a punch lands a metre from the lens, where a world-space
+    /// number is drawn a third of the screen high and hides the fight it is reporting.
+    /// </summary>
+    public void ReportHit(DamageInfo info)
+    {
+        if (info.amount <= 0f) return;
+        DealtDamage?.Invoke(this, info);
+    }
+
     /// <summary>Floats the damage dealt over the target, brighter for a headshot or a kill.</summary>
     void ShowDamage(DamageInfo info, Health target)
     {
@@ -612,7 +647,7 @@ public class Weapon : MonoBehaviour
         _kickback = Mathf.Lerp(_kickback, 0f, Mathf.Clamp01(12f * Time.deltaTime));
 
         Vector3 basePosition = Vector3.Lerp(_hipPosition, data.adsPosition, AimProgress);
-        transform.localPosition = basePosition + Vector3.back * _kickback;
+        transform.localPosition = basePosition + Vector3.back * _kickback + HandsOffset;
 
         // Widened for the speed, not for the intent. IsSprinting is true the moment
         // the key goes down, standing still included, so keying the FOV off it alone

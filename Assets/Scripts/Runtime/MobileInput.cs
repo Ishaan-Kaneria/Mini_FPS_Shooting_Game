@@ -72,6 +72,7 @@ public static class MobileInput
     static bool _jumpQueued;
     static bool _reloadQueued;
     static bool _useItemQueued;
+    static bool _meleeQueued;
 
     /// <summary>
     /// A touch player has no Escape key, so without this there is no way to pause --
@@ -136,6 +137,16 @@ public static class MobileInput
         return queued;
     }
 
+    public static void QueueMelee() => _meleeQueued = true;
+
+    /// <summary>Reads and clears. Only MeleeStrike should call this.</summary>
+    public static bool ConsumeMelee()
+    {
+        bool queued = _meleeQueued;
+        _meleeQueued = false;
+        return queued;
+    }
+
     /// <summary>
     /// Static state survives play-mode restarts in the editor, so the touch UI
     /// clears it on enable and disable.
@@ -161,6 +172,6 @@ public static class MobileInput
         _sprintButton = _sprintStick = false;
         _fireButton = _fireTap = _autoFire = false;
         _fireHolds = 0;
-        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = false;
+        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = _meleeQueued = false;
     }
 }

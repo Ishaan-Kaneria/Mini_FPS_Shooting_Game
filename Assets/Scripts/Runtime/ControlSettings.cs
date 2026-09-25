@@ -52,6 +52,10 @@ public class ControlSettings : ScriptableObject
              "one-off item, and it is nowhere near the movement keys.")]
     public KeyCode useItem = KeyCode.F;
 
+    [Tooltip("Punches whoever is within arm's reach in front of you. A tap, never a hold, " +
+             "and next to the movement keys so it can be thrown mid-strafe.")]
+    public KeyCode melee = KeyCode.V;
+
     [Header("Sprint")]
     [Tooltip("Sprint by double-tapping the key below rather than holding one down.")]
     public bool sprintByDoubleTap;
@@ -182,6 +186,7 @@ public class ControlSettings : ScriptableObject
         aim = KeyCode.Mouse1;
         bomb = KeyCode.G;
         useItem = KeyCode.F;
+        melee = KeyCode.V;
         sprintEndsWhenNotAdvancing = true;
         sprintNeedsMovement = false;
         sprintDrivesForward = true;

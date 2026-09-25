@@ -179,6 +179,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 5b569dfda96fae9d09b24260a6a25996, type: 3}
   - id: device-gamepad-2
     sprite: {fileID: 21300000, guid: c2eba8a379b41c6b39dc4c0f4e33c55e, type: 3}
+  - id: fist
+    sprite: {fileID: 21300000, guid: 231341afd690167ba94468740c469c70, type: 3}
   - id: flash
     sprite: {fileID: 21300000, guid: cfd03fdfe4bcf09f289511b50969a4a3, type: 3}
   - id: flask

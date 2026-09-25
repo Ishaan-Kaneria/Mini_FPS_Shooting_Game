@@ -42,7 +42,7 @@ namespace FPSKit.EditorTools
         /// <summary>How close the player is held during the point-blank phase.</summary>
         const float PointBlank = 1.6f;
 
-        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Judge }
+        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Punch, PunchMiss, Judge }
 
         /// <summary>
         /// Seconds the level is given while this test runs.
@@ -84,6 +84,14 @@ namespace FPSKit.EditorTools
         static int _closeAttacks;
         static bool _sawRangedShot;
 
+        // --- the punch ------------------------------------------------------
+        static bool _punchThrown;
+        static string _punchRole = "";
+        static float _punchPoolBefore = -1f, _punchPoolAfter = -1f;
+        static bool _punchKilled, _gunLowered, _fistShown, _punchMissed;
+        static string _punchMissHit = "";
+        static float _punchAt;
+
         // --- diagnostics, printed on failure so a red run says why ---------
         static float _minDistance = float.MaxValue;
         static int _framesWithSight;
@@ -113,6 +121,9 @@ namespace FPSKit.EditorTools
                 _poolAtEngage = _poolAfterRanged = _poolBeforeClose = _poolAtEnd = -1f;
                 _closeAttacks = 0;
                 _sawRangedShot = false;
+                _punchThrown = _punchKilled = _gunLowered = _fistShown = _punchMissed = false;
+                _punchRole = _punchMissHit = "";
+                _punchPoolBefore = _punchPoolAfter = -1f;
                 _startedAt = EditorApplication.timeSinceStartup;
                 _phase = Phase.Enter;
 
@@ -267,8 +278,90 @@ namespace FPSKit.EditorTools
                         _poolAtEnd = Pool();
 
                         bool hurt = _poolBeforeClose > 0f && _poolAtEnd < _poolBeforeClose;
-                        if (hurt || !Waiting()) _phase = Phase.Judge;
+                        if (hurt || !Waiting()) _phase = Phase.Punch;
 
+                        return;
+                    }
+
+                    case Phase.Punch:
+                    {
+                        // Arm's length from the nearest enemy, facing it: the one place a
+                        // punch has to land. Thrown through the component rather than a
+                        // key, because batch mode has no keyboard to press.
+                        HoldPointBlank();
+                        var player = GameObject.FindGameObjectWithTag("Player");
+                        var nearest = Nearest(player);
+                        var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
+
+                        if (melee == null || nearest == null)
+                        {
+                            Notes.Append("\n  punch: no MeleeStrike on the player, or nobody left to punch");
+                            _phase = Phase.Judge;
+                            return;
+                        }
+
+                        Face(player, nearest.transform.position);
+                        Physics.SyncTransforms();
+
+                        var target = nearest.GetComponent<Health>();
+                        _punchPoolBefore = target.Current + target.Shield;
+                        _punchRole = nearest.archetype != null ? nearest.archetype.role.ToString() : "Standard";
+
+                        // Game time, pinned: the cooldown is measured in it, and batch frames
+                        // otherwise advance it by next to nothing. Put back in Detach.
+                        Time.captureDeltaTime = 1f / 60f;
+                        _punchAt = Time.time;
+
+                        var hit = melee.TryPunch();
+                        _punchThrown = true;
+                        _punchPoolAfter = target.Current + target.Shield;
+                        _punchKilled = target.IsDead;
+                        _gunLowered = melee.weapon != null && melee.weapon.IsLowered;
+
+                        // The fist is switched on by the component's own Update, a frame on.
+                        Notes.Append($"\n  punch at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
+                                     $"hit {(hit != null ? hit.name : "nothing")} ({_punchRole}): pool " +
+                                     $"{_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0}");
+
+                        Wait(30.0, Phase.PunchMiss);
+                        return;
+                    }
+
+                    case Phase.PunchMiss:
+                    {
+                        var player = GameObject.FindGameObjectWithTag("Player");
+                        var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
+                        if (melee != null && melee.fist != null && melee.fist.gameObject.activeInHierarchy)
+                            _fistShown = true;
+
+                        // Past the cooldown, then well out of reach: a punch must not
+                        // land on anyone eight metres away.
+                        if (melee != null && Time.time < _punchAt + melee.cooldown + 0.05f)
+                        {
+                            if (Waiting()) return;
+                            Notes.Append("\n  punch: game time never passed the cooldown");
+                        }
+
+                        var nearest = Nearest(player);
+                        if (melee != null && nearest != null)
+                        {
+                            Vector3 away = Vector3.ProjectOnPlane(player.transform.position - nearest.transform.position, Vector3.up);
+                            away = away.sqrMagnitude > 0.01f ? away.normalized : Vector3.forward;
+
+                            var controller = player.GetComponent<CharacterController>();
+                            if (controller != null) controller.enabled = false;
+                            player.transform.position = nearest.transform.position + away * 8f + Vector3.up * 1.1f;
+                            if (controller != null) controller.enabled = true;
+
+                            Face(player, nearest.transform.position);
+                            Physics.SyncTransforms();
+
+                            var hit = melee.TryPunch();
+                            _punchMissed = hit == null;
+                            _punchMissHit = hit != null ? hit.name : "";
+                        }
+
+                        _phase = Phase.Judge;
                         return;
                     }
 
@@ -463,6 +556,26 @@ namespace FPSKit.EditorTools
             if (controller != null) controller.enabled = true;
         }
 
+        static EnemyAI Nearest(GameObject player)
+        {
+            if (player == null) return null;
+
+            EnemyAI nearest = null;
+            float best = float.MaxValue;
+            foreach (var ai in Enemies())
+            {
+                float d = Vector3.Distance(ai.transform.position, player.transform.position);
+                if (d < best) { best = d; nearest = ai; }
+            }
+            return nearest;
+        }
+
+        static void Face(GameObject player, Vector3 at)
+        {
+            Vector3 to = Vector3.ProjectOnPlane(at - player.transform.position, Vector3.up);
+            if (to.sqrMagnitude > 0.001f) player.transform.rotation = Quaternion.LookRotation(to);
+        }
+
         static List<EnemyAI> Enemies()
         {
             var found = new List<EnemyAI>();
@@ -502,6 +615,7 @@ namespace FPSKit.EditorTools
             _clockBackup = -1f;
 
             FPSKitPlayMode.RestoreStartScene();
+            Time.captureDeltaTime = 0f;
 
             EditorApplication.update -= Tick;
             Application.logMessageReceived -= OnGameLog;
@@ -556,6 +670,28 @@ namespace FPSKit.EditorTools
                 problems.Append($"\n  - the player took no damage in {CloseWindow}s standing in an " +
                                 $"enemy's face (pool {_poolBeforeClose:0.0} -> {_poolAtEnd:0.0}): this is " +
                                 "the gather-round-and-do-nothing failure");
+
+            if (!_punchThrown)
+                problems.Append("\n  - no punch was thrown: the player has no MeleeStrike, or nobody was left");
+            else
+            {
+                if (_punchPoolAfter >= _punchPoolBefore)
+                    problems.Append($"\n  - a punch thrown at arm's length from a {_punchRole} did no damage " +
+                                    $"(pool {_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0})");
+
+                if (_punchRole == "Standard" && !_punchKilled)
+                    problems.Append("\n  - a punch did not put down an ordinary enemy, which is the whole " +
+                                    "point of it on a level with no spare rounds");
+
+                if (!_gunLowered)
+                    problems.Append("\n  - the gun was not lowered during the punch: it could fire through the swing");
+
+                if (!_fistShown)
+                    problems.Append("\n  - the fist never appeared: the punch is invisible");
+
+                if (!_punchMissed)
+                    problems.Append($"\n  - a punch thrown from eight metres hit {_punchMissHit}");
+            }
 
             if (problems.Length > 0)
             {

@@ -88,7 +88,7 @@ namespace FPSKit.EditorTools
                 c.ApplyPreset(preset);
                 foreach (var k in new[] { c.moveForward, c.moveBack, c.moveLeft, c.moveRight, c.altForward, c.altBack,
                                           c.altLeft, c.altRight, c.fire, c.jump, c.aim, c.reload, c.crouch, c.altCrouch,
-                                          c.bomb, c.useItem, c.sprintKey })
+                                          c.bomb, c.useItem, c.melee, c.sprintKey })
                 {
                     if (k == KeyCode.None) continue;
                     if (GameInput.PathFor(k) == null) Fail($"{preset}: {k} has no Input System binding");

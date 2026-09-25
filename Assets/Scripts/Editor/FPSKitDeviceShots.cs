@@ -141,6 +141,8 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc_hudedit", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit", Wait = 8f },
                 new Shot { File = "pc_hudedit_crosshair", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit_crosshair", Wait = 8f },
                 new Shot { File = "iphone15_hudedit", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "hudedit", Wait = 8f },
+                new Shot { File = "pc_punch", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "punch", Wait = 14f, After = 0.12f },
+                new Shot { File = "iphone15_punch", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "punch", Wait = 14f, After = 0.12f },
                 new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
             };
             string only = Arg("-fpskitOnly");
@@ -239,6 +241,45 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>
+        /// The player at arm's length from the nearest enemy, facing it, with a punch just
+        /// thrown: the fist out, the gun dipped, and the prompt under the crosshair.
+        /// </summary>
+        static void StagePunch()
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
+            if (melee == null) throw new Exception("the player has no MeleeStrike to punch with");
+
+            EnemyAI nearest = null;
+            float best = float.MaxValue;
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+            {
+                var h = ai.GetComponent<Health>();
+                if (h == null || h.IsDead) continue;
+                float d = Vector3.Distance(ai.transform.position, player.transform.position);
+                if (d < best) { best = d; nearest = ai; }
+            }
+            if (nearest == null) throw new Exception("no enemy had spawned to punch");
+
+            Vector3 away = Vector3.ProjectOnPlane(player.transform.position - nearest.transform.position, Vector3.up);
+            away = away.sqrMagnitude > 0.01f ? away.normalized : nearest.transform.forward;
+
+            var controller = player.GetComponent<CharacterController>();
+            if (controller != null) controller.enabled = false;
+            player.transform.position = nearest.transform.position + away * 1.7f + Vector3.up * 1.1f;
+            player.transform.rotation = Quaternion.LookRotation(-away);
+            if (controller != null) controller.enabled = true;
+
+            // Nobody else in the frame: the shot is of the hands, not of a crowd.
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+                if (ai != nearest && Vector3.Distance(ai.transform.position, nearest.transform.position) < 6f)
+                    ai.gameObject.SetActive(false);
+
+            Physics.SyncTransforms();
+            melee.TryPunch();
+        }
+
         static void OpenResults()
         {
             var ui = Object.FindAnyObjectByType<LevelResultsUI>();
@@ -315,6 +356,10 @@ namespace FPSKit.EditorTools
                         else if (shot.Open == "combat")
                         {
                             StageCombat();
+                        }
+                        else if (shot.Open == "punch")
+                        {
+                            StagePunch();
                         }
                         else if ((shot.Open ?? "").StartsWith("hudedit"))
                         {

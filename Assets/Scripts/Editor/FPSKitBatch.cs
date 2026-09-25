@@ -503,6 +503,12 @@ namespace FPSKit.EditorTools
             if (player.GetComponent<ConsumableBelt>() == null)
                 problems.Add("player has no ConsumableBelt: energy drinks could not be used");
 
+            var melee = player.GetComponent<MeleeStrike>();
+            if (melee == null)
+                problems.Add("player has no MeleeStrike: the punch key would do nothing");
+            else if (melee.fist == null || melee.supportHand == null)
+                problems.Add("MeleeStrike has no fist or support hand: a punch would be invisible");
+
             var catalog = loadout.catalog;
             if (catalog == null) return;
 

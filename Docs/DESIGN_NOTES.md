@@ -1668,6 +1668,41 @@ Magazine's empty reserve is the last word. The limit is a runtime flag on `Weapo
 reloading: it starts with nothing spare, and kills are the only resupply. Pickup size is
 `Pickup.ammoAmount` (90, in the scene builder) and the carry cap `WeaponData.maxReserveAmmo`.
 
+## The punch, and the hands that throw it
+
+Added 2026-09-25 at Ishaan's request, for the level with no spare rounds: up close, the
+player chooses between spending a bullet and a fist. `MeleeStrike` on the player root.
+
+- **Damage is a share of the target's own pool**, not a number, so it means the same on
+  level one and level eight after the level curve has scaled health. An ordinary enemy goes
+  down in one; an elite loses `eliteShare` (0.45) of health plus armour; a boss only
+  `bossShare` (0.08), or a boss fight becomes walking up to it. Role comes from
+  `EnemyAI.archetype.role`. Nothing is written into `EnemyArchetype`.
+- **Reach is found, not aimed**: nearest the crosshair within `reach` (2.3m, eye to the
+  closest point of a collider) and a 50-degree cone, with no non-enemy collider between.
+  Scanned ten times a second for the HUD prompt, and asked again at the moment of the punch.
+- **Bindings**: `ControlSettings.melee` (V), rebindable as "Punch"; pad **R3**
+  (`AddPadBindings` and `InputPrompts.PadGlyph` agree); touch `TouchButton.ActionKind.Melee`,
+  appended last because the kind is serialized by number into staged scenes. The touch button
+  is **always shown**, in column 3 row 0, beyond the bomb on the bottom row -- a free cell, so
+  nothing else in the cluster moves. The top row is taken on a phone: above JUMP is under the
+  pause button, above the bomb is over the objective strip (both seen in `CaptureDevices`). A situational button that appeared when an enemy got close would jump
+  under a thumb in the middle of the fight it was for.
+- **The HUD says when it would land**: "V PUNCH" under the crosshair only while `InReach`.
+- **The gun is lowered, not the reload cancelled**: `Weapon.Lower(seconds)` blocks fire,
+  sights and the reload key; a reload already running carries on. The hitmarker and damage
+  number come through `Weapon.ReportHit`, so the HUD has one source of hits.
+
+**The hands** are primitives like the gun, gloves and sleeves rather than skin (no one skin
+tone is the player's). Right hand on the grip and left under the handguard are children of
+`WeaponModel` (`BuildGunHands`), so they recoil, sway and come up to the sights with it. The
+punching fist is a separate arm under `WeaponHolder` (`BuildFist`): the gun dips away while it
+is out and the fist must not go with it. The support hand hides while the fist is out, so there
+are never two left hands. The swing is driven from a timestamp, not a coroutine, so a domain
+reload mid-swing cannot leave the gun dipped. `VerifyCombat` punches the nearest level-one
+enemy from arm's length (must go down, gun lowered, fist shown) and from eight metres (must
+hit nothing); `CaptureDevices -fpskitOnly punch` shows it.
+
 ## A crosshair authored in canvas units disappears on a phone
 
 The HUD's crosshair is four 2x10 arms against a 1920-wide reference. On a monitor that is a

@@ -6,7 +6,7 @@ using UnityEngine.InputSystem.DualShock;
 using UnityEngine.InputSystem.LowLevel;
 
 /// <summary>The things a player does in a level, independent of what they do them with.</summary>
-public enum GameAction { Move, Look, Fire, Aim, Jump, Crouch, Sprint, Reload, Bomb, UseItem, Pause }
+public enum GameAction { Move, Look, Fire, Aim, Jump, Crouch, Sprint, Reload, Bomb, UseItem, Pause, Melee }
 
 /// <summary>What the player is holding.</summary>
 public enum InputScheme { KeyboardMouse, Gamepad, Touch }
@@ -180,6 +180,8 @@ public static class GameInput
         Bind(GameAction.Bomb, "<Gamepad>/rightShoulder");
         Bind(GameAction.UseItem, "<Gamepad>/leftShoulder");
         Bind(GameAction.Pause, "<Gamepad>/start");
+        // R3, where most pad shooters put the melee: the thumb is already on that stick.
+        Bind(GameAction.Melee, "<Gamepad>/rightStickPress");
     }
 
     /// <summary>
@@ -219,6 +221,7 @@ public static class GameInput
         Key(GameAction.Reload, c.reload);
         Key(GameAction.Bomb, c.bomb);
         Key(GameAction.UseItem, c.useItem);
+        Key(GameAction.Melee, c.melee);
         Key(GameAction.Pause, KeyCode.Escape);
         Key(GameAction.Pause, KeyCode.P);
         _play.Enable();

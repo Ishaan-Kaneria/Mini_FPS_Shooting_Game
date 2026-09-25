@@ -106,6 +106,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   clamp range from the player; flight time scales with distance; touch uses `RangeFromPitch`.
   Blast damages each `Health` once. Audible reach is `maxRange`.
 - Reserve ammo is per level (`LevelSet.Level.reserveMagazines`), a runtime flag on `Weapon`.
+- Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
+  the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
+  `Weapon.ReportHit`. Hands are builder primitives (`BuildGunHands`, `BuildFist`).
 
 ## Terrain and arenas
 

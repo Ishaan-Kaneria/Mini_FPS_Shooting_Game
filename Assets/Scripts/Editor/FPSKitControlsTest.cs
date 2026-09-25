@@ -132,7 +132,7 @@ namespace FPSKit.EditorTools
         static readonly string[] Essential =
         {
             "moveForward", "moveBack", "moveLeft", "moveRight",
-            "fire", "jump", "aim", "reload", "crouch", "bomb", "useItem", "sprintKey"
+            "fire", "jump", "aim", "reload", "crouch", "bomb", "useItem", "melee", "sprintKey"
         };
 
         static bool IsPair(string a, string b, string x, string y)

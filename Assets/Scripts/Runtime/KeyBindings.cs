@@ -42,6 +42,7 @@ public static class KeyBindings
         new Binding("crouch", "Crouch", c => c.crouch, (c, k) => c.crouch = k),
         new Binding("bomb", "Grenade", c => c.bomb, (c, k) => c.bomb = k),
         new Binding("item", "Medkit", c => c.useItem, (c, k) => c.useItem = k),
+        new Binding("melee", "Punch", c => c.melee, (c, k) => c.melee = k),
     };
 
     const string Prefix = "settings.key.";

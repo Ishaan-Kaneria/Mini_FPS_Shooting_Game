@@ -22,7 +22,13 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         Bomb,
 
         /// <summary>Drinks one off the belt. Edge-triggered, like reload.</summary>
-        UseItem
+        UseItem,
+
+        /// <summary>
+        /// Punches whoever is in reach. Edge-triggered. Last in the list because the
+        /// kind is serialized by number into every staged touch scene.
+        /// </summary>
+        Melee
     }
 
     public ActionKind action = ActionKind.Fire;
@@ -113,6 +119,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         else if (action == ActionKind.Reload) MobileInput.QueueReload();
         else if (action == ActionKind.Pause) MobileInput.QueuePause();
         else if (action == ActionKind.UseItem) MobileInput.QueueUseItem();
+        else if (action == ActionKind.Melee) MobileInput.QueueMelee();
     }
 
     /// <summary>

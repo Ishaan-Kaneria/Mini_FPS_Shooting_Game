@@ -1828,6 +1828,18 @@ namespace FPSKit.EditorTools
 
             BuildEquipment(player, cam, weapon, hp, playerAudio, progression);
 
+            // The punch. Its fist hangs off the weapon holder so it sways with the gun
+            // but does not drop with it.
+            var melee = player.AddComponent<MeleeStrike>();
+            melee.weapon = weapon;
+            melee.fpsCamera = cam;
+            melee.controls = motor.controls;
+            melee.audioSource = playerAudio;
+            melee.swingClip = Clip("SFX/punch_swing.wav");
+            melee.hitClip = Clip("SFX/punch_hit.wav");
+            melee.fist = BuildFist(weaponHolder.transform);
+            melee.supportHand = model.transform.Find("SupportHand")?.gameObject;
+
             return player;
         }
 
@@ -1898,6 +1910,132 @@ namespace FPSKit.EditorTools
             GunPart(parent, "Trigger", PrimitiveType.Cube, accent,
                     new Vector3(0f, -0.055f, -0.025f), new Vector3(0.012f, 0.032f, 0.012f), Vector3.zero);
 
+            BuildGunHands(parent);
+
+            return root;
+        }
+
+        // ------------------------------------------------------------------
+        // The player's hands.
+        //
+        // Built from the same primitives as the gun, in the same flat colours, so they
+        // read as one kit rather than as a borrowed model. Gloves and sleeves rather than
+        // skin: there is no one skin tone that is the player's, and a glove is what anyone
+        // holding this rifle would be wearing.
+        // ------------------------------------------------------------------
+
+        // Named by colour: a shared material is created once and then left alone, so a
+        // retuned colour under the old name would build and change nothing.
+        static readonly Color GloveColor = new Color(0.46f, 0.36f, 0.25f);
+        static readonly Color SleeveColor = new Color(0.34f, 0.38f, 0.27f);
+
+        static Material GloveMaterial()
+            => MakeSharedMaterial("Hands_Glove_" + ColorKey(GloveColor), GloveColor, 0.12f, 0f);
+
+        static Material SleeveMaterial()
+            => MakeSharedMaterial("Hands_Sleeve_" + ColorKey(SleeveColor), SleeveColor, 0.08f, 0f);
+
+        /// <summary>
+        /// A hand round the grip and one under the handguard, each with a forearm running
+        /// back out of frame. Children of the model, so they recoil, sway and come up to
+        /// the sights with it; in the model's authored units, like every part of the gun.
+        /// The left one sits under its own empty so <see cref="MeleeStrike"/> can hide it
+        /// while the fist is out.
+        /// </summary>
+        private static void BuildGunHands(Transform model)
+        {
+            var glove = GloveMaterial();
+            var sleeve = SleeveMaterial();
+
+            var right = new GameObject("RightHand").transform;
+            right.SetParent(model, false);
+
+            GunPart(right, "Palm", PrimitiveType.Cube, glove,
+                    new Vector3(0.004f, -0.092f, -0.058f), new Vector3(0.066f, 0.095f, 0.080f),
+                    new Vector3(-16f, 0f, 0f));
+            GunPart(right, "Knuckles", PrimitiveType.Cube, glove,
+                    new Vector3(-0.030f, -0.090f, -0.030f), new Vector3(0.018f, 0.085f, 0.028f),
+                    new Vector3(-16f, 0f, 0f));
+            GunPart(right, "Thumb", PrimitiveType.Cube, glove,
+                    new Vector3(-0.042f, -0.036f, -0.064f), new Vector3(0.018f, 0.022f, 0.056f),
+                    Vector3.zero);
+            GunPart(right, "TriggerFinger", PrimitiveType.Cube, glove,
+                    new Vector3(-0.016f, -0.050f, -0.004f), new Vector3(0.016f, 0.018f, 0.040f),
+                    new Vector3(-8f, 0f, 0f));
+
+            // Back to the lower right corner of the screen, where a right arm comes from.
+            var wrist = new Vector3(0.010f, -0.135f, -0.100f);
+            var elbow = new Vector3(0.13f, -0.34f, -0.64f);
+            Limb(right, "Cuff", glove, wrist, Vector3.Lerp(wrist, elbow, 0.28f), 0.074f, 0.068f);
+            Limb(right, "Sleeve", sleeve, Vector3.Lerp(wrist, elbow, 0.22f), elbow, 0.096f, 0.090f);
+
+            var left = new GameObject("SupportHand").transform;
+            left.SetParent(model, false);
+
+            GunPart(left, "Palm", PrimitiveType.Cube, glove,
+                    new Vector3(-0.006f, -0.050f, 0.200f), new Vector3(0.072f, 0.040f, 0.092f), Vector3.zero);
+            GunPart(left, "Fingers", PrimitiveType.Cube, glove,
+                    new Vector3(0.036f, -0.018f, 0.205f), new Vector3(0.018f, 0.052f, 0.082f), Vector3.zero);
+            GunPart(left, "Thumb", PrimitiveType.Cube, glove,
+                    new Vector3(-0.037f, -0.014f, 0.190f), new Vector3(0.018f, 0.034f, 0.062f), Vector3.zero);
+
+            var leftWrist = new Vector3(-0.012f, -0.068f, 0.150f);
+            var leftElbow = new Vector3(-0.54f, -0.37f, -0.54f);
+            Limb(left, "Cuff", glove, leftWrist, Vector3.Lerp(leftWrist, leftElbow, 0.18f), 0.072f, 0.066f);
+            Limb(left, "Sleeve", sleeve, Vector3.Lerp(leftWrist, leftElbow, 0.14f), leftElbow, 0.094f, 0.088f);
+        }
+
+        /// <summary>A box from one point to another, in the gun's authored units.</summary>
+        private static void Limb(Transform parent, string name, Material material,
+                                 Vector3 from, Vector3 to, float width, float height)
+        {
+            Vector3 along = to - from;
+            var euler = Quaternion.LookRotation(along.normalized, Vector3.up).eulerAngles;
+            GunPart(parent, name, PrimitiveType.Cube, material,
+                    (from + to) * 0.5f, new Vector3(width, height, along.magnitude), euler);
+        }
+
+        /// <summary>
+        /// The punching fist and its forearm, under the weapon holder rather than the gun:
+        /// the gun drops away while it is out, and the fist must not go with it. Real
+        /// metres, knuckles at the origin and the arm running back along -Z, so
+        /// <see cref="MeleeStrike"/> moves the whole arm by moving this one transform.
+        /// Starts hidden.
+        /// </summary>
+        private static Transform BuildFist(Transform weaponHolder)
+        {
+            var glove = GloveMaterial();
+            var sleeve = SleeveMaterial();
+
+            var root = new GameObject("Fist").transform;
+            root.SetParent(weaponHolder, false);
+
+            void Box(string name, Material m, Vector3 at, Vector3 size, Quaternion turn)
+            {
+                var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                part.name = name;
+                part.transform.SetParent(root, false);
+                part.transform.localPosition = at;
+                part.transform.localRotation = turn;
+                part.transform.localScale = size;
+                Object.DestroyImmediate(part.GetComponent<Collider>());
+                part.GetComponent<Renderer>().sharedMaterial = m;
+            }
+
+            var flat = Quaternion.identity;
+            Box("Fist", glove, new Vector3(0f, 0f, 0f), new Vector3(0.100f, 0.086f, 0.100f), flat);
+            Box("Knuckles", glove, new Vector3(0f, 0.012f, 0.056f), new Vector3(0.094f, 0.046f, 0.018f), flat);
+            Box("Thumb", glove, new Vector3(0.044f, -0.026f, 0.024f), new Vector3(0.022f, 0.030f, 0.064f), flat);
+
+            // The forearm runs back towards the left shoulder -- down, left and back --
+            // not straight at the lens. Straight back, it filled the lower half of the
+            // screen and hid the fist at the end of it.
+            var back = new Vector3(-0.34f, -0.50f, -0.80f).normalized;
+            var along = Quaternion.LookRotation(back, Vector3.up);
+            Box("Cuff", glove, back * 0.085f, new Vector3(0.080f, 0.074f, 0.080f), along);
+            Box("Sleeve", sleeve, back * 0.26f, new Vector3(0.096f, 0.090f, 0.30f), along);
+
+            root.gameObject.SetActive(false);
             return root;
         }
 

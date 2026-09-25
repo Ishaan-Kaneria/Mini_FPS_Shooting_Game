@@ -42,6 +42,9 @@ public class HudView : MonoBehaviour
     Health _health;
     BombThrower _bombs;
     ConsumableBelt _belt;
+    MeleeStrike _melee;
+    GameObject _punchPrompt;
+    TMP_Text _punchText;
     Canvas _canvas;
     UITheme _t;
 
@@ -120,6 +123,7 @@ public class HudView : MonoBehaviour
         _health = _hud.playerHealth;
         _bombs = _hud.bombs;
         _belt = _hud.belt;
+        _melee = _health != null ? _health.GetComponent<MeleeStrike>() : FindAnyObjectByType<MeleeStrike>();
 
         // What this replaces goes, and stops updating. What stays is HUDController's.
         _hud.legacyReadouts = false;
@@ -140,6 +144,7 @@ public class HudView : MonoBehaviour
         BuildWeapon();
         if (DeviceProfile.Touched) ArrangeForTouch();
         BuildHitMarker();
+        BuildPunchPrompt();
         BuildPauseMenu();
 
         var toastArea = UIKit.Rect(transform, "Toasts");
@@ -217,6 +222,7 @@ public class HudView : MonoBehaviour
         }
         if (_bombs != null) _bombs.ChargesChanged += OnBombs;
         if (_belt != null) _belt.Changed += OnBelt;
+        if (_melee != null) _melee.ReachChanged += OnReach;
         GameInput.SchemeChanged += OnScheme;
         GameSettings.Changed += OnSetting;
         KeyBindings.Changed += OnScheme;
@@ -256,6 +262,7 @@ public class HudView : MonoBehaviour
         }
         if (_bombs != null) _bombs.ChargesChanged -= OnBombs;
         if (_belt != null) _belt.Changed -= OnBelt;
+        if (_melee != null) _melee.ReachChanged -= OnReach;
         GameInput.SchemeChanged -= OnScheme;
         GameSettings.Changed -= OnSetting;
         KeyBindings.Changed -= OnScheme;
@@ -670,6 +677,30 @@ public class HudView : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// "V PUNCH" under the crosshair while someone is in arm's reach. Only then: the
+    /// point is to say "you could punch this one", and a prompt that was always up would
+    /// stop saying anything by the second level.
+    /// </summary>
+    void BuildPunchPrompt()
+    {
+        var panel = HudPanel(transform, "PunchPrompt");
+        Corner(panel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -86f));
+        UIKit.Row(panel, 0f, new RectOffset(12, 12, 4, 4), TextAnchor.MiddleCenter);
+        Hug(panel);
+        _punchText = Label(panel.transform, "Text", "", UIKit.TextRole.Label, _t.textPrimary);
+        _punchText.alignment = TextAlignmentOptions.Center;
+        _punchPrompt = panel.gameObject;
+        _punchPrompt.SetActive(false);
+    }
+
+    void OnReach(MeleeStrike m, bool inReach)
+    {
+        if (_punchPrompt == null) return;
+        _punchText.text = $"{InputPrompts.For(GameAction.Melee)}  PUNCH";
+        _punchPrompt.SetActive(inReach);
+    }
+
     GameObject _pauseShade, _pauseLayer;
 
     /// <summary>
@@ -937,6 +968,7 @@ public class HudView : MonoBehaviour
         _pauseHint.text = $"PAUSE ({InputPrompts.For(GameAction.Pause)})";
         OnBombs(_bombs);
         OnBelt(_belt);
+        if (_melee != null) OnReach(_melee, _melee.InReach);
     }
 
     void OnPause(GameDirector d, bool paused)

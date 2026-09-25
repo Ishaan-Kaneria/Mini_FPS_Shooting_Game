@@ -472,3 +472,27 @@ save(f"{A}/SFX/bomb_pin.wav",
          gain(cat(blank(0.035), env(lowpass(n(secs(0.12)), 700), power=6)), 0.3)))
 
 random.setstate(_pin_stream)
+
+
+# ---- the punch ---------------------------------------------------------------
+# Its own saved stream, for the reason the pin has one: appended last, so a retune
+# here re-rolls nothing written above it.
+_punch_stream = random.getstate()
+
+# The swing: air moving past a sleeve. Band-limited noise that rises and falls in the
+# time the fist takes to go out, so a miss still sounds like something was thrown.
+def whoosh(t, lo, hi):
+    body = highpass(lowpass(n(secs(t)), hi), lo)
+    total = len(body)
+    return [v * math.sin(math.pi * i / total) ** 1.5 for i, v in enumerate(body)]
+
+save(f"{A}/SFX/punch_swing.wav", gain(whoosh(0.20, 500, 2600), 0.7))
+
+# The landing: a dull, heavy knock -- a glove on a body, lower and drier than a round
+# hitting one, so the two never read as the same event.
+save(f"{A}/SFX/punch_hit.wav",
+     mix(gain(env(lowpass(n(secs(0.12)), 260), power=5), 1.0),
+         gain(env(tone(0.10, 110, 55), power=5), 0.7),
+         gain(env(highpass(n(secs(0.02)), 1800), power=10), 0.25)))
+
+random.setstate(_punch_stream)

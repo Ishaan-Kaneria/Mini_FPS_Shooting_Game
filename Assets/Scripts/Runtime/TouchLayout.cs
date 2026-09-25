@@ -107,6 +107,7 @@ public class TouchLayout : MonoBehaviour
     {
         TouchButton.ActionKind.Bomb => "Grenade button",
         TouchButton.ActionKind.UseItem => "Medkit button",
+        TouchButton.ActionKind.Melee => "Punch button",
         _ => a + " button",
     };
 

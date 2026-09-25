@@ -215,7 +215,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: e803b20c4971b60fda687deac03369c6, type: 2}
+  - {fileID: 2100000, guid: 8850175ceaf11fd628af10c1c39e2148, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -376,7 +376,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0f49f324218f08b369ba96245aa459b9, type: 2}
+  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -538,7 +538,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0f49f324218f08b369ba96245aa459b9, type: 2}
+  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -668,7 +668,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0f49f324218f08b369ba96245aa459b9, type: 2}
+  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -921,7 +921,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0f49f324218f08b369ba96245aa459b9, type: 2}
+  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1051,7 +1051,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0f49f324218f08b369ba96245aa459b9, type: 2}
+  - {fileID: 2100000, guid: 70fd948765e3aceeaacfd9b429c805d6, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1287,7 +1287,7 @@ MonoBehaviour:
   attackWindup: 0.35
   shotsPerAttack: 1
   burstInterval: 0.12
-  detectionRadius: 56
+  detectionRadius: 350
   fieldOfView: 150
   sightBlockers:
     serializedVersion: 2
@@ -1502,6 +1502,9 @@ MonoBehaviour:
   criticalColor: {r: 0.9, g: 0.25, b: 0.2, a: 1}
   shieldColor: {r: 0.4, g: 0.75, b: 1, a: 1}
   backgroundColor: {r: 0.05, g: 0.05, b: 0.06, a: 1}
+  showMarker: 1
+  markerColor: {r: 0.851, g: 0.325, b: 0.31, a: 1}
+  markerSize: 0.2
   barMaterial: {fileID: 2100000, guid: 918dec61807505bb5bbefe656c32dbda, type: 2}
 --- !u!1 &7177606014255382322
 GameObject:

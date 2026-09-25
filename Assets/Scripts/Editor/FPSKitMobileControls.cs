@@ -380,6 +380,17 @@ namespace FPSKit.EditorTools
                                     true, Neutral, profile);
             Slot(cluster, crouch, column: 1, row: 2);
 
+            // Punch, on the bottom row beyond the bomb: a free cell, so the button is
+            // always there and nothing else in the cluster moves to make room. Not in the
+            // top row: on a phone, above the jump is under the pause button and above the
+            // bomb is over the objective strip.
+            // Always shown rather than situational -- the fists are never out of stock,
+            // and a button that appeared only when an enemy got close would jump into
+            // view under a thumb in the middle of the fight it was for.
+            var punch = MakeButton(parent, "PunchButton", "PUNCH", TouchButton.ActionKind.Melee,
+                                   false, Neutral, profile);
+            Slot(cluster, punch, column: 3, row: 0);
+
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no
             // Escape key, so without it a touch player cannot pause, cannot quit and
@@ -522,6 +533,7 @@ namespace FPSKit.EditorTools
             TouchButton.ActionKind.Reload => GameAction.Reload,
             TouchButton.ActionKind.Bomb => GameAction.Bomb,
             TouchButton.ActionKind.UseItem => GameAction.UseItem,
+            TouchButton.ActionKind.Melee => GameAction.Melee,
             _ => GameAction.Pause,
         };
 

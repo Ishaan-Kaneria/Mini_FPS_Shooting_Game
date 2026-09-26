@@ -254,7 +254,7 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Desert Outpost":
-                    t.description = "A ruined town, an oasis and an oil field on a river of sand. Heat haze and blowing dust.";
+                    t.description = "A mud-brick village, a forward base and walled farms on a river of sand. Heat haze and blowing dust.";
                     // Heat and dust (2026-09-23): a hotter, hazier sky than the clean blue it was, which
                     // read as a mild day rather than a desert. Thicker air scatters the blue out
                     // towards the horizon, and the fog is warmer and a little denser so the far
@@ -354,7 +354,10 @@ namespace FPSKit.EditorTools
                     t.backdropColor = new Color(0.50f, 0.40f, 0.30f);
                     t.landmarkCount = 12;
 
-                    t.outpostCount = 10;
+                    // Six rather than ten since the desert was made full (2026-09-26): the farms,
+                    // camps and checkpoints are the compounds now, and the generic ones were
+                    // taking the ground they need.
+                    t.outpostCount = 6;
                     t.vantageCount = 10;
                     t.coverLineCount = 22;
 

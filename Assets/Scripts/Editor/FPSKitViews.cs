@@ -459,22 +459,76 @@ namespace FPSKit.EditorTools
             }
             _ = town;
 
-            var pool = Of("OasisWater");
-            if (pool.HasValue)
+            // The base: from out in front of the main gate, and from inside on its main street.
+            var fob = Of("Hesco");
+            var chicane = Of("JerseyBarriers");
+            if (fob.HasValue && chicane.HasValue)
             {
-                var p = pool.Value.center;
-                yield return new Shot { Name = "13_oasis", Grounded = true, From = new Vector3(p.x + 26f, 1.65f, p.z + 20f),
-                                        Look = new Vector3(p.x, 1f, p.z), Fov = 72f };
+                var c = fob.Value.center;
+                var gate = chicane.Value.center;
+                var outward = new Vector3(gate.x - c.x, 0f, gate.z - c.z).normalized;
+                var side = Vector3.Cross(Vector3.up, outward);
+                yield return new Shot { Name = "13_base_gate", Grounded = true, From = gate + outward * 16f + side * 6f + Vector3.up * (1.65f - gate.y),
+                                        Look = new Vector3(c.x, 2f, c.z), Fov = 72f };
+                yield return new Shot { Name = "14_base_inside", Grounded = true, From = c + outward * 26f + side * 2f + Vector3.up * (1.65f - c.y),
+                                        Look = new Vector3(c.x - side.x * 14f, 2f, c.z - side.z * 14f) - outward * 10f, Fov = 78f };
             }
 
-            var jack = FindFirst("Pumpjack");
-            if (jack != null)
+            if (fob.HasValue)
             {
-                var p = jack.transform.position;
-                // From the landward side: the river is always to the west of an oil site, and a
-                // grounded camera over the canyon lands on its floor.
-                yield return new Shot { Name = "14_oilfield", Grounded = true, From = p + new Vector3(22f, 1.65f, -18f),
-                                        Look = p + new Vector3(-6f, 3f, 14f), Fov = 72f };
+                var c = fob.Value.center;
+                yield return new Shot { Name = "24_base_above", From = new Vector3(c.x - 40f, c.y + 60f, c.z - 60f),
+                                        Look = c, Fov = 60f };
+            }
+
+            yield return new Shot { Name = "25_map_top", From = new Vector3(0f, 430f, -60f), Look = Vector3.zero, Fov = 64f };
+
+            var farm = Of("FarmWall");
+            if (farm.HasValue)
+            {
+                var p = farm.Value.center;
+                yield return new Shot { Name = "18_farm", Grounded = true, From = new Vector3(p.x + 22f, 3.5f, p.z - 20f),
+                                        Look = new Vector3(p.x, 1.5f, p.z), Fov = 70f };
+            }
+
+            var room = Of("HouseWalls");
+            if (room.HasValue)
+            {
+                var p = room.Value.center;
+                yield return new Shot { Name = "19_house_inside", Grounded = true, From = new Vector3(p.x - 0.8f, 1.65f, p.z - 0.4f),
+                                        Look = new Vector3(p.x + 3f, 1.2f, p.z - 3f), Fov = 82f };
+            }
+
+            if (minaret.HasValue)
+            {
+                var m = minaret.Value.center;
+                // Down a lane rather than the main street: the lanes are what the village is.
+                yield return new Shot { Name = "20_village_lane", Grounded = true, From = new Vector3(m.x - 7.5f - 45f, 1.65f, m.z + 7.5f),
+                                        Look = new Vector3(m.x - 7.5f, 2.5f, m.z + 7.5f), Fov = 72f };
+            }
+
+            var camp = Of("CampTent");
+            if (camp.HasValue)
+            {
+                var p = camp.Value.center;
+                yield return new Shot { Name = "21_camp", Grounded = true, From = new Vector3(p.x + 12f, 1.65f, p.z - 10f),
+                                        Look = new Vector3(p.x, 0.5f, p.z), Fov = 70f };
+            }
+
+            var cp = Of("Booth");
+            if (cp.HasValue)
+            {
+                var p = cp.Value.center;
+                yield return new Shot { Name = "22_checkpoint", Grounded = true, From = new Vector3(p.x - 16f, 1.65f, p.z - 16f),
+                                        Look = new Vector3(p.x, 1f, p.z), Fov = 70f };
+            }
+
+            var wadi = Of("Wadi");
+            if (wadi.HasValue)
+            {
+                var p = wadi.Value.center;
+                yield return new Shot { Name = "23_wadi", Grounded = true, From = new Vector3(p.x, 2.2f, p.z),
+                                        Look = new Vector3(p.x + 30f, 0.5f, p.z + 30f), Fov = 72f };
             }
 
             var net = Of("CamoNet");
@@ -566,6 +620,20 @@ namespace FPSKit.EditorTools
                     float lift = GroundUnder(shot.From);
                     shot.From.y += lift;
                     shot.Look.y += lift;
+
+                    // Out of anything solid: the places are placed from the seed, and a shot
+                    // framed off one of them can land in a parked car or a wall.
+                    var start = shot.From;
+                    for (int ring = 1; ring <= 6 && Physics.CheckSphere(shot.From, 0.45f, ~0, QueryTriggerInteraction.Ignore); ring++)
+                        for (int k = 0; k < 8; k++)
+                        {
+                            float a = k * Mathf.PI * 0.25f;
+                            var p = start + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * ring;
+                            p.y = GroundUnder(p) + (start.y - lift);
+                            if (Physics.CheckSphere(p, 0.45f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                            shot.From = p;
+                            break;
+                        }
                 }
 
                 rig.transform.position = shot.From;

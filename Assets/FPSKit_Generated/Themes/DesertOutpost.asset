@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Desert Outpost
   displayName: 
-  description: A ruined town, an oasis and an oil field on a river of sand. Heat haze and blowing dust.
+  description: A mud-brick village, a forward base and walled farms on a river of sand. Heat haze and blowing dust.
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
   - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}
@@ -65,7 +65,7 @@ MonoBehaviour:
   backdropWidth: {x: 80, y: 280}
   backdropColor: {r: 0.5, g: 0.4, b: 0.3, a: 1}
   landmarkCount: 12
-  outpostCount: 10
+  outpostCount: 6
   vantageCount: 10
   coverLineCount: 22
   scatterClusterCount: 58

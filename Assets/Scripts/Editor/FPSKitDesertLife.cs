@@ -5,26 +5,27 @@ using UnityEngine;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// What people left on the desert: a ruined mud-brick town, an oasis with fields and a
-    /// nomad camp beside it, an oil field across the river with its pipeline, the wrecks of
-    /// trucks and a plane, a dirt track joining it all up -- and the heat and dust over it.
+    /// What people left on the desert: the village, the wrecks of trucks and a plane, a
+    /// dirt track joining it all up to the base -- and the heat and dust over it. The base,
+    /// the village's houses and the open desert's detail are in FPSKitDesertFull,
+    /// FPSKitDesertVillage and FPSKitDesertWild.
     ///
-    /// Ishaan's pick, all four, from a short list after he asked to "focus on the desert
-    /// scene". The desert had the best ground in the game and the least on it: from the
-    /// spawn it was rippled sand, a fence and three palms, and every place worth going was a
-    /// low adobe compound that looked like every other.
+    /// History: Ishaan's first pick for the desert (2026-09-23) was a ruined town, an
+    /// oasis, an oil field and heat and dust. Asked to make it "full" and "real"
+    /// (2026-09-26), he chose a base, a real village and wild detail, and dropped the oasis;
+    /// the oil field went with it to make room for the base.
     ///
-    /// <b>Planned before the ground, built after it.</b> The town, the oasis, the fields and
-    /// every oil pad are flattened sites, and a site has to be in the pad list before the
-    /// dune field is generated or the ground under it is whatever the dunes were doing
-    /// (see FlattenPad). So <see cref="PlanDesertLife"/> runs with the other planning passes
-    /// and <see cref="BuildDesertLife"/> with the building ones, and the second reads what the
+    /// <b>Planned before the ground, built after it.</b> The village, the base and every
+    /// farm are flattened sites, and a site has to be in the pad list before the dune field
+    /// is generated or the ground under it is whatever the dunes were doing (see
+    /// FlattenPad). So <see cref="PlanDesertLife"/> runs with the other planning passes and
+    /// <see cref="BuildDesertLife"/> with the building ones, and the second reads what the
     /// first chose.
     ///
-    /// <b>The town is laid out on a grid of lanes, and that is a navigation decision.</b>
+    /// <b>The village is laid out on a grid of lanes, and that is a navigation decision.</b>
     /// Houses packed at random close courtyards nothing can reach -- the works yard found that
     /// the expensive way. On a grid every lane runs through, so every door opens onto ground
-    /// that leads out of town.
+    /// that leads out of the village.
     ///
     /// <b>Its own materials, never the plant's.</b> The stairs, steel and paint the industrial
     /// passes use are only resolved for the industrial zone; asked for here they are null,
@@ -36,25 +37,23 @@ namespace FPSKit.EditorTools
         private static bool DesertLife =>
             _theme != null && _theme.openZone && !_theme.volcanicZone && _theme.hazard == LevelTheme.Hazard.River;
 
-        private static Vector2 _townCentre, _oasisCentre, _fieldCentre, _planeSite;
+        private static Vector2 _townCentre, _planeSite;
         private static float _townRadius;
-        private static bool _hasTown, _hasOasis, _hasFields, _hasPlane;
-        private static readonly List<Vector2> _oilSites = new List<Vector2>();
+        private static bool _hasTown, _hasPlane;
         private static readonly List<Vector2> _track = new List<Vector2>();
-        private static readonly List<int> _trackBreaks = new List<int>();
 
         private static Material _earthMat, _clothRed, _clothBlue, _clothSaffron, _clothCream, _tentMat,
-                                _grassMat, _cropMat, _soilMat, _alloyMat, _burntMat, _rustMat, _trackMat,
-                                _shadowMat, _oilSteelMat, _dustMat;
+                                _grassMat, _alloyMat, _burntMat, _rustMat, _trackMat,
+                                _shadowMat, _dustMat;
         private static Material[] _adobeTints;
 
         /// <summary>Cleared with the terrain, for every arena: see ResetTerrain.</summary>
         private static void ResetDesertLife()
         {
-            _hasTown = _hasOasis = _hasFields = _hasPlane = false;
-            _oilSites.Clear();
+            _hasTown = _hasPlane = false;
             _track.Clear();
-            _trackBreaks.Clear();
+            _wadis.Clear();
+            ResetDesertFull();
         }
 
         private static void ResolveDesertLifeMaterials()
@@ -66,14 +65,13 @@ namespace FPSKit.EditorTools
             _earthMat = MakeDetailMaterial("PackedEarth", new Color(0.55f, 0.45f, 0.32f), "Adobe", 0.2f, 0.06f, 0f, 0.8f);
             _trackMat = MakeDetailMaterial("Track", new Color(0.50f, 0.41f, 0.29f), "Sand", 0.12f, 0.05f, 0f, 0.7f);
             _grassMat = MakeDetailMaterial("OasisGrass", new Color(0.30f, 0.40f, 0.16f), "Sand", 0.3f, 0.12f, 0f, 0.6f);
-            _soilMat = MakeDetailMaterial("Soil", new Color(0.36f, 0.27f, 0.18f), "Sand", 0.25f, 0.08f, 0f, 0.8f);
 
             _adobeTints = new[]
             {
                 _adobeMat,
                 MakeDetailMaterial("AdobePale", Shade(_theme.wallColor, 1.12f), "Adobe", 0.28f, _theme.wallSmoothness, 0f, 0.9f),
                 MakeDetailMaterial("AdobeWarm", new Color(0.72f, 0.54f, 0.38f), "Adobe", 0.28f, _theme.wallSmoothness, 0f, 0.9f),
-                MakeDetailMaterial("AdobeRed", new Color(0.64f, 0.44f, 0.32f), "Adobe", 0.28f, _theme.wallSmoothness, 0f, 0.9f)
+                MakeDetailMaterial("AdobeRed", new Color(0.72f, 0.52f, 0.39f), "Adobe", 0.28f, _theme.wallSmoothness, 0f, 0.9f)
             };
 
             _clothRed = MakeMaterial("ClothRed", new Color(0.62f, 0.16f, 0.12f), 0.05f, 0f);
@@ -81,7 +79,6 @@ namespace FPSKit.EditorTools
             _clothSaffron = MakeMaterial("ClothSaffron", new Color(0.82f, 0.56f, 0.14f), 0.05f, 0f);
             _clothCream = MakeMaterial("ClothCream", new Color(0.82f, 0.76f, 0.62f), 0.05f, 0f);
             _tentMat = MakeMaterial("TentHair", new Color(0.20f, 0.16f, 0.12f), 0.04f, 0f);
-            _cropMat = MakeMaterial("Crop", new Color(0.28f, 0.44f, 0.14f), 0.1f, 0f);
             _shadowMat = MakeMaterial("DoorShadow", new Color(0.10f, 0.08f, 0.07f), 0.05f, 0f);
 
             // Matte, both of them: there is no baked reflection here either, and anything glossy
@@ -89,9 +86,10 @@ namespace FPSKit.EditorTools
             _alloyMat = MakeMaterial("Alloy", new Color(0.62f, 0.63f, 0.64f), 0.22f, 0.25f);
             _burntMat = MakeMaterial("Burnt", new Color(0.14f, 0.11f, 0.09f), 0.08f, 0f);
             _rustMat = MakeMaterial("WreckRust", new Color(0.40f, 0.23f, 0.13f), 0.1f, 0.1f);
-            _oilSteelMat = MakeMaterial("OilSteel", new Color(0.30f, 0.30f, 0.31f), 0.25f, 0.3f);
 
             _dustMat = ParticleMaterial("Dust", "Puff", additive: false, new Color(0.86f, 0.74f, 0.55f));
+
+            ResolveDesertFullMaterials();
         }
 
         // ==================================================================
@@ -113,12 +111,12 @@ namespace FPSKit.EditorTools
             bool ClearOfRiver(Vector2 p, float r) => Mathf.Abs(p.x - GorgeCentreAt(p.y)) > rim + r + 14f;
             bool Inside(Vector2 p, float r) => Mathf.Abs(p.x) + r < half - 22f && Mathf.Abs(p.y) + r < half - 22f;
 
-            // ---- the town: the spawn side of the river, a walk from the spawn ----
-            _townRadius = 60f;
-            for (int i = 0; i < 80 && !_hasTown; i++)
+            // ---- the village: the spawn side of the river, a walk from the spawn ----
+            _townRadius = 72f;
+            for (int i = 0; i < 160 && !_hasTown; i++)
             {
-                var p = new Vector2(Rand(rng, -half + 80f, 20f), Rand(rng, -half * 0.5f, half * 0.5f));
-                if (p.magnitude < _townRadius + 40f || !ClearOfRiver(p, _townRadius) || !Inside(p, _townRadius)) continue;
+                var p = new Vector2(Rand(rng, -half + 70f, 20f), Rand(rng, -half * 0.5f, half * 0.5f));
+                if (p.magnitude < _townRadius + 30f || !ClearOfRiver(p, _townRadius) || !Inside(p, _townRadius)) continue;
                 if (!Free(p, _townRadius + 8f)) continue;
 
                 _townCentre = p;
@@ -128,53 +126,10 @@ namespace FPSKit.EditorTools
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
             }
 
-            if (!_hasTown) { Debug.LogWarning("[FPSKit] desert: no room for the town."); return; }
+            if (!_hasTown) { Debug.LogWarning("[FPSKit] desert: no room for the village."); return; }
 
-            // ---- the oasis, beside the town, sunk into a bowl ----
-            for (int i = 0; i < 16 && !_hasOasis; i++)
-            {
-                float a = Rand(rng, 0f, Mathf.PI * 2f);
-                var p = _townCentre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (_townRadius + 36f);
-                if (!ClearOfRiver(p, 26f) || !Inside(p, 26f) || !Free(p, 24f)) continue;
-
-                _oasisCentre = p;
-                _hasOasis = true;
-                Claim(p.x, p.y, 26f);
-
-                // Pinned below the ground round it, which is what makes it a hollow water
-                // runs into rather than a pond on a plateau.
-                FlattenPad(p.x, p.y, 15f, 16f, NaturalHeightAt(p.x, p.y) - 1.4f);
-
-                // ---- the fields, on the far side of the oasis from the town ----
-                var away = (p - _townCentre).normalized;
-                for (int k = 0; k < 30 && !_hasFields; k++)
-                {
-                    var f = p + (Vector2)(Quaternion.Euler(0f, 0f, Rand(rng, -120f, 120f)) * away) * Rand(rng, 44f, 60f);
-                    if (!ClearOfRiver(f, 24f) || !Inside(f, 24f) || !Free(f, 22f)) continue;
-
-                    _fieldCentre = f;
-                    _hasFields = true;
-                    Claim(f.x, f.y, 24f);
-                    FlattenPad(f.x, f.y, 22f, 22f);
-                }
-            }
-
-            // ---- the oil field, on the far bank ----
-            for (int i = 0; i < 60 && _oilSites.Count < 5; i++)
-            {
-                float z = Rand(rng, -half * 0.8f, half * 0.8f);
-                float east = GorgeCentreAt(z) + rim + 12f;
-                if (east > half - 30f) continue;
-
-                var p = new Vector2(Rand(rng, east, half - 30f), z);
-                if (!Free(p, 11f)) continue;
-
-                _oilSites.Add(p);
-                Claim(p.x, p.y, 11f);
-                FlattenPad(p.x, p.y, 7f, 10f);
-            }
-
-            _oilSites.Sort((a, b) => a.y.CompareTo(b.y));
+            // ---- the base, away from the village, gate to the middle of the map ----
+            PlanFob(rng, half, rim);
 
             // ---- the plane, somewhere open on this bank ----
             for (int i = 0; i < 60 && !_hasPlane; i++)
@@ -191,17 +146,21 @@ namespace FPSKit.EditorTools
                 FlattenPad(p.x, p.y, 13f, 18f);
             }
 
-            PlanTrack(rng, half);
+            PlanTrack(rng, half, rim);
+            PlanDesertWild(rng, half, rim);
         }
 
         /// <summary>
-        /// The dirt track: in from the west edge, down the town's main street, over the nearer
-        /// bridge and up through the oil field. Claimed along its length as it is planned, so
-        /// nothing placed afterwards lands on it. A car will want it.
+        /// The dirt track: in from the west edge, down the village's main street, over the
+        /// nearer bridge and along the far bank; and a branch from the village out to the
+        /// base's main gate. Claimed along its length as it is planned, so nothing placed
+        /// afterwards lands on it. A car will want it.
         /// </summary>
-        private static void PlanTrack(System.Random rng, float half)
+        private static void PlanTrack(System.Random rng, float half, float rim)
         {
-            var points = new List<Vector2>
+            var runs = new List<List<Vector2>>();
+
+            var west = new List<Vector2>
             {
                 new Vector2(-half + 14f, _townCentre.y + Rand(rng, -25f, 25f)),
                 new Vector2(_townCentre.x - _townRadius - 12f, _townCentre.y),
@@ -209,60 +168,84 @@ namespace FPSKit.EditorTools
                 new Vector2(_townCentre.x + _townRadius * 0.5f, _townCentre.y),
                 new Vector2(_townCentre.x + _townRadius + 12f, _townCentre.y)
             };
+            runs.Add(west);
 
-            // The bridge nearest the town, both of its landings.
-            Vector3 bridge = Vector3.zero;
-            float best = float.MaxValue;
-            foreach (var c in _crossings)
-            {
-                float d = Mathf.Abs(c.z - _townCentre.y);
-                if (d < best) { best = d; bridge = c; }
-            }
-
-            float deck = _theme.hazardWidth + BridgeOverhang * 2f;
+            // The bridge nearest the village, both of its landings; the span itself is the
+            // bridge, not track, so the far side is a run of its own.
             if (_crossings.Count > 0)
             {
-                points.Add(new Vector2(bridge.x - deck * 0.5f - 22f, bridge.z));
-                points.Add(new Vector2(bridge.x - deck * 0.5f + 2f, bridge.z));
-                int west = points.Count - 1;
-
-                points.Add(new Vector2(bridge.x + deck * 0.5f - 2f, bridge.z));
-                points.Add(new Vector2(bridge.x + deck * 0.5f + 22f, bridge.z));
-
-                // The span itself is the bridge, not track.
-                _trackBreaks.Add(west);
-
-                foreach (var site in _oilSites) points.Add(site + new Vector2(-12f, 0f));
-                if (_oilSites.Count > 0)
-                    points.Add(new Vector2(_oilSites[_oilSites.Count - 1].x - 12f, half - 14f));
-            }
-
-            // Smoothed through the points: a track bends, it does not corner.
-            for (int i = 0; i < points.Count - 1; i++)
-            {
-                var p0 = points[Mathf.Max(0, i - 1)];
-                var p1 = points[i];
-                var p2 = points[i + 1];
-                var p3 = points[Mathf.Min(points.Count - 1, i + 2)];
-
-                bool broken = _trackBreaks.Contains(i);
-                int steps = Mathf.Max(2, Mathf.CeilToInt(Vector2.Distance(p1, p2) / 3f));
-
-                for (int s = 0; s < steps; s++)
+                Vector3 bridge = _crossings[0];
+                float best = float.MaxValue;
+                foreach (var c in _crossings)
                 {
-                    float t = s / (float)steps;
-                    var q = 0.5f * ((2f * p1) + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t * t
-                                    + (-p0 + 3f * p1 - 3f * p2 + p3) * t * t * t);
-
-                    // Across a break, mark it with a NaN so the drape leaves a gap.
-                    _track.Add(broken ? new Vector2(float.NaN, float.NaN) : q);
-
-                    if (!broken && _track.Count % 3 == 0 && (q - _townCentre).magnitude > _townRadius)
-                        Claim(q.x, q.y, 5f);
+                    float d = Mathf.Abs(c.z - _townCentre.y);
+                    if (d < best) { best = d; bridge = c; }
                 }
+
+                float deck = _theme.hazardWidth + BridgeOverhang * 2f;
+                west.Add(new Vector2(bridge.x - deck * 0.5f - 22f, bridge.z));
+                west.Add(new Vector2(bridge.x - deck * 0.5f + 2f, bridge.z));
+
+                var east = new List<Vector2>
+                {
+                    new Vector2(bridge.x + deck * 0.5f - 2f, bridge.z),
+                    new Vector2(bridge.x + deck * 0.5f + 22f, bridge.z)
+                };
+                float dir = bridge.z <= 0f ? 1f : -1f;
+                for (int k = 1; k <= 6; k++)
+                {
+                    float z = bridge.z + dir * 42f * k;
+                    if (Mathf.Abs(z) > half - 16f) { z = dir * (half - 14f); }
+                    float x = Mathf.Min(GorgeCentreAt(z) + rim + 20f, half - 16f);
+                    east.Add(new Vector2(x, z));
+                    if (Mathf.Abs(z) >= half - 14f) break;
+                }
+                runs.Add(east);
             }
 
-            _track.Add(points[points.Count - 1]);
+            // The branch to the base: from the edge of the village nearest it to the gate.
+            if (_hasFob)
+            {
+                var toFob = (FobGate(30f) - _townCentre).normalized;
+                runs.Add(new List<Vector2>
+                {
+                    _townCentre + toFob * (_townRadius - 2f),
+                    _townCentre + toFob * (_townRadius + 12f),
+                    FobGate(30f),
+                    FobGate(12f),
+                    FobGate(-8f)
+                });
+            }
+
+            // Smoothed through the points: a track bends, it does not corner. A NaN between
+            // runs tells the drape to leave a gap.
+            foreach (var points in runs)
+            {
+                if (_track.Count > 0) _track.Add(new Vector2(float.NaN, float.NaN));
+
+                for (int i = 0; i < points.Count - 1; i++)
+                {
+                    var p0 = points[Mathf.Max(0, i - 1)];
+                    var p1 = points[i];
+                    var p2 = points[i + 1];
+                    var p3 = points[Mathf.Min(points.Count - 1, i + 2)];
+                    int steps = Mathf.Max(2, Mathf.CeilToInt(Vector2.Distance(p1, p2) / 3f));
+
+                    for (int s = 0; s < steps; s++)
+                    {
+                        float t = s / (float)steps;
+                        var q = 0.5f * ((2f * p1) + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t * t
+                                        + (-p0 + 3f * p1 - 3f * p2 + p3) * t * t * t);
+                        _track.Add(q);
+
+                        bool inBase = _hasFob && _fob.Contains(q, 0f);
+                        if (_track.Count % 3 == 0 && (q - _townCentre).magnitude > _townRadius && !inBase)
+                            Claim(q.x, q.y, 5f);
+                    }
+                }
+
+                _track.Add(points[points.Count - 1]);
+            }
         }
 
         // ==================================================================
@@ -280,10 +263,9 @@ namespace FPSKit.EditorTools
             group.SetParent(root, false);
 
             BuildTrack(group, backdrop);
-            BuildTown(group, layer, backdrop, rng);
-            if (_hasOasis) BuildOasis(group, layer, backdrop, rng);
-            if (_hasFields) BuildFields(group, backdrop, rng);
-            BuildOilField(group, layer, rng);
+            BuildVillage(group, layer, backdrop, rng);
+            if (_hasFob) BuildFob(group, layer, backdrop, rng);
+            BuildDesertWild(group, layer, backdrop, rng, half);
             BuildWrecks(group, layer, backdrop, rng);
             BuildDust(group, rng, half);
 
@@ -299,8 +281,7 @@ namespace FPSKit.EditorTools
             anchor.position = new Vector3(from.x, GroundHeightAt(from.x, from.y) + 16f, from.y);
             anchor.rotation = Quaternion.LookRotation(new Vector3(look.x, GroundHeightAt(_townCentre.x, _townCentre.y) + 2f, look.y) - anchor.position);
 
-            Debug.Log($"[FPSKit] desert: town at {_townCentre}, oasis {_hasOasis}, fields {_hasFields}, " +
-                      $"{_oilSites.Count} oil site(s), plane {_hasPlane}, track {_track.Count} points.");
+            Debug.Log($"[FPSKit] desert: village at {_townCentre}, base {_hasFob}, plane {_hasPlane}, track {_track.Count} points.");
         }
 
         // ---- shared ------------------------------------------------------
@@ -401,181 +382,6 @@ namespace FPSKit.EditorTools
             }
 
             Flush();
-        }
-
-        // ==================================================================
-        // The town
-        // ==================================================================
-        /// <summary>
-        /// A ruined mud-brick town on its flattened site: houses on lots along a grid of lanes,
-        /// a main street down the middle that the track runs along, a market square with
-        /// awnings and a well, a minaret, and ruins open to walk through.
-        ///
-        /// Four of the houses have a stair up the outside to a roof you can fight from, sealed
-        /// only to a metre below the roof so the roof itself stays on the bake.
-        /// </summary>
-        private static void BuildTown(Transform parent, int layer, int backdrop, System.Random rng)
-        {
-            var town = new GameObject("Town").transform;
-            town.SetParent(parent, false);
-
-            var c = _townCentre;
-            float floor = GroundHeightAt(c.x, c.y);
-            float R = _townRadius;
-
-            // Packed earth under the whole town, so the streets read as streets.
-            var earth = new MeshBuild { UVScale = 0.2f };
-            const int Sides = 36;
-            for (int i = 0; i < Sides; i++)
-            {
-                float a0 = i * Mathf.PI * 2f / Sides, a1 = (i + 1) * Mathf.PI * 2f / Sides;
-                float r0 = (R - 3f) * (1f + Fbm2(Mathf.Cos(a0) * 2f, Mathf.Sin(a0) * 2f, 7201, 2) * 0.12f);
-                float r1 = (R - 3f) * (1f + Fbm2(Mathf.Cos(a1) * 2f, Mathf.Sin(a1) * 2f, 7201, 2) * 0.12f);
-                AddUp(earth, new Vector3(c.x, floor + 0.03f, c.y), new Vector3(c.x + Mathf.Cos(a0) * r0, floor + 0.03f, c.y + Mathf.Sin(a0) * r0),
-                      new Vector3(c.x + Mathf.Cos(a1) * r1, floor + 0.03f, c.y + Mathf.Sin(a1) * r1),
-                      new Vector3(c.x + Mathf.Cos(a1) * r1, floor + 0.03f, c.y + Mathf.Sin(a1) * r1));
-            }
-            Flat(town, backdrop, "TownGround", earth, DenseKey("townground"), _earthMat);
-
-            // ---- lots on a grid of lanes ----
-            const float lot = 11f, lane = 4f, pitch = lot + lane;
-            const float mainHalf = 4.5f, crossHalf = 3f;
-
-            // The square is the four lots nearest the middle, left empty.
-            float plazaX = crossHalf + lot, plazaZ = mainHalf + lot;
-
-            var lots = new List<Vector2>();
-            for (int j = -5; j <= 5; j++)
-                for (int k = -5; k <= 5; k++)
-                {
-                    // Lanes between every lot, the main street along x through the middle
-                    // and a narrower lane along z: every lot fronts onto ground that runs out.
-                    if (j == 0 || k == 0) continue;
-                    float x = c.x + Mathf.Sign(j) * (crossHalf + lot * 0.5f + (Mathf.Abs(j) - 1) * pitch);
-                    float z = c.y + Mathf.Sign(k) * (mainHalf + lot * 0.5f + (Mathf.Abs(k) - 1) * pitch);
-
-                    var p = new Vector2(x, z);
-                    if ((p - c).magnitude + lot * 0.7f > R - 3f) continue;
-                    if (Mathf.Abs(x - c.x) < plazaX && Mathf.Abs(z - c.y) < plazaZ) continue;
-                    lots.Add(p);
-                }
-
-            int roofHouses = 0, houses = 0, ruins = 0;
-
-            // The minaret takes the lot nearest a corner of the square.
-            Vector2 minaretLot = lots.Count > 0 ? lots[0] : c;
-            float nearest = float.MaxValue;
-            var corner = c + new Vector2(plazaX, plazaZ);
-            foreach (var p in lots) { float d = (p - corner).magnitude; if (d < nearest) { nearest = d; minaretLot = p; } }
-
-            foreach (var p in lots)
-            {
-                if (p == minaretLot) { BuildMinaret(town, layer, new Vector3(p.x, floor, p.y)); continue; }
-
-                double roll = rng.NextDouble();
-                if (roll < 0.1) continue;                        // an empty lot: rubble and a gap
-                if (roll < 0.26) { BuildRuin(town, layer, rng, new Vector3(p.x, floor, p.y), lot); ruins++; continue; }
-
-                bool roof = roofHouses < 4 && rng.NextDouble() < 0.3;
-                BuildHouse(town, layer, rng, new Vector3(p.x, floor, p.y), lot, roof);
-                if (roof) roofHouses++;
-                houses++;
-            }
-
-            BuildMarket(town, layer, rng, new Vector3(c.x, floor, c.y), plazaX, plazaZ);
-
-            // Palms in the square and at the edge of town.
-            for (int i = 0; i < 6; i++)
-            {
-                float a = Rand(rng, 0f, Mathf.PI * 2f);
-                var at = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Rand(rng, R + 2f, R + 12f);
-                if (!Free(at, 2f)) continue;
-                BuildPalm(town, layer, rng, new Vector3(at.x, GroundHeightAt(at.x, at.y) - 0.2f, at.y));
-            }
-
-            Debug.Log($"[FPSKit] desert town: {houses} house(s), {roofHouses} with a roof stair, {ruins} ruin(s).");
-        }
-
-        /// <summary>
-        /// One house on its lot: a mud-brick box, sometimes a second storey stepped back on
-        /// top, a parapet, the ends of roof beams through the wall, a door and small windows.
-        /// </summary>
-        private static void BuildHouse(Transform parent, int layer, System.Random rng, Vector3 lotCentre, float lot, bool roofStair)
-        {
-            const float storey = 18 * StairRise;   // a whole number of risers, for the stair
-            bool twoStorey = !roofStair && rng.NextDouble() < 0.3;
-
-            float w = Rand(rng, 7.5f, lot - 0.6f), d = Rand(rng, 7.5f, lot - 0.6f);
-            if (roofStair) { w = Mathf.Min(w, lot - 3.2f); d = lot - 0.6f; }
-
-            var centre = lotCentre + new Vector3(Rand(rng, -(lot - w) * 0.5f, (lot - w) * 0.5f) * (roofStair ? 0f : 1f), 0f,
-                                                 Rand(rng, -(lot - d) * 0.5f, (lot - d) * 0.5f));
-            if (roofStair) centre.x = lotCentre.x - (lot - w) * 0.5f;   // room for the stair on the +x side
-
-            var mat = _adobeTints[rng.Next(_adobeTints.Length)];
-            var shell = new MeshBuild { UVScale = 0.28f };
-            shell.Box(centre + Vector3.up * storey * 0.5f, new Vector3(w, storey, d), Quaternion.identity);
-
-            float top = storey;
-            if (twoStorey)
-            {
-                float w2 = w * Rand(rng, 0.55f, 0.8f), d2 = d * Rand(rng, 0.55f, 0.8f);
-                var up = centre + new Vector3((w - w2) * 0.5f * (rng.Next(2) == 0 ? 1 : -1), 0f, (d - d2) * 0.5f * (rng.Next(2) == 0 ? 1 : -1));
-                shell.Box(up + Vector3.up * (storey + 1.6f), new Vector3(w2, 3.2f, d2), Quaternion.identity);
-                top = storey + 3.2f;
-            }
-
-            // The roof of a stair house is ground; everything else about the house is not.
-            var house = MeshObject(parent, "House", ToMesh(shell, DenseKey("house")), mat, Vector3.zero, Quaternion.identity,
-                                   Vector3.one, layer, "Concrete");
-            if (!roofStair) NoStanding(house);
-
-            if (roofStair) SealBox(parent, centre + Vector3.up * (storey - 3f) * 0.5f, new Vector3(w, storey - 3f, d));
-            else SealBox(parent, centre + Vector3.up * top * 0.5f, new Vector3(w, top, d));
-
-            // Parapet, open where the stair lands.
-            var parapet = new MeshBuild { UVScale = 0.3f };
-            const float ph = 0.7f, pt = 0.28f;
-            float y = storey + ph * 0.5f;
-            float gapZ = centre.z + d * 0.5f - 1.6f;
-
-            parapet.Box(new Vector3(centre.x, y, centre.z - d * 0.5f + pt * 0.5f), new Vector3(w, ph, pt), Quaternion.identity);
-            parapet.Box(new Vector3(centre.x, y, centre.z + d * 0.5f - pt * 0.5f), new Vector3(w, ph, pt), Quaternion.identity);
-            parapet.Box(new Vector3(centre.x - w * 0.5f + pt * 0.5f, y, centre.z), new Vector3(pt, ph, d), Quaternion.identity);
-
-            float eastX = centre.x + w * 0.5f - pt * 0.5f;
-            if (roofStair)
-            {
-                // The +x run, with a gap where the landing arrives near its +z end.
-                float z0 = centre.z - d * 0.5f, z1 = gapZ - 1.2f, z2 = gapZ + 1.2f, z3 = centre.z + d * 0.5f;
-                if (z1 > z0) parapet.Box(new Vector3(eastX, y, (z0 + z1) * 0.5f), new Vector3(pt, ph, z1 - z0), Quaternion.identity);
-                if (z3 > z2) parapet.Box(new Vector3(eastX, y, (z2 + z3) * 0.5f), new Vector3(pt, ph, z3 - z2), Quaternion.identity);
-            }
-            else parapet.Box(new Vector3(eastX, y, centre.z), new Vector3(pt, ph, d), Quaternion.identity);
-
-            Solid(parent, "Parapet", parapet, mat, layer);
-
-            // Beam ends through the wall, a door, and small high windows -- on the long faces.
-            var beams = new MeshBuild { UVScale = 0.5f };
-            var dark = new MeshBuild { UVScale = 0.5f };
-            foreach (float s in new[] { -1f, 1f })
-            {
-                for (float x = -w * 0.5f + 0.8f; x < w * 0.5f - 0.6f; x += 1.3f)
-                    beams.Box(centre + new Vector3(x, storey - 0.45f, s * (d * 0.5f + 0.25f)), new Vector3(0.18f, 0.18f, 0.5f), Quaternion.identity);
-
-                float doorX = Rand(rng, -w * 0.3f, w * 0.3f);
-                dark.Box(centre + new Vector3(doorX, 1.15f, s * (d * 0.5f + 0.04f)), new Vector3(1.2f, 2.3f, 0.1f), Quaternion.identity);
-
-                for (float x = -w * 0.5f + 1.5f; x < w * 0.5f - 1.2f; x += 2.6f)
-                    if (Mathf.Abs(x - doorX) > 1.4f && rng.NextDouble() < 0.6)
-                        dark.Box(centre + new Vector3(x, 2.4f, s * (d * 0.5f + 0.04f)), new Vector3(0.7f, 0.7f, 0.1f), Quaternion.identity);
-            }
-            Visual(parent, "Beams", beams, _timberMat, layer);
-            Visual(parent, "Openings", dark, _shadowMat, layer);
-
-            // The stair: along the +x side, climbing towards +z, landing beside the gap.
-            if (roofStair)
-                AdobeStair(parent, layer, mat, new Vector3(centre.x + w * 0.5f + 0.95f, centre.y, gapZ), Vector3.forward, storey);
         }
 
         /// <summary>
@@ -703,312 +509,6 @@ namespace FPSKit.EditorTools
                 well.Box(centre + new Vector3(s, 1.4f, 0f), new Vector3(0.2f, 2.8f, 0.2f), Quaternion.identity);
             well.Box(centre + new Vector3(0f, 2.75f, 0f), new Vector3(2.8f, 0.2f, 0.2f), Quaternion.identity);
             Solid(parent, "Well", well, _rockPaleMat, layer);
-        }
-
-        // ==================================================================
-        // The oasis, the fields, the camp
-        // ==================================================================
-        private static void BuildOasis(Transform parent, int layer, int backdrop, System.Random rng)
-        {
-            var oasis = new GameObject("Oasis").transform;
-            oasis.SetParent(parent, false);
-
-            var c = _oasisCentre;
-            float bed = GroundHeightAt(c.x, c.y);
-
-            // Grass round the water, draped on the bowl.
-            Drape(oasis, "OasisGrass", BlobMesh("OasisGrass", c, 19f, 7301, 0.08f, 1f, 1.15f, Rand(rng, 0f, 3f)), _grassMat, backdrop);
-
-            // The water: shallow, walkable, and not a hazard -- the river is the thing that kills.
-            var water = new MeshBuild { UVScale = 0.2f };
-            const int Sides = 28;
-            for (int i = 0; i < Sides; i++)
-            {
-                float a0 = i * Mathf.PI * 2f / Sides, a1 = (i + 1) * Mathf.PI * 2f / Sides;
-                float r0 = 11.5f * (1f + Fbm2(Mathf.Cos(a0) * 2f, Mathf.Sin(a0) * 2f, 7302, 2) * 0.15f);
-                float r1 = 11.5f * (1f + Fbm2(Mathf.Cos(a1) * 2f, Mathf.Sin(a1) * 2f, 7302, 2) * 0.15f);
-                var mid = new Vector3(c.x, bed + 0.35f, c.y);
-                AddUp(water, mid, new Vector3(c.x + Mathf.Cos(a0) * r0, bed + 0.35f, c.y + Mathf.Sin(a0) * r0),
-                      new Vector3(c.x + Mathf.Cos(a1) * r1, bed + 0.35f, c.y + Mathf.Sin(a1) * r1),
-                      new Vector3(c.x + Mathf.Cos(a1) * r1, bed + 0.35f, c.y + Mathf.Sin(a1) * r1));
-            }
-            var pool = MeshObject(oasis, "OasisWater", ToMesh(water, DenseKey("oasiswater")), _waterMat, Vector3.zero,
-                                  Quaternion.identity, Vector3.one, backdrop, null, collider: false);
-            Mark(pool, new Color(0.25f, 0.42f, 0.38f), 2);
-            pool.AddComponent<ScrollingWater>().scrollSpeed = new Vector2(0.004f, 0.01f);
-
-            // Reeds at the water's edge, palms round the rim.
-            var reeds = new MeshBuild { UVScale = 0.5f };
-            for (int i = 0; i < 70; i++)
-            {
-                float a = Rand(rng, 0f, Mathf.PI * 2f);
-                float r = Rand(rng, 10f, 13.5f);
-                var foot = new Vector3(c.x + Mathf.Cos(a) * r, 0f, c.y + Mathf.Sin(a) * r);
-                foot.y = SurfaceHeightAt(foot.x, foot.z);
-                float h = Rand(rng, 1f, 2.2f);
-                var lean = new Vector3(Rand(rng, -0.25f, 0.25f), 1f, Rand(rng, -0.25f, 0.25f)).normalized;
-                reeds.Tube(foot, foot + lean * h, 0.03f, 0.01f, 3);
-            }
-            Visual(oasis, "Reeds", reeds, _foliageMat, backdrop);
-
-            for (int i = 0; i < 12; i++)
-            {
-                float a = i * Mathf.PI * 2f / 12f + Rand(rng, -0.2f, 0.2f);
-                float r = Rand(rng, 14.5f, 19f);
-                var at = new Vector2(c.x + Mathf.Cos(a) * r, c.y + Mathf.Sin(a) * r);
-                BuildPalm(oasis, layer, rng, new Vector3(at.x, GroundHeightAt(at.x, at.y) - 0.2f, at.y));
-            }
-
-            // A nomad camp on the far side from the town.
-            var away = (c - _townCentre).normalized;
-            for (int i = 0; i < 3; i++)
-            {
-                var dir = (Vector2)(Quaternion.Euler(0f, 0f, -50f + i * 50f + Rand(rng, -10f, 10f)) * away);
-                var at = c + dir * Rand(rng, 25f, 29f);
-                if (!Drapeable(at.x, at.y, 4f)) continue;
-                BuildTent(oasis, layer, rng, at, Mathf.Atan2(-dir.x, -dir.y) * Mathf.Rad2Deg);
-            }
-        }
-
-        /// <summary>
-        /// A black goat-hair tent: a ridge on three poles, the cloth pitched down to low poles
-        /// either side, closed at the back and open at the front, a rug inside. The cloth is
-        /// drawn both ways, since you stand under it; it has no collider, the poles do.
-        /// </summary>
-        private static void BuildTent(Transform parent, int layer, System.Random rng, Vector2 at, float yaw)
-        {
-            float y = GroundHeightAt(at.x, at.y);
-            var rot = Quaternion.Euler(0f, yaw, 0f);
-            var o = new Vector3(at.x, y, at.y);
-            Vector3 P(float x, float h, float z) => o + rot * new Vector3(x, h, z);
-
-            const float w = 7f, d = 4.5f, ridge = 2.4f, eave = 1.2f;
-
-            var poles = new MeshBuild { UVScale = 0.5f };
-            foreach (float x in new[] { -w * 0.45f, 0f, w * 0.45f })
-                poles.Box(P(x, ridge * 0.5f, 0f), new Vector3(0.12f, ridge, 0.12f), rot);
-            foreach (float x in new[] { -w * 0.5f, w * 0.5f })
-                foreach (float z in new[] { -d * 0.5f, d * 0.5f })
-                    poles.Box(P(x, eave * 0.5f, z), new Vector3(0.1f, eave, 0.1f), rot);
-            Solid(parent, "TentPoles", poles, _timberMat, layer, "Wood");
-
-            var cloth = new MeshBuild { UVScale = 0.5f };
-            var r0 = P(-w * 0.55f, ridge, 0f); var r1 = P(w * 0.55f, ridge, 0f);
-            var f0 = P(-w * 0.55f, eave, d * 0.55f); var f1 = P(w * 0.55f, eave, d * 0.55f);
-            var b0 = P(-w * 0.55f, eave, -d * 0.55f); var b1 = P(w * 0.55f, eave, -d * 0.55f);
-            AddUp(cloth, r0, r1, f1, f0); AddDown(cloth, r0, r1, f1, f0);
-            AddUp(cloth, r1, r0, b0, b1); AddDown(cloth, r1, r0, b0, b1);
-
-            // The back wall, down to the sand.
-            var g0 = P(-w * 0.55f, 0f, -d * 0.55f); var g1 = P(w * 0.55f, 0f, -d * 0.55f);
-            cloth.Quad(g0, b0, b1, g1); cloth.Quad(g1, b1, b0, g0);
-            Visual(parent, "Tent", cloth, _tentMat, layer);
-
-            var rug = new MeshBuild { UVScale = 0.5f };
-            rug.Box(P(0f, 0.03f, 0f), new Vector3(3.2f, 0.04f, 2.2f), rot);
-            Visual(parent, "Rug", rug, rng.Next(2) == 0 ? _clothRed : _clothBlue, layer);
-        }
-
-        /// <summary>Irrigated plots: soil, rows of green crop, a channel of water along one side.</summary>
-        private static void BuildFields(Transform parent, int layer, System.Random rng)
-        {
-            var fields = new GameObject("Fields").transform;
-            fields.SetParent(parent, false);
-
-            var c = _fieldCentre;
-            float y = GroundHeightAt(c.x, c.y);
-            bool alongX = rng.Next(2) == 0;
-
-            var soil = new MeshBuild { UVScale = 0.2f };
-            var crop = new MeshBuild { UVScale = 0.5f };
-            var channel = new MeshBuild { UVScale = 0.2f };
-
-            for (int plot = -1; plot <= 1; plot++)
-            {
-                float offset = plot * 12.5f;
-                var centre = alongX ? new Vector3(c.x, y + 0.03f, c.y + offset) : new Vector3(c.x + offset, y + 0.03f, c.y);
-                var size = alongX ? new Vector3(26f, 0.04f, 11f) : new Vector3(11f, 0.04f, 26f);
-                soil.Box(centre, size, Quaternion.identity);
-
-                bool fallow = rng.NextDouble() < 0.25;
-                if (fallow) continue;
-
-                for (float r = -4.6f; r <= 4.6f; r += 1.15f)
-                {
-                    var rowAt = alongX ? centre + new Vector3(0f, 0.18f, r) : centre + new Vector3(r, 0.18f, 0f);
-                    crop.Box(rowAt, alongX ? new Vector3(24.5f, 0.32f, 0.45f) : new Vector3(0.45f, 0.32f, 24.5f), Quaternion.identity);
-                }
-            }
-
-            var ch = alongX ? new Vector3(c.x, y + 0.05f, c.y - 19.5f) : new Vector3(c.x - 19.5f, y + 0.05f, c.y);
-            channel.Box(ch, alongX ? new Vector3(27f, 0.04f, 1.2f) : new Vector3(1.2f, 0.04f, 27f), Quaternion.identity);
-
-            Flat(fields, layer, "Soil", soil, DenseKey("soil"), _soilMat);
-            Flat(fields, layer, "Crops", crop, DenseKey("crops"), _cropMat);
-            Flat(fields, layer, "Channel", channel, DenseKey("channel"), _waterMat);
-        }
-
-        // ==================================================================
-        // The oil field
-        // ==================================================================
-        private static void BuildOilField(Transform parent, int layer, System.Random rng)
-        {
-            if (_oilSites.Count == 0) return;
-
-            var oil = new GameObject("OilField").transform;
-            oil.SetParent(parent, false);
-
-            for (int i = 0; i < _oilSites.Count; i++)
-            {
-                var s = _oilSites[i];
-                var at = new Vector3(s.x, GroundHeightAt(s.x, s.y), s.y);
-
-                if (i % 3 == 1) BuildDerrick(oil, layer, at, rng);
-                else BuildPumpjack(oil, layer, rng, at);
-            }
-
-            BuildPipeline(oil, layer);
-        }
-
-        /// <summary>
-        /// A pumpjack: the skid, the A-frame samson post, a walking beam that nods on top of it
-        /// with the horse head over the well, and the crank and counterweight turning at the
-        /// other end in time with it. The moving parts carry no collider.
-        /// </summary>
-        private static void BuildPumpjack(Transform parent, int layer, System.Random rng, Vector3 at)
-        {
-            float yaw = rng.Next(4) * 90f;
-            var site = new GameObject("Pumpjack").transform;
-            site.SetParent(parent, false);
-            site.localPosition = at;
-            site.localRotation = Quaternion.Euler(0f, yaw, 0f);
-
-            var frame = new MeshBuild { UVScale = 0.4f };
-            frame.Box(new Vector3(0f, 0.25f, -0.5f), new Vector3(2.2f, 0.5f, 8f), Quaternion.identity);
-            foreach (float s in new[] { -0.8f, 0.8f })
-            {
-                frame.Box(new Vector3(s, 2.3f, -0.6f), new Vector3(0.22f, 4.4f, 0.22f), Quaternion.Euler(-12f, 0f, 0f));
-                frame.Box(new Vector3(s, 2.3f, 0.6f), new Vector3(0.22f, 4.4f, 0.22f), Quaternion.Euler(12f, 0f, 0f));
-            }
-            frame.Box(new Vector3(0f, 1.2f, -3.6f), new Vector3(1.4f, 1.6f, 1.2f), Quaternion.identity);   // gearbox
-            frame.Box(new Vector3(0f, 0.6f, 3.6f), new Vector3(0.7f, 1.2f, 0.7f), Quaternion.identity);    // wellhead
-            var frameGo = MeshObject(site, "PumpjackFrame", ToMesh(frame, "pumpjackframe"), _oilSteelMat, Vector3.zero,
-                                     Quaternion.identity, Vector3.one, layer, "Metal");
-            NoStanding(frameGo);
-
-            float period = Rand(rng, 4f, 6f), phase = Rand(rng, 0f, 6f);
-
-            // The walking beam, pivoting on top of the post.
-            var beamBuild = new MeshBuild { UVScale = 0.4f };
-            beamBuild.Box(new Vector3(0f, 0f, 0.3f), new Vector3(0.45f, 0.6f, 7.4f), Quaternion.identity);
-            beamBuild.Box(new Vector3(0f, -0.4f, 3.9f), new Vector3(0.5f, 1.8f, 0.9f), Quaternion.identity);   // horse head
-            var beam = MeshObject(site, "WalkingBeam", ToMesh(beamBuild, "walkingbeam"), _rustMat,
-                                  new Vector3(0f, 4.5f, 0f), Quaternion.identity, Vector3.one, layer, null, collider: false);
-            var rock = beam.AddComponent<MachineRock>();
-            rock.rest = Quaternion.identity;
-            rock.axis = Vector3.right;
-            rock.amplitude = 16f;
-            rock.period = period;
-            rock.phase = phase;
-
-            // The crank and its counterweights, turning once a nod.
-            var crankBuild = new MeshBuild { UVScale = 0.4f };
-            foreach (float s in new[] { -0.85f, 0.85f })
-                crankBuild.Box(new Vector3(s, -0.6f, 0f), new Vector3(0.25f, 2.2f, 0.9f), Quaternion.identity);
-            crankBuild.Tube(new Vector3(-1f, 0f, 0f), new Vector3(1f, 0f, 0f), 0.2f, 0.2f, 8);
-            var crank = MeshObject(site, "Crank", ToMesh(crankBuild, "pumpjackcrank"), _rustMat,
-                                   new Vector3(0f, 1.9f, -3.6f), Quaternion.identity, Vector3.one, layer, null, collider: false);
-            var spin = crank.AddComponent<MachineSpin>();
-            spin.rest = Quaternion.identity;
-            spin.axis = Vector3.right;
-            spin.degreesPerSecond = 360f / period;
-            spin.phase = phase * 360f / period;
-        }
-
-        /// <summary>An oil derrick: a tapering lattice tower on a drill floor, with a crown on top.</summary>
-        private static void BuildDerrick(Transform parent, int layer, Vector3 at, System.Random rng)
-        {
-            var build = new MeshBuild { UVScale = 0.5f };
-            const float height = 24f, baseHalf = 3.2f, topHalf = 0.8f;
-
-            void Strut(Vector3 a, Vector3 b, float t)
-            {
-                var d = b - a;
-                build.Box(at + (a + b) * 0.5f, new Vector3(t, t, d.magnitude), Quaternion.LookRotation(d.normalized, Vector3.up));
-            }
-
-            Vector3 Leg(int i, float y)
-            {
-                float h = Mathf.Lerp(baseHalf, topHalf, y / height);
-                float sx = (i == 0 || i == 3) ? -1f : 1f, sz = (i < 2) ? -1f : 1f;
-                return new Vector3(sx * h, y + 1.2f, sz * h);
-            }
-
-            for (int i = 0; i < 4; i++) Strut(Leg(i, 0f), Leg(i, height), 0.28f);
-
-            for (float y = 0f; y < height; y += 3f)
-                for (int i = 0; i < 4; i++)
-                {
-                    int j = (i + 1) % 4;
-                    Strut(Leg(i, y), Leg(j, y), 0.12f);
-                    Strut(Leg(i, y), Leg(j, Mathf.Min(height, y + 3f)), 0.08f);
-                }
-
-            build.Box(at + new Vector3(0f, 0.6f, 0f), new Vector3(baseHalf * 2f + 2f, 1.2f, baseHalf * 2f + 2f), Quaternion.identity);
-            build.Box(at + new Vector3(0f, height + 1.8f, 0f), new Vector3(2.2f, 1.2f, 2.2f), Quaternion.identity);
-
-            Solid(parent, "Derrick", build, _oilSteelMat, layer, "Metal");
-
-            // The doghouse beside it.
-            var shed = new MeshBuild { UVScale = 0.3f };
-            var shedAt = at + new Vector3(baseHalf + 3.5f, 1.4f, 0f);
-            shed.Box(shedAt, new Vector3(3.5f, 2.8f, 5f), Quaternion.identity);
-            Solid(parent, "Doghouse", shed, _rustMat, layer, "Metal");
-            SealBox(parent, shedAt, new Vector3(3.5f, 2.8f, 5f));
-            _ = rng;
-        }
-
-        /// <summary>
-        /// A pipeline from well to well and off the edge of the map, on supports three and a half
-        /// metres up: high enough to walk and drive under, so it is scenery and a landmark to
-        /// follow rather than a wall across the far bank.
-        /// </summary>
-        private static void BuildPipeline(Transform parent, int layer)
-        {
-            var route = new List<Vector2>();
-            foreach (var s in _oilSites) route.Add(s + new Vector2(10f, 0f));
-            if (route.Count == 0) return;
-            route.Add(new Vector2(route[route.Count - 1].x, _theme.arenaSize * 0.5f + 40f));
-
-            var supports = new MeshBuild { UVScale = 0.5f };
-            var pipe = new MeshBuild { UVScale = 0.5f };
-            const float lift = 3.6f;
-
-            Vector3 prev = Vector3.zero;
-            bool first = true;
-
-            for (int i = 0; i < route.Count - 1; i++)
-            {
-                float len = Vector2.Distance(route[i], route[i + 1]);
-                int n = Mathf.Max(1, Mathf.CeilToInt(len / 9f));
-                for (int k = 0; k <= n; k++)
-                {
-                    if (!first && k == 0) continue;
-                    var p = Vector2.Lerp(route[i], route[i + 1], k / (float)n);
-                    float g = GroundHeightAt(p.x, p.y);
-                    var top = new Vector3(p.x, g + lift, p.y);
-
-                    supports.Box(new Vector3(p.x, g + lift * 0.5f, p.y), new Vector3(0.25f, lift, 0.25f), Quaternion.identity);
-                    supports.Box(new Vector3(p.x, g + lift - 0.1f, p.y), new Vector3(1.2f, 0.2f, 0.3f), Quaternion.identity);
-
-                    if (!first) pipe.Tube(prev, top + Vector3.up * 0.4f, 0.35f, 0.35f, 10);
-                    prev = top + Vector3.up * 0.4f;
-                    first = false;
-                }
-            }
-
-            Solid(parent, "PipelineSupports", supports, _oilSteelMat, layer, "Metal");
-            Visual(parent, "Pipeline", pipe, _rustMat, layer);
         }
 
         // ==================================================================
@@ -1145,6 +645,8 @@ namespace FPSKit.EditorTools
                 {
                     var p = new Vector2(x + Rand(rng, -4f, 4f), z + Rand(rng, -4f, 4f));
                     if (p.magnitude < 40f || !Drapeable(p.x, p.y, 12f)) continue;
+                    // Not in the village, the base, a farm or a camp: open sand only.
+                    if (InSite(p, 16f)) continue;
                     if (!OpenSand(p, 15f)) continue;
                     spots.Add(p);
                 }
@@ -1175,6 +677,9 @@ namespace FPSKit.EditorTools
             }
 
             Debug.Log($"[FPSKit] desert fill: {groves} grove(s), {nets} net position(s) in {spots.Count} empty spot(s).");
+
+            // The very last thing: plants and junk over whatever sand is still bare.
+            BuildScrub(root, layer, half);
         }
 
         /// <summary>
@@ -1363,10 +868,13 @@ namespace FPSKit.EditorTools
             fall.tintAlt = new Color(0.72f, 0.62f, 0.46f, 0.4f);
             fall.size = new Vector2(0.04f, 0.1f);
 
-            for (int i = 0, made = 0; i < 40 && made < 5; i++)
+            for (int i = 0, made = 0; i < 120 && made < 5; i++)
             {
                 var p = new Vector2(Rand(rng, -half * 0.85f, half * 0.85f), Rand(rng, -half * 0.85f, half * 0.85f));
                 if (p.magnitude < 70f || !Drapeable(p.x, p.y, 10f)) continue;
+                // A devil wanders up to fifty metres: kept that far off the places, where a
+                // column of orange dust drifting between the tents reads as a fire.
+                if (InSite(p, 55f)) continue;
                 DustDevil(parent, rng, new Vector3(p.x, GroundHeightAt(p.x, p.y), p.y));
                 made++;
             }

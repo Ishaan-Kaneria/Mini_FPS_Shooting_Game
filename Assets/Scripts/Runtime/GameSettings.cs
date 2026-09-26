@@ -227,6 +227,16 @@ public static class GameSettings
         set => SetBool("minimapRotates", value);
     }
 
+    /// <summary>
+    /// Blood on hits, on walls and under bodies. On by default; off leaves a dull puff so a
+    /// hit still reads as a hit. The wounds still cost enemies their legs and arms either way.
+    /// </summary>
+    public static bool Blood
+    {
+        get => GetBool("blood", true);
+        set => SetBool("blood", value);
+    }
+
     // ==================================================================
 
     /// <summary>Puts every setting back to its default.</summary>
@@ -237,7 +247,7 @@ public static class GameSettings
                      "uiScale", "quality", "fps", "battery", "touchSens", "padSens", "deadzone", "curve",
                      "invertY", "assist", "assistStrength", "autoFire", "gyro", "gyroSens", "aimMode",
                      "leftHanded", "touchOpacity",
-                     "mouseSens", "fov", "vsync", "volMaster", "volMusic", "volSfx", "hudScale", "minimapRotates",
+                     "mouseSens", "fov", "vsync", "volMaster", "volMusic", "volSfx", "hudScale", "minimapRotates", "blood",
                  })
             PlayerPrefs.DeleteKey(Prefix + key);
         // The HUD layout is a setting like the rest and goes with them; the named layouts the

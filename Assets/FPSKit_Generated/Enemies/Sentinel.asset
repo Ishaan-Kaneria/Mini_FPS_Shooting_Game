@@ -43,6 +43,8 @@ MonoBehaviour:
   staggerThreshold: 40
   canRetreat: 0
   suppressionDamage: 45
+  voice: 0
+  woundResistance: 0.45
   scoreValue: 450
   healthDropChance: 0.3
   shieldDropChance: 0.35

@@ -268,12 +268,18 @@ public class EnemyAI : MonoBehaviour
     /// <summary>0 to 1 severity, so a graze and a slug do not throw the body equally.</summary>
     public float LastReactionStrength { get; private set; }
 
+    /// <summary>When it last fired a round, for the kick of the rifle into the shoulder.</summary>
+    public float LastShotTime { get; private set; } = -999f;
+
     NavMeshAgent _agent;
     Health _health;
     Health _targetHealth;
     AudioSource _audio;
     Collider[] _colliders;
     RagdollController _ragdoll;
+    EnemyDeath _death;
+    EnemyWounds _wounds;
+    EnemyVoice _voice;
 
     Renderer[] _renderers;
     MaterialPropertyBlock _block;
@@ -301,6 +307,9 @@ public class EnemyAI : MonoBehaviour
     }
     Color[] _restBodyColor;
     Color[] _restGlowColor;
+
+    /// <summary>The archetype's colours before any blood, so a stain is measured from clean.</summary>
+    Color[] _cleanBodyColor;
 
     Coroutine _attackRoutine;
 
@@ -380,6 +389,9 @@ public class EnemyAI : MonoBehaviour
         _audio = GetComponent<AudioSource>();
         _colliders = GetComponentsInChildren<Collider>();
         _ragdoll = GetComponent<RagdollController>();
+        _death = GetComponent<EnemyDeath>();
+        _wounds = GetComponent<EnemyWounds>();
+        _voice = GetComponent<EnemyVoice>();
 
         if (eyes == null) eyes = transform;
         if (animator == null) animator = GetComponentInChildren<Animator>();
@@ -470,7 +482,7 @@ public class EnemyAI : MonoBehaviour
             if (!_hasAlerted)
             {
                 _hasAlerted = true;
-                PlayClip(alertClip);
+                if (_voice == null) PlayClip(alertClip);
             }
         }
 
@@ -599,6 +611,9 @@ public class EnemyAI : MonoBehaviour
         }
 
         if (!canRetreat || _suppression < suppressionDamage) return false;
+
+        // Something on the floor cannot break off. It stays where it fell and fights.
+        if (Crawling) return false;
         if (Time.time < _nextRetreatTime) return false;
 
         _suppression = 0f;
@@ -684,6 +699,12 @@ public class EnemyAI : MonoBehaviour
         if (CurrentState == State.Retreat) multiplier = retreatSpeedMultiplier;
         else if (Time.time < _chargeUntil) multiplier = chargeSpeedMultiplier;
         else if (ranged && canSee) multiplier = aimMoveSpeedMultiplier;
+
+        // A wound caps it rather than scaling it. A limping enemy does not get its limp
+        // back by charging, and a crawler drags itself along at one pace whatever the
+        // rest of the brain wanted.
+        if (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound)
+            multiplier = Mathf.Min(multiplier, 1f) * _wounds.MoveSpeedMultiplier;
 
         _agent.speed = _baseSpeed * multiplier;
     }
@@ -813,6 +834,7 @@ public class EnemyAI : MonoBehaviour
     {
         if (chargeSpeedMultiplier <= 1f) return;
         if (Time.time < _chargeUntil) return;
+        if (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound) return;
 
         bool inWindow = distance <= chargeRange && distance > attackRange;
         if (!inWindow || Time.time < _nextChargeTime) return;
@@ -893,7 +915,8 @@ public class EnemyAI : MonoBehaviour
         if (animator != null && !string.IsNullOrEmpty(attackTrigger))
             animator.SetTrigger(attackTrigger);
 
-        PlayClip(attackClip);
+        if (_voice != null) _voice.OnAttack(ranged && Vector3.Distance(transform.position, target.position) > meleeRange);
+        else PlayClip(attackClip);
 
         _windupStart = Time.time;
         _windupEnd = Time.time + attackWindup;
@@ -975,11 +998,15 @@ public class EnemyAI : MonoBehaviour
         Vector3 origin = eyes.position;
         Vector3 direction = ((target.position + Vector3.up * 1.2f) - origin).normalized;
 
-        Vector2 offset = Random.insideUnitCircle * rangedSpread;
+        // A hurt arm shakes the aim. Wider, never tighter: a wound only ever helps you.
+        float spread = rangedSpread * (_wounds != null ? _wounds.AimSpreadMultiplier : 1f);
+
+        Vector2 offset = Random.insideUnitCircle * spread;
         direction = Quaternion.AngleAxis(offset.x, Vector3.up) *
                     Quaternion.AngleAxis(offset.y, transform.right) * direction;
 
         PlayMuzzleEffects();
+        LastShotTime = Time.time;
 
         // The shot is resolved before the visuals are sent anywhere, so the tracer can be
         // drawn to the real impact point. Note the early return is gone: a shot that hits
@@ -1089,7 +1116,7 @@ public class EnemyAI : MonoBehaviour
 
         // Not on the killing blow: the death sound is what that hit makes, and both at
         // once reads as two enemies rather than one.
-        if (health == null || health.Current > 0f) PlayPain();
+        if ((health == null || health.Current > 0f) && _voice == null) PlayPain();
 
         if (staggerThreshold <= 0f || info.amount < staggerThreshold)
         {
@@ -1114,6 +1141,39 @@ public class EnemyAI : MonoBehaviour
         _nextAttackTime = Mathf.Max(_nextAttackTime,
                                     Time.time + staggerDuration + flinchAttackDelay);
         _chargeUntil = 0f;
+    }
+
+    /// <summary>On the floor, dragging itself along. See <see cref="EnemyWounds"/>.</summary>
+    public bool Crawling => _wounds != null && _wounds.Legs == EnemyWounds.LegState.Crawling;
+
+    /// <summary>
+    /// Knocks it off balance for a while, whatever the hit was worth. For the wounds that
+    /// matter more than their damage: a boss taking a round through the visor, a leg
+    /// going out from under it. Costs it the attack exactly as a heavy hit's stagger does.
+    /// </summary>
+    public void ForceStagger(float seconds)
+    {
+        if (CurrentState == State.Dead || seconds <= 0f) return;
+
+        _staggerUntil = Mathf.Max(_staggerUntil, Time.time + seconds);
+        CancelAttack();
+
+        _nextAttackTime = Mathf.Max(_nextAttackTime, _staggerUntil + flinchAttackDelay);
+        _chargeUntil = 0f;
+    }
+
+    /// <summary>
+    /// The rifle is gone: from here on it closes and fights by hand. Its reach becomes its
+    /// swing, so the stand-off it chose as a shooter does not park it twenty metres from
+    /// the player with nothing to do there.
+    /// </summary>
+    public void Disarm()
+    {
+        if (!ranged) return;
+
+        ranged = false;
+        attackRange = Mathf.Min(attackRange, Mathf.Max(1.6f, meleeRange - 0.2f));
+        CancelAttack();
     }
 
     /// <summary>
@@ -1183,7 +1243,7 @@ public class EnemyAI : MonoBehaviour
         // With a ragdoll present the bone colliders ARE the corpse's physics, so
         // switching them off here would drop it straight through the floor. Let the
         // RagdollController own collider state in that case.
-        if (_ragdoll == null)
+        if (_ragdoll == null && _death == null)
         {
             foreach (var col in _colliders)
                 if (col != null) col.enabled = false;
@@ -1199,8 +1259,9 @@ public class EnemyAI : MonoBehaviour
         // than the destroy delay is a death cry that gets cut off mid-word. The pooled
         // source is not on the body and does not care. It also survives the level being
         // scored on the same frame, which is exactly when the last enemy tends to die.
-        OneShotAudio.Play(deathClip, transform.position, deathVolume,
-                          Random.Range(0.94f, 1.06f));
+        if (_voice == null)
+            OneShotAudio.Play(deathClip, transform.position, deathVolume,
+                              Random.Range(0.94f, 1.06f));
 
         enabled = false;
     }
@@ -1271,6 +1332,38 @@ public class EnemyAI : MonoBehaviour
                 ? block.GetColor("_EmissionColor")
                 : Color.black;
         }
+
+        _cleanBodyColor = (Color[])_restBodyColor.Clone();
+    }
+
+    /// <summary>
+    /// Darkens one body part toward a colour -- the blood on a limb that has been shot up.
+    ///
+    /// Written into the rest colour rather than onto the renderer, because the wind-up
+    /// flash repaints every renderer from the rest colours each frame it runs: a stain put
+    /// anywhere else would be washed off by the next attack. Measured from the clean
+    /// colour, so the same amount twice is the same stain, not a darker one.
+    /// </summary>
+    public void Stain(Renderer renderer, Color toward, float amount)
+    {
+        if (_renderers == null || _restBodyColor == null || _cleanBodyColor == null) return;
+
+        int i = System.Array.IndexOf(_renderers, renderer);
+        if (i < 0 || i >= _cleanBodyColor.Length) return;
+
+        Color clean = _cleanBodyColor[i];
+        Color stained = Color.Lerp(clean, toward, Mathf.Clamp01(amount));
+        stained.a = clean.a;
+
+        _restBodyColor[i] = stained;
+
+        if (_flashing) return;
+
+        var block = Block;
+        renderer.GetPropertyBlock(block);
+        block.SetColor("_BaseColor", stained);
+        block.SetColor("_Color", stained);
+        renderer.SetPropertyBlock(block);
     }
 
     static Color ReadSharedColor(Renderer renderer, string property)

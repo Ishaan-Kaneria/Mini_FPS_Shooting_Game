@@ -496,3 +496,281 @@ save(f"{A}/SFX/punch_hit.wav",
          gain(env(highpass(n(secs(0.02)), 1800), power=10), 0.25)))
 
 random.setstate(_punch_stream)
+
+
+# ---- voices -------------------------------------------------------------------
+# Its own saved stream, like the pin and the punch: appended last, so nothing here
+# re-rolls a clip written above it.
+_voice_stream = random.getstate()
+random.seed(1907)
+
+# Two throats. A soldier and a creature, picked per archetype (EnemyArchetype.voice)
+# and routed by EnemyVoice through the VoiceBank asset the scene builder writes.
+#
+# The old pain grunts were a sawtooth through three resonators, which is why they
+# sounded like a synthesiser saying "uh". What a throat does that a sawtooth does not:
+#
+# - the source is a *pulse* (the folds opening and snapping shut), not a ramp, and its
+#   spectrum falls away steeply -- that is most of the difference between a voice and
+#   a buzz;
+# - no two periods are the same length or the same loudness (jitter and shimmer), and
+#   under strain the folds start skipping every other cycle (the subharmonic that makes
+#   a scream rough and a growl a growl);
+# - breath runs through the same mouth as the voice, so it has the vowel's colour;
+# - the mouth moves: the vowel slides while the note is held.
+#
+# Every one of those is below. None of it is a real recording, and a real recording
+# will always beat it -- the VoiceBank takes any clips, so replacing these is a drag
+# and drop.
+
+def glottal(t, f0, jitter=0.012, shimmer=0.07, sub=0.0, open_q=0.62):
+    """The folds: one pulse per period, each a little different. f0 is a function of
+    0..1 across the clip. `sub` drops every other pulse by that much -- period doubling,
+    the rasp of a throat pushed past what it can hold steady."""
+    total = secs(t)
+    raw = [0.0] * total
+    phase, period_f, amp, odd = 0.0, f0(0.0), 1.0, False
+    rise = open_q * 0.72
+    fall = open_q - rise
+    for i in range(total):
+        phase += period_f / RATE
+        if phase >= 1.0:
+            phase -= 1.0
+            x = i / total
+            period_f = max(25.0, f0(x) * (1.0 + random.gauss(0, jitter)))
+            amp = max(0.1, 1.0 + random.gauss(0, shimmer))
+            odd = not odd
+        p = phase
+        if p < rise:
+            g = 0.5 * (1 - math.cos(math.pi * p / rise))
+        elif p < open_q:
+            g = math.cos(0.5 * math.pi * (p - rise) / fall)
+        else:
+            g = 0.0
+        raw[i] = g * amp * ((1.0 - sub) if odd else 1.0)
+    # What leaves the mouth is the derivative of the airflow, not the airflow.
+    return [raw[i] - raw[i - 1] if i else 0.0 for i in range(total)]
+
+def curve(*points):
+    """A pitch contour through (x, hz) points, linear between them."""
+    pts = sorted(points)
+    def f(x):
+        if x <= pts[0][0]: return pts[0][1]
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            if x <= x1:
+                return y0 + (y1 - y0) * (x - x0) / max(1e-6, x1 - x0)
+        return pts[-1][1]
+    return f
+
+def through(src, formants, scale=1.0, widen=1.0):
+    return mix(*[gain(resonator(src, f * scale, bw * widen), a) for f, bw, a in formants])
+
+def morph(a, b, shape=lambda x: x):
+    total = min(len(a), len(b))
+    return [a[i] * (1 - shape(i / total)) + b[i] * shape(i / total) for i in range(total)]
+
+def drive(buf, k):
+    """Soft clipping: a voice at full effort distorts in the throat before it ever
+    reaches a microphone."""
+    m = max(abs(v) for v in buf) or 1.0
+    d = math.tanh(k)
+    return [math.tanh(k * v / m) / d for v in buf]
+
+def tremolo(buf, rate, depth):
+    return [v * (1 - depth * 0.5 * (1 + math.sin(2 * math.pi * rate * i / RATE))) for i, v in enumerate(buf)]
+
+def shape_env(buf, attack=0.01, release=0.08, hold_power=1.0):
+    total = len(buf)
+    a, r = max(1, secs(attack)), max(1, secs(release))
+    out = []
+    for i, v in enumerate(buf):
+        g = 1.0
+        if i < a: g = i / a
+        if i > total - r: g = min(g, (total - i) / r)
+        out.append(v * g ** hold_power)
+    return out
+
+# Five-formant vowels for an adult male (Peterson & Barney, rounded), with bandwidths.
+V = {
+    "AH": [(730, 90, 1.0), (1090, 110, 0.55), (2440, 160, 0.25), (3400, 250, 0.12), (4200, 300, 0.06)],
+    "AE": [(660, 90, 1.0), (1720, 120, 0.5), (2410, 160, 0.26), (3400, 250, 0.12), (4200, 300, 0.06)],
+    "EH": [(530, 80, 1.0), (1840, 120, 0.5), (2480, 160, 0.25), (3450, 250, 0.1), (4200, 300, 0.05)],
+    "EE": [(270, 60, 1.0), (2290, 120, 0.35), (3010, 180, 0.2), (3500, 250, 0.1), (4300, 300, 0.05)],
+    "OH": [(570, 80, 1.0), (840, 90, 0.7), (2410, 160, 0.15), (3300, 250, 0.07), (4100, 300, 0.04)],
+    "UH": [(520, 80, 1.0), (1190, 110, 0.45), (2390, 160, 0.16), (3300, 250, 0.08), (4100, 300, 0.04)],
+    "OO": [(300, 60, 1.0), (870, 90, 0.4), (2240, 160, 0.1), (3300, 250, 0.05), (4100, 300, 0.03)],
+    "ER": [(490, 80, 1.0), (1350, 110, 0.5), (1690, 140, 0.3), (3300, 250, 0.08), (4100, 300, 0.04)],
+    "MM": [(250, 60, 1.0), (1000, 200, 0.08), (2200, 250, 0.05), (3300, 300, 0.02), (4000, 300, 0.01)],
+}
+
+def voice(t, f0, vowel, to=None, breath=0.1, jitter=0.012, shimmer=0.07, sub=0.0,
+          scale=1.0, widen=1.0, tilt=3200):
+    """A voiced sound: pulses, their breath, the mouth, and optionally the mouth moving."""
+    src = glottal(t, f0, jitter, shimmer, sub)
+    src = lowpass(src, tilt)
+    noise = highpass(n(len(src)), 500)
+    # Breath is loudest while the folds are open; gating the noise by the pulse is
+    # what makes it the same breath as the voice rather than hiss laid over it.
+    gate = [abs(v) for v in lowpass(src, 60)]
+    gm = max(gate) or 1.0
+    air = [noise[i] * (0.35 + 0.65 * gate[i] / gm) * breath for i in range(len(src))]
+    excite = mix(src, air)
+    a = through(excite, V[vowel], scale, widen)
+    if to is None:
+        return a
+    b = through(excite, V[to], scale, widen)
+    return morph(a, b, lambda x: min(1.0, x * 1.4))
+
+def breathe(t, vowel, rising=True, level=1.0, scale=1.0):
+    """Air alone, coloured by a mouth shape: a breath in, or out."""
+    total = secs(t)
+    air = through(highpass(n(total), 300), V[vowel], scale, 2.5)
+    out = []
+    for i, v in enumerate(air):
+        x = i / total
+        g = math.sin(math.pi * x) ** (0.7 if rising else 1.3)
+        out.append(v * g * level)
+    return out
+
+def aspirate(t, level=1.0):
+    """An 'h': a short puff of unvoiced air before a vowel."""
+    return gain(env(highpass(lowpass(n(secs(t)), 3500), 800), attack=0.004, power=1.5), level)
+
+def gurgle(t, rate=22, level=1.0, low=110):
+    """Liquid in the throat: low noise chopped into bubbles, with a rough low voice under it."""
+    total = secs(t)
+    bubbles = lowpass(n(total), 700)
+    chop = [bubbles[i] * max(0.0, math.sin(2 * math.pi * rate * i / RATE + random.uniform(-0.3, 0.3))) ** 2
+            for i in range(total)]
+    throat = through(glottal(t, curve((0, low), (1, low * 0.6)), 0.05, 0.3, 0.5), V["UH"])
+    return gain(mix(gain(chop, 1.2), gain(throat, 0.5)), level)
+
+VO = f"{A}/SFX/Voice"
+
+def say(name, buf, attack=0.006, release=0.06, power=1.0):
+    save(f"{VO}/{name}.wav", shape_env(buf, attack, release, power))
+
+# ---- the soldier ----------------------------------------------------------------
+# Adult male, around 120Hz speaking. Under pain the pitch jumps an octave and falls.
+
+say("human_pain_01", voice(0.24, curve((0, 190), (0.25, 175), (1, 118)), "UH", breath=0.14))
+say("human_pain_02", drive(voice(0.28, curve((0, 230), (0.2, 215), (1, 150)), "AH", breath=0.12, sub=0.1), 1.6))
+say("human_pain_03", cat(voice(0.26, curve((0, 175), (1, 132)), "MM", breath=0.05, jitter=0.02),
+                         gain(breathe(0.16, "UH", rising=False), 0.25)))
+say("human_pain_04", cat(voice(0.12, curve((0, 210), (1, 180)), "UH", breath=0.1),
+                         blank(0.05),
+                         gain(voice(0.2, curve((0, 190), (1, 120)), "UH", breath=0.14), 0.8)))
+say("human_pain_05", cat(aspirate(0.04, 0.5), drive(voice(0.16, curve((0, 250), (1, 190)), "AH", breath=0.1), 1.4)))
+say("human_pain_06", voice(0.4, curve((0, 150), (0.3, 140), (1, 98)), "OH", breath=0.16, jitter=0.02, shimmer=0.1),
+    release=0.15)
+
+# Screams: an octave and more above speech, straining (subharmonics, clipping), the
+# mouth opening wider as it goes.
+say("human_hurt_01", drive(voice(0.95, curve((0, 300), (0.15, 430), (0.6, 400), (1, 250)), "AH", to="AE",
+                                 breath=0.18, jitter=0.03, shimmer=0.12, sub=0.25), 2.2), release=0.25)
+say("human_hurt_02", drive(voice(0.7, curve((0, 380), (0.3, 360), (1, 230)), "AE", breath=0.2,
+                                 jitter=0.03, shimmer=0.12, sub=0.2), 2.0), release=0.2)
+say("human_hurt_03", drive(cat(aspirate(0.05, 0.6),
+                               voice(0.75, curve((0, 210), (0.3, 250), (1, 170)), "AH", to="ER",
+                                     breath=0.16, jitter=0.035, shimmer=0.14, sub=0.45)), 3.0), release=0.2)
+
+# Deaths: a long fall in pitch that runs out of air rather than stopping.
+say("human_death_01", mix(voice(1.1, curve((0, 230), (0.2, 210), (1, 68)), "AH", to="UH",
+                                breath=0.18, jitter=0.03, shimmer=0.12, sub=0.2),
+                          cat(blank(0.85), gain(breathe(0.45, "UH", rising=False), 0.3))), release=0.3)
+say("human_death_02", cat(drive(voice(0.35, curve((0, 320), (1, 260)), "AE", breath=0.15, sub=0.2), 1.8),
+                          gain(gurgle(0.45, rate=18), 0.55)), release=0.2)
+say("human_death_03", voice(1.0, curve((0, 160), (0.5, 120), (0.85, 60), (1, 42)), "OH", to="UH",
+                            breath=0.2, jitter=0.06, shimmer=0.2, sub=0.35), release=0.35)
+
+# A headshot leaves no time for a cry: a choke, or only the air going out.
+say("human_headshot_01", cat(gain(env(highpass(n(secs(0.02)), 1500), power=6), 0.4),
+                             gurgle(0.26, rate=24, level=0.8, low=95)), release=0.1)
+say("human_headshot_02", gain(breathe(0.4, "UH", rising=False), 0.8), release=0.15)
+
+# Finding you: a shout, not a word -- a word from a synthesiser sounds like one.
+say("human_alert_01", drive(cat(aspirate(0.06, 0.7),
+                                voice(0.34, curve((0, 175), (0.35, 205), (1, 160)), "EH", to="EE",
+                                      breath=0.12, sub=0.1)), 1.8), release=0.08)
+say("human_alert_02", drive(cat(aspirate(0.05, 0.6),
+                                voice(0.3, curve((0, 200), (1, 175)), "AH", breath=0.12, sub=0.15)), 2.0))
+say("human_alert_03", drive(voice(0.42, curve((0, 160), (0.2, 190), (1, 150)), "EH", to="ER",
+                                  breath=0.14, sub=0.1), 1.7), release=0.1)
+
+# Hunting: breathing hard, and the odd bark of effort.
+say("human_hunt_01", cat(gain(breathe(0.45, "AH", True), 0.5), gain(breathe(0.55, "UH", False), 0.7),
+                         blank(0.08), gain(breathe(0.4, "AH", True), 0.45), gain(breathe(0.5, "UH", False), 0.65)),
+    release=0.1)
+say("human_hunt_02", cat(voice(0.14, curve((0, 170), (1, 150)), "UH", breath=0.2), blank(0.12),
+                         voice(0.14, curve((0, 175), (1, 150)), "UH", breath=0.2)))
+say("human_hunt_03", cat(gain(breathe(0.35, "EE", True), 0.4),
+                         voice(0.3, curve((0, 130), (1, 105)), "MM", breath=0.1, jitter=0.03)), release=0.12)
+say("human_hunt_04", drive(cat(aspirate(0.05, 0.5), voice(0.26, curve((0, 185), (1, 165)), "UH", to="AH",
+                                                          breath=0.14)), 1.5))
+
+# The effort of a swing.
+say("human_attack_01", drive(cat(aspirate(0.04, 0.8), voice(0.3, curve((0, 210), (0.3, 230), (1, 160)), "AH",
+                                                            breath=0.18, sub=0.3)), 2.6))
+say("human_attack_02", drive(voice(0.22, curve((0, 240), (1, 190)), "AH", breath=0.15, sub=0.2), 2.2))
+say("human_attack_03", drive(voice(0.26, curve((0, 200), (1, 170)), "MM", to="AH", breath=0.1, sub=0.25), 2.4))
+
+# On the floor, dragging a wrecked leg.
+say("human_crawl_01", voice(1.2, curve((0, 128), (0.3, 138), (0.7, 118), (1, 100)), "OH", to="UH",
+                            breath=0.22, jitter=0.03, shimmer=0.16), attack=0.08, release=0.3)
+say("human_crawl_02", cat(voice(0.3, curve((0, 190), (1, 160)), "MM", breath=0.1, jitter=0.025), blank(0.2),
+                          voice(0.35, curve((0, 200), (1, 150)), "MM", breath=0.1, jitter=0.03), blank(0.15),
+                          gain(breathe(0.4, "UH", False), 0.5)), release=0.15)
+
+# ---- the creature ---------------------------------------------------------------
+# A longer throat: every formant lower and wider (scale ~0.7), the pitch down in the
+# range where the ear stops hearing notes and hears a rumble, and the folds skipping
+# constantly. Tremolo in the 20-35Hz band is the flutter of a growl.
+
+C = dict(scale=0.7, widen=1.6)
+
+def growl(t, f0, vowel="OH", to=None, sub=0.55, flutter=28, rough=0.4, k=2.6, breath=0.3):
+    body = voice(t, f0, vowel, to=to, breath=breath, jitter=0.05, shimmer=0.25, sub=sub, tilt=2200, **C)
+    return drive(tremolo(body, flutter, rough), k)
+
+for i, (t, lo, hi, fl, v) in enumerate([(1.5, 62, 78, 26, "OH"), (1.7, 55, 70, 31, "UH"),
+                                         (1.3, 70, 90, 24, "OH"), (1.8, 58, 74, 34, "ER")]):
+    wobble = curve((0, lo), (0.3, hi), (0.55, lo * 1.05), (0.8, hi * 0.95), (1, lo))
+    say(f"creature_hunt_0{i + 1}", growl(t, wobble, v, flutter=fl), attack=0.12, release=0.3)
+
+say("creature_alert_01", growl(1.3, curve((0, 75), (0.3, 135), (0.7, 120), (1, 70)), "AH", to="OH",
+                               sub=0.45, rough=0.3, k=3.4, breath=0.4), attack=0.05, release=0.35)
+say("creature_alert_02", cat(growl(0.35, curve((0, 110), (1, 150)), "EH", sub=0.4, k=3.0, breath=0.5),
+                             growl(0.6, curve((0, 140), (1, 80)), "AH", sub=0.5, k=3.2)), release=0.2)
+
+for i, (t, a, b, v) in enumerate([(0.26, 160, 95, "EH"), (0.22, 180, 110, "AE"), (0.3, 140, 85, "AH"),
+                                  (0.2, 200, 130, "EH"), (0.32, 125, 75, "UH")]):
+    say(f"creature_pain_0{i + 1}", growl(t, curve((0, a), (1, b)), v, sub=0.4, flutter=32, rough=0.25, k=3.0,
+                                         breath=0.45))
+
+say("creature_hurt_01", growl(0.95, curve((0, 120), (0.25, 210), (0.6, 190), (1, 90)), "AH", to="OH",
+                              sub=0.35, rough=0.2, k=3.4, breath=0.4), release=0.3)
+say("creature_hurt_02", growl(0.75, curve((0, 170), (1, 95)), "AE", to="UH", sub=0.45, k=3.2, breath=0.5),
+    release=0.25)
+
+say("creature_death_01", mix(growl(1.3, curve((0, 130), (0.3, 110), (1, 38)), "AH", to="UH", sub=0.6,
+                                   flutter=22, k=3.0),
+                             cat(blank(0.9), gurgle(0.6, rate=14, level=0.6, low=70))), release=0.4)
+say("creature_death_02", cat(growl(0.4, curve((0, 180), (1, 120)), "AE", sub=0.4, k=3.4),
+                             gurgle(0.8, rate=12, level=0.9, low=65)), release=0.35)
+say("creature_death_03", growl(1.2, curve((0, 90), (0.6, 60), (1, 30)), "OH", to="UH", sub=0.7,
+                               flutter=18, rough=0.5, k=2.4, breath=0.5), release=0.45)
+
+say("creature_headshot_01", cat(growl(0.12, curve((0, 150), (1, 110)), "EH", k=3.0),
+                                gurgle(0.3, rate=20, level=0.8, low=70)), release=0.1)
+say("creature_headshot_02", gurgle(0.45, rate=16, level=1.0, low=60), release=0.15)
+
+for i, (t, a, b) in enumerate([(0.4, 110, 170), (0.35, 130, 95), (0.45, 95, 150)]):
+    say(f"creature_attack_0{i + 1}", growl(t, curve((0, a), (0.5, max(a, b) * 1.1), (1, b)), "AH",
+                                           sub=0.45, rough=0.25, k=3.6, breath=0.45), release=0.12)
+
+say("creature_crawl_01", cat(gain(breathe(0.4, "OH", True, scale=0.7), 0.8),
+                             growl(0.7, curve((0, 70), (1, 58)), "UH", sub=0.6, k=2.2)), release=0.2)
+say("creature_crawl_02", mix(growl(1.1, curve((0, 65), (0.5, 80), (1, 55)), "OH", sub=0.65, flutter=20, k=2.0),
+                             gain(gurgle(1.1, rate=9, level=0.5, low=55), 0.6)), attack=0.1, release=0.3)
+
+random.setstate(_voice_stream)

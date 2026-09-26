@@ -133,6 +133,24 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Rebuilds the enemy prefab -- body, wounds, blood, voice, death -- and the blood
+        /// and voice assets it points at, without rebuilding an arena. Every scene holds the
+        /// prefab by GUID, which saving over it keeps. -fpskitTheme picks the arena whose
+        /// detection radius it is built with; the default is the one the prefab ships with.
+        /// </summary>
+        public static void RebuildEnemy()
+        {
+            Run(() =>
+            {
+                string theme = ReadArg(ThemeArg);
+                if (string.IsNullOrEmpty(theme)) theme = "Industrial Warehouse";
+
+                FPSKitSceneBuilder.RebuildEnemyPrefab(theme);
+                Debug.Log($"[FPSKitBatch] rebuilt the enemy prefab against \"{theme}\"");
+            });
+        }
+
+        /// <summary>
         /// Re-stamps the built-in curve onto every LevelSet asset.
         ///
         /// Exactly the same trap as the archetypes, and worth stating twice because the
@@ -266,6 +284,19 @@ namespace FPSKit.EditorTools
         /// player, and able to land a hit on someone standing in the middle of it.
         /// </summary>
         public static void VerifyCombat() => FPSKitCombatTest.VerifyCombat();
+
+        /// <summary>
+        /// Wounds, blood, voices and deaths: a leg shot limps then floors an enemy, a gun
+        /// arm shot disarms it, a headshot kills a grunt and not a boss, a kill ragdolls
+        /// the body the way the killing hit says.
+        /// </summary>
+        public static void VerifyWounds() => FPSKitWoundTest.VerifyWounds();
+
+        /// <summary>
+        /// Photographs the enemy walking, limping, crawling, shooting and dying, into
+        /// -fpskitOut (default Build/Enemies). Needs UNITY_GRAPHICS=1.
+        /// </summary>
+        public static void CaptureEnemies() => FPSKitEnemyShots.Capture(ReadArg("-fpskitOut"));
 
         /// <summary>
         /// Plays the loop the player sees: dashboard, into an arena, quit, back to the

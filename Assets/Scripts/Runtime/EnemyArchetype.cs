@@ -130,6 +130,17 @@ public class EnemyArchetype : ScriptableObject
              "meant to hold its ground.")]
     [Min(1f)] public float suppressionDamage = 45f;
 
+    [Header("Body")]
+    [Tooltip("What it sounds like when it is hurt, when it hunts and when it dies. " +
+             "Human soldiers grunt, shout and scream; creatures growl, snarl and roar.")]
+    public EnemyVoice.Kind voice = EnemyVoice.Kind.Human;
+
+    [Tooltip("How much punishment its limbs take before a wound changes how it fights, " +
+             "0 to 1. At 0 a couple of rounds in the leg put it on the floor and one " +
+             "through the gun arm makes it drop the rifle; at 1 it limps at worst and " +
+             "never lets go of the weapon. Bosses ignore headshot kills whatever this says.")]
+    [Range(0f, 1f)] public float woundResistance = 0.2f;
+
     [Header("Reward")]
     [Min(0)] public int scoreValue = 100;
 
@@ -200,6 +211,12 @@ public class EnemyArchetype : ScriptableObject
             ai.staggerThreshold = staggerThreshold;
         }
 
+        var wounds = enemy.GetComponent<EnemyWounds>();
+        if (wounds != null) wounds.Configure(this);
+
+        var voiceBox = enemy.GetComponent<EnemyVoice>();
+        if (voiceBox != null) voiceBox.kind = voice;
+
         var agent = enemy.GetComponent<NavMeshAgent>();
         if (agent != null)
         {
@@ -227,6 +244,11 @@ public class EnemyArchetype : ScriptableObject
     /// on the shared enemy material once instead, with the colour left black, so this
     /// block can drive the glow for free.
     /// </summary>
+    static bool IsSkin(string name)
+        => name.IndexOf("Head", System.StringComparison.OrdinalIgnoreCase) >= 0
+        || name.IndexOf("Hand", System.StringComparison.OrdinalIgnoreCase) >= 0
+        || name.IndexOf("Neck", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
     void Tint(GameObject enemy)
     {
         var block = new MaterialPropertyBlock();
@@ -237,9 +259,10 @@ public class EnemyArchetype : ScriptableObject
             // archetype's colour. See EnemyAI.IsBodyRenderer for the rule.
             if (!EnemyAI.IsBodyRenderer(renderer)) continue;
 
-            // The head is the headshot box, so it keeps its own lighter shade.
-            bool isHead = renderer.name.IndexOf("Head", System.StringComparison.OrdinalIgnoreCase) >= 0;
-            Color color = isHead ? headColor : bodyColor;
+            // Skin -- the head, which is the headshot box, and the hands and neck -- keeps
+            // its own lighter shade; the clothes take the body colour.
+            bool isSkin = IsSkin(renderer.name);
+            Color color = isSkin ? headColor : bodyColor;
 
             renderer.GetPropertyBlock(block);
             block.SetColor("_BaseColor", color);

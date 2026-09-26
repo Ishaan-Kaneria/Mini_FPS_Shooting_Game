@@ -287,6 +287,29 @@ namespace FPSKit.EditorTools
             return list.ToArray();
         }
 
+        /// <summary>Whether the enemy prefab is a rigged character from Enemy Setup rather than the built soldier.</summary>
+        private static bool IsRiggedEnemy()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(AssetFolder + "/Enemy.prefab");
+            return existing != null && existing.GetComponentInChildren<Animator>(true) != null;
+        }
+
+        /// <summary>
+        /// Rebuilds the enemy prefab alone, without rebuilding an arena. Every scene points
+        /// at the prefab by GUID and saving over it keeps the GUID, so this is all a change
+        /// to the enemy's body needs. Built against the theme whose detection radius the
+        /// prefab already carries, since that is the one number here that comes from an arena.
+        /// </summary>
+        public static GameObject RebuildEnemyPrefab(string themeName)
+        {
+            EnsureProjectTagsAndLayers();
+            EnsureFolders();
+
+            _theme = FPSKitThemes.GetOrCreate(themeName);
+
+            return IsRiggedEnemy() ? UpgradeEnemyPrefab(AssetFolder + "/Enemy.prefab") : BuildEnemyPrefab();
+        }
+
         /// <summary>Reuses an existing Enemy prefab so a character built in Enemy Setup survives.</summary>
         private static GameObject LoadOrBuildEnemyPrefab()
         {
@@ -361,6 +384,51 @@ namespace FPSKit.EditorTools
                 if (ai.muzzleFlashPrefab == null)
                 {
                     ai.muzzleFlashPrefab = CreateMuzzleFlashPrefab();
+                    changed = true;
+                }
+
+                // Wounds, blood and a voice. A rigged character falls through its own
+                // RagdollController, so it gets no EnemyDeath -- the push is shared.
+                if (contents.GetComponent<EnemyWounds>() == null)
+                {
+                    contents.AddComponent<EnemyWounds>();
+                    changed = true;
+                }
+
+                var gore = contents.GetComponent<EnemyGore>();
+                if (gore == null)
+                {
+                    gore = contents.AddComponent<EnemyGore>();
+                    changed = true;
+                }
+
+                if (gore.library == null)
+                {
+                    gore.library = FPSKitGore.GetOrCreateLibrary();
+                    changed = true;
+                }
+
+                var voice = contents.GetComponent<EnemyVoice>();
+                if (voice == null)
+                {
+                    var voiceObject = new GameObject("Voice");
+                    voiceObject.transform.SetParent(contents.transform, false);
+                    voiceObject.transform.localPosition = new Vector3(0f, 1.7f, 0.1f);
+                    var voiceSource = voiceObject.AddComponent<AudioSource>();
+                    voiceSource.playOnAwake = false;
+                    voiceSource.spatialBlend = 1f;
+                    voiceSource.minDistance = 2.5f;
+                    voiceSource.maxDistance = 45f;
+                    voiceSource.rolloffMode = AudioRolloffMode.Linear;
+
+                    voice = contents.AddComponent<EnemyVoice>();
+                    voice.source = voiceSource;
+                    changed = true;
+                }
+
+                if (voice.bank == null)
+                {
+                    voice.bank = FPSKitGore.GetOrCreateVoiceBank();
                     changed = true;
                 }
             }
@@ -481,7 +549,12 @@ namespace FPSKit.EditorTools
             StampStoreContent(FPSKitStore.GetOrCreate(), impacts);
 
             var player = BuildPlayer(weaponData);
-            var enemyPrefab = BuildEnemyPrefab();
+
+            // Rebuilt every time, unless it is a rigged character from Enemy Setup -- that
+            // is somebody's imported model, and rebuilding the capsule soldier over it
+            // would throw it away on the next arena build. It is patched instead.
+            var enemyPrefab = IsRiggedEnemy() ? UpgradeEnemyPrefab(AssetFolder + "/Enemy.prefab")
+                                              : BuildEnemyPrefab();
             var spawnPoints = BuildSpawnPoints();
 
             BakeNavMesh();
@@ -2083,52 +2156,128 @@ namespace FPSKit.EditorTools
             var flesh = MakeTintableMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
             var headFlesh = MakeTintableMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);
 
-            // The torso is an empty pivot at the hips, so EnemyLimbAnimator can lean and
-            // bob the upper body without dragging the feet off the floor. Legs hang off
-            // the root for the same reason.
+            // Webbing, helmet, boots and goggles. Tagged as gear so the archetype's colour
+            // stays on the clothes and the skin (see EnemyAI.IsBodyRenderer): a soldier
+            // is a uniform with kit on it, not one colour from helmet to boots.
+            var gear = MakeSharedMaterial("Enemy_Gear", new Color(0.13f, 0.135f, 0.12f), 0.12f, 0f);
+            var goggles = MakeSharedMaterial("Enemy_Goggles", new Color(0.03f, 0.035f, 0.04f), 0.55f, 0f);
+
+            // <b>A body in segments, jointed where a body is.</b>
+            //
+            // The old enemy was a capsule, a ball and four sticks. It walked, but nothing
+            // about it could limp, crawl, hang an arm or fold at the knee as it fell,
+            // because it had no knees. Every pivot below is a real joint -- hips, knees,
+            // shoulders, elbows, neck -- so EnemyLimbAnimator can bend it and EnemyDeath
+            // can hand it to physics joint by joint. Proportions are an adult's: hips at
+            // a metre, the top of the helmet a little under two.
+            //
+            // The torso is an empty pivot at the hips, so the upper body can lean and bob
+            // without dragging the feet off the floor. Legs hang off the root for the
+            // same reason.
             var torso = new GameObject("Torso");
             torso.transform.SetParent(enemy.transform, false);
-            torso.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+            torso.transform.localPosition = new Vector3(0f, 1.0f, 0f);
 
+            var pelvis = EnemyPart(torso.transform, "Pelvis", PrimitiveType.Capsule, flesh, enemyLayer,
+                                   new Vector3(0f, 0.02f, 0f), new Vector3(0.34f, 0.14f, 0.24f));
             var body = EnemyPart(torso.transform, "Chest", PrimitiveType.Capsule, flesh, enemyLayer,
-                                 new Vector3(0f, 0.30f, 0f), new Vector3(0.5f, 0.33f, 0.42f));
+                                 new Vector3(0f, 0.33f, 0f), new Vector3(0.46f, 0.27f, 0.3f));
 
-            var head = EnemyPart(torso.transform, "Head", PrimitiveType.Sphere, headFlesh, enemyLayer,
-                                 new Vector3(0f, 0.80f, 0f), Vector3.one * 0.40f);
+            // The vest is a capsule a hair larger than the chest, not a box round it: a box
+            // reads as a crate strapped to a mannequin.
+            EnemyGear(torso.transform, "Vest", PrimitiveType.Capsule, gear, new Vector3(0f, 0.36f, 0.005f),
+                      new Vector3(0.48f, 0.2f, 0.33f));
+            EnemyGear(torso.transform, "Pouches", PrimitiveType.Cube, gear, new Vector3(0f, 0.25f, 0.155f),
+                      new Vector3(0.3f, 0.09f, 0.05f));
+            EnemyGear(torso.transform, "Pack", PrimitiveType.Cube, gear, new Vector3(0f, 0.38f, -0.17f),
+                      new Vector3(0.26f, 0.28f, 0.09f));
+            EnemyGear(torso.transform, "Belt", PrimitiveType.Cylinder, gear, new Vector3(0f, 0.1f, 0f),
+                      new Vector3(0.36f, 0.035f, 0.27f));
 
-            // Shoulder and hip pivots carry the limb, so a swing rotates the whole limb
-            // about its joint instead of spinning the mesh around its own middle.
-            var leftArm = EnemyJoint(torso.transform, "ArmLeft", new Vector3(-0.31f, 0.55f, 0f));
-            var rightArm = EnemyJoint(torso.transform, "ArmRight", new Vector3(0.31f, 0.55f, 0f));
+            // The neck pivots the head, so it can turn to the player and snap back on a
+            // headshot without the shoulders going with it.
+            var neck = EnemyJoint(torso.transform, "Neck", new Vector3(0f, 0.6f, 0f));
 
-            var leftArmMesh = EnemyPart(leftArm, "ArmLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
-                                        new Vector3(0f, -0.31f, 0f), new Vector3(0.15f, 0.31f, 0.15f));
-            var rightArmMesh = EnemyPart(rightArm, "ArmRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
-                                         new Vector3(0f, -0.31f, 0f), new Vector3(0.15f, 0.31f, 0.15f));
+            EnemyGear(neck, "NeckSkin", PrimitiveType.Cylinder, headFlesh, new Vector3(0f, 0.05f, 0f),
+                      new Vector3(0.12f, 0.06f, 0.12f), gearTag: false);
+            var head = EnemyPart(neck, "Head", PrimitiveType.Sphere, headFlesh, enemyLayer,
+                                 new Vector3(0f, 0.2f, 0.01f), new Vector3(0.23f, 0.27f, 0.25f));
+            EnemyGear(neck, "Helmet", PrimitiveType.Sphere, gear, new Vector3(0f, 0.27f, -0.005f),
+                      new Vector3(0.28f, 0.2f, 0.3f));
+            EnemyGear(neck, "Goggles", PrimitiveType.Cube, goggles, new Vector3(0f, 0.22f, 0.115f),
+                      new Vector3(0.17f, 0.045f, 0.04f));
 
-            var leftLeg = EnemyJoint(enemy.transform, "LegLeft", new Vector3(-0.14f, 1.05f, 0f));
-            var rightLeg = EnemyJoint(enemy.transform, "LegRight", new Vector3(0.14f, 1.05f, 0f));
+            // Shoulders and elbows. The upper arm hangs from the shoulder, the forearm
+            // from the elbow, and a swing rotates the whole limb about its joint.
+            var leftArm = EnemyJoint(torso.transform, "ArmLeft", new Vector3(-0.29f, 0.54f, 0f));
+            var rightArm = EnemyJoint(torso.transform, "ArmRight", new Vector3(0.29f, 0.54f, 0f));
 
-            var leftLegMesh = EnemyPart(leftLeg, "LegLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
-                                        new Vector3(0f, -0.52f, 0f), new Vector3(0.19f, 0.52f, 0.19f));
-            var rightLegMesh = EnemyPart(rightLeg, "LegRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
-                                         new Vector3(0f, -0.52f, 0f), new Vector3(0.19f, 0.52f, 0.19f));
+            var leftUpper = EnemyPart(leftArm, "ArmLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                      new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.17f, 0.12f));
+            var rightUpper = EnemyPart(rightArm, "ArmRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                       new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.17f, 0.12f));
+
+            var leftElbow = EnemyJoint(leftArm, "ElbowLeft", new Vector3(0f, -0.3f, 0f));
+            var rightElbow = EnemyJoint(rightArm, "ElbowRight", new Vector3(0f, -0.3f, 0f));
+
+            var leftFore = EnemyPart(leftElbow, "ForearmLeft", PrimitiveType.Capsule, flesh, enemyLayer,
+                                     new Vector3(0f, -0.13f, 0f), new Vector3(0.1f, 0.15f, 0.1f));
+            var rightFore = EnemyPart(rightElbow, "ForearmRight", PrimitiveType.Capsule, flesh, enemyLayer,
+                                      new Vector3(0f, -0.13f, 0f), new Vector3(0.1f, 0.15f, 0.1f));
+
+            EnemyGear(leftElbow, "HandLeft", PrimitiveType.Sphere, headFlesh, new Vector3(0f, -0.3f, 0.01f),
+                      new Vector3(0.08f, 0.1f, 0.07f), gearTag: false);
+            EnemyGear(rightElbow, "HandRight", PrimitiveType.Sphere, headFlesh, new Vector3(0f, -0.3f, 0.01f),
+                      new Vector3(0.08f, 0.1f, 0.07f), gearTag: false);
+
+            // Hips and knees, with the boot on the shin so it swings with the foot.
+            var leftLeg = EnemyJoint(enemy.transform, "LegLeft", new Vector3(-0.12f, 1.0f, 0f));
+            var rightLeg = EnemyJoint(enemy.transform, "LegRight", new Vector3(0.12f, 1.0f, 0f));
+
+            var leftThigh = EnemyPart(leftLeg, "LegLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                      new Vector3(0f, -0.23f, 0f), new Vector3(0.17f, 0.26f, 0.17f));
+            var rightThigh = EnemyPart(rightLeg, "LegRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
+                                       new Vector3(0f, -0.23f, 0f), new Vector3(0.17f, 0.26f, 0.17f));
+
+            var leftKnee = EnemyJoint(leftLeg, "KneeLeft", new Vector3(0f, -0.47f, 0f));
+            var rightKnee = EnemyJoint(rightLeg, "KneeRight", new Vector3(0f, -0.47f, 0f));
+
+            var leftShin = EnemyPart(leftKnee, "ShinLeft", PrimitiveType.Capsule, flesh, enemyLayer,
+                                     new Vector3(0f, -0.22f, 0f), new Vector3(0.13f, 0.23f, 0.13f));
+            var rightShin = EnemyPart(rightKnee, "ShinRight", PrimitiveType.Capsule, flesh, enemyLayer,
+                                      new Vector3(0f, -0.22f, 0f), new Vector3(0.13f, 0.23f, 0.13f));
+
+            EnemyGear(leftKnee, "BootLeft", PrimitiveType.Cube, gear, new Vector3(0f, -0.47f, 0.04f),
+                      new Vector3(0.13f, 0.1f, 0.27f));
+            EnemyGear(rightKnee, "BootRight", PrimitiveType.Cube, gear, new Vector3(0f, -0.47f, 0.04f),
+                      new Vector3(0.13f, 0.1f, 0.27f));
 
             var hp = enemy.AddComponent<Health>();
             hp.maxHealth = 100f;
             hp.destroyOnDeath = true;
-            hp.destroyDelay = 2f;
 
-            // Hitboxes -- this is what gives you headshots, and now what makes a limb
-            // shot worth less than a chest shot. Every visible part carries one, so no
-            // part of the silhouette is a hole that swallows rounds.
-            AddHitbox(body, hp, 1f, false);
-            AddHitbox(head, hp, 3f, true);
+            // Long enough to see where a body fell and what it left on the floor, and
+            // EnemyDeath sinks it out of sight before this is up. Every system that
+            // counts enemies filters on IsDead, not on the object existing.
+            hp.destroyDelay = 12f;
 
-            AddHitbox(leftArmMesh, hp, 0.65f, false);
-            AddHitbox(rightArmMesh, hp, 0.65f, false);
-            AddHitbox(leftLegMesh, hp, 0.75f, false);
-            AddHitbox(rightLegMesh, hp, 0.75f, false);
+            // Hitboxes, one per segment, each saying which part of the body it is. The
+            // part is what a wound is booked to (EnemyWounds), so a round in the shin is
+            // a leg wound exactly as one in the thigh is. Every visible segment carries
+            // one, so no part of the silhouette is a hole that swallows rounds.
+            AddHitbox(body, hp, 1f, false, BodyPart.Torso);
+            AddHitbox(pelvis, hp, 0.9f, false, BodyPart.Torso);
+            AddHitbox(head, hp, 3f, true, BodyPart.Head);
+
+            AddHitbox(leftUpper, hp, 0.65f, false, BodyPart.LeftArm);
+            AddHitbox(rightUpper, hp, 0.65f, false, BodyPart.RightArm);
+            AddHitbox(leftFore, hp, 0.6f, false, BodyPart.LeftArm);
+            AddHitbox(rightFore, hp, 0.6f, false, BodyPart.RightArm);
+
+            AddHitbox(leftThigh, hp, 0.75f, false, BodyPart.LeftLeg);
+            AddHitbox(rightThigh, hp, 0.75f, false, BodyPart.RightLeg);
+            AddHitbox(leftShin, hp, 0.7f, false, BodyPart.LeftLeg);
+            AddHitbox(rightShin, hp, 0.7f, false, BodyPart.RightLeg);
 
             var agent = enemy.AddComponent<UnityEngine.AI.NavMeshAgent>();
 
@@ -2153,7 +2302,7 @@ namespace FPSKit.EditorTools
 
             var eyes = new GameObject("Eyes");
             eyes.transform.SetParent(torso.transform, false);
-            eyes.transform.localPosition = new Vector3(0f, 0.80f, 0.18f);
+            eyes.transform.localPosition = new Vector3(0f, 0.82f, 0.14f);
 
             var ai = enemy.AddComponent<EnemyAI>();
             ai.eyes = eyes.transform;
@@ -2191,10 +2340,28 @@ namespace FPSKit.EditorTools
             ai.painVolume = 0.7f;
             ai.deathVolume = 1f;
 
-            // The rifle a ranged archetype carries. Hung off the right arm so the limb
-            // animator swings and raises it with the hands rather than needing to know
-            // it exists.
-            var enemyMuzzle = BuildEnemyWeapon(rightArm, out GameObject enemyWeapon);
+            // The voice proper: a soldier or a creature, per archetype. With this on the
+            // prefab the single clips above are only a fallback the AI no longer uses.
+            // Its own source, a hand's width above the eyes, so a pitch set for a voice
+            // never bends a gunshot playing through the body's source.
+            var voiceObject = new GameObject("Voice");
+            voiceObject.transform.SetParent(torso.transform, false);
+            voiceObject.transform.localPosition = new Vector3(0f, 0.8f, 0.1f);
+            var voiceSource = voiceObject.AddComponent<AudioSource>();
+            voiceSource.playOnAwake = false;
+            voiceSource.spatialBlend = 1f;
+            voiceSource.minDistance = 2.5f;
+            voiceSource.maxDistance = 45f;
+            voiceSource.rolloffMode = AudioRolloffMode.Linear;
+
+            var voice = enemy.AddComponent<EnemyVoice>();
+            voice.bank = FPSKitGore.GetOrCreateVoiceBank();
+            voice.source = voiceSource;
+
+            // The rifle a ranged archetype carries, at the shoulder. The limb animator aims
+            // it and brings the hands to its two grips.
+            var enemyMuzzle = BuildEnemyWeapon(torso.transform, out GameObject enemyWeapon,
+                                               out Transform rightGrip, out Transform leftGrip);
 
             ai.muzzlePoint = enemyMuzzle;
             ai.muzzleFlashPrefab = CreateMuzzleFlashPrefab();
@@ -2214,6 +2381,32 @@ namespace FPSKit.EditorTools
             limbs.leftLeg = leftLeg;
             limbs.rightLeg = rightLeg;
             limbs.weapon = enemyWeapon;
+            limbs.rightGrip = rightGrip;
+            limbs.leftGrip = leftGrip;
+            limbs.leftForearm = leftElbow;
+            limbs.rightForearm = rightElbow;
+            limbs.leftShin = leftKnee;
+            limbs.rightShin = rightKnee;
+            limbs.head = neck;
+
+            // Where it has been hurt and what that does to it (EnemyWounds), what that
+            // looks like (EnemyGore), and how it goes down (EnemyDeath).
+            enemy.AddComponent<EnemyWounds>();
+
+            var gore = enemy.AddComponent<EnemyGore>();
+            gore.library = FPSKitGore.GetOrCreateLibrary();
+
+            var death = enemy.AddComponent<EnemyDeath>();
+            death.torso = torso.transform;
+            death.head = neck;
+            death.leftUpperArm = leftArm;
+            death.rightUpperArm = rightArm;
+            death.leftForearm = leftElbow;
+            death.rightForearm = rightElbow;
+            death.leftThigh = leftLeg;
+            death.rightThigh = rightLeg;
+            death.leftShin = leftKnee;
+            death.rightShin = rightKnee;
 
             // Matched to the agent's own speed above. The walk cycle scales its swing by
             // speed/fullSpeed, so leaving this at a figure the enemy never reaches makes
@@ -2233,12 +2426,15 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The rifle a ranged enemy carries, parented to the arm that holds it.
+        /// The rifle a ranged enemy carries: held at the right shoulder, with a grip for
+        /// each hand.
         ///
-        /// The arm is a joint that hangs straight down at rest and is pitched up to
-        /// EnemyLimbAnimator.aimRaise while armed. Cancelling exactly that angle here
-        /// means the weapon points along the enemy's forward once the arms come up, with
-        /// no aiming code: arm pitch and weapon pitch sum to zero.
+        /// It hangs off the torso, not off an arm. It used to ride the right arm, which
+        /// only pointed forward with both arms held out straight and level -- a mannequin
+        /// with a gun between its hands. Now EnemyLimbAnimator aims the rifle itself and
+        /// reaches each hand to its grip with the elbows bent, which is the posture of
+        /// somebody actually shooting: stock in the shoulder, right hand on the pistol
+        /// grip, left hand forward on the handguard.
         ///
         /// Tagged Metal, which does two jobs -- it keeps the archetype's body colour off
         /// the gun (see EnemyAI.IsBodyRenderer) and, if it ever gains colliders, would
@@ -2246,19 +2442,19 @@ namespace FPSKit.EditorTools
         /// that absorbed shots meant for the chest behind it would be a stealth nerf on
         /// every ranged enemy.
         /// </summary>
-        private static Transform BuildEnemyWeapon(Transform arm, out GameObject weapon)
+        private static Transform BuildEnemyWeapon(Transform torso, out GameObject weapon,
+                                                  out Transform rightGrip, out Transform leftGrip)
         {
             var metal = MakeSharedMaterial("Gun_Metal", new Color(0.11f, 0.115f, 0.125f), 0.55f, 0.85f);
             var polymer = MakeSharedMaterial("Gun_Polymer", new Color(0.16f, 0.17f, 0.18f), 0.25f, 0f);
 
             var root = new GameObject("Weapon");
-            root.transform.SetParent(arm, false);
+            root.transform.SetParent(torso, false);
 
-            // Down at the hand, and pulled back toward the chest: hung straight off the
-            // right arm the rifle reads as held out at the hip by one hand, where both
-            // arms raise together and this sits between them as a two-handed grip.
-            root.transform.localPosition = new Vector3(-0.22f, -0.44f, 0.05f);
-            root.transform.localRotation = Quaternion.Euler(EnemyAimRaise, 0f, 0f);
+            // Just right of the breastbone at shoulder height, far enough forward that the
+            // stock sits against the vest rather than inside it.
+            root.transform.localPosition = new Vector3(0.07f, 0.46f, 0.38f);
+            root.transform.localRotation = Quaternion.identity;
 
             EnemyGunPart(root.transform, "Receiver", PrimitiveType.Cube, metal,
                          new Vector3(0f, 0f, 0.08f), new Vector3(0.07f, 0.1f, 0.34f));
@@ -2271,12 +2467,24 @@ namespace FPSKit.EditorTools
                          new Vector3(0f, -0.11f, 0.1f), new Vector3(0.05f, 0.16f, 0.09f),
                          new Vector3(8f, 0f, 0f));
 
+            EnemyGunPart(root.transform, "PistolGrip", PrimitiveType.Cube, polymer,
+                         new Vector3(0f, -0.08f, -0.03f), new Vector3(0.045f, 0.11f, 0.05f),
+                         new Vector3(-18f, 0f, 0f));
+
             EnemyGunPart(root.transform, "Stock", PrimitiveType.Cube, polymer,
                          new Vector3(0f, -0.02f, -0.15f), new Vector3(0.055f, 0.09f, 0.16f));
 
             var muzzle = new GameObject("MuzzlePoint");
             muzzle.transform.SetParent(root.transform, false);
             muzzle.transform.localPosition = new Vector3(0f, 0.01f, 0.5f) * EnemyGunScale;
+
+            rightGrip = new GameObject("GripRight").transform;
+            rightGrip.SetParent(root.transform, false);
+            rightGrip.localPosition = new Vector3(0f, -0.1f, -0.02f) * EnemyGunScale;
+
+            leftGrip = new GameObject("GripLeft").transform;
+            leftGrip.SetParent(root.transform, false);
+            leftGrip.localPosition = new Vector3(0f, -0.05f, 0.07f) * EnemyGunScale;
 
             weapon = root;
 
@@ -2287,13 +2495,6 @@ namespace FPSKit.EditorTools
 
             return muzzle.transform;
         }
-
-        /// <summary>
-        /// Must match EnemyLimbAnimator.aimRaise. The weapon cancels this angle so it
-        /// points forward once the arms are up, so the two have to agree -- if you
-        /// retune one, retune the other.
-        /// </summary>
-        private const float EnemyAimRaise = 76f;
 
         /// <summary>
         /// The enemy's rifle is authored at the player's proportions and then enlarged,
@@ -2353,12 +2554,44 @@ namespace FPSKit.EditorTools
             return part;
         }
 
-        private static void AddHitbox(GameObject part, Health owner, float multiplier, bool headshot)
+        private static void AddHitbox(GameObject part, Health owner, float multiplier, bool headshot,
+                                      BodyPart bodyPart)
         {
             var box = part.AddComponent<Hitbox>();
             box.owner = owner;
             box.damageMultiplier = multiplier;
             box.isHeadshot = headshot;
+            box.part = bodyPart;
+        }
+
+        /// <summary>
+        /// A piece of kit, or of skin that is never shot at on its own: drawn, never
+        /// collided with. The collider is removed so it cannot soak a round meant for the
+        /// segment underneath it, and so a ragdoll does not have to carry it.
+        ///
+        /// Gear is tagged Metal, which is what keeps the archetype's colour and the
+        /// wind-up flash off it (EnemyAI.IsBodyRenderer). Skin (hands, neck) is not,
+        /// so it takes the archetype's head colour like the face does.
+        /// </summary>
+        private static GameObject EnemyGear(Transform parent, string name, PrimitiveType shape,
+                                            Material material, Vector3 localPosition, Vector3 localScale,
+                                            bool gearTag = true)
+        {
+            var part = GameObject.CreatePrimitive(shape);
+            part.name = name;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+            part.layer = LayerMask.NameToLayer("Enemy");
+            part.tag = gearTag ? "Metal" : "Flesh";
+
+            Object.DestroyImmediate(part.GetComponent<Collider>());
+
+            var renderer = part.GetComponent<Renderer>();
+            if (material != null) renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+
+            return part;
         }
 
         // ==================================================================

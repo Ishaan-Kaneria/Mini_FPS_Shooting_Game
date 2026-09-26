@@ -1,0 +1,81 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a935f893fe44e286bd68a7aa07faa62, type: 3}
+  m_Name: VoiceBank
+  m_EditorClassIdentifier: Assembly-CSharp::VoiceBank
+  human:
+    alert:
+    - {fileID: 8300000, guid: 549eaac012eef86aa8babfaef8806f53, type: 3}
+    - {fileID: 8300000, guid: 5bf2d4e6bba3a67b7a67cf08704abc50, type: 3}
+    - {fileID: 8300000, guid: c831cf20a8e45a4e7b75d878dd03e3fd, type: 3}
+    pain:
+    - {fileID: 8300000, guid: f018e4964241950948bcd848d42380b8, type: 3}
+    - {fileID: 8300000, guid: adc9356900243fec1b76ec42ff3ae9ee, type: 3}
+    - {fileID: 8300000, guid: ab74124ec7af690b0b6f437e2b03eacf, type: 3}
+    - {fileID: 8300000, guid: a04ac521729fe15128e0dd55baf8b78d, type: 3}
+    - {fileID: 8300000, guid: a5c10ff224f05cdc6a5a5d0708a77d47, type: 3}
+    - {fileID: 8300000, guid: c8aaa6bdcb1103e39897713e19c1bdc2, type: 3}
+    hurt:
+    - {fileID: 8300000, guid: 862425f5a219864359f3768e705405f1, type: 3}
+    - {fileID: 8300000, guid: 7850cd2d73f3d42acb52503762e20eee, type: 3}
+    - {fileID: 8300000, guid: 04ef22cd476dd5716ad3b2d4bfbb552a, type: 3}
+    death:
+    - {fileID: 8300000, guid: a67cb8bdb8e63ffe4817286c330e41af, type: 3}
+    - {fileID: 8300000, guid: c88d12f75d662db0abc3d0ed07a45438, type: 3}
+    - {fileID: 8300000, guid: c2701d2fd633daa6ea830fdda2fff447, type: 3}
+    headshotDeath:
+    - {fileID: 8300000, guid: 8ee7dde050218ed0e9a65815b69783a5, type: 3}
+    - {fileID: 8300000, guid: af667ffbb3332c2f7a46b688067a1011, type: 3}
+    hunt:
+    - {fileID: 8300000, guid: c03d5c514616d76f09964e52ba0f2c93, type: 3}
+    - {fileID: 8300000, guid: c2914a20d5e2fcf1d9e636912b28a073, type: 3}
+    - {fileID: 8300000, guid: 60095451539ee937d967b817cc577f21, type: 3}
+    - {fileID: 8300000, guid: 4321b0b2121885fa9833b45897f6bbc2, type: 3}
+    attack:
+    - {fileID: 8300000, guid: 5c83cbd36e0f3a3fa813e7e100258e03, type: 3}
+    - {fileID: 8300000, guid: 8ce3e4ce767c6800c96599fed71639d9, type: 3}
+    - {fileID: 8300000, guid: 974b6b007f6fd363a99673318ca79a51, type: 3}
+    crawl:
+    - {fileID: 8300000, guid: 8711900a0c1ca59788a0f81dbc55eaf8, type: 3}
+    - {fileID: 8300000, guid: 79714c76e6e8f38cba2094164c304bc9, type: 3}
+  creature:
+    alert:
+    - {fileID: 8300000, guid: 9213df1d4b2afa9d784bb7af1b1ef353, type: 3}
+    - {fileID: 8300000, guid: 64ae37d0e535d69a8b5159e827f5d644, type: 3}
+    pain:
+    - {fileID: 8300000, guid: ca8bc093b3c6e6c5eabb77140aa59907, type: 3}
+    - {fileID: 8300000, guid: 7c54c0c29cbfc230988987ffc919e854, type: 3}
+    - {fileID: 8300000, guid: 796c2eb0196847f66a7e3f4555e90c56, type: 3}
+    - {fileID: 8300000, guid: 40a3b087a9b7083bb907188786b72d91, type: 3}
+    - {fileID: 8300000, guid: c49b828387944c88391f6bbf6fcd5317, type: 3}
+    hurt:
+    - {fileID: 8300000, guid: d615b571e13e9c87ea8dd76b896ffd9b, type: 3}
+    - {fileID: 8300000, guid: 7f802c47264c4234088d0cb16568ded5, type: 3}
+    death:
+    - {fileID: 8300000, guid: fcdd6709247c01e16b8b58408a5d53ef, type: 3}
+    - {fileID: 8300000, guid: 407fb88d081193049b150596e2158993, type: 3}
+    - {fileID: 8300000, guid: ec2bc2eba91011638b7432dd35c69c62, type: 3}
+    headshotDeath:
+    - {fileID: 8300000, guid: 68018adf873cb0346a050d48b5f1619e, type: 3}
+    - {fileID: 8300000, guid: fde078454371a89438d2fdf446f0a661, type: 3}
+    hunt:
+    - {fileID: 8300000, guid: 08a07fa7d518dd3609f0cd5d0eb2b839, type: 3}
+    - {fileID: 8300000, guid: b109ae1521422bedb94132be4f6fd312, type: 3}
+    - {fileID: 8300000, guid: 080d2542ca2ff8b6a82bdf897fd79b65, type: 3}
+    - {fileID: 8300000, guid: 0717dd4e5d5e3d0f7a679c58ce5f2081, type: 3}
+    attack:
+    - {fileID: 8300000, guid: 36caed6d542eae5159b02f336945a4d1, type: 3}
+    - {fileID: 8300000, guid: 8ee54de3dbb6e6c768f656fd85e74c09, type: 3}
+    - {fileID: 8300000, guid: 6b15b7c0700e74306b4a8a7f5e23d244, type: 3}
+    crawl:
+    - {fileID: 8300000, guid: 73d2d0299a0a67ea58e2b4c13fd8cd13, type: 3}
+    - {fileID: 8300000, guid: a6a734ac368fb21d58bd15499af67314, type: 3}

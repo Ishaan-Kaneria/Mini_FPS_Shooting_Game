@@ -310,6 +310,10 @@ public class SettingsPanel : OverlayPanel
                       () => GameSettings.VSync, v => GameSettings.VSync = v, t);
         }
 
+        Heading(page, "Content", t);
+        AddSwitch(page, "Blood", "Blood on hits, walls and bodies. Off leaves a dull puff; wounds still slow enemies.",
+                  () => GameSettings.Blood, v => GameSettings.Blood = v, t);
+
         Heading(page, "Performance", t);
         AddChoice(page, "Quality", "Low turns off shadows and post-processing.", new[] { "Low", "Medium", "High" },
                   () => (int)QualityTiers.Current, i => GameSettings.QualityTier = i, t);

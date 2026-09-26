@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b02e07e76a641094282f1fe5e67449f9, type: 3}
+  m_Name: Blood
+  m_EditorClassIdentifier: Assembly-CSharp::BloodLibrary
+  sprayPrefab: {fileID: 2602744797720593986, guid: 32bf654915f196faca761cf2e4504b58, type: 3}
+  mistPrefab: {fileID: 8731233104287420763, guid: f2e34dfe397e1a1c19d5dc1d3f0c1f60, type: 3}
+  splatMaterial: {fileID: 2100000, guid: 02a90534649e9646fa65a55e9dab63db, type: 2}
+  poolMaterial: {fileID: 2100000, guid: 6e76b90b5076318df9666e2b3b258402, type: 2}
+  woundMaterial: {fileID: 2100000, guid: 4933736173e344bfebce2f865edf9cd2, type: 2}
+  dropColor: {r: 0.34, g: 0.015, b: 0.02, a: 1}
+  mistColor: {r: 0.55, g: 0.04, b: 0.04, a: 0.7}
+  bloodlessColor: {r: 0.32, g: 0.3, b: 0.28, a: 0.55}
+  stainColor: {r: 0.2, g: 0.02, b: 0.02, a: 1}
+  decalBudget: {x: 48, y: 96, z: 160}
+  dropsPerHit: 26

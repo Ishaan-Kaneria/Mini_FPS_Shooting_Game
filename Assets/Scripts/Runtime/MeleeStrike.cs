@@ -210,7 +210,10 @@ public class MeleeStrike : MonoBehaviour
         };
 
         var point = ClosestPoint(target, cam.position);
-        var info = new DamageInfo(amount, point, -cam.forward, cam.forward, gameObject);
+        var info = new DamageInfo(amount, point, -cam.forward, cam.forward, gameObject)
+        {
+            fromMelee = true,
+        };
         info.amount = target.ApplyDamage(info);
 
         if (info.amount <= 0f) return;

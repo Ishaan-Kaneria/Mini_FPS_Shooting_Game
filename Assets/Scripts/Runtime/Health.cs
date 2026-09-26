@@ -2,6 +2,25 @@ using System;
 using UnityEngine;
 
 /// <summary>
+/// Which part of a body a hit landed on. Stamped onto the hit by the <see cref="Hitbox"/>
+/// it went through, so a wound, a limp, a disarm or a dropped-like-a-stone headshot can
+/// all be decided from the one damage event. Anything with no hitboxes -- a blast, a
+/// fall, a kill volume -- reports <see cref="Torso"/>, which is the part that changes
+/// nothing about how the body carries on.
+///
+/// Appended to, never reordered: the values are serialized on every hitbox.
+/// </summary>
+public enum BodyPart
+{
+    Torso,
+    Head,
+    LeftArm,
+    RightArm,
+    LeftLeg,
+    RightLeg
+}
+
+/// <summary>
 /// Everything a damage event carries. Passed by value so callers can safely
 /// mutate a copy (hitboxes multiply the amount before forwarding it on).
 ///
@@ -29,6 +48,12 @@ public struct DamageInfo
     /// </summary>
     public bool fromBlast;
 
+    /// <summary>A fist did this. Deaths read it: a punch spins a body, a round does not.</summary>
+    public bool fromMelee;
+
+    /// <summary>Where it landed, from the hitbox. <see cref="BodyPart.Torso"/> when no hitbox was involved.</summary>
+    public BodyPart part;
+
     public DamageInfo(float amount, Vector3 point, Vector3 normal, Vector3 direction, GameObject source)
     {
         this.amount = amount;
@@ -38,6 +63,8 @@ public struct DamageInfo
         this.source = source;
         this.isHeadshot = false;
         this.fromBlast = false;
+        this.fromMelee = false;
+        this.part = BodyPart.Torso;
     }
 }
 

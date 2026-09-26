@@ -135,7 +135,7 @@ namespace FPSKit.EditorTools
             var health = root.AddComponent<Health>();
             health.maxHealth = _health;
             health.destroyOnDeath = true;
-            health.destroyDelay = _buildRagdoll ? 6f : 2.5f;
+            health.destroyDelay = _buildRagdoll ? 12f : 2.5f;
 
             // ---- hitboxes on real bones ----
             int hitboxCount = BuildHitboxes(animator, health, enemyLayer, out Transform head);
@@ -206,6 +206,26 @@ namespace FPSKit.EditorTools
                 ragdoll.animator = animator;
                 ragdoll.mainCollider = capsule;
             }
+
+            // ---- wounds, blood, voice ----
+            // Same components the built soldier carries. A rigged enemy falls through its
+            // RagdollController, which shares EnemyDeath's rules, so it gets no EnemyDeath.
+            root.AddComponent<EnemyWounds>();
+            root.AddComponent<EnemyGore>().library = FPSKitGore.GetOrCreateLibrary();
+
+            var voiceObject = new GameObject("Voice");
+            voiceObject.transform.SetParent(root.transform, false);
+            voiceObject.transform.position = eyes.transform.position;
+            var voiceSource = voiceObject.AddComponent<AudioSource>();
+            voiceSource.playOnAwake = false;
+            voiceSource.spatialBlend = 1f;
+            voiceSource.minDistance = 2.5f;
+            voiceSource.maxDistance = 45f;
+            voiceSource.rolloffMode = AudioRolloffMode.Linear;
+
+            var voice = root.AddComponent<EnemyVoice>();
+            voice.bank = FPSKitGore.GetOrCreateVoiceBank();
+            voice.source = voiceSource;
 
             // ---- save ----
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
@@ -280,11 +300,30 @@ namespace FPSKit.EditorTools
                 hitbox.owner = owner;
                 hitbox.damageMultiplier = entry.multiplier;
                 hitbox.isHeadshot = entry.headshot;
+                hitbox.part = PartOf(entry.bone);
 
                 built++;
             }
 
             return built;
+        }
+
+        /// <summary>Which part of the body a bone's hitbox books its wounds to (see EnemyWounds).</summary>
+        private static BodyPart PartOf(HumanBodyBones bone)
+        {
+            switch (bone)
+            {
+                case HumanBodyBones.Head: return BodyPart.Head;
+                case HumanBodyBones.LeftUpperArm:
+                case HumanBodyBones.LeftLowerArm: return BodyPart.LeftArm;
+                case HumanBodyBones.RightUpperArm:
+                case HumanBodyBones.RightLowerArm: return BodyPart.RightArm;
+                case HumanBodyBones.LeftUpperLeg:
+                case HumanBodyBones.LeftLowerLeg: return BodyPart.LeftLeg;
+                case HumanBodyBones.RightUpperLeg:
+                case HumanBodyBones.RightLowerLeg: return BodyPart.RightLeg;
+                default: return BodyPart.Torso;
+            }
         }
 
         // ==================================================================

@@ -66,6 +66,28 @@ public class RagdollController : MonoBehaviour
 
         if (!_hasLastHit || deathImpulse <= 0f) return;
 
+        // The same rules the built enemy falls by (see EnemyDeath): a headshot drops it,
+        // a blast throws the whole body, a heavy hit blows it back. deathImpulse scales
+        // the lot, so an imported character tuned before these existed keeps its feel.
+        var wounds = GetComponent<EnemyWounds>();
+        float max = _health != null ? Mathf.Max(1f, _health.maxHealth) : 100f;
+        float burst = wounds != null ? Mathf.Max(wounds.RecentDamage, _lastHit.amount) : _lastHit.amount;
+        bool crawling = wounds != null && wounds.Legs == EnemyWounds.LegState.Crawling;
+
+        var style = EnemyDeath.Classify(_lastHit, burst / max, crawling);
+        Vector3 impulse = EnemyDeath.Blow(_lastHit, style, burst / max) * (deathImpulse / 6f);
+
+        if (style == EnemyDeath.Style.Thrown)
+        {
+            float total = 0f;
+            foreach (var bone in _bones) if (bone != null) total += bone.mass;
+
+            foreach (var bone in _bones)
+                if (bone != null) bone.AddForce(impulse * (bone.mass / Mathf.Max(0.01f, total)), ForceMode.Impulse);
+
+            return;
+        }
+
         // Shove the bone nearest the killing shot so the fall reads as a reaction.
         Rigidbody nearest = null;
         float best = float.MaxValue;
@@ -85,8 +107,7 @@ public class RagdollController : MonoBehaviour
         }
 
         if (nearest != null)
-            nearest.AddForceAtPosition(_lastHit.direction.normalized * deathImpulse,
-                                       _lastHit.point, ForceMode.Impulse);
+            nearest.AddForceAtPosition(impulse, _lastHit.point, ForceMode.Impulse);
     }
 
     public void SetRagdollActive(bool active)

@@ -1068,6 +1068,60 @@ are plain values rather than an event on purpose -- an imported character with a
 Animator ignores them, and three floats survive a mid-play domain reload where a
 subscription would not.
 
+## Where a round lands changes what it does
+
+Added 2026-09-26 at Ishaan's request: enemies that look, move, bleed, sound and die like
+bodies rather than capsules. His calls: blood heavy but no dismemberment (with a Settings
+switch), limb wounds that change the fight, scaled by how strong the enemy is, voices mixed
+by type (soldiers human, heavies and the two generic bosses creature; the Augers are people
+and stay human), and a realistic model to come from an **Asset Store pack he will import**.
+
+**The body.** `BuildEnemyPrefab` builds a segmented soldier: hips, knees, shoulders, elbows
+and a neck are real pivots, with gear (vest, helmet, goggles, boots, pack) tagged Metal so
+the archetype colour stays on the clothes and skin. Every segment has a `Hitbox` with a
+`BodyPart`; the part rides on `DamageInfo.part`. The rifle hangs off the torso, is aimed by
+`EnemyLimbAnimator.PoseWeapon`, and the hands reach its two grips by two-bone IK
+(`ReachFor`). It used to ride the right arm, which pointed forward only with both arms held
+out straight: a mannequin with a gun between its hands.
+
+**Wounds are behaviour** (`EnemyWounds`). Per-part damage as a fraction of max health; past
+`limpAt` a leg limps, past `crawlAt` (or two limping legs) it crawls, past `disarmAt` the gun
+arm drops the rifle (a real object) and `EnemyAI.Disarm` turns it melee. Every threshold is
+stretched by `EnemyArchetype.woundResistance` (0-1, set per archetype in `FPSKitEnemyRoster`).
+A boss never crawls and never drops its weapon. A headshot is lethal to a Standard, to an
+Elite only with its shield down, never to a Boss (which is staggered instead); the lethality
+is done in `Hitbox.Receive` by raising the damage, so the kill passes through Damaged/Died
+like any other. Wounds only ever slow or loosen an enemy -- the sprint rule is untouched.
+
+**Blood** (`BloodFX`, `EnemyGore`, assets from `FPSKitGore`). One spray and one mist particle
+system per level, emitted into by code; splats are a ring of quads capped per quality tier;
+wounds are quads on the nearest evenly-scaled ancestor of the hit segment; limbs darken via
+`EnemyAI.Stain` (written into the rest colours, or the wind-up flash washes it off). Blood
+materials must have `_BlendModePreserveSpecular` off: URP's default keeps specular where
+alpha is zero and every splat drew a pale square of sky. Keep their smoothness low (0.3) for
+the same reason, or flat pools come out lilac. `GameSettings.Blood` off leaves a grey puff.
+
+**Death** (`EnemyDeath`). Built at the moment of death, not kept kinematic: a rigidbody per
+segment and CharacterJoints with a body's limits, made in the *built* pose (limits are
+measured from the pose a joint is created in) then put back. `Classify` picks the fall:
+headshot drops, blast throws, a burst over `heavyShare` blows back, a leg shot buckles,
+otherwise doubles over or staggers back. Corpses freeze after `settleTime`, sink before
+`Health.destroyDelay` (12s), and only a tier's budget simulate at once. A rigged character's
+`RagdollController` uses the same `Classify`/`Blow`.
+
+**Voices** (`EnemyVoice`, `VoiceBank`). Synthesised in `Tools/generate-placeholder-audio.py`
+(pulse source with jitter/shimmer/subharmonics through five formants); replace any with a
+recording of the same name in `Assets/Audio/SFX/Voice` and rebuild the enemy. The voice has
+its own AudioSource: a per-enemy pitch on the shared one bent the gunshots.
+
+**The Asset Store model** goes through Enemy Setup as before. `BuildFromTheme` now keeps a
+prefab with an Animator and only upgrades it (adding wounds, blood, voice); rebuilding the
+built soldier over an imported character is what it used to do.
+
+Checks: `VerifyWounds` (the rules above, in an empty scene). Pictures:
+`UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.CaptureEnemies -fpskitOut Build/Enemies`.
+Enemy-only rebuild: `FPSKitBatch.RebuildEnemy` (scenes hold the prefab by GUID).
+
 ## Coins are earned in a level and spent between them
 
 `Wallet` is the only thing that moves coins, and `Wallet.TrySpend` is the only thing

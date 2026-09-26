@@ -1763,6 +1763,14 @@ namespace FPSKit.EditorTools
                                : data.roundsPerMinute >= 750f ? "SFX/Recorded/smg_fire.wav"
                                : "SFX/Recorded/rifle_fire.wav");
             data.reloadClip = Clip("SFX/weapon_reload.wav");
+
+            // The reload in three recorded beats (CC0, SpringySpringo and zer0_sol on
+            // OpenGameArt), each played on its moment of Weapon's reload animation. A
+            // shotgun feeds a shell and racks the pump instead of changing a magazine.
+            bool shotgun = data.pelletsPerShot > 1;
+            data.reloadOutClip = shotgun ? null : Clip("SFX/Recorded/reload_mag_out.wav");
+            data.reloadInClip = Clip(shotgun ? "SFX/Recorded/shotgun_shell_in.mp3" : "SFX/Recorded/reload_mag_in.wav");
+            data.reloadBoltClip = Clip(shotgun ? "SFX/Recorded/shotgun_rack.wav" : "SFX/Recorded/reload_bolt.wav");
             data.emptyClip = Clip("SFX/weapon_empty.wav");
             data.pitchVariance = 0.06f;
 
@@ -1912,8 +1920,8 @@ namespace FPSKit.EditorTools
 
             BuildEquipment(player, cam, weapon, hp, playerAudio, progression);
 
-            // The punch. Its fist hangs off the weapon holder so it sways with the gun
-            // but does not drop with it.
+            // The punch, thrown with the rifle's stock: MeleeStrike turns and drives the
+            // gun itself, so there is no fist to build and no hand to swap.
             var melee = player.AddComponent<MeleeStrike>();
             melee.weapon = weapon;
             melee.fpsCamera = cam;
@@ -1921,8 +1929,13 @@ namespace FPSKit.EditorTools
             melee.audioSource = playerAudio;
             melee.swingClip = Clip("SFX/punch_swing.wav");
             melee.hitClip = Clip("SFX/punch_hit.wav");
-            melee.fist = BuildFist(weaponHolder.transform);
+            melee.fist = null;
             melee.supportHand = model.transform.Find("SupportHand")?.gameObject;
+
+            // What the reload animation moves: the magazine out and a fresh one in, and
+            // the left hand that does it.
+            weapon.magazine = model.transform.Find("Magazine");
+            weapon.supportHandRig = model.transform.Find("SupportHand");
 
             return player;
         }
@@ -2021,10 +2034,16 @@ namespace FPSKit.EditorTools
 
         /// <summary>
         /// A hand round the grip and one under the handguard, each with a forearm running
-        /// back out of frame. Children of the model, so they recoil, sway and come up to
-        /// the sights with it; in the model's authored units, like every part of the gun.
-        /// The left one sits under its own empty so <see cref="MeleeStrike"/> can hide it
-        /// while the fist is out.
+        /// back out of frame. Children of the model, so they recoil, sway, reload and come
+        /// up to the sights with it; in the model's authored units, like every part of the
+        /// gun. The left one sits under its own empty so the reload can take it off the
+        /// handguard to change the magazine.
+        ///
+        /// Rounded and heavy on purpose. They were thin boxes, which read as a child's
+        /// hands on a rifle and made a strike that reaches over two metres look absurd.
+        /// Now: a gloved fist closed round the grip, a thumb over the top and a finger on
+        /// the trigger; a forearm as thick as a sleeved forearm is, filling the lower
+        /// corner the way it does in every shooter.
         /// </summary>
         private static void BuildGunHands(Transform model)
         {
@@ -2034,93 +2053,83 @@ namespace FPSKit.EditorTools
             var right = new GameObject("RightHand").transform;
             right.SetParent(model, false);
 
-            GunPart(right, "Palm", PrimitiveType.Cube, glove,
-                    new Vector3(0.004f, -0.092f, -0.058f), new Vector3(0.066f, 0.095f, 0.080f),
-                    new Vector3(-16f, 0f, 0f));
-            GunPart(right, "Knuckles", PrimitiveType.Cube, glove,
-                    new Vector3(-0.030f, -0.090f, -0.030f), new Vector3(0.018f, 0.085f, 0.028f),
-                    new Vector3(-16f, 0f, 0f));
-            GunPart(right, "Thumb", PrimitiveType.Cube, glove,
-                    new Vector3(-0.042f, -0.036f, -0.064f), new Vector3(0.018f, 0.022f, 0.056f),
-                    Vector3.zero);
-            GunPart(right, "TriggerFinger", PrimitiveType.Cube, glove,
-                    new Vector3(-0.016f, -0.050f, -0.004f), new Vector3(0.016f, 0.018f, 0.040f),
-                    new Vector3(-8f, 0f, 0f));
+            // The fist round the pistol grip: lofted along the grip's own slant.
+            HandPart(right, "Grip", glove, new Vector3(0.004f, -0.035f, -0.045f), new Vector3(0.004f, -0.16f, -0.08f),
+                     R(0f, 0.05f, 0.056f), R(-0.04f, 0.056f, 0.064f, 0.004f), R(-0.09f, 0.054f, 0.062f, 0.004f),
+                     R(-0.125f, 0.042f, 0.05f));
+            HandPart(right, "Knuckles", glove, new Vector3(-0.036f, -0.045f, -0.02f), new Vector3(-0.034f, -0.14f, -0.045f),
+                     R(0f, 0.024f, 0.028f), R(-0.05f, 0.026f, 0.03f), R(-0.095f, 0.022f, 0.026f));
+            HandPart(right, "Thumb", glove, new Vector3(-0.03f, -0.03f, -0.1f), new Vector3(-0.045f, -0.02f, -0.02f),
+                     R(0f, 0.02f, 0.02f), R(-0.05f, 0.019f, 0.018f), R(-0.08f, 0.016f, 0.015f));
+            HandPart(right, "TriggerFinger", glove, new Vector3(-0.02f, -0.05f, -0.04f), new Vector3(-0.012f, -0.058f, 0.006f),
+                     R(0f, 0.016f, 0.016f), R(-0.045f, 0.013f, 0.013f));
 
             // Back to the lower right corner of the screen, where a right arm comes from.
-            var wrist = new Vector3(0.010f, -0.135f, -0.100f);
-            var elbow = new Vector3(0.13f, -0.34f, -0.64f);
-            Limb(right, "Cuff", glove, wrist, Vector3.Lerp(wrist, elbow, 0.28f), 0.074f, 0.068f);
-            Limb(right, "Sleeve", sleeve, Vector3.Lerp(wrist, elbow, 0.22f), elbow, 0.096f, 0.090f);
+            var wrist = new Vector3(0.012f, -0.15f, -0.1f);
+            // Long, so the far end stays out of frame even with the rifle turned on its
+            // side for the butt strike.
+            var elbow = new Vector3(0.22f, -0.56f, -1.02f);
+            HandPart(right, "Forearm", sleeve, wrist, elbow,
+                     R(0f, 0.052f, 0.052f), R(-0.06f, 0.062f, 0.058f), R(-0.2f, 0.078f, 0.072f),
+                     R(-0.45f, 0.09f, 0.085f), R(-1.0f, 0.095f, 0.09f));
+            HandPart(right, "Cuff", glove, wrist, Vector3.Lerp(wrist, elbow, 0.1f),
+                     R(0f, 0.056f, 0.056f), R(-0.07f, 0.066f, 0.062f), R(-0.1f, 0.068f, 0.064f));
 
             var left = new GameObject("SupportHand").transform;
             left.SetParent(model, false);
 
-            GunPart(left, "Palm", PrimitiveType.Cube, glove,
-                    new Vector3(-0.006f, -0.050f, 0.200f), new Vector3(0.072f, 0.040f, 0.092f), Vector3.zero);
-            GunPart(left, "Fingers", PrimitiveType.Cube, glove,
-                    new Vector3(0.036f, -0.018f, 0.205f), new Vector3(0.018f, 0.052f, 0.082f), Vector3.zero);
-            GunPart(left, "Thumb", PrimitiveType.Cube, glove,
-                    new Vector3(-0.037f, -0.014f, 0.190f), new Vector3(0.018f, 0.034f, 0.062f), Vector3.zero);
+            // The left palm cupped under the handguard, fingers wrapped up the far side,
+            // thumb along the near side.
+            HandPart(left, "Palm", glove, new Vector3(-0.004f, -0.058f, 0.15f), new Vector3(-0.004f, -0.058f, 0.26f),
+                     R(0f, 0.05f, 0.03f, -0.004f), R(-0.04f, 0.058f, 0.036f), R(-0.09f, 0.054f, 0.034f),
+                     R(-0.11f, 0.044f, 0.028f));
+            HandPart(left, "Fingers", glove, new Vector3(0.04f, -0.06f, 0.21f), new Vector3(0.04f, 0.018f, 0.21f),
+                     R(0f, 0.018f, 0.05f), R(-0.05f, 0.016f, 0.046f), R(-0.075f, 0.013f, 0.038f));
+            HandPart(left, "Thumb", glove, new Vector3(-0.04f, -0.05f, 0.17f), new Vector3(-0.04f, -0.012f, 0.23f),
+                     R(0f, 0.019f, 0.019f), R(-0.05f, 0.017f, 0.016f), R(-0.07f, 0.014f, 0.013f));
 
-            var leftWrist = new Vector3(-0.012f, -0.068f, 0.150f);
-            var leftElbow = new Vector3(-0.54f, -0.37f, -0.54f);
-            Limb(left, "Cuff", glove, leftWrist, Vector3.Lerp(leftWrist, leftElbow, 0.18f), 0.072f, 0.066f);
-            Limb(left, "Sleeve", sleeve, Vector3.Lerp(leftWrist, leftElbow, 0.14f), leftElbow, 0.094f, 0.088f);
-        }
-
-        /// <summary>A box from one point to another, in the gun's authored units.</summary>
-        private static void Limb(Transform parent, string name, Material material,
-                                 Vector3 from, Vector3 to, float width, float height)
-        {
-            Vector3 along = to - from;
-            var euler = Quaternion.LookRotation(along.normalized, Vector3.up).eulerAngles;
-            GunPart(parent, name, PrimitiveType.Cube, material,
-                    (from + to) * 0.5f, new Vector3(width, height, along.magnitude), euler);
+            var leftWrist = new Vector3(-0.012f, -0.08f, 0.13f);
+            var leftElbow = new Vector3(-0.86f, -0.6f, -0.86f);
+            HandPart(left, "Forearm", sleeve, leftWrist, leftElbow,
+                     R(0f, 0.05f, 0.05f), R(-0.06f, 0.06f, 0.056f), R(-0.22f, 0.076f, 0.07f),
+                     R(-0.5f, 0.088f, 0.084f), R(-1.35f, 0.095f, 0.09f));
+            HandPart(left, "Cuff", glove, leftWrist, Vector3.Lerp(leftWrist, leftElbow, 0.065f),
+                     R(0f, 0.054f, 0.054f), R(-0.07f, 0.064f, 0.06f), R(-0.09f, 0.066f, 0.062f));
         }
 
         /// <summary>
-        /// The punching fist and its forearm, under the weapon holder rather than the gun:
-        /// the gun drops away while it is out, and the fist must not go with it. Real
-        /// metres, knuckles at the origin and the arm running back along -Z, so
-        /// <see cref="MeleeStrike"/> moves the whole arm by moving this one transform.
-        /// Starts hidden.
+        /// One rounded piece of a hand or arm: rings lofted from <paramref name="from"/>
+        /// toward <paramref name="to"/>, in the gun's authored units. Each ring's y is its
+        /// distance along the piece (negative, down the loft); the ends are closed round.
         /// </summary>
-        private static Transform BuildFist(Transform weaponHolder)
+        private static void HandPart(Transform parent, string name, Material material, Vector3 from, Vector3 to,
+                                     params Ring[] rings)
         {
-            var glove = GloveMaterial();
-            var sleeve = SleeveMaterial();
+            var list = new System.Collections.Generic.List<Ring>();
+            var first = rings[0];
+            var last = rings[rings.Length - 1];
 
-            var root = new GameObject("Fist").transform;
-            root.SetParent(weaponHolder, false);
+            list.Add(Pole((first.y + Mathf.Min(first.rx, first.rz) * 0.6f) * GunScale));
+            foreach (var r in rings) list.Add(R(r.y * GunScale, r.rx * GunScale, r.rz * GunScale, r.cz * GunScale));
+            list.Add(Pole((last.y - Mathf.Min(last.rx, last.rz) * 0.6f) * GunScale));
 
-            void Box(string name, Material m, Vector3 at, Vector3 size, Quaternion turn)
-            {
-                var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                part.name = name;
-                part.transform.SetParent(root, false);
-                part.transform.localPosition = at;
-                part.transform.localRotation = turn;
-                part.transform.localScale = size;
-                Object.DestroyImmediate(part.GetComponent<Collider>());
-                part.GetComponent<Renderer>().sharedMaterial = m;
-            }
+            string side = parent.name == "SupportHand" ? "Left" : "Right";
+            var mesh = Loft($"Hands_{side}{name}", 14, list.ToArray());
 
-            var flat = Quaternion.identity;
-            Box("Fist", glove, new Vector3(0f, 0f, 0f), new Vector3(0.100f, 0.086f, 0.100f), flat);
-            Box("Knuckles", glove, new Vector3(0f, 0.012f, 0.056f), new Vector3(0.094f, 0.046f, 0.018f), flat);
-            Box("Thumb", glove, new Vector3(0.044f, -0.026f, 0.024f), new Vector3(0.022f, 0.030f, 0.064f), flat);
+            Vector3 along = (to - from).normalized;
 
-            // The forearm runs back towards the left shoulder -- down, left and back --
-            // not straight at the lens. Straight back, it filled the lower half of the
-            // screen and hid the fist at the end of it.
-            var back = new Vector3(-0.34f, -0.50f, -0.80f).normalized;
-            var along = Quaternion.LookRotation(back, Vector3.up);
-            Box("Cuff", glove, back * 0.085f, new Vector3(0.080f, 0.074f, 0.080f), along);
-            Box("Sleeve", sleeve, back * 0.26f, new Vector3(0.096f, 0.090f, 0.30f), along);
+            // Down the loft is -Y; point it along the piece, keeping the ellipse's width
+            // across the gun (the model's X) wherever the piece allows.
+            var rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(Vector3.forward, along).sqrMagnitude > 0.001f
+                                                       ? Vector3.ProjectOnPlane(Vector3.forward, along).normalized
+                                                       : Vector3.up, -along);
 
-            root.gameObject.SetActive(false);
-            return root;
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = from * GunScale;
+            go.transform.localRotation = rotation;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = material;
         }
 
         /// <summary>
@@ -2163,6 +2172,11 @@ namespace FPSKit.EditorTools
             var enemy = new GameObject("Enemy");
             enemy.tag = "Enemy";
             enemy.layer = enemyLayer;
+
+            // A tenth over a person's size. Asked for by Ishaan: at arena distances a
+            // 1.9m soldier read small. The archetype's own scale multiplies this, and the
+            // agent's radius and height scale with the transform.
+            enemy.transform.localScale = Vector3.one * 1.1f;
 
             var flesh = MakeTintableMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
             var headFlesh = MakeTintableMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);

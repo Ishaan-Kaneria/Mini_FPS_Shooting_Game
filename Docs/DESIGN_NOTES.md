@@ -1135,6 +1135,25 @@ its own AudioSource: a per-enemy pitch on the shared one bent the gunshots.
 prefab with an Animator and only upgrades it (adding wounds, blood, voice); rebuilding the
 built soldier over an imported character is what it used to do.
 
+**Every enemy is a person (2026-09-26, later the same day).** Ishaan heard the creature
+growls as "evil voices and disturbing noise" and asked for every enemy to be a human soldier
+in voice and look: every archetype is `EnemyVoice.Kind.Human`, the creature clips and the
+moaning hunt clips are gone (hunting is the alert shouts, rarely), and the Creature slot
+of the bank plays the same people at 0.9 pitch. The Kit_Creature parts remain in the prefab
+but nothing wears them. Enemies are built at 1.1 scale.
+
+**The player's hands, reload and strike.** Hands are lofted (`BuildGunHands`, `HandPart`):
+a glove closed round the grip, a cupped hand under the handguard, forearms as thick as a
+sleeved arm and long enough that their ends never swing into frame. The reload is drawn
+in `Weapon.ReloadPose` (turn to show the side, magazine out, left hand down for it, fresh
+one up and seated, bolt kick), with three recorded clips on `WeaponData` placed on the same
+beats (`MagOutAt`, `MagInAt`, `BoltAt`) by `ReloadRoutine`. The punch is a rifle-butt strike
+(his choice): `MeleeStrike.AnimateButt` turns and drives the rifle through
+`Weapon.HandsRotation`/`HandsOffset`; the forearms counter-rotate at the wrist
+(`Weapon._forearms`) so they keep running back to the shoulders while the gun turns. See
+it with `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.CaptureViewModel`, which pins
+`Time.captureDeltaTime` -- a batch frame can be longer than the whole strike.
+
 Checks: `VerifyWounds` (the rules above, in an empty scene). Pictures:
 `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.CaptureEnemies -fpskitOut Build/Enemies`.
 Enemy-only rebuild: `FPSKitBatch.RebuildEnemy` (scenes hold the prefab by GUID).

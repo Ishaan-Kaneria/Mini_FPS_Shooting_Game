@@ -18,6 +18,14 @@ public class Weapon : MonoBehaviour
     public Light muzzleLight;
     public AudioSource audioSource;
 
+    [Header("Reload Animation")]
+    [Tooltip("The magazine: dropped out and a fresh one pushed back in during a reload. " +
+             "Left empty, the gun still tilts and the sounds still play.")]
+    public Transform magazine;
+
+    [Tooltip("The left hand: goes down for the old magazine and brings the new one up.")]
+    public Transform supportHandRig;
+
     [Tooltip("Layers the bullet can hit. Exclude the Player layer.")]
     public LayerMask hitMask = ~0;
 
@@ -217,6 +225,12 @@ public class Weapon : MonoBehaviour
     /// </summary>
     [NonSerialized] public Vector3 HandsOffset;
 
+    /// <summary>
+    /// Turned on top of the model's pose, in degrees. <see cref="MeleeStrike"/> swings the
+    /// rifle round to drive the stock forward with it.
+    /// </summary>
+    [NonSerialized] public Vector3 HandsRotation;
+
     /// <summary>True while the gun is lowered for something else the hands are doing.</summary>
     public bool IsLowered => Time.time < _loweredUntil;
 
@@ -226,6 +240,15 @@ public class Weapon : MonoBehaviour
     BombThrower _bombs;
     ControlSettings _fallbackControls;
     Vector3 _hipPosition;
+    Quaternion _hipRotation;
+    float _reloadStart = -99f;
+    float _reloadLength = 1f;
+    Vector3 _magazineRest, _handRest;
+    Quaternion _magazineRestRotation;
+
+    /// <summary>The forearms (and their cuffs), which stay pointing back at the shoulders while the gun turns.</summary>
+    Transform[] _forearms;
+    Quaternion[] _forearmRest;
     float _baseFieldOfView;
     float _nextFireTime;
     float _spreadBonus;
@@ -251,6 +274,23 @@ public class Weapon : MonoBehaviour
         _motor = GetComponentInParent<PlayerMotor>();
         _bombs = GetComponentInParent<BombThrower>();
         _hipPosition = transform.localPosition;
+        _hipRotation = transform.localRotation;
+
+        if (magazine != null)
+        {
+            _magazineRest = magazine.localPosition;
+            _magazineRestRotation = magazine.localRotation;
+        }
+
+        if (supportHandRig != null) _handRest = supportHandRig.localPosition;
+
+        var arms = new System.Collections.Generic.List<Transform>();
+        foreach (var part in GetComponentsInChildren<Transform>(true))
+            if (part.name == "Forearm" || part.name == "Cuff") arms.Add(part);
+
+        _forearms = arms.ToArray();
+        _forearmRest = new Quaternion[_forearms.Length];
+        for (int i = 0; i < _forearms.Length; i++) _forearmRest[i] = _forearms[i].localRotation;
         _baseFieldOfView = fpsCamera != null ? fpsCamera.fieldOfView : 75f;
 
         if (muzzleLight != null) muzzleLight.enabled = false;
@@ -508,9 +548,31 @@ public class Weapon : MonoBehaviour
         IsReloading = true;
         IsAiming = false;
         ReloadStarted?.Invoke(this);
-        PlayClip(data.reloadClip, 0.8f);
 
-        yield return new WaitForSeconds(ReloadTime);
+        float length = Mathf.Max(0.2f, ReloadTime);
+        _reloadStart = Time.time;
+        _reloadLength = length;
+
+        bool staged = data.reloadOutClip != null || data.reloadInClip != null || data.reloadBoltClip != null;
+
+        if (!staged)
+        {
+            PlayClip(data.reloadClip, 0.8f);
+            yield return new WaitForSeconds(length);
+        }
+        else
+        {
+            // Each sound on its beat of the animation (see ReloadPose), so a longer or an
+            // upgraded reload stretches both together and the click is always the moment
+            // the magazine seats.
+            yield return new WaitForSeconds(length * MagOutAt);
+            PlayClip(data.reloadOutClip, 0.85f);
+            yield return new WaitForSeconds(length * (MagInAt - MagOutAt));
+            PlayClip(data.reloadInClip, 0.95f);
+            yield return new WaitForSeconds(length * (BoltAt - MagInAt));
+            PlayClip(data.reloadBoltClip, 1f);
+            yield return new WaitForSeconds(length * (1f - BoltAt));
+        }
 
         int needed = MagazineSize - CurrentAmmo;
 
@@ -529,6 +591,7 @@ public class Weapon : MonoBehaviour
 
         IsReloading = false;
         _reloadRoutine = null;
+        _reloadStart = -99f;
         AmmoChanged?.Invoke(this);
         ReloadFinished?.Invoke(this);
     }
@@ -647,7 +710,22 @@ public class Weapon : MonoBehaviour
         _kickback = Mathf.Lerp(_kickback, 0f, Mathf.Clamp01(12f * Time.deltaTime));
 
         Vector3 basePosition = Vector3.Lerp(_hipPosition, data.adsPosition, AimProgress);
-        transform.localPosition = basePosition + Vector3.back * _kickback + HandsOffset;
+        ReloadPose(out Vector3 reloadOffset, out Vector3 reloadTurn);
+
+        transform.localPosition = basePosition + Vector3.back * _kickback + HandsOffset + reloadOffset;
+        var turned = Quaternion.Euler(reloadTurn + HandsRotation);
+        transform.localRotation = _hipRotation * turned;
+
+        // The hands turn with the gun; the forearms behind them do not. They pivot at the
+        // wrist, so undoing the gun's turn on them keeps each one running back to its
+        // shoulder -- without this, turning the rifle stock-first swung both arms across
+        // the screen like two poles. Most of the reload's turn is undone the same way.
+        if (_forearms != null && _forearmRest != null)
+        {
+            var undo = Quaternion.Inverse(Quaternion.Euler(reloadTurn * 0.7f + HandsRotation));
+            for (int i = 0; i < _forearms.Length; i++)
+                if (_forearms[i] != null) _forearms[i].localRotation = undo * _forearmRest[i];
+        }
 
         // Widened for the speed, not for the intent. IsSprinting is true the moment
         // the key goes down, standing still included, so keying the FOV off it alone
@@ -763,6 +841,88 @@ public class Weapon : MonoBehaviour
         }
 
         if (tracer != null) Destroy(tracer.gameObject);
+    }
+
+    // ======================================================================
+    // The reload, drawn
+    // ======================================================================
+
+    /// <summary>Where in the reload each sound lands, as a share of it.</summary>
+    const float MagOutAt = 0.16f, MagInAt = 0.6f, BoltAt = 0.78f;
+
+    /// <summary>
+    /// The reload as the player sees it, driven from the time it started so a domain
+    /// reload or a disabled frame cannot strand the gun mid-pose.
+    ///
+    /// Tilt the rifle over to look at the magazine well; drop the old magazine out with
+    /// the left hand going after it; bring a fresh one up and seat it; the hand goes back
+    /// to the handguard, the bolt is run (a jerk of the whole gun) and it comes back up
+    /// into the shoulder. The three sounds in ReloadRoutine land on the same beats.
+    /// </summary>
+    void ReloadPose(out Vector3 offset, out Vector3 turn)
+    {
+        offset = Vector3.zero;
+        turn = Vector3.zero;
+
+        float p = IsReloading && _reloadLength > 0f ? (Time.time - _reloadStart) / _reloadLength : -1f;
+
+        if (p < 0f || p > 1f)
+        {
+            ResetReloadParts();
+            return;
+        }
+
+        // The tilt: in quickly, held, out at the end.
+        float tilt = p < 0.14f ? UITheme.EaseOut(p / 0.14f)
+                   : p < 0.84f ? 1f
+                   : 1f - UITheme.EaseOut((p - 0.84f) / 0.16f);
+
+        // Turned to show its right side and rolled onto it, raised and brought in toward
+        // the middle of the screen: the magazine well is what the player is looking at.
+        turn = new Vector3(-8f, -26f, 20f) * tilt;
+        offset = new Vector3(-0.1f, 0.03f, -0.03f) * tilt;
+
+        // The bolt: a sharp kick back and up, and a settle.
+        float bolt = p >= BoltAt && p < BoltAt + 0.1f ? Mathf.Sin((p - BoltAt) / 0.1f * Mathf.PI) : 0f;
+        turn += new Vector3(-7f, 0f, -4f) * bolt;
+        offset += new Vector3(0f, 0.012f, -0.035f) * bolt;
+
+        // The magazine: out and away below the frame, then a fresh one up and seated.
+        float drop;
+        if (p < MagOutAt) drop = 0f;
+        else if (p < MagOutAt + 0.14f) drop = UITheme.EaseOut((p - MagOutAt) / 0.14f);
+        else if (p < MagInAt - 0.16f) drop = 1f;
+        else if (p < MagInAt) drop = 1f - UITheme.EaseOut((p - (MagInAt - 0.16f)) / 0.16f);
+        else drop = 0f;
+
+        if (magazine != null)
+        {
+            magazine.localPosition = _magazineRest + new Vector3(0f, -0.2f, -0.03f) * drop;
+            magazine.localRotation = _magazineRestRotation * Quaternion.Euler(-18f * drop, 0f, 12f * drop);
+        }
+
+        // The left hand leaves the handguard for the magazine, follows it down, brings
+        // the new one up, and goes back.
+        float reach = p < MagOutAt - 0.04f ? UITheme.EaseOut(Mathf.Clamp01(p / (MagOutAt - 0.04f)))
+                    : p < MagInAt + 0.08f ? 1f
+                    : 1f - UITheme.EaseOut(Mathf.Clamp01((p - (MagInAt + 0.08f)) / 0.14f));
+
+        if (supportHandRig != null)
+            supportHandRig.localPosition = _handRest
+                + new Vector3(0.01f, -0.05f, -0.13f) * reach
+                + new Vector3(0f, -0.19f, -0.02f) * drop;
+    }
+
+    void ResetReloadParts()
+    {
+        if (magazine != null && magazine.localPosition != _magazineRest)
+        {
+            magazine.localPosition = _magazineRest;
+            magazine.localRotation = _magazineRestRotation;
+        }
+
+        if (supportHandRig != null && supportHandRig.localPosition != _handRest)
+            supportHandRig.localPosition = _handRest;
     }
 
     void PlayClip(AudioClip clip, float volume)

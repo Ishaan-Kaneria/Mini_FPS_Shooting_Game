@@ -39,14 +39,14 @@ public class EnemyVoice : MonoBehaviour
 
     [Header("Timing")]
     [Tooltip("Minimum seconds between grunts, so sustained fire does not machine-gun the voice.")]
-    [Min(0f)] public float painCooldown = 0.32f;
+    [Min(0f)] public float painCooldown = 0.5f;
 
     [Tooltip("Seconds between one enemy's hunting sounds, picked between these two.")]
-    public Vector2 huntInterval = new Vector2(5f, 10f);
+    public Vector2 huntInterval = new Vector2(9f, 18f);
 
     [Tooltip("Seconds between any two hunting sounds in the whole level. The shared " +
              "budget that keeps a crowd from drowning out the fight.")]
-    [Min(0f)] public float huntGap = 1.1f;
+    [Min(0f)] public float huntGap = 3f;
 
     [Tooltip("A hit worth this share of its health is a scream, not a grunt.")]
     [Range(0.05f, 1f)] public float hurtShare = 0.3f;

@@ -113,7 +113,10 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Blood materials: `_BlendModePreserveSpecular` 0, low smoothness. Blood obeys `GameSettings.Blood`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
-  `Weapon.ReportHit`. Hands are builder primitives (`BuildGunHands`, `BuildFist`).
+  `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via
+  `Weapon.HandsRotation`/`HandsOffset`); no fist is built. Hands are lofted (`BuildGunHands`).
+- Reload is animated in `Weapon.ReloadPose` (tilt, magazine out/in, left hand, bolt) with
+  three `WeaponData` clips on its beats (`MagOutAt`/`MagInAt`/`BoltAt`); keep them in step.
 
 ## Terrain and arenas
 

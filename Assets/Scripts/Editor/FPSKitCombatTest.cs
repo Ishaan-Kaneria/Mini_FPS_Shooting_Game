@@ -318,7 +318,6 @@ namespace FPSKit.EditorTools
                         _punchKilled = target.IsDead;
                         _gunLowered = melee.weapon != null && melee.weapon.IsLowered;
 
-                        // The fist is switched on by the component's own Update, a frame on.
                         Notes.Append($"\n  punch at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
                                      $"hit {(hit != null ? hit.name : "nothing")} ({_punchRole}): pool " +
                                      $"{_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0}");
@@ -331,7 +330,10 @@ namespace FPSKit.EditorTools
                     {
                         var player = GameObject.FindGameObjectWithTag("Player");
                         var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
-                        if (melee != null && melee.fist != null && melee.fist.gameObject.activeInHierarchy)
+                        // The strike is the rifle turned stock-first and driven forward (or,
+                        // with a fist wired, the fist out). Either is seen, a frame on.
+                        if (melee != null && ((melee.fist != null && melee.fist.gameObject.activeInHierarchy)
+                                              || (melee.weapon != null && melee.weapon.HandsRotation.magnitude > 5f)))
                             _fistShown = true;
 
                         // Past the cooldown, then well out of reach: a punch must not
@@ -601,6 +603,10 @@ namespace FPSKit.EditorTools
 
         static void OnGameLog(string message, string stackTrace, LogType type)
         {
+            // The editor probes for an Android device on entering play mode when the Android
+            // build profile is active, and logs the failure as an exception. Not the game.
+            if (message.Contains("Unity Remote requirements check failed")) return;
+
             if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert)
                 Errors.Add($"[{type}] {message.Trim()}");
         }
@@ -687,7 +693,7 @@ namespace FPSKit.EditorTools
                     problems.Append("\n  - the gun was not lowered during the punch: it could fire through the swing");
 
                 if (!_fistShown)
-                    problems.Append("\n  - the fist never appeared: the punch is invisible");
+                    problems.Append("\n  - the strike never showed: neither the rifle butt nor a fist moved, the punch is invisible");
 
                 if (!_punchMissed)
                     problems.Append($"\n  - a punch thrown from eight metres hit {_punchMissHit}");

@@ -79,13 +79,15 @@ namespace FPSKit.EditorTools
                 AssetDatabase.CreateAsset(bank, VoiceBankPath);
             }
 
+            // Every enemy is a person and sounds like one. There was a creature voice --
+            // growls and roars from a filtered-voice pack -- and Ishaan heard it as evil,
+            // disturbing noise, which is not what a soldier being shot sounds like. The
+            // creature slot now plays the same people a little deeper, so an archetype
+            // still set to Creature is a big man, not a monster.
             bank.human = Set("human");
-            bank.creature = Set("creature");
-
-            // The creature recordings are a person's voice through filters, at a person's
-            // size. Taken down a fifth they stop sounding like somebody doing a monster.
+            bank.creature = Set("human");
             bank.human.pitch = 1f;
-            bank.creature.pitch = 0.72f;
+            bank.creature.pitch = 0.9f;
 
             EditorUtility.SetDirty(bank);
             AssetDatabase.SaveAssets();
@@ -99,12 +101,13 @@ namespace FPSKit.EditorTools
             hurt = Voice(who, "hurt"),
             death = Voice(who, "death"),
             headshotDeath = Voice(who, "headshot"),
-            hunt = Voice(who, "hunt"),
+            // Hunting is calling out, not moaning: the shouts, heard now and then.
+            hunt = Voice(who, "hunt", quiet: true) is var hunt && hunt.Length > 0 ? hunt : Voice(who, "alert"),
             attack = Voice(who, "attack"),
             crawl = Voice(who, "crawl"),
         };
 
-        static AudioClip[] Voice(string who, string what)
+        static AudioClip[] Voice(string who, string what, bool quiet = false)
         {
             var clips = new System.Collections.Generic.List<AudioClip>();
 
@@ -115,7 +118,7 @@ namespace FPSKit.EditorTools
                 if (clip != null) clips.Add(clip);
             }
 
-            if (clips.Count == 0)
+            if (clips.Count == 0 && !quiet)
                 Debug.LogWarning($"[FPSKit] No {who} {what} voice clips in {VoiceFolder}. " +
                                  "They are recordings, not generated: see Docs/DESIGN_NOTES.md.");
 

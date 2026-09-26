@@ -2,7 +2,10 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// The punch: a close-range strike that costs no ammunition.
+/// The punch: a close-range strike that costs no ammunition. Drawn as a rifle-butt
+/// strike (Ishaan's choice over a fist): the gun is turned so the stock comes round and
+/// driven into the target, both hands on it, out and back in a third of a second. A fist
+/// is still supported if one is wired, but the builder no longer makes one.
 ///
 /// It exists for the level where every round counts. Up against an enemy, the player
 /// gets a choice -- spend bullets, or put them down with a fist -- and on One Magazine
@@ -52,8 +55,20 @@ public class MeleeStrike : MonoBehaviour
     [Tooltip("Where the fist lands: a little left of and below the crosshair.")]
     public Vector3 fistStrike = new Vector3(-0.05f, -0.09f, 0.58f);
 
-    [Tooltip("How far the gun drops out of the fist's way, in the model's local space.")]
+    [Tooltip("How far the gun drops out of the fist's way, in the model's local space. " +
+             "Only with a fist; without one the rifle itself is the strike.")]
     public Vector3 gunDip = new Vector3(0.07f, -0.16f, -0.06f);
+
+    [Header("Rifle Butt")]
+    [Tooltip("How the rifle is turned to bring the stock round to the front, in degrees: " +
+             "yawed so the butt comes across, rolled onto its side, tipped down a little.")]
+    public Vector3 buttTurn = new Vector3(8f, 62f, -16f);
+
+    [Tooltip("Where the rifle is pulled to as it is turned, before the thrust.")]
+    public Vector3 buttWindUp = new Vector3(-0.1f, -0.02f, -0.06f);
+
+    [Tooltip("Where the thrust drives the stock to, out at the target.")]
+    public Vector3 buttThrust = new Vector3(-0.16f, 0.02f, 0.26f);
 
     [Header("Strike")]
     [Tooltip("Metres from the eye to the nearest point of the target. About an arm and " +
@@ -67,7 +82,7 @@ public class MeleeStrike : MonoBehaviour
     [Range(0.2f, 2f)] public float cooldown = 0.55f;
 
     [Tooltip("Seconds the whole throw takes, out and back. The gun is down for this long.")]
-    [Range(0.15f, 1f)] public float swingSeconds = 0.38f;
+    [Range(0.15f, 1f)] public float swingSeconds = 0.34f;
 
     [Header("Damage, as a share of the target's full health and armour")]
     [Tooltip("An ordinary enemy is put down by one punch whatever this says. Kept as a " +
@@ -139,7 +154,12 @@ public class MeleeStrike : MonoBehaviour
 
     void OnDisable()
     {
-        if (weapon != null) weapon.HandsOffset = Vector3.zero;
+        if (weapon != null)
+        {
+            weapon.HandsOffset = Vector3.zero;
+            weapon.HandsRotation = Vector3.zero;
+        }
+
         if (fist != null) fist.gameObject.SetActive(false);
         if (supportHand != null) supportHand.SetActive(true);
         SetTarget(null);
@@ -319,6 +339,12 @@ public class MeleeStrike : MonoBehaviour
         float k = swingSeconds <= 0f ? 1f : (Time.time - _swingStart) / swingSeconds;
         bool swinging = k >= 0f && k < 1f;
 
+        if (fist == null)
+        {
+            AnimateButt(k, swinging);
+            return;
+        }
+
         // The gun: down over the first fifth, held, back up over the last half.
         float dip = !swinging ? 0f
                   : k < 0.2f ? UITheme.EaseOut(k / 0.2f)
@@ -342,6 +368,39 @@ public class MeleeStrike : MonoBehaviour
         fist.localRotation = Quaternion.Euler(Mathf.Lerp(20f, -2f, reachOut),
                                               Mathf.Lerp(22f, 4f, reachOut),
                                               Mathf.Lerp(-30f, -8f, reachOut));
+    }
+
+    /// <summary>
+    /// The rifle-butt strike: the gun is turned on its side so the stock comes round to
+    /// the front, driven forward into whatever is there, and brought back into the
+    /// shoulder. Both hands stay on it throughout, which is the point -- there is no
+    /// changing hands, so it is out and back faster than any punch could be.
+    ///
+    /// Snap round in the first fifth, thrust in the next, hold the impact a beat, and
+    /// settle back over the last half.
+    /// </summary>
+    void AnimateButt(float k, bool swinging)
+    {
+        if (weapon == null) return;
+
+        if (!swinging)
+        {
+            weapon.HandsOffset = Vector3.zero;
+            weapon.HandsRotation = Vector3.zero;
+            return;
+        }
+
+        float turn = k < 0.2f ? UITheme.EaseOut(k / 0.2f)
+                   : k < 0.55f ? 1f
+                   : 1f - UITheme.EaseOut((k - 0.55f) / 0.45f);
+
+        float thrust = k < 0.18f ? 0f
+                     : k < 0.36f ? UITheme.EaseOut((k - 0.18f) / 0.18f)
+                     : k < 0.5f ? 1f
+                     : 1f - UITheme.EaseOut((k - 0.5f) / 0.5f);
+
+        weapon.HandsRotation = buttTurn * turn;
+        weapon.HandsOffset = Vector3.Lerp(buttWindUp * turn, buttThrust, thrust);
     }
 
     void PlayClip(AudioClip clip, float volume)

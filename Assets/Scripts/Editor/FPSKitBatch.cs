@@ -299,6 +299,12 @@ namespace FPSKit.EditorTools
         public static void CaptureEnemies() => FPSKitEnemyShots.Capture(ReadArg("-fpskitOut"));
 
         /// <summary>
+        /// Photographs the player's gun at rest, through a reload and through the rifle-butt
+        /// strike, into -fpskitOut (default Build/ViewModel). Needs UNITY_GRAPHICS=1.
+        /// </summary>
+        public static void CaptureViewModel() => FPSKitViewModelShots.Capture(ReadArg("-fpskitOut"));
+
+        /// <summary>
         /// Plays the loop the player sees: dashboard, into an arena, quit, back to the
         /// dashboard with the run recorded.
         /// </summary>
@@ -537,8 +543,8 @@ namespace FPSKit.EditorTools
             var melee = player.GetComponent<MeleeStrike>();
             if (melee == null)
                 problems.Add("player has no MeleeStrike: the punch key would do nothing");
-            else if (melee.fist == null || melee.supportHand == null)
-                problems.Add("MeleeStrike has no fist or support hand: a punch would be invisible");
+            else if (melee.supportHand == null || melee.weapon == null)
+                problems.Add("MeleeStrike has no weapon or support hand: the rifle-butt strike would be invisible");
 
             var catalog = loadout.catalog;
             if (catalog == null) return;

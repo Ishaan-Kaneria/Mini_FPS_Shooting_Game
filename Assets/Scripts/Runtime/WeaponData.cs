@@ -77,6 +77,14 @@ public class WeaponData : ScriptableObject
     public AudioClip fireClip;
     public AudioClip reloadClip;
     public AudioClip emptyClip;
+
+    [Tooltip("The reload in three sounds, each played at its moment of the reload " +
+             "animation: the magazine coming out, the new one seating, the bolt. When all " +
+             "three are empty the single reload clip plays at the start instead.")]
+    public AudioClip reloadOutClip;
+    public AudioClip reloadInClip;
+    public AudioClip reloadBoltClip;
+
     [Range(0f, 0.3f)] public float pitchVariance = 0.06f;
 
     [Header("VFX (optional)")]

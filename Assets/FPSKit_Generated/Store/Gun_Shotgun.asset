@@ -51,6 +51,9 @@ MonoBehaviour:
   fireClip: {fileID: 8300000, guid: 75e8d77216737f004ace35a0dcdbfc4f, type: 3}
   reloadClip: {fileID: 8300000, guid: 4e11845933db44619adbc649c9bf8ea2, type: 3}
   emptyClip: {fileID: 8300000, guid: 75ab90f74094cc38184cac61a2b794a7, type: 3}
+  reloadOutClip: {fileID: 0}
+  reloadInClip: {fileID: 8300000, guid: 5fec68ad1d4ab8e73b34961484923a26, type: 3}
+  reloadBoltClip: {fileID: 8300000, guid: b45ef2d0ca8bc61c68503f7ad1361f8a, type: 3}
   pitchVariance: 0.06
   muzzleFlashPrefab: {fileID: 2134951606029692187, guid: 8a79f2628d8bdbc7e804f0f81f251750, type: 3}
   tracerPrefab: {fileID: 2247844606418610152, guid: cafbe0e8fd18c73c9b941c758f06c078, type: 3}

@@ -269,8 +269,8 @@ namespace FPSKit.EditorTools
                     "the enemy prefab still destroys its body: corpses must stay until the level ends");
 
             // ---- kit ------------------------------------------------------------------
-            Require(Worn(_boss, "Kit_Boss_Visor") && !Worn(_boss, "Kit_Human_Helmet"),
-                    "the Warden is not dressed as a boss creature (visor on, helmet off)");
+            Require(Worn(_boss, "Kit_Boss_Visor") && Worn(_boss, "Kit_Human_Helmet") && !Worn(_boss, "Kit_Creature_Respirator"),
+                    "the Warden is not dressed as a boss soldier (visor and helmet on, no respirator)");
             Require(Worn(_armGrunt, "Kit_Human_Helmet") && !Worn(_armGrunt, "Kit_Elite_PadLeft"),
                     "a grunt is not dressed as an ordinary soldier (helmet on, no shoulder armour)");
             Require(Worn(_elite, "Kit_Elite_PadLeft"), "the Sentinel has no elite shoulder armour");
@@ -324,8 +324,14 @@ namespace FPSKit.EditorTools
                 }
             }
 
-            Require(_boss.GetComponent<EnemyVoice>().kind == EnemyVoice.Kind.Creature,
-                    "the Warden speaks with a human voice; the archetype's voice did not stamp");
+            // Every enemy is a person: Ishaan heard the creature growls as evil noise.
+            foreach (var name in FPSKitEnemyRoster.Names)
+                Require(FPSKitEnemyRoster.GetOrCreate(name).voice == EnemyVoice.Kind.Human,
+                        $"{name} does not have a human voice");
+
+            // Ten percent over a person's size, on top of whatever the archetype adds.
+            Require(prefab != null && Mathf.Abs(prefab.transform.localScale.y - 1.1f) < 0.01f,
+                    $"the enemy prefab is scaled {(prefab != null ? prefab.transform.localScale.y : 0f):0.00}, not 1.10");
         }
 
         // ==================================================================

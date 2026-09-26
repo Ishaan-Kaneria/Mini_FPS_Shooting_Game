@@ -301,7 +301,7 @@ namespace FPSKit.EditorTools
                 case "Brute":
                     a.description = "Huge, armoured, hits like a truck. Telegraphs hard.";
                     a.role = EnemyArchetype.Role.Standard;
-                    a.voice = EnemyVoice.Kind.Creature;
+                    a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 0.6f;
                     a.bodyColor = new Color(0.28f, 0.20f, 0.30f);
                     a.headColor = new Color(0.45f, 0.30f, 0.42f);
@@ -372,7 +372,7 @@ namespace FPSKit.EditorTools
                 case "Screamer":
                     a.description = "Small, quick and always circling. Flanks relentlessly.";
                     a.role = EnemyArchetype.Role.Standard;
-                    a.voice = EnemyVoice.Kind.Creature;
+                    a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 0.0f;
                     a.bodyColor = new Color(0.62f, 0.15f, 0.45f);
                     a.headColor = new Color(0.90f, 0.35f, 0.65f);
@@ -570,7 +570,7 @@ namespace FPSKit.EditorTools
                 case "Stalker":
                     a.description = "Closes fast in the dark and hits far harder than it looks.";
                     a.role = EnemyArchetype.Role.Standard;
-                    a.voice = EnemyVoice.Kind.Creature;
+                    a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 0.25f;
                     a.bodyColor = new Color(0.12f, 0.14f, 0.13f);
                     a.headColor = new Color(0.30f, 0.38f, 0.32f);
@@ -600,7 +600,7 @@ namespace FPSKit.EditorTools
                 case "Hardsuit":
                     a.description = "Sealed armour. Outlasting it is not the plan; leaving is.";
                     a.role = EnemyArchetype.Role.Elite;
-                    a.voice = EnemyVoice.Kind.Creature;
+                    a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 0.8f;
                     a.bodyColor = new Color(0.38f, 0.22f, 0.16f);
                     a.headColor = new Color(0.62f, 0.38f, 0.26f);
@@ -641,7 +641,7 @@ namespace FPSKit.EditorTools
                 case "Warden":
                     a.description = "Boss. An enormous armoured melee threat with a long reach.";
                     a.role = EnemyArchetype.Role.Boss;
-                    a.voice = EnemyVoice.Kind.Creature;
+                    a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 1.0f;
                     a.bodyColor = new Color(0.32f, 0.06f, 0.08f);
                     a.headColor = new Color(0.60f, 0.12f, 0.12f);
@@ -671,7 +671,7 @@ namespace FPSKit.EditorTools
                 case "Harbinger":
                     a.description = "Boss. Hangs back and shells the arena in bursts.";
                     a.role = EnemyArchetype.Role.Boss;
-                    a.voice = EnemyVoice.Kind.Creature;
+                    a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 1.0f;
                     a.bodyColor = new Color(0.12f, 0.24f, 0.30f);
                     a.headColor = new Color(0.30f, 0.60f, 0.70f);

@@ -481,7 +481,7 @@ namespace FPSKit.EditorTools
                                         Look = c, Fov = 60f };
             }
 
-            yield return new Shot { Name = "25_map_top", From = new Vector3(0f, 430f, -60f), Look = Vector3.zero, Fov = 64f };
+            yield return new Shot { Name = "25_map_top", From = new Vector3(0f, 520f, -1f), Look = Vector3.zero, Fov = 50f };
 
             var farm = Of("FarmWall");
             if (farm.HasValue)
@@ -636,6 +636,9 @@ namespace FPSKit.EditorTools
                         }
                 }
 
+                // A map shot is for reading the layout, which fog at four hundred metres hides.
+                if (shot.Name.EndsWith("_top")) RenderSettings.fog = false;
+
                 rig.transform.position = shot.From;
                 rig.transform.rotation = Quaternion.LookRotation((shot.Look - shot.From).normalized,
                                                                  Vector3.up);
@@ -680,6 +683,7 @@ namespace FPSKit.EditorTools
                 camera.targetTexture = null;
                 if (target != null) { target.Release(); Object.DestroyImmediate(target); }
                 Object.DestroyImmediate(rig);
+                if (shot.Name.EndsWith("_top")) RenderSettings.fog = true;
             }
         }
 

@@ -37,7 +37,7 @@ namespace FPSKit.EditorTools
 
             // ---- hamlets: a handful of houses on two lanes. The first within sight of the
             // spawn, so the first thing a player sees is somewhere and not sand. ----
-            for (int i = 0; i < 400 && _hamletPlans.Count < 3; i++)
+            for (int i = 0; i < 600 && _hamletPlans.Count < 4; i++)
             {
                 float lo = _hamletPlans.Count == 0 ? 50f : 60f, hi = _hamletPlans.Count == 0 ? 95f : half;
                 var p = new Vector2(Rand(rng, -half + 45f, half - 45f), Rand(rng, -half + 45f, half - 45f));
@@ -45,17 +45,17 @@ namespace FPSKit.EditorTools
                 if ((p - _townCentre).magnitude < _townRadius + 40f) continue;
                 if (_hasFob && _fob.Contains(p, 30f)) continue;
                 bool crowded = false;
-                foreach (var h in _hamletPlans) if ((h.Centre - p).magnitude < 110f) crowded = true;
+                foreach (var h in _hamletPlans) if ((h.Centre - p).magnitude < 85f) crowded = true;
                 if (crowded) continue;
 
                 _hamletPlans.Add(new SitePlan { Centre = p, Width = 26f, Depth = 41f, Yaw = rng.Next(4) * 90f });
                 Claim(p.x, p.y, 25f);
-                FlattenPad(p.x, p.y, 25f, 22f);
+                FlattenPad(p.x, p.y, 25f, 30f, SiteHeight(p, 25f));
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
             }
 
-            // ---- farm compounds ----
-            for (int i = 0; i < 500 && _farmPlans.Count < 14; i++)
+            // ---- farm compounds, each with a field beside it ----
+            for (int i = 0; i < 800 && _farmPlans.Count < 18; i++)
             {
                 var p = new Vector2(Rand(rng, -half + 40f, half - 40f), Rand(rng, -half + 40f, half - 40f));
                 if (p.magnitude < 45f || !ClearOfRiver(p, 18f) || !Free(p, 19f)) continue;
@@ -65,9 +65,13 @@ namespace FPSKit.EditorTools
                 var plan = new SitePlan { Centre = p, Width = 26f, Depth = 22f, Yaw = rng.Next(4) * 90f };
                 _farmPlans.Add(plan);
                 Claim(p.x, p.y, 19f);
-                FlattenPad(p.x, p.y, 17.5f, 16f);
+                FlattenPad(p.x, p.y, 17.5f, 24f, SiteHeight(p, 17.5f));
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
+                PlanFieldFor(rng, plan);
             }
+
+            // ---- then whatever of the groves, kilns, cemetery, mast and battle sites still fits ----
+            PlanDesertMore(rng, half, rim);
 
             // ---- camps: on the open dunes, no pad ----
             for (int i = 0; i < 300 && _campSites.Count < 9; i++)
@@ -136,6 +140,7 @@ namespace FPSKit.EditorTools
             foreach (var farm in _farmPlans) BuildFarm(wild, layer, backdrop, rng, farm);
             foreach (var camp in _campSites) BuildCamp(wild, layer, backdrop, rng, camp);
             foreach (var cp in _checkpoints) BuildCheckpoint(wild, layer, rng, cp);
+            BuildDesertMore(wild, layer, backdrop, rng);
             BuildPowerLine(wild, layer, backdrop);
             BuildWadis(wild, backdrop, rng, half);
             BuildRuts(wild, backdrop, rng, half);
@@ -659,6 +664,7 @@ namespace FPSKit.EditorTools
             if (_hasFob && _fob.Contains(p, margin)) return true;
             foreach (var farm in _farmPlans) if (farm.Contains(p, margin)) return true;
             foreach (var hamlet in _hamletPlans) if (hamlet.Contains(p, margin)) return true;
+            foreach (var site in MoreSites()) if (site.Contains(p, margin)) return true;
             foreach (var camp in _campSites) if ((camp - p).magnitude < 9f + margin) return true;
             foreach (var cp in _checkpoints) if ((new Vector2(cp.x, cp.y) - p).magnitude < 11f + margin) return true;
             return false;

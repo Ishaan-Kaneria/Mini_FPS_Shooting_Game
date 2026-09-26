@@ -58,6 +58,7 @@ namespace FPSKit.EditorTools
             _hasFob = false;
             _farmPlans.Clear();
             _hamletPlans.Clear();
+            ResetDesertMore();
             _campSites.Clear();
             _checkpoints.Clear();
             _poleLine.Clear();

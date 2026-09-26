@@ -32,7 +32,7 @@ namespace FPSKit.EditorTools
         static MeleeStrike _melee;
 
         static readonly float[] ReloadAt = { 0.08f, 0.25f, 0.45f, 0.62f, 0.8f };
-        static readonly float[] StrikeAt = { 0.1f, 0.3f, 0.45f, 0.75f };
+        static readonly float[] StrikeAt = { 0.2f, 0.3f, 0.38f, 0.5f, 0.75f };
         static int _shot;
 
         public static void Capture(string folder)

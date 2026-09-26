@@ -241,6 +241,10 @@ public class Weapon : MonoBehaviour
     ControlSettings _fallbackControls;
     Vector3 _hipPosition;
     Quaternion _hipRotation;
+
+    /// <summary>The model's resting pose in the holder, which the hands' offsets are added to.</summary>
+    public Vector3 HipPosition => _hipPosition;
+    public Quaternion HipRotation => _hipRotation;
     float _reloadStart = -99f;
     float _reloadLength = 1f;
     Vector3 _magazineRest, _handRest;

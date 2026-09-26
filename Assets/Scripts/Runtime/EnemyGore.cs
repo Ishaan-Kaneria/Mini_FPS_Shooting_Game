@@ -45,10 +45,12 @@ public class EnemyGore : MonoBehaviour
     [Min(0f)] public float poolDelay = 1.1f;
 
     [Tooltip("Width of the pool under a body of ordinary size, in metres.")]
-    [Min(0.1f)] public float poolSize = 1.3f;
+    [Min(0.1f)] public float poolSize = 1.7f;
 
-    [Tooltip("Seconds the pool takes to spread to its full size.")]
-    [Min(0.1f)] public float poolSpread = 6f;
+    [Tooltip("Seconds the pool keeps spreading for. Most of it comes in the first few " +
+             "seconds; the rest is a slow creep, so a body lying there for the rest of " +
+             "the level is still visibly bleeding out a minute later.")]
+    [Min(0.1f)] public float poolSpread = 60f;
 
     Health _health;
     EnemyAI _ai;
@@ -173,20 +175,44 @@ public class EnemyGore : MonoBehaviour
     {
         yield return new WaitForSeconds(poolDelay);
 
-        // From the torso, wherever the ragdoll has put it by now.
-        Vector3 at = transform.position;
+        var info = _health != null ? _health.LastDamage : default;
+
+        // The main pool from the torso, wherever the ragdoll has put it by now, and a
+        // smaller one from every part that was badly hurt: a head wound bleeds, and so
+        // does a shot-through leg. They run together as they spread.
+        bool torsoDone = false;
 
         for (int i = 0; i < _hitboxes.Length; i++)
         {
-            if (_hitboxes[i] == null || _hitboxes[i].Part != BodyPart.Torso || _hitColliders[i] == null) continue;
+            var hitbox = _hitboxes[i];
+            var collider = _hitColliders[i];
+            if (hitbox == null || collider == null) continue;
 
-            at = _hitColliders[i].bounds.center;
-            break;
+            var part = hitbox.Part;
+            float scale;
+
+            if (part == BodyPart.Torso)
+            {
+                if (torsoDone) continue;
+                torsoDone = true;
+                scale = 1f;
+            }
+            else if (part == BodyPart.Head)
+            {
+                if (!info.isHeadshot) continue;
+                scale = 0.65f;
+            }
+            else
+            {
+                if (_wounds == null || _wounds.Severity(part) < 0.5f) continue;
+                scale = 0.4f;
+            }
+
+            BloodFX.Pool(library, collider.bounds.center, poolSize * Size * scale * Random.Range(0.85f, 1.15f),
+                         poolSpread * Random.Range(0.8f, 1.2f));
+
+            yield return new WaitForSeconds(Random.Range(0.2f, 0.6f));
         }
-
-        // Faster and wider from a body that took a lot at once.
-        BloodFX.Pool(library, at, poolSize * Size * Random.Range(0.85f, 1.15f),
-                     poolSpread * Random.Range(0.8f, 1.2f));
     }
 
     // ======================================================================
@@ -271,7 +297,7 @@ public class EnemyGore : MonoBehaviour
         {
             if (_hitboxes[i] == null || _hitboxes[i].Part != part) continue;
 
-            var renderer = _hitboxes[i].GetComponent<Renderer>();
+            var renderer = _hitboxes[i].visual != null ? _hitboxes[i].visual : _hitboxes[i].GetComponent<Renderer>();
 
             // One skinned mesh is the whole body; staining it would paint all of it.
             if (renderer == null || renderer is SkinnedMeshRenderer) continue;

@@ -49,9 +49,11 @@ namespace FPSKit.EditorTools
             // a highlight and reads as wet -- but not much: on a flat floor a transparent
             // surface reflects the sky across its whole face, and at 0.6 every splat came
             // out a pale lilac instead of red.
-            library.splatMaterial = Surface("Blood_Splat", splat, new Color(0.26f, 0.008f, 0.012f, 0.97f), 0.3f);
-            library.poolMaterial = Surface("Blood_Pool", pool, new Color(0.2f, 0.006f, 0.01f, 0.98f), 0.3f);
-            library.woundMaterial = Surface("Blood_Wound", wound, new Color(0.4f, 0.025f, 0.025f, 1f), 0.35f);
+            library.splatMaterial = Surface("Blood_Splat", splat, new Color(0.17f, 0.004f, 0.007f, 0.97f), 0.22f);
+            library.poolMaterial = Surface("Blood_Pool", pool, new Color(0.14f, 0.003f, 0.006f, 0.98f), 0.3f);
+            library.woundMaterial = Surface("Blood_Wound", wound, new Color(0.24f, 0.008f, 0.01f, 1f), 0.25f);
+
+            library.decalBudget = new Vector3Int(64, 128, 200);
 
             var dropMat = Particle("Blood_Drop", drop);
             var mistMat = Particle("Blood_Mist", mist);
@@ -80,6 +82,11 @@ namespace FPSKit.EditorTools
             bank.human = Set("human");
             bank.creature = Set("creature");
 
+            // The creature recordings are a person's voice through filters, at a person's
+            // size. Taken down a fifth they stop sounding like somebody doing a monster.
+            bank.human.pitch = 1f;
+            bank.creature.pitch = 0.72f;
+
             EditorUtility.SetDirty(bank);
             AssetDatabase.SaveAssets();
             return bank;
@@ -101,15 +108,16 @@ namespace FPSKit.EditorTools
         {
             var clips = new System.Collections.Generic.List<AudioClip>();
 
-            for (int i = 1; i <= 9; i++)
+            for (int i = 1; i <= 40; i++)
             {
-                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{VoiceFolder}/{who}_{what}_{i:00}.wav");
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{VoiceFolder}/{who}_{what}_{i:00}.wav")
+                        ?? AssetDatabase.LoadAssetAtPath<AudioClip>($"{VoiceFolder}/{who}_{what}_{i:00}.ogg");
                 if (clip != null) clips.Add(clip);
             }
 
             if (clips.Count == 0)
                 Debug.LogWarning($"[FPSKit] No {who} {what} voice clips in {VoiceFolder}. " +
-                                 "Run Tools/generate-placeholder-audio.py.");
+                                 "They are recordings, not generated: see Docs/DESIGN_NOTES.md.");
 
             return clips.ToArray();
         }
@@ -138,6 +146,13 @@ namespace FPSKit.EditorTools
             if (mat.HasProperty("_SpecularHighlights")) mat.SetFloat("_SpecularHighlights", 1f);
 
             Transparent(mat);
+
+            // No sky in it. A flat transparent surface picks up the environment reflection
+            // across its whole face, and a blue sky over dark red comes out pink -- which is
+            // exactly how the first splats looked. The highlight from the light stays, so a
+            // pool still reads wet.
+            if (mat.HasProperty("_EnvironmentReflections")) mat.SetFloat("_EnvironmentReflections", 0f);
+            mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
 
             // Blood lies on a surface; it does not cast a shadow onto it.
             mat.SetShaderPassEnabled("ShadowCaster", false);

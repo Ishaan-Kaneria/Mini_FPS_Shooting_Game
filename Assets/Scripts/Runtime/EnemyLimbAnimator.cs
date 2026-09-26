@@ -76,6 +76,17 @@ public class EnemyLimbAnimator : MonoBehaviour
     [Tooltip("Degrees the torso leans into the direction of travel at full speed.")]
     public float runLean = 9f;
 
+    [Tooltip("Degrees a creature walks bent forward. A soldier walks upright; something " +
+             "that has stopped being one stoops.")]
+    public float creatureHunch = 14f;
+
+    [Tooltip("Degrees the hips twist and the body sways side to side across a stride. " +
+             "Without it the upper body rides the legs like a turret on a chassis.")]
+    public float strideTwist = 7f;
+
+    [Tooltip("Metres the chest rises with each breath while standing still.")]
+    public float breath = 0.006f;
+
     [Tooltip("Speed the walk cycle is considered 'full'. Below it the swing scales down, " +
              "so an enemy easing to a stop settles instead of snapping to rest.")]
     public float fullSpeed = 4f;
@@ -180,6 +191,12 @@ public class EnemyLimbAnimator : MonoBehaviour
     BodyPart _hitPart;
 
     bool _dropped;
+    float _breathPhase;
+
+    /// <summary>The stoop of a creature, read from its archetype so one prefab serves both.</summary>
+    float Hunch => _ai != null && _ai.archetype != null && _ai.archetype.voice == EnemyVoice.Kind.Creature
+        ? creatureHunch * (1f - _crawl01)
+        : 0f;
 
     Vector3 _weaponRestPosition;
     Quaternion _weaponRestRotation;
@@ -192,6 +209,8 @@ public class EnemyLimbAnimator : MonoBehaviour
         _wounds = GetComponent<EnemyWounds>();
 
         // Something else takes the body at death; this just stops.
+        _breathPhase = Random.value * Mathf.PI * 2f;
+
         _ownedAtDeath = GetComponent<EnemyDeath>() != null || GetComponent<RagdollController>() != null;
 
         // Captured before anything animates, so "rest" is whatever the builder and the
@@ -387,13 +406,21 @@ public class EnemyLimbAnimator : MonoBehaviour
 
         float lowered = (_torsoRestPosition.y - crawlHeight) * _crawl01;
 
-        torso.localPosition = _torsoRestPosition + Vector3.up * (bob - dip - buckle - lowered) + shove;
+        // Standing, it breathes: a slow rise and fall that stops it being a statue. Each
+        // enemy on its own phase, so a squad does not breathe in unison.
+        float breathing = Mathf.Sin(Time.time * 1.7f + _breathPhase) * breath * (1f - speed01) * (1f - _crawl01);
+
+        // Walking, the weight moves over each planted foot in turn.
+        Vector3 sway = Vector3.right * (Mathf.Sin(_stridePhase) * 0.022f * speed01 * (1f - _crawl01));
+
+        torso.localPosition = _torsoRestPosition + Vector3.up * (bob - dip - buckle - lowered + breathing) + shove + sway;
 
         float lean = runLean * speed01;
 
         // The attack leans further in and death folds the whole thing forward, so the
         // poses share one axis instead of fighting over the transform.
-        lean = Mathf.Lerp(lean, runLean + 12f, _attack01);
+        lean += Hunch;
+        lean = Mathf.Lerp(lean, runLean + 12f + Hunch, _attack01);
         lean = Mathf.Lerp(lean, crawlPitch, _crawl01);
         lean = Mathf.Lerp(lean, deathSlump, _death01);
 
@@ -411,7 +438,11 @@ public class EnemyLimbAnimator : MonoBehaviour
         // Crawling, it rocks side to side with each pull.
         roll += Mathf.Sin(_stridePhase) * 8f * _crawl01 * speed01;
 
-        torso.localRotation = _torsoRest * Quaternion.Euler(pitch, 0f, roll);
+        // The shoulders turn against the hips as the legs swing -- less with a rifle up,
+        // which is held on the target, not swung.
+        float twist = Mathf.Sin(_stridePhase) * strideTwist * speed01 * (1f - _crawl01) * (Armed ? 0.35f : 1f);
+
+        torso.localRotation = _torsoRest * Quaternion.Euler(pitch, twist, roll);
         return pitch;
     }
 

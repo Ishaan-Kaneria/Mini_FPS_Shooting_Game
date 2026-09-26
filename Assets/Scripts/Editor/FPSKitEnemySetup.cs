@@ -134,8 +134,8 @@ namespace FPSKit.EditorTools
             // ---- health ----
             var health = root.AddComponent<Health>();
             health.maxHealth = _health;
-            health.destroyOnDeath = true;
-            health.destroyDelay = _buildRagdoll ? 12f : 2.5f;
+            health.destroyOnDeath = !_buildRagdoll;
+            health.destroyDelay = 2.5f;
 
             // ---- hitboxes on real bones ----
             int hitboxCount = BuildHitboxes(animator, health, enemyLayer, out Transform head);

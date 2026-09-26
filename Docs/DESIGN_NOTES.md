@@ -1074,11 +1074,18 @@ Added 2026-09-26 at Ishaan's request: enemies that look, move, bleed, sound and 
 bodies rather than capsules. His calls: blood heavy but no dismemberment (with a Settings
 switch), limb wounds that change the fight, scaled by how strong the enemy is, voices mixed
 by type (soldiers human, heavies and the two generic bosses creature; the Augers are people
-and stay human), and a realistic model to come from an **Asset Store pack he will import**.
+and stay human). He then said he has no Asset Store soldier and to keep and improve the
+built one; bodies stay until the level ends; the synthesised voices were "very bad".
 
 **The body.** `BuildEnemyPrefab` builds a segmented soldier: hips, knees, shoulders, elbows
-and a neck are real pivots, with gear (vest, helmet, goggles, boots, pack) tagged Metal so
-the archetype colour stays on the clothes and skin. Every segment has a `Hitbox` with a
+and a neck are real pivots. What is drawn is a lofted mesh per segment (`FPSKitSoldier`:
+tapered thighs, calves, deltoids, a chest broader than the waist, a jawed head); what is hit
+is a plain primitive underneath with its renderer removed (`HideUnder`, `Hitbox.visual`
+points the stain at the drawn mesh). Gear is tagged Metal so the archetype colour stays on
+the clothes and skin. Kit named `Kit_<Human|Creature|Elite|Boss>_` is switched per archetype
+in `EnemyArchetype.Dress`. The uniform is the archetype colour muted toward drab
+(`UniformColor`) over a camo weave; skin is a real tone picked per soldier, a pallor for
+creatures, which also walk hunched. Every segment has a `Hitbox` with a
 `BodyPart`; the part rides on `DamageInfo.part`. The rifle hangs off the torso, is aimed by
 `EnemyLimbAnimator.PoseWeapon`, and the hands reach its two grips by two-bone IK
 (`ReachFor`). It used to ride the right arm, which pointed forward only with both arms held
@@ -1101,6 +1108,11 @@ materials must have `_BlendModePreserveSpecular` off: URP's default keeps specul
 alpha is zero and every splat drew a pale square of sky. Keep their smoothness low (0.3) for
 the same reason, or flat pools come out lilac. `GameSettings.Blood` off leaves a grey puff.
 
+**Corpses stay.** `Health.destroyOnDeath` is off on the built enemy: bodies lie where they
+fell until the scene changes, frozen and stripped of behaviours and (below High) shadows by
+`EnemyDeath.Rest`. Pools are a separate ring from splats (`BloodFX.Pools`, never recycled
+within a level's roster) and spread for about a minute, front-loaded.
+
 **Death** (`EnemyDeath`). Built at the moment of death, not kept kinematic: a rigidbody per
 segment and CharacterJoints with a body's limits, made in the *built* pose (limits are
 measured from the pose a joint is created in) then put back. `Classify` picks the fall:
@@ -1109,9 +1121,14 @@ otherwise doubles over or staggers back. Corpses freeze after `settleTime`, sink
 `Health.destroyDelay` (12s), and only a tier's budget simulate at once. A rigged character's
 `RagdollController` uses the same `Classify`/`Blow`.
 
-**Voices** (`EnemyVoice`, `VoiceBank`). Synthesised in `Tools/generate-placeholder-audio.py`
-(pulse source with jitter/shimmer/subharmonics through five formants); replace any with a
-recording of the same name in `Assets/Audio/SFX/Voice` and rebuild the enemy. The voice has
+**Voices** (`EnemyVoice`, `VoiceBank`). Recordings, all CC0 from OpenGameArt: "Male
+Grunt/Yelling sounds" (HaelDB), "grunts of male death and pain" (thebardofblasphemy, split
+into segments), "80 CC0 creature SFX" (rubberduck, played at `VoiceBank.Set.pitch` 0.72).
+A formant synth was tried first and rejected. Files are `<human|creature>_<slot>_NN.wav|ogg`
+in `Assets/Audio/SFX/Voice`; `FPSKitGore.GetOrCreateVoiceBank` finds them by name.
+Gunfire is recorded too (`Assets/Audio/SFX/Recorded`, The Free Firearm Sound Library, CC0):
+AR-15 for rifles, Mossberg for shotguns, PPSh for SMGs (picked by pellets / rpm in
+`StampWeaponFeedback`), AK-47 for enemies. The voice has
 its own AudioSource: a per-enemy pitch on the shared one bent the gunshots.
 
 **The Asset Store model** goes through Enemy Setup as before. `BuildFromTheme` now keeps a

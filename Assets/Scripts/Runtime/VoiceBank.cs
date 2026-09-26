@@ -40,6 +40,9 @@ public class VoiceBank : ScriptableObject
 
         [Tooltip("Dragging itself along the floor on a wrecked leg.")]
         public AudioClip[] crawl;
+
+        [Tooltip("Played at this pitch, before each enemy's own. Below 1 makes a voice bigger.")]
+        [Range(0.4f, 1.6f)] public float pitch = 1f;
     }
 
     public Set human = new Set();

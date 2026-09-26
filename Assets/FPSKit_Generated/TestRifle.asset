@@ -48,7 +48,7 @@ MonoBehaviour:
   muzzleFlashDuration: 0.045
   impactForce: 35
   cameraShake: 0.18
-  fireClip: {fileID: 8300000, guid: 63da0a84f4945c9aab87d69e6dedcc8d, type: 3}
+  fireClip: {fileID: 8300000, guid: a7a566e49c85b6d7ea5058221dab4bb5, type: 3}
   reloadClip: {fileID: 8300000, guid: 4e11845933db44619adbc649c9bf8ea2, type: 3}
   emptyClip: {fileID: 8300000, guid: 75ab90f74094cc38184cac61a2b794a7, type: 3}
   pitchVariance: 0.06

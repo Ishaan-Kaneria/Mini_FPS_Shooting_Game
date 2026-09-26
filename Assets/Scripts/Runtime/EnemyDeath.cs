@@ -543,9 +543,11 @@ public class EnemyDeath : MonoBehaviour
     {
         yield return new WaitForSeconds(settleTime);
         Freeze();
+        Rest();
 
-        // Sink out of sight before Health destroys it, so a body never pops out of existence
-        // in front of the player.
+        // A body normally stays for the rest of the level (Health.destroyOnDeath is off on
+        // the built enemy). If something does destroy it, it sinks out of sight first, so a
+        // body never pops out of existence in front of the player.
         float lifetime = _health != null && _health.destroyOnDeath ? _health.destroyDelay : 0f;
         if (lifetime <= 0f || sinkTime <= 0f) yield break;
 
@@ -562,6 +564,26 @@ public class EnemyDeath : MonoBehaviour
             transform.position = Vector3.Lerp(from, to, (Time.time - start) / sinkTime);
             yield return null;
         }
+    }
+
+    /// <summary>
+    /// A body that stays for the rest of the level should cost as little as a prop. Its
+    /// behaviours stop, its audio sources stop, and on the lower tiers it stops casting a
+    /// shadow -- fifty corpses in a long level are fifty extra shadow passes otherwise.
+    /// </summary>
+    void Rest()
+    {
+        foreach (var behaviour in GetComponents<MonoBehaviour>())
+            if (behaviour != null && behaviour != this && !(behaviour is EnemyGore) && !(behaviour is Health))
+                behaviour.enabled = false;
+
+        foreach (var source in GetComponentsInChildren<AudioSource>())
+            if (source != null && !source.isPlaying) source.enabled = false;
+
+        if (QualityTiers.Current == GameSettings.Quality.High) return;
+
+        foreach (var renderer in GetComponentsInChildren<Renderer>())
+            if (renderer != null) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     }
 
     /// <summary>Stops simulating: every body kinematic where it lies.</summary>

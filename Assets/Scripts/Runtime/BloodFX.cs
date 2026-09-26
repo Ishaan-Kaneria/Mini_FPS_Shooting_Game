@@ -29,6 +29,9 @@ public static class BloodFX
         public Transform target;
         public Vector3 from, to;
         public float start, duration;
+
+        /// <summary>How front-loaded the spread is. Higher: most of it early, then a slow creep.</summary>
+        public float power;
     }
 
     static BloodLibrary s_library;
@@ -36,6 +39,16 @@ public static class BloodFX
     static ParticleSystem s_spray;
     static ParticleSystem s_mist;
     static readonly List<MeshRenderer> Decals = new List<MeshRenderer>();
+
+    /// <summary>
+    /// The pools under bodies, kept apart from the splats. Splats are recycled oldest-first
+    /// once the tier's budget is spent; a pool marks where somebody died and stays until
+    /// the level ends, like the body lying in it.
+    /// </summary>
+    static readonly List<MeshRenderer> Pools = new List<MeshRenderer>();
+
+    /// <summary>Pools a level can hold before the oldest is reused. Far above any level's roster.</summary>
+    const int PoolBudget = 160;
     static readonly List<Growth> Growing = new List<Growth>();
     static int s_next;
     static Mesh[] s_quads;
@@ -50,6 +63,7 @@ public static class BloodFX
         s_spray = null;
         s_mist = null;
         Decals.Clear();
+        Pools.Clear();
         Growing.Clear();
         s_next = 0;
         s_quads = null;
@@ -182,7 +196,10 @@ public static class BloodFX
         decal.transform.localScale = scale;
     }
 
-    /// <summary>The pool that spreads out under a body over a few seconds.</summary>
+    /// <summary>
+    /// The pool that spreads out under a body: quickly at first, then creeping outward for
+    /// as long as <paramref name="seconds"/> says. It is never taken back while the level runs.
+    /// </summary>
     public static void Pool(BloodLibrary library, Vector3 at, float size, float seconds)
     {
         if (!Enabled || !Ensure(library)) return;
@@ -192,7 +209,7 @@ public static class BloodFX
 
         var decal = Place(floor.point, floor.normal, size, Vector3.zero,
                           library.poolMaterial != null ? library.poolMaterial : library.splatMaterial,
-                          library.poolMaterial != null ? Whole() : Atlas());
+                          library.poolMaterial != null ? Whole() : Atlas(), pool: true);
         if (decal == null) return;
 
         var full = decal.transform.localScale;
@@ -203,7 +220,8 @@ public static class BloodFX
             from = full * 0.12f,
             to = full,
             start = Time.time,
-            duration = Mathf.Max(0.1f, seconds)
+            duration = Mathf.Max(0.1f, seconds),
+            power = 4f
         });
 
         decal.transform.localScale = full * 0.12f;
@@ -262,20 +280,21 @@ public static class BloodFX
     /// is the oldest one in the level.
     /// </summary>
     static MeshRenderer Place(Vector3 point, Vector3 normal, float size, Vector3 along,
-                              Material material, Mesh mesh)
+                              Material material, Mesh mesh, bool pool = false)
     {
         if (material == null || s_root == null) return null;
 
         MeshRenderer decal = null;
-        int budget = Budget;
+        var ring = pool ? Pools : Decals;
+        int budget = pool ? PoolBudget : Budget;
 
         // Destroyed from outside (a scene change mid-fight) leaves holes; drop them.
-        for (int i = Decals.Count - 1; i >= 0; i--)
-            if (Decals[i] == null) Decals.RemoveAt(i);
+        for (int i = ring.Count - 1; i >= 0; i--)
+            if (ring[i] == null) ring.RemoveAt(i);
 
-        if (Decals.Count < budget)
+        if (ring.Count < budget)
         {
-            var go = new GameObject("Blood");
+            var go = new GameObject(pool ? "BloodPool" : "Blood");
             go.layer = 2;   // Ignore Raycast: nothing should ever hit a splat
             go.transform.SetParent(s_root, false);
             go.AddComponent<MeshFilter>();
@@ -284,7 +303,14 @@ public static class BloodFX
             decal.receiveShadows = true;
             decal.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             decal.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
-            Decals.Add(decal);
+            ring.Add(decal);
+        }
+        else if (pool)
+        {
+            decal = ring[0];
+            ring.RemoveAt(0);
+            ring.Add(decal);
+            RemoveGrowth(decal.transform);
         }
         else
         {
@@ -298,7 +324,9 @@ public static class BloodFX
 
         // Lifted off the surface by a hair, and a different hair for each of a run of
         // neighbours, so two splats that overlap do not fight over the same depth.
-        float lift = 0.008f + (Decals.IndexOf(decal) % 8) * 0.0015f;
+        // Pools sit a hair above the splats, so a body's own pool is not hidden under the
+        // spatter it landed in.
+        float lift = 0.008f + (ring.IndexOf(decal) % 8) * 0.0015f + (pool ? 0.012f : 0f);
 
         Vector3 up = normal.normalized;
         Vector3 forward = Vector3.ProjectOnPlane(along, up);
@@ -335,7 +363,7 @@ public static class BloodFX
             float t = Mathf.Clamp01((Time.time - g.start) / g.duration);
 
             // Fast, then slowing, the way a liquid actually spreads.
-            float eased = 1f - (1f - t) * (1f - t) * (1f - t);
+            float eased = 1f - Mathf.Pow(1f - t, g.power > 0f ? g.power : 3f);
             g.target.localScale = Vector3.Lerp(g.from, g.to, eased);
 
             if (t >= 1f) Growing.RemoveAt(i);
@@ -357,6 +385,7 @@ public static class BloodFX
         if (s_root != null) return true;
 
         Decals.Clear();
+        Pools.Clear();
         Growing.Clear();
         s_next = 0;
 

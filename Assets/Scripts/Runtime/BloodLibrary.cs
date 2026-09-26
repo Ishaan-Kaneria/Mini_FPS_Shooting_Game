@@ -49,7 +49,7 @@ public class BloodLibrary : ScriptableObject
     [Header("Budget")]
     [Tooltip("Splats kept in the world at once, per quality tier (Low, Medium, High). " +
              "The oldest is reused past this, so a long fight never costs more.")]
-    public Vector3Int decalBudget = new Vector3Int(48, 96, 160);
+    public Vector3Int decalBudget = new Vector3Int(64, 128, 200);
 
     [Tooltip("Droplets per hit at full severity, before the quality tier scales it.")]
     [Min(1)] public int dropsPerHit = 26;

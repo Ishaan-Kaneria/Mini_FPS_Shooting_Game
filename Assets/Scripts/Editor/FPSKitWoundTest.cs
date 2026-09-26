@@ -262,6 +262,19 @@ namespace FPSKit.EditorTools
                 Require(height < 0.55f, $"a headshot victim's hips are still {height:0.00}m up: it did not fall");
             }
 
+            // ---- corpses stay ---------------------------------------------------------
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+            var prefabHealth = prefab != null ? prefab.GetComponent<Health>() : null;
+            Require(prefabHealth != null && !prefabHealth.destroyOnDeath,
+                    "the enemy prefab still destroys its body: corpses must stay until the level ends");
+
+            // ---- kit ------------------------------------------------------------------
+            Require(Worn(_boss, "Kit_Boss_Visor") && !Worn(_boss, "Kit_Human_Helmet"),
+                    "the Warden is not dressed as a boss creature (visor on, helmet off)");
+            Require(Worn(_armGrunt, "Kit_Human_Helmet") && !Worn(_armGrunt, "Kit_Elite_PadLeft"),
+                    "a grunt is not dressed as an ordinary soldier (helmet on, no shoulder armour)");
+            Require(Worn(_elite, "Kit_Elite_PadLeft"), "the Sentinel has no elite shoulder armour");
+
             // ---- blood --------------------------------------------------------------
             int wounds = 0;
             foreach (var enemy in new[] { _legGrunt, _armGrunt })
@@ -343,6 +356,16 @@ namespace FPSKit.EditorTools
             if (death == null) return;
 
             Require(death.LastStyle == expected, $"killed by {how}, {Name(enemy)} died {death.LastStyle}, not {expected}");
+        }
+
+        static bool Worn(GameObject enemy, string part)
+        {
+            if (enemy == null) return false;
+
+            foreach (var t in enemy.GetComponentsInChildren<Transform>(true))
+                if (t.name == part) return t.gameObject.activeInHierarchy;
+
+            return false;
         }
 
         static string Name(GameObject go) => go != null ? go.name : "(destroyed)";

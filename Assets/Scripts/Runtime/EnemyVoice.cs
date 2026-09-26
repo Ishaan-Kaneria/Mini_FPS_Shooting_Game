@@ -105,7 +105,7 @@ public class EnemyVoice : MonoBehaviour
         // fifth lower -- the square root, because a full octave for a big enemy turns a
         // voice into a sound effect.
         float size = Mathf.Max(0.3f, transform.lossyScale.y);
-        _pitch = Random.Range(0.92f, 1.08f) / Mathf.Sqrt(size);
+        _pitch = Random.Range(0.92f, 1.08f) / Mathf.Sqrt(size) * (Voice != null ? Voice.pitch : 1f);
 
         _nextHunt = Time.time + Random.Range(huntInterval.x, huntInterval.y);
     }

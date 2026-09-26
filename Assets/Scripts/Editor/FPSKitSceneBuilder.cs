@@ -307,6 +307,12 @@ namespace FPSKit.EditorTools
 
             _theme = FPSKitThemes.GetOrCreate(themeName);
 
+            // The guns' recorded fire clips live on the store's and the starter rifle's
+            // assets, which only a scene build otherwise re-stamps.
+            var impacts = CreateImpactLibrary();
+            CreateWeaponData(impacts);
+            StampStoreContent(FPSKitStore.GetOrCreate(), impacts);
+
             return IsRiggedEnemy() ? UpgradeEnemyPrefab(AssetFolder + "/Enemy.prefab") : BuildEnemyPrefab();
         }
 
@@ -357,7 +363,7 @@ namespace FPSKit.EditorTools
                 changed |= FillClip(ref ai.alertClip, "SFX/enemy_alert.wav");
                 changed |= FillClip(ref ai.attackClip, "SFX/enemy_attack.wav");
                 changed |= FillClip(ref ai.deathClip, "SFX/enemy_death.wav");
-                changed |= FillClip(ref ai.fireClip, "SFX/weapon_fire.wav");
+                changed |= FillClip(ref ai.fireClip, "SFX/Recorded/enemy_rifle_fire.wav");
 
                 if (ai.painClips == null || ai.painClips.Length == 0)
                 {
@@ -1750,7 +1756,12 @@ namespace FPSKit.EditorTools
         {
             data.impacts = impacts;
 
-            data.fireClip = Clip("SFX/weapon_fire.wav");
+            // Recorded, not synthesised (CC0, the Free Firearm Sound Library): a shotgun, a
+            // submachine gun and a rifle, picked by how the gun fires rather than by name so
+            // a new store gun sounds like its class without anybody wiring it.
+            data.fireClip = Clip(data.pelletsPerShot > 1 ? "SFX/Recorded/shotgun_fire.wav"
+                               : data.roundsPerMinute >= 750f ? "SFX/Recorded/smg_fire.wav"
+                               : "SFX/Recorded/rifle_fire.wav");
             data.reloadClip = Clip("SFX/weapon_reload.wav");
             data.emptyClip = Clip("SFX/weapon_empty.wav");
             data.pitchVariance = 0.06f;
@@ -2156,110 +2167,165 @@ namespace FPSKit.EditorTools
             var flesh = MakeTintableMaterial("Enemy", new Color(0.55f, 0.18f, 0.18f), 0.2f, 0f);
             var headFlesh = MakeTintableMaterial("EnemyHead", new Color(0.75f, 0.3f, 0.25f), 0.2f, 0f);
 
-            // Webbing, helmet, boots and goggles. Tagged as gear so the archetype's colour
-            // stays on the clothes and the skin (see EnemyAI.IsBodyRenderer): a soldier
-            // is a uniform with kit on it, not one colour from helmet to boots.
-            var gear = MakeSharedMaterial("Enemy_Gear", new Color(0.13f, 0.135f, 0.12f), 0.12f, 0f);
-            var goggles = MakeSharedMaterial("Enemy_Goggles", new Color(0.03f, 0.035f, 0.04f), 0.55f, 0f);
+            // Cloth and skin. The uniform carries a camouflage weave the archetype's colour
+            // is multiplied over; skin is plain with a little sheen.
+            Dress(flesh, UniformTexture(), 0.12f);
+            Dress(headFlesh, null, 0.32f);
 
-            // <b>A body in segments, jointed where a body is.</b>
+            // Webbing, helmet, boots, gloves and goggles. Tagged as gear so the archetype's
+            // colour stays on the clothes and the skin (see EnemyAI.IsBodyRenderer): a
+            // soldier is a uniform with kit on it, not one colour from helmet to boots.
+            var gearTexture = GearTexture();
+            var gear = MakeSharedMaterial("Enemy_Gear", new Color(0.13f, 0.135f, 0.12f), 0.12f, 0f);
+            var kit = MakeSharedMaterial("Enemy_Kit", new Color(0.24f, 0.22f, 0.17f), 0.1f, 0f);
+            var boots = MakeSharedMaterial("Enemy_Boots", new Color(0.09f, 0.08f, 0.07f), 0.28f, 0f);
+            // Emissive-capable, because the archetype's glow is carried on the lenses.
+            var goggles = MakeTintableMaterial("Enemy_Goggles", new Color(0.03f, 0.035f, 0.04f), 0.55f, 0f, shared: true);
+            Dress(gear, gearTexture, 0.12f);
+            Dress(kit, gearTexture, 0.1f);
+            Dress(boots, gearTexture, 0.28f);
+
+            // <b>A body in segments, jointed where a body is, shaped like one.</b>
             //
-            // The old enemy was a capsule, a ball and four sticks. It walked, but nothing
-            // about it could limp, crawl, hang an arm or fold at the knee as it fell,
-            // because it had no knees. Every pivot below is a real joint -- hips, knees,
-            // shoulders, elbows, neck -- so EnemyLimbAnimator can bend it and EnemyDeath
-            // can hand it to physics joint by joint. Proportions are an adult's: hips at
-            // a metre, the top of the helmet a little under two.
+            // The old enemy was a capsule, a ball and four sticks. Every pivot below is a
+            // real joint -- hips, knees, shoulders, elbows, neck -- so EnemyLimbAnimator
+            // can bend it and EnemyDeath can hand it to physics joint by joint. What is
+            // drawn is a lofted mesh per segment (FPSKitSoldier): a thigh that tapers, a
+            // calf behind the shin, a chest broader than the waist. What is hit is still
+            // a plain primitive under it, a hitbox the size of the segment.
             //
             // The torso is an empty pivot at the hips, so the upper body can lean and bob
-            // without dragging the feet off the floor. Legs hang off the root for the
-            // same reason.
+            // without dragging the feet off the floor. Legs hang off the root for the same
+            // reason.
             var torso = new GameObject("Torso");
             torso.transform.SetParent(enemy.transform, false);
             torso.transform.localPosition = new Vector3(0f, 1.0f, 0f);
 
             var pelvis = EnemyPart(torso.transform, "Pelvis", PrimitiveType.Capsule, flesh, enemyLayer,
-                                   new Vector3(0f, 0.02f, 0f), new Vector3(0.34f, 0.14f, 0.24f));
+                                   new Vector3(0f, 0.02f, 0f), new Vector3(0.32f, 0.13f, 0.23f));
             var body = EnemyPart(torso.transform, "Chest", PrimitiveType.Capsule, flesh, enemyLayer,
-                                 new Vector3(0f, 0.33f, 0f), new Vector3(0.46f, 0.27f, 0.3f));
+                                 new Vector3(0f, 0.33f, 0f), new Vector3(0.42f, 0.27f, 0.26f));
 
-            // The vest is a capsule a hair larger than the chest, not a box round it: a box
-            // reads as a crate strapped to a mannequin.
-            EnemyGear(torso.transform, "Vest", PrimitiveType.Capsule, gear, new Vector3(0f, 0.36f, 0.005f),
-                      new Vector3(0.48f, 0.2f, 0.33f));
-            EnemyGear(torso.transform, "Pouches", PrimitiveType.Cube, gear, new Vector3(0f, 0.25f, 0.155f),
+            var torsoLook = Visual(torso.transform, "TorsoMesh", TorsoMesh(), flesh, Vector3.zero, Vector3.zero, false);
+            HideUnder(pelvis, torsoLook);
+            HideUnder(body, torsoLook);
+
+            Visual(torso.transform, "Vest", VestMesh(), gear, Vector3.zero, Vector3.zero, true);
+            Visual(torso.transform, "Pack", PackMesh(), kit, new Vector3(0f, 0f, -0.19f), Vector3.zero, true);
+            EnemyGear(torso.transform, "Pouches", PrimitiveType.Cube, kit, new Vector3(0f, 0.25f, 0.155f),
                       new Vector3(0.3f, 0.09f, 0.05f));
-            EnemyGear(torso.transform, "Pack", PrimitiveType.Cube, gear, new Vector3(0f, 0.38f, -0.17f),
-                      new Vector3(0.26f, 0.28f, 0.09f));
-            EnemyGear(torso.transform, "Belt", PrimitiveType.Cylinder, gear, new Vector3(0f, 0.1f, 0f),
-                      new Vector3(0.36f, 0.035f, 0.27f));
+            EnemyGear(torso.transform, "PouchLeft", PrimitiveType.Cube, kit, new Vector3(-0.1f, 0.38f, 0.16f),
+                      new Vector3(0.08f, 0.1f, 0.045f));
+            EnemyGear(torso.transform, "Radio", PrimitiveType.Cube, gear, new Vector3(0.13f, 0.45f, 0.155f),
+                      new Vector3(0.05f, 0.09f, 0.04f));
+            EnemyGear(torso.transform, "Belt", PrimitiveType.Cylinder, gear, new Vector3(0f, 0.08f, 0.005f),
+                      new Vector3(0.35f, 0.03f, 0.25f));
+            EnemyGear(torso.transform, "Holster", PrimitiveType.Cube, gear, new Vector3(0.17f, -0.02f, 0.02f),
+                      new Vector3(0.05f, 0.13f, 0.09f));
 
             // The neck pivots the head, so it can turn to the player and snap back on a
             // headshot without the shoulders going with it.
             var neck = EnemyJoint(torso.transform, "Neck", new Vector3(0f, 0.6f, 0f));
 
-            EnemyGear(neck, "NeckSkin", PrimitiveType.Cylinder, headFlesh, new Vector3(0f, 0.05f, 0f),
-                      new Vector3(0.12f, 0.06f, 0.12f), gearTag: false);
             var head = EnemyPart(neck, "Head", PrimitiveType.Sphere, headFlesh, enemyLayer,
-                                 new Vector3(0f, 0.2f, 0.01f), new Vector3(0.23f, 0.27f, 0.25f));
-            EnemyGear(neck, "Helmet", PrimitiveType.Sphere, gear, new Vector3(0f, 0.27f, -0.005f),
-                      new Vector3(0.28f, 0.2f, 0.3f));
-            EnemyGear(neck, "Goggles", PrimitiveType.Cube, goggles, new Vector3(0f, 0.22f, 0.115f),
-                      new Vector3(0.17f, 0.045f, 0.04f));
+                                 new Vector3(0f, 0.19f, 0.01f), new Vector3(0.2f, 0.26f, 0.22f));
+            var headLook = Visual(neck, "HeadSkin", HeadMesh(), headFlesh, Vector3.zero, Vector3.zero, false);
+            HideUnder(head, headLook);
 
-            // Shoulders and elbows. The upper arm hangs from the shoulder, the forearm
-            // from the elbow, and a swing rotates the whole limb about its joint.
-            var leftArm = EnemyJoint(torso.transform, "ArmLeft", new Vector3(-0.29f, 0.54f, 0f));
-            var rightArm = EnemyJoint(torso.transform, "ArmRight", new Vector3(0.29f, 0.54f, 0f));
+            // Kit that depends on who is wearing it. Everything named Kit_<Who>_ is switched
+            // on or off by EnemyArchetype.ApplyTo: soldiers wear helmet, goggles and scarf;
+            // creatures go bare-headed behind a respirator; elites add shoulder armour and
+            // bosses a faceplate, a chest plate and a collar. One prefab, a roster of
+            // different-looking enemies.
+            Visual(neck, "Kit_Human_Mask", MaskMesh(), kit, Vector3.zero, Vector3.zero, true);
+            Visual(neck, "Kit_Human_Helmet", HelmetMesh(), gear, Vector3.zero, Vector3.zero, true);
+            EnemyGear(neck, "Kit_Human_Goggles", PrimitiveType.Cube, goggles, new Vector3(0f, 0.215f, 0.1f),
+                      new Vector3(0.16f, 0.045f, 0.04f));
+            EnemyGear(neck, "Kit_Human_GoggleStrap", PrimitiveType.Cylinder, gear, new Vector3(0f, 0.215f, 0f),
+                      new Vector3(0.2f, 0.012f, 0.215f));
+
+            EnemyGear(neck, "Kit_Creature_Respirator", PrimitiveType.Cube, goggles, new Vector3(0f, 0.1f, 0.09f),
+                      new Vector3(0.09f, 0.07f, 0.06f));
+            EnemyGear(neck, "Kit_Creature_FilterLeft", PrimitiveType.Cylinder, gear, new Vector3(-0.055f, 0.085f, 0.1f),
+                      new Vector3(0.05f, 0.025f, 0.05f)).transform.localRotation = Quaternion.Euler(70f, 0f, 35f);
+            EnemyGear(neck, "Kit_Creature_FilterRight", PrimitiveType.Cylinder, gear, new Vector3(0.055f, 0.085f, 0.1f),
+                      new Vector3(0.05f, 0.025f, 0.05f)).transform.localRotation = Quaternion.Euler(70f, 0f, -35f);
+            EnemyGear(neck, "Kit_Creature_Eyes", PrimitiveType.Cube, goggles, new Vector3(0f, 0.2f, 0.098f),
+                      new Vector3(0.12f, 0.02f, 0.02f));
+
+            EnemyGear(neck, "Kit_Boss_Visor", PrimitiveType.Cube, goggles, new Vector3(0f, 0.19f, 0.11f),
+                      new Vector3(0.19f, 0.13f, 0.035f));
+            EnemyGear(torso.transform, "Kit_Boss_Collar", PrimitiveType.Cylinder, gear, new Vector3(0f, 0.57f, 0f),
+                      new Vector3(0.26f, 0.05f, 0.22f));
+            EnemyGear(torso.transform, "Kit_Boss_Plate", PrimitiveType.Cube, gear, new Vector3(0f, 0.37f, 0.16f),
+                      new Vector3(0.36f, 0.3f, 0.04f)).transform.localRotation = Quaternion.Euler(-6f, 0f, 0f);
+
+            // Shoulders and elbows. The upper arm hangs from the shoulder, the forearm from
+            // the elbow, the gloved hand from the forearm.
+            var leftArm = EnemyJoint(torso.transform, "ArmLeft", new Vector3(-0.27f, 0.53f, 0f));
+            var rightArm = EnemyJoint(torso.transform, "ArmRight", new Vector3(0.27f, 0.53f, 0f));
 
             var leftUpper = EnemyPart(leftArm, "ArmLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
-                                      new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.17f, 0.12f));
+                                      new Vector3(0f, -0.15f, 0f), new Vector3(0.105f, 0.17f, 0.105f));
             var rightUpper = EnemyPart(rightArm, "ArmRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
-                                       new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.17f, 0.12f));
+                                       new Vector3(0f, -0.15f, 0f), new Vector3(0.105f, 0.17f, 0.105f));
+            HideUnder(leftUpper, Visual(leftArm, "UpperArmLeft", UpperArmMesh(), flesh, Vector3.zero, Vector3.zero, false));
+            HideUnder(rightUpper, Visual(rightArm, "UpperArmRight", UpperArmMesh(), flesh, Vector3.zero, Vector3.zero, false));
 
             var leftElbow = EnemyJoint(leftArm, "ElbowLeft", new Vector3(0f, -0.3f, 0f));
             var rightElbow = EnemyJoint(rightArm, "ElbowRight", new Vector3(0f, -0.3f, 0f));
 
             var leftFore = EnemyPart(leftElbow, "ForearmLeft", PrimitiveType.Capsule, flesh, enemyLayer,
-                                     new Vector3(0f, -0.13f, 0f), new Vector3(0.1f, 0.15f, 0.1f));
+                                     new Vector3(0f, -0.13f, 0f), new Vector3(0.085f, 0.15f, 0.085f));
             var rightFore = EnemyPart(rightElbow, "ForearmRight", PrimitiveType.Capsule, flesh, enemyLayer,
-                                      new Vector3(0f, -0.13f, 0f), new Vector3(0.1f, 0.15f, 0.1f));
+                                      new Vector3(0f, -0.13f, 0f), new Vector3(0.085f, 0.15f, 0.085f));
+            HideUnder(leftFore, Visual(leftElbow, "ForearmLeftMesh", ForearmMesh(), flesh, Vector3.zero, Vector3.zero, false));
+            HideUnder(rightFore, Visual(rightElbow, "ForearmRightMesh", ForearmMesh(), flesh, Vector3.zero, Vector3.zero, false));
 
-            EnemyGear(leftElbow, "HandLeft", PrimitiveType.Sphere, headFlesh, new Vector3(0f, -0.3f, 0.01f),
-                      new Vector3(0.08f, 0.1f, 0.07f), gearTag: false);
-            EnemyGear(rightElbow, "HandRight", PrimitiveType.Sphere, headFlesh, new Vector3(0f, -0.3f, 0.01f),
-                      new Vector3(0.08f, 0.1f, 0.07f), gearTag: false);
+            Visual(leftArm, "Kit_Elite_PadLeft", KneePadMesh(), gear, new Vector3(-0.035f, -0.02f, 0f),
+                   new Vector3(0f, 0f, -12f), true, new Vector3(1.5f, 1.3f, 2.2f));
+            Visual(rightArm, "Kit_Elite_PadRight", KneePadMesh(), gear, new Vector3(0.035f, -0.02f, 0f),
+                   new Vector3(0f, 0f, 12f), true, new Vector3(1.5f, 1.3f, 2.2f));
+
+            Visual(leftElbow, "GloveLeft", HandMesh(), gear, Vector3.zero, Vector3.zero, true);
+            Visual(rightElbow, "GloveRight", HandMesh(), gear, Vector3.zero, Vector3.zero, true);
 
             // Hips and knees, with the boot on the shin so it swings with the foot.
-            var leftLeg = EnemyJoint(enemy.transform, "LegLeft", new Vector3(-0.12f, 1.0f, 0f));
-            var rightLeg = EnemyJoint(enemy.transform, "LegRight", new Vector3(0.12f, 1.0f, 0f));
+            var leftLeg = EnemyJoint(enemy.transform, "LegLeft", new Vector3(-0.1f, 1.0f, 0f));
+            var rightLeg = EnemyJoint(enemy.transform, "LegRight", new Vector3(0.1f, 1.0f, 0f));
 
             var leftThigh = EnemyPart(leftLeg, "LegLeftMesh", PrimitiveType.Capsule, flesh, enemyLayer,
                                       new Vector3(0f, -0.23f, 0f), new Vector3(0.17f, 0.26f, 0.17f));
             var rightThigh = EnemyPart(rightLeg, "LegRightMesh", PrimitiveType.Capsule, flesh, enemyLayer,
                                        new Vector3(0f, -0.23f, 0f), new Vector3(0.17f, 0.26f, 0.17f));
+            HideUnder(leftThigh, Visual(leftLeg, "ThighLeft", ThighMesh(), flesh, Vector3.zero, Vector3.zero, false));
+            HideUnder(rightThigh, Visual(rightLeg, "ThighRight", ThighMesh(), flesh, Vector3.zero, Vector3.zero, false));
 
             var leftKnee = EnemyJoint(leftLeg, "KneeLeft", new Vector3(0f, -0.47f, 0f));
             var rightKnee = EnemyJoint(rightLeg, "KneeRight", new Vector3(0f, -0.47f, 0f));
 
             var leftShin = EnemyPart(leftKnee, "ShinLeft", PrimitiveType.Capsule, flesh, enemyLayer,
-                                     new Vector3(0f, -0.22f, 0f), new Vector3(0.13f, 0.23f, 0.13f));
+                                     new Vector3(0f, -0.22f, 0f), new Vector3(0.12f, 0.23f, 0.12f));
             var rightShin = EnemyPart(rightKnee, "ShinRight", PrimitiveType.Capsule, flesh, enemyLayer,
-                                      new Vector3(0f, -0.22f, 0f), new Vector3(0.13f, 0.23f, 0.13f));
+                                      new Vector3(0f, -0.22f, 0f), new Vector3(0.12f, 0.23f, 0.12f));
+            HideUnder(leftShin, Visual(leftKnee, "ShinLeftMesh", ShinMesh(), flesh, Vector3.zero, Vector3.zero, false));
+            HideUnder(rightShin, Visual(rightKnee, "ShinRightMesh", ShinMesh(), flesh, Vector3.zero, Vector3.zero, false));
 
-            EnemyGear(leftKnee, "BootLeft", PrimitiveType.Cube, gear, new Vector3(0f, -0.47f, 0.04f),
-                      new Vector3(0.13f, 0.1f, 0.27f));
-            EnemyGear(rightKnee, "BootRight", PrimitiveType.Cube, gear, new Vector3(0f, -0.47f, 0.04f),
-                      new Vector3(0.13f, 0.1f, 0.27f));
+            Visual(leftKnee, "KneePadLeft", KneePadMesh(), gear, new Vector3(0f, -0.02f, 0.052f), Vector3.zero, true);
+            Visual(rightKnee, "KneePadRight", KneePadMesh(), gear, new Vector3(0f, -0.02f, 0.052f), Vector3.zero, true);
+
+            // A boot lies along the foot: lofted up +Y, turned forward, the sole at the floor.
+            Visual(leftKnee, "BootLeft", BootMesh(), boots, new Vector3(0f, -0.475f, 0.01f), new Vector3(90f, 0f, 0f), true);
+            Visual(rightKnee, "BootRight", BootMesh(), boots, new Vector3(0f, -0.475f, 0.01f), new Vector3(90f, 0f, 0f), true);
 
             var hp = enemy.AddComponent<Health>();
             hp.maxHealth = 100f;
-            hp.destroyOnDeath = true;
-
-            // Long enough to see where a body fell and what it left on the floor, and
-            // EnemyDeath sinks it out of sight before this is up. Every system that
-            // counts enemies filters on IsDead, not on the object existing.
-            hp.destroyDelay = 12f;
+            // The body stays where it fell until the level ends, with its blood spreading
+            // under it. Every system that counts enemies filters on IsDead, not on the
+            // object existing, and a scene change takes the corpses with it. EnemyDeath
+            // freezes the ragdoll once it has settled, so a lying body is a static prop.
+            hp.destroyOnDeath = false;
+            hp.destroyDelay = 0f;
 
             // Hitboxes, one per segment, each saying which part of the body it is. The
             // part is what a wound is booked to (EnemyWounds), so a round in the shin is
@@ -2370,7 +2436,8 @@ namespace FPSKit.EditorTools
             // Slower than the player's 240, so incoming fire is legible as something
             // arriving at you rather than an instant hit you can only infer from damage.
             ai.tracerSpeed = 170f;
-            ai.fireClip = Clip("SFX/weapon_fire.wav");
+            // A different rifle from the player's, so incoming fire is heard as theirs.
+            ai.fireClip = Clip("SFX/Recorded/enemy_rifle_fire.wav");
 
             // No AnimationClips and no AnimatorController anywhere in the kit -- the walk
             // comes off the agent's own velocity. See EnemyLimbAnimator.

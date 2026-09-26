@@ -231,7 +231,34 @@ public class EnemyArchetype : ScriptableObject
             }
         }
 
+        Dress(enemy);
         Tint(enemy);
+    }
+
+    /// <summary>
+    /// Switches the kit the prefab carries for everybody to what this one wears, by the
+    /// Kit_&lt;Who&gt;_ naming the builder uses: Human and Creature by voice, Elite for elites
+    /// and bosses, Boss for bosses alone. A prefab with no such children is left as it is.
+    /// </summary>
+    void Dress(GameObject enemy)
+    {
+        bool creature = voice == EnemyVoice.Kind.Creature;
+        bool elite = role != Role.Standard;
+        bool boss = role == Role.Boss;
+
+        foreach (var part in enemy.GetComponentsInChildren<Transform>(true))
+        {
+            string name = part.name;
+            if (!name.StartsWith("Kit_", System.StringComparison.Ordinal)) continue;
+
+            bool wear = name.StartsWith("Kit_Human_", System.StringComparison.Ordinal) ? !creature && !(boss && name.Contains("Goggles"))
+                      : name.StartsWith("Kit_Creature_", System.StringComparison.Ordinal) ? creature
+                      : name.StartsWith("Kit_Elite_", System.StringComparison.Ordinal) ? elite
+                      : name.StartsWith("Kit_Boss_", System.StringComparison.Ordinal) ? boss
+                      : part.gameObject.activeSelf;
+
+            if (part.gameObject.activeSelf != wear) part.gameObject.SetActive(wear);
+        }
     }
 
     /// <summary>
@@ -249,9 +276,59 @@ public class EnemyArchetype : ScriptableObject
         || name.IndexOf("Hand", System.StringComparison.OrdinalIgnoreCase) >= 0
         || name.IndexOf("Neck", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
+    /// <summary>
+    /// Human skin, from pale to dark. One is picked per soldier at spawn, so a squad is a
+    /// group of people rather than a row of the same face.
+    /// </summary>
+    static Color SkinTone(int index)
+    {
+        // A switch rather than a static array: constant data, and no static for the
+        // domain-reload audit to ask a reset hook of.
+        switch (index)
+        {
+            case 0: return new Color(0.87f, 0.68f, 0.56f);
+            case 1: return new Color(0.78f, 0.57f, 0.44f);
+            case 2: return new Color(0.66f, 0.46f, 0.33f);
+            case 3: return new Color(0.5f, 0.34f, 0.24f);
+            case 4: return new Color(0.36f, 0.24f, 0.17f);
+            default: return new Color(0.82f, 0.62f, 0.48f);
+        }
+    }
+
+    /// <summary>
+    /// The uniform: the archetype's colour, taken most of the way to a field drab. The raw
+    /// colours are signal colours -- the minimap draws them -- and a soldier dressed in
+    /// saturated orange reads as a toy. Keeping the hue and dropping the saturation leaves
+    /// each type recognisable by its shade and makes all of them look like cloth.
+    /// </summary>
+    public Color UniformColor
+    {
+        get
+        {
+            float grey = bodyColor.r * 0.3f + bodyColor.g * 0.59f + bodyColor.b * 0.11f;
+            var drab = new Color(0.33f, 0.32f, 0.25f);
+            var muted = Color.Lerp(bodyColor, new Color(grey, grey, grey), 0.55f);
+            return Color.Lerp(muted, drab, 0.35f);
+        }
+    }
+
+    /// <summary>A person's skin, or for a creature a sick, bloodless pallor tinged by its own colour.</summary>
+    Color SkinColor()
+    {
+        if (voice == EnemyVoice.Kind.Creature)
+        {
+            float grey = headColor.r * 0.3f + headColor.g * 0.59f + headColor.b * 0.11f;
+            return Color.Lerp(new Color(0.55f, 0.56f, 0.5f), Color.Lerp(headColor, new Color(grey, grey, grey), 0.6f), 0.35f);
+        }
+
+        return SkinTone(Random.Range(0, 6));
+    }
+
     void Tint(GameObject enemy)
     {
         var block = new MaterialPropertyBlock();
+        Color skin = SkinColor();
+        Color uniform = UniformColor;
 
         foreach (var renderer in enemy.GetComponentsInChildren<Renderer>())
         {
@@ -259,15 +336,33 @@ public class EnemyArchetype : ScriptableObject
             // archetype's colour. See EnemyAI.IsBodyRenderer for the rule.
             if (!EnemyAI.IsBodyRenderer(renderer)) continue;
 
-            // Skin -- the head, which is the headshot box, and the hands and neck -- keeps
-            // its own lighter shade; the clothes take the body colour.
+            // Skin -- the head, which is the headshot box, and the hands and neck -- is a
+            // person's; the clothes take the archetype's colour, muted to cloth.
             bool isSkin = IsSkin(renderer.name);
-            Color color = isSkin ? headColor : bodyColor;
+            Color color = isSkin ? skin : uniform;
 
             renderer.GetPropertyBlock(block);
             block.SetColor("_BaseColor", color);
             block.SetColor("_Color", color);
-            block.SetColor("_EmissionColor", glowColor);
+
+            // The body itself never glows: a whole soldier lit up in the variant's colour
+            // read as a neon mannequin. The glow goes on the optics instead, below.
+            block.SetColor("_EmissionColor", Color.black);
+            renderer.SetPropertyBlock(block);
+        }
+
+        // The variant's glow, where a real threat would carry a light: goggles, a visor,
+        // a creature's eyes. Still the at-a-glance tell in a dark arena, now a pair of
+        // lit lenses rather than a lit body.
+        foreach (var renderer in enemy.GetComponentsInChildren<Renderer>(true))
+        {
+            string name = renderer.name;
+            if (name.IndexOf("Goggles", System.StringComparison.Ordinal) < 0
+                && name.IndexOf("Visor", System.StringComparison.Ordinal) < 0
+                && name.IndexOf("Eyes", System.StringComparison.Ordinal) < 0) continue;
+
+            renderer.GetPropertyBlock(block);
+            block.SetColor("_EmissionColor", glowColor * 1.6f);
             renderer.SetPropertyBlock(block);
         }
     }

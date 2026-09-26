@@ -16,6 +16,11 @@ public class Hitbox : MonoBehaviour
              "is the head whatever this says.")]
     public BodyPart part = BodyPart.Torso;
 
+    [Tooltip("What is drawn for this part, when the collider is not itself drawn -- the " +
+             "shaped limb over a plain capsule. Blood stains this. Empty means the " +
+             "renderer on this object, if it has one.")]
+    public Renderer visual;
+
     /// <summary>What this hitbox reports, with the headshot flag taking precedence.</summary>
     public BodyPart Part => isHeadshot ? BodyPart.Head : part;
 

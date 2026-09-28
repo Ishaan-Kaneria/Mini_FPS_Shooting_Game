@@ -101,6 +101,41 @@ Build Dashboard, and the rebuilds/verifies named per item.
 15. **Coins shown twice on the store screen** (top bar "118" and header "118 COINS"). OPEN,
     minor. On a handset, drop the header copy to free a row.
 
+## C. Level start and dashboard (second batch of screenshots)
+
+16. **Level-start briefing was a pile of text over the fight.** **FIXED**.
+    The builder's `briefingText` was a bare 1180-wide, 34pt label in TMP's default font.
+    On a phone it ran under the run panel and the touch buttons, with the countdown and the
+    stakes in faint type over the scenery.
+    - `HudView.BuildBriefingCard` re-parents the same label onto one centred HUD card with
+      an accent stripe and the theme font. The card is 560 wide on touch (760 on desktop),
+      which clears the left panels and the right button cluster. It shows only while there is
+      a briefing (`UpdateBriefingCard`). The middle of the screen is free then, because
+      nothing has spawned.
+    - `HUDController.UpdateBriefingText`: "GET READY · 3" now leads as an accent header. The
+      stakes line goes up from 62% to 78% and the equipment hint from 58% to 72%. On touch the
+      bomb tip is one line: "HOLD [bomb] AND SLIDE TO PLACE A BOMB, RELEASE TO THROW".
+    - The same `briefingText` label is kept, so `VerifyFlow`'s stakes check still reads it.
+      Run `VerifyFlow` and `VerifyHudLayout`, and check a handset capture.
+    - Still worth considering: the brief and the stakes are about 40 words to read in a
+      3-second countdown. Either shorten them in `FPSKitLevels`/`FPSKitThemes` or lengthen
+      `briefingTime` on the first levels. Both need a reset.
+
+17. **"OUT OF TIME" last-run toast covered the mission card's heading on the dashboard.**
+    **FIXED** (`MainMenuController.ShowLastRun`): skipped on touch devices. The results
+    card has just shown the same information.
+
+18. **Arena row on a phone: the second card slides under the mission panel.** OPEN.
+    Its lock reason, title and description are all cut at the panel edge ("FINISH
+    INDUST..."). Either fit whole cards (one full card plus a visible scroll hint) or give
+    the row the full width and put the mission panel below it on `Form.Handset`.
+
+19. **HUD shows the kill count twice** (mission strip "0 / 9" and the run panel's KILLS).
+    OPEN, minor. On a handset, drop KILLS from the run panel to shrink it.
+
+20. **Results card: "TIME LIMIT" sits alone under "43s / 43s"** as if it were a fourth
+    stat row. OPEN, cosmetic (`ResultsView`). Put it inline, e.g. "43s / 43s LIMIT".
+
 ## How the fixes were checked
 
 No Unity in the session, so nothing was compiled. Each change was read against the APIs it

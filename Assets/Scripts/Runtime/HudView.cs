@@ -145,6 +145,7 @@ public class HudView : MonoBehaviour
         if (DeviceProfile.Touched) ArrangeForTouch();
         BuildHitMarker();
         BuildPunchPrompt();
+        BuildBriefingCard();
         BuildPauseMenu();
 
         var toastArea = UIKit.Rect(transform, "Toasts");
@@ -718,6 +719,57 @@ public class HudView : MonoBehaviour
         _punchPrompt.SetActive(false);
     }
 
+    GameObject _briefCard;
+    bool _editing;
+
+    /// <summary>
+    /// The start-of-level briefing, on a card. The builder's label was a bare 1180-wide
+    /// line of 34pt text in TMP's default font. On a phone it ran under the run panel on the
+    /// left and the touch buttons on the right, with the stakes and the countdown in faint
+    /// type over the scenery. Here it keeps HUDController's words but sits on one centred
+    /// card in the theme face. The card is narrow enough on touch to clear both sides.
+    /// The middle of the screen is free during the briefing because nothing has spawned yet.
+    /// </summary>
+    void BuildBriefingCard()
+    {
+        var text = _hud.briefingText;
+        if (text == null) return;
+
+        var card = HudPanel(transform, "BriefingCard");
+        card.stripeSide = FlatRect.Side.Top;
+        card.stripeColor = _t.accent;
+        card.stripePixels = _t.stripePixels;
+        var rt = card.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0f, 30f);
+        rt.sizeDelta = new Vector2(DeviceProfile.Touched ? 560f : 760f, 0f);
+        var col = UIKit.Column(card, 0f, new RectOffset(26, 26, 18, 20));
+        col.childControlWidth = col.childControlHeight = true;
+        col.childForceExpandHeight = false;
+        card.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        text.transform.SetParent(card.transform, false);
+        if (_t.bodyFont != null) text.font = _t.bodyFont;
+        text.enableAutoSizing = false;
+        text.fontSize = DeviceProfile.Touched ? 26f : 28f;
+        text.alignment = TextAlignmentOptions.Center;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.color = _t.textPrimary;
+        text.raycastTarget = false;
+
+        _briefCard = card.gameObject;
+        _briefCard.SetActive(false);
+    }
+
+    /// <summary>Shown only while HUDController has a briefing in the label.</summary>
+    void UpdateBriefingCard()
+    {
+        if (_briefCard == null || _hud.briefingText == null) return;
+        bool show = !_editing && !string.IsNullOrEmpty(_hud.briefingText.text);
+        if (_briefCard.activeSelf != show) _briefCard.SetActive(show);
+    }
+
     void OnReach(MeleeStrike m, bool inReach)
     {
         if (_punchPrompt == null) return;
@@ -1042,6 +1094,8 @@ public class HudView : MonoBehaviour
     /// </summary>
     public void SetEditing(bool editing)
     {
+        _editing = editing;
+        UpdateBriefingCard();
         if (editing)
         {
             // The briefing and banner are words over the middle of the screen, which is where the
@@ -1187,6 +1241,8 @@ public class HudView : MonoBehaviour
             OnProgress(_level);
             OnClock(_level, _level.IsRunning ? Mathf.CeilToInt(_level.TimeRemaining) : -1);
         }
+
+        UpdateBriefingCard();
 
         float now = Time.unscaledTime;
 

@@ -693,6 +693,16 @@ public class MainMenuController : MonoBehaviour
     void ShowLastRun()
     {
         if (!GameSession.ReturnedFromRun || toasts == null) return;
+
+        // Not on a phone. The results card has just said all of this, and a handset
+        // dashboard has no free corner for it: the toast sat over the mission card's
+        // heading for six seconds.
+        if (DeviceProfile.Touched)
+        {
+            GameSession.ClearLastRun();
+            return;
+        }
+
         var result = GameSession.LastResult;
         string where = string.IsNullOrEmpty(GameSession.SelectedArenaLabel) ? "" : GameSession.SelectedArenaLabel + ", ";
         string level = string.IsNullOrEmpty(result.levelName) ? $"level {result.levelIndex + 1}" : result.levelName;

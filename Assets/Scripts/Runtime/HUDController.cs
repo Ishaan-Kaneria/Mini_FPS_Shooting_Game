@@ -790,13 +790,19 @@ public class HUDController : MonoBehaviour
         // happening in it.
         string stakes = levelManager.LevelStakes;
 
+        // Sized for a phone: the stakes were 62% of the line, which is unreadable on a
+        // handset. The countdown leads as a short accent header, so the one thing that
+        // matters in three seconds is read first.
         string why = string.IsNullOrWhiteSpace(stakes)
             ? ""
-            : $"\n<size=62%><color=#B8AFA0>{stakes}</color></size>";
+            : $"\n<size=78%><color=#B8AFA0>{stakes}</color></size>";
+
+        string accent = ColorUtility.ToHtmlStringRGB(UITheme.Active.accent);
+        string header = $"<size=85%><color=#{accent}>GET READY{UIText.Separator}{seconds}</color></size>";
 
         briefingText.text = string.IsNullOrWhiteSpace(brief)
-            ? $"GET READY - {seconds}{why}{EquipmentHint()}"
-            : $"{brief}\n<size=70%>GET READY - {seconds}</size>{why}{EquipmentHint()}";
+            ? $"{header}{why}{EquipmentHint()}"
+            : $"{header}\n{brief}{why}{EquipmentHint()}";
     }
 
     /// <summary>
@@ -820,7 +826,7 @@ public class HUDController : MonoBehaviour
         if (!hasBomb && !hasDrink) return string.Empty;
 
         const string Dim = "<color=#B8AFA0>";
-        var hint = new System.Text.StringBuilder("\n<size=58%>");
+        var hint = new System.Text.StringBuilder("\n<size=72%>");
 
         // How the bomb is *placed* is named too, and it is named differently for the
         // two ways of placing it. The key teaches itself the moment a ring appears on
@@ -834,12 +840,21 @@ public class HUDController : MonoBehaviour
                     ? "TO AIM A BOMB, MOVE THE MOUSE TO PLACE IT"
                     : "TO AIM A BOMB, LOOK DOWN TO BRING THE RING IN";
 
-            // Both ways of ending it are named. The tap is the one a laptop player
-            // needs -- a held key stops their touchpad reporting motion at all -- and
-            // it is the one nobody discovers on their own.
-            hint.Append($"TAP {Prompt(GameAction.Bomb, BombKey())} {Dim}{place}, TAP AGAIN TO THROW</color>" +
-                        $"\n<size=90%>{Dim}OR HOLD </color>{Prompt(GameAction.Bomb, BombKey())}" +
-                        $"{Dim} AND RELEASE, {Prompt(GameAction.Aim, AimKey())} LOCKS THE RANGE</color></size>");
+            // On a phone the throw is one gesture on the BOMB button, so one short line.
+            if (GameInput.Scheme == InputScheme.Touch)
+            {
+                hint.Append($"{Dim}HOLD </color>{Prompt(GameAction.Bomb, BombKey())}" +
+                            $"{Dim} AND SLIDE TO PLACE A BOMB, RELEASE TO THROW</color>");
+            }
+            else
+            {
+                // Both ways of ending it are named. The tap is the one a laptop player
+                // needs -- a held key stops their touchpad reporting motion at all -- and
+                // it is the one nobody discovers on their own.
+                hint.Append($"TAP {Prompt(GameAction.Bomb, BombKey())} {Dim}{place}, TAP AGAIN TO THROW</color>" +
+                            $"\n<size=90%>{Dim}OR HOLD </color>{Prompt(GameAction.Bomb, BombKey())}" +
+                            $"{Dim} AND RELEASE, {Prompt(GameAction.Aim, AimKey())} LOCKS THE RANGE</color></size>");
+            }
         }
 
         if (hasBomb && hasDrink) hint.Append("\n");

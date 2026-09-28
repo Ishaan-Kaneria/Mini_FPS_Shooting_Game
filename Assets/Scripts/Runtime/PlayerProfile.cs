@@ -28,9 +28,7 @@ public static class PlayerProfile
     public static int TotalKills => PlayerPrefs.GetInt(KillsKey, 0);
 
     /// <summary>
-    /// What to call the player. Not asked for anywhere yet -- the dashboard just shows
-    /// it -- but it is the one piece of "user information" that is genuinely theirs, so
-    /// it is stored rather than hard-coded into the panel.
+    /// What to call the player. Asked once by <see cref="NameDialog"/>; "OPERATIVE" until then.
     /// </summary>
     public static string Name
     {
@@ -45,6 +43,9 @@ public static class PlayerProfile
             PlayerPrefs.Save();
         }
     }
+
+    /// <summary>True once the player has been asked for a name and answered, even with SKIP.</summary>
+    public static bool HasName => !string.IsNullOrWhiteSpace(PlayerPrefs.GetString(NameKey, ""));
 
     /// <summary>
     /// Folds one finished attempt into the totals. Called once, from

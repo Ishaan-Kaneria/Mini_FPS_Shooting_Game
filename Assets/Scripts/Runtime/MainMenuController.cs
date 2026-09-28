@@ -183,7 +183,20 @@ public class MainMenuController : MonoBehaviour
             footerText.text = $"SINGLE PLAYER CAMPAIGN   |   VERSION {Application.version}";
 
         TellStory();
+        if (story == null || !story.IsOpen) AskName();
     }
+
+    /// <summary>
+    /// Asks for a name on a profile that has none, after the opening story rather than in
+    /// front of it, so the first thing a new player reads is still the story.
+    /// </summary>
+    void AskName()
+    {
+        if (PlayerProfile.HasName || _nameDialog != null && _nameDialog.IsOpen) return;
+        _nameDialog = NameDialog.Show(GetComponentInParent<Canvas>(), Refresh);
+    }
+
+    NameDialog _nameDialog;
 
     void OnDestroy()
     {
@@ -581,6 +594,7 @@ public class MainMenuController : MonoBehaviour
         if (topBar != null) topBar.ShowTab(MenuTopBar.Tab.Play);
         _fitted = new Vector2(-1f, -1f);
         Refresh();
+        AskName();
     }
 
     bool AnyScreenOpen() =>

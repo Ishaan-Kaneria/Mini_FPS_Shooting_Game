@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6077009092455da449d8fceb0c88662d, type: 3}
   m_Name: TestRifle
   m_EditorClassIdentifier: Assembly-CSharp::WeaponData
-  weaponName: Test Rifle
+  weaponName: Service Rifle
   fireMode: 2
   roundsPerMinute: 650
   damage: 24

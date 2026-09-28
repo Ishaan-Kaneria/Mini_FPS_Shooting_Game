@@ -147,8 +147,18 @@ public static class GameInput
         var cancel = _ui.AddAction("Cancel", InputActionType.Button);
         cancel.AddBinding("<Gamepad>/buttonEast", groups: "Gamepad");
         cancel.AddBinding("<Keyboard>/escape", groups: "Keyboard&Mouse");
-        _ui.AddAction("Point", InputActionType.PassThrough, "<Pointer>/position", expectedControlLayout: "Vector2");
-        _ui.AddAction("Click", InputActionType.PassThrough, "<Pointer>/press", expectedControlLayout: "Button");
+        // Every finger bound on its own, never <Pointer>: on a touchscreen <Pointer> is the
+        // primary touch only, so the event system saw one finger at a time and a thumb on
+        // the move stick locked out the FIRE button (and the reverse). touch* gives the
+        // module one pointer per finger -- the same bindings as Unity's default UI actions.
+        var point = _ui.AddAction("Point", InputActionType.PassThrough, expectedControlLayout: "Vector2");
+        point.AddBinding("<Mouse>/position");
+        point.AddBinding("<Pen>/position");
+        point.AddBinding("<Touchscreen>/touch*/position");
+        var click = _ui.AddAction("Click", InputActionType.PassThrough, expectedControlLayout: "Button");
+        click.AddBinding("<Mouse>/leftButton");
+        click.AddBinding("<Pen>/tip");
+        click.AddBinding("<Touchscreen>/touch*/press");
         _ui.AddAction("RightClick", InputActionType.PassThrough, "<Mouse>/rightButton", expectedControlLayout: "Button");
         _ui.AddAction("MiddleClick", InputActionType.PassThrough, "<Mouse>/middleButton", expectedControlLayout: "Button");
         _ui.AddAction("ScrollWheel", InputActionType.PassThrough, "<Mouse>/scroll", expectedControlLayout: "Vector2");
@@ -327,8 +337,22 @@ public static class GameInput
     }
 
     /// <summary>Back: Escape, Q, or B/Circle. What every overlay closes on.</summary>
+    ///
+    /// Q only while nothing is being typed: a Q in a name (the HUD editor's layout names,
+    /// the player's own) closed the screen the field was on.
     public static bool BackPressed =>
-        UICancel.WasPressedThisFrame() || KeyPressed(KeyCode.Q);
+        UICancel.WasPressedThisFrame() || (KeyPressed(KeyCode.Q) && !Typing);
+
+    /// <summary>True while a text field has the keyboard.</summary>
+    public static bool Typing
+    {
+        get
+        {
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            var selected = es != null ? es.currentSelectedGameObject : null;
+            return selected != null && selected.TryGetComponent(out TMPro.TMP_InputField field) && field.isFocused;
+        }
+    }
 
     /// <summary>Confirm on a card that has no button: Space, Enter or A/Cross.</summary>
     public static bool ConfirmPressed =>

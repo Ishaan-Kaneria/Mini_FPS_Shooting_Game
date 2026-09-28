@@ -355,9 +355,12 @@ namespace FPSKit.EditorTools
             Slot(cluster, reload, column: 1, row: 1);
 
             // The bomb is a hold: press to bring the ring up, slide the look around to
-            // place it, release to throw.
+            // place it, release to throw. Drag-steered like FIRE, so the slide can be the
+            // same thumb: without it, placing the ring anywhere but dead ahead took a
+            // second finger on the look area while the first held the button.
             var bomb = MakeButton(parent, "BombButton", "BOMB", TouchButton.ActionKind.Bomb,
                                   false, BombTint, profile);
+            bomb.GetComponent<TouchButton>().dragFire = profile == null || profile.dragFire;
             Slot(cluster, bomb, column: 2, row: 0, situational: true);
 
             var drink = MakeButton(parent, "ItemButton", "DRINK", TouchButton.ActionKind.UseItem,

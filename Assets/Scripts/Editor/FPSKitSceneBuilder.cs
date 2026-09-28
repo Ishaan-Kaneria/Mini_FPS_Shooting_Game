@@ -1720,7 +1720,7 @@ namespace FPSKit.EditorTools
             if (existing != null) return StampWeaponFeedback(existing, impacts);
 
             var data = ScriptableObject.CreateInstance<WeaponData>();
-            data.weaponName = "Test Rifle";
+            data.weaponName = "Service Rifle";
             data.fireMode = FireMode.Auto;
             data.roundsPerMinute = 650f;
             data.damage = 24f;

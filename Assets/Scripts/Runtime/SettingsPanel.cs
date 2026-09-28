@@ -196,12 +196,19 @@ public class SettingsPanel : OverlayPanel
 
     void BuildControls(RectTransform page, UITheme t)
     {
+        // A phone has no mouse and no keyboard, from the dashboard as well as in a level.
+        // This used to ask MobileInput.Active alone, which only an arena's touch layer sets,
+        // so the dashboard's settings showed a phone the mouse slider and the key list.
+        bool touchOnly = ScreenInfo.SimulatedTouch ??
+                         (MobileInput.Active || WebDevice.IsTouchOnly || Application.isMobilePlatform);
+
         Heading(page, "Look", t);
-        AddSlider(page, "Mouse sensitivity", "How far the view turns for a move of the mouse.", 0.2f, 3f,
-                  () => GameSettings.MouseSensitivity, v => GameSettings.MouseSensitivity = v, v => v.ToString("0.00"), t);
+        if (!touchOnly)
+            AddSlider(page, "Mouse sensitivity", "How far the view turns for a move of the mouse.", 0.2f, 3f,
+                      () => GameSettings.MouseSensitivity, v => GameSettings.MouseSensitivity = v, v => v.ToString("0.00"), t);
         AddSwitch(page, "Invert Y", "Push up to look down.", () => GameSettings.InvertY, v => GameSettings.InvertY = v, t);
 
-        if (!DeviceProfile.Touched || !MobileInput.Active)
+        if (!touchOnly)
         {
             Heading(page, "Keys", t);
             foreach (var b in KeyBindings.All()) AddKey(page, b, t);

@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -23,7 +24,21 @@ public static class InputPrompts
     ///
     /// Drawn a third larger than the line's capitals: a glyph is a small picture with a
     /// letter inside it, and at cap height the letter in an Xbox A is a speck.
-    public static string Glyph(string id) => $"<size=135%><sprite=\"{SpriteAsset}\" name=\"{id}\" tint=1></size>";
+    ///
+    /// An id the sprite asset does not hold comes back empty. TMP prints an unresolved
+    /// sprite tag as its raw markup, so a new icon whose atlas was never rebuilt
+    /// (FPSKitBatch.ImportUiKit) put <c>&lt;SPRITE="GLYPHS" NAME="FIST"...&gt;</c> under the
+    /// crosshair on a phone instead of the punch prompt.
+    public static string Glyph(string id)
+        => HasGlyph(id) ? $"<size=135%><sprite=\"{SpriteAsset}\" name=\"{id}\" tint=1></size>" : "";
+
+    static TMP_SpriteAsset _glyphs;
+
+    static bool HasGlyph(string id)
+    {
+        if (_glyphs == null) _glyphs = Resources.Load<TMP_SpriteAsset>("Sprite Assets/" + SpriteAsset);
+        return _glyphs != null && _glyphs.GetSpriteIndexFromName(id) >= 0;
+    }
 
     /// <summary>The prompt for an action, for whatever the player is holding now.</summary>
     public static string For(GameAction action, ControlSettings keys = null)
@@ -146,7 +161,11 @@ public static class InputPrompts
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => _defaults = null;
+    static void ResetStatics()
+    {
+        _defaults = null;
+        _glyphs = null;
+    }
 
     static KeyCode KeyFor(GameAction action, ControlSettings c) => action switch
     {

@@ -156,6 +156,14 @@ public class StoryPanel : OverlayPanel
 
     protected override void OnOpened()
     {
+        // The card is authored 1180x620 against a 1080-tall canvas; a handset's menu canvas
+        // is about 540 tall, so the answer buttons ran off the bottom of a phone. Shrunk to
+        // fit, the way ConfirmDialog is. Added here so a dashboard built before this line
+        // gets it too.
+        var card = panel != null ? panel.transform.Find("Card") : null;
+        if (card != null && card.GetComponent<FitInsideParent>() == null)
+            card.gameObject.AddComponent<FitInsideParent>();
+
         _cards.Clear();
         _at = -1;
 

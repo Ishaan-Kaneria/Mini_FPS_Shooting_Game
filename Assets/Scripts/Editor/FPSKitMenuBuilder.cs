@@ -1306,6 +1306,10 @@ namespace FPSKit.EditorTools
             go.transform.SetParent(parent, false);
 
             var text = go.AddComponent<TextMeshProUGUI>();
+            // The theme's face, not TMP's default: without it the story card, the dossier
+            // and the instruction rows were set in LiberationSans beside a Barlow dashboard.
+            var font = UITheme.Active.bodyFont;
+            if (font != null) text.font = font;
             text.text = content;
             text.fontSize = size;
             text.alignment = align;

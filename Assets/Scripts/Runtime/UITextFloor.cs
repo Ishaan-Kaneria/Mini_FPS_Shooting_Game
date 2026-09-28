@@ -2,7 +2,7 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Keeps a line of text from rendering smaller than a phone can read: 12dp, about 1.9mm of
+/// Keeps a line of text from rendering smaller than a phone can read: 14dp, about 2.2mm of
 /// glass, whatever the canvas scale, the device or the interface-scale setting does to it.
 ///
 /// Sizes are authored in canvas units against a 1920x1080 reference, and a unit is a
@@ -19,7 +19,15 @@ using UnityEngine;
 public class UITextFloor : MonoBehaviour
 {
     [Tooltip("The smallest the text may render, in density-independent pixels.")]
-    public float minimumDp = 12f;
+    public float minimumDp = 14f;
+
+    /// <summary>
+    /// The floor every text gets, whatever its own field says. The builders serialized
+    /// 12dp into the dashboard and the HUD. At 12dp (about 1.9mm) a phone's body text was
+    /// a strain to read, and raising the initialiser alone would only reach text made
+    /// after the change.
+    /// </summary>
+    public const float GlobalMinimumDp = 14f;
 
     [SerializeField] float _authored = -1f;
     TMP_Text _text;
@@ -64,7 +72,7 @@ public class UITextFloor : MonoBehaviour
         // phone when a monitor reports 96, which is right for sizing a thumb target and would
         // put 30px type on every desktop here.
         float dpi = TouchMetrics.ScreenDpi > 0f ? TouchMetrics.ScreenDpi : 160f;
-        float floorPixels = minimumDp * dpi / 160f;
+        float floorPixels = Mathf.Max(minimumDp, GlobalMinimumDp) * dpi / 160f;
         float floorUnits = floorPixels / scale;
         _text.fontSize = Mathf.Max(_authored, floorUnits);
         _lastSet = _text.fontSize;

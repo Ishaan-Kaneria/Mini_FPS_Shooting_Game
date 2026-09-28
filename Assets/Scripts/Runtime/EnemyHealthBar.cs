@@ -47,6 +47,16 @@ public class EnemyHealthBar : MonoBehaviour
     public Color markerColor = new Color(0.851f, 0.325f, 0.310f, 1f);
     [Min(0.01f)] public float markerSize = 0.2f;
 
+    [Tooltip("On a touch screen, every living enemy in range carries the marker, not only " +
+             "the ones that have spotted the player, and it never draws smaller than this " +
+             "many millimetres on the glass. At 30 metres the 0.2m diamond was two or three " +
+             "pixels on a phone, so the player strained to find anyone at range. It is still " +
+             "an opaque quad, so walls hide it.")]
+    [Min(0f)] public float touchMarkerMm = 2.5f;
+
+    [Tooltip("How far away the touch marker still shows, in metres.")]
+    public float touchMarkerRange = 70f;
+
     [Header("Wiring")]
     [Tooltip("Unlit material for the bar quads. Left empty, one is found at runtime -- " +
              "assign the generated asset instead so the shader survives a player build.")]
@@ -60,6 +70,7 @@ public class EnemyHealthBar : MonoBehaviour
     Renderer _shieldRenderer;
     Renderer _backgroundRenderer;
     Renderer _markerRenderer;
+    Transform _marker;
     EnemyAI _ai;
     bool _barShown = true;
     MaterialPropertyBlock _block;
@@ -103,6 +114,7 @@ public class EnemyHealthBar : MonoBehaviour
 
         _ai = GetComponent<EnemyAI>();
         _markerRenderer = MakeQuad("Marker", material, Vector2.one * markerSize, -0.003f, out var marker);
+        _marker = marker;
         marker.localPosition = new Vector3(0f, size.y * 0.5f + markerSize, 0f);
         marker.localRotation = Quaternion.Euler(0f, 0f, 45f);
         SetColor(_markerRenderer, markerColor);
@@ -162,6 +174,8 @@ public class EnemyHealthBar : MonoBehaviour
         // at the eye makes the row of them fan outwards at the screen edges.
         _root.rotation = _camera.transform.rotation;
 
+        if (mark) SizeMarker();
+
         // Parent scale would squash the bar on a resized archetype, so undo it -- but
         // only when it has actually moved. An archetype stamps its scale once at spawn
         // and nothing touches it again, so rewriting localScale and localPosition every
@@ -189,15 +203,42 @@ public class EnemyHealthBar : MonoBehaviour
 
     static float SafeInverse(float value) => Mathf.Abs(value) < 0.0001f ? 1f : 1f / value;
 
-    /// <summary>Spotted the player, or been hit -- and alive, and near enough to matter.</summary>
+    /// <summary>
+    /// Spotted the player, or been hit -- and alive, and near enough to matter. On touch,
+    /// every living enemy in range: see <see cref="touchMarkerMm"/>.
+    /// </summary>
     bool ShouldMark()
     {
         if (!showMarker || _markerRenderer == null || _health == null || _health.IsDead) return false;
-        if (_camera != null && maxVisibleDistance > 0f &&
-            (transform.position - _camera.transform.position).sqrMagnitude >
-            maxVisibleDistance * maxVisibleDistance)
+        bool touch = MobileInput.Active;
+        float range = touch ? Mathf.Max(maxVisibleDistance, touchMarkerRange) : maxVisibleDistance;
+        if (_camera != null && range > 0f &&
+            (transform.position - _camera.transform.position).sqrMagnitude > range * range)
             return false;
-        return (_ai != null && _ai.HasSpotted) || !_health.IsFull;
+        return touch || (_ai != null && _ai.HasSpotted) || !_health.IsFull;
+    }
+
+    /// <summary>
+    /// Grows the diamond with distance on touch, so it keeps a readable size on the glass.
+    /// Never smaller than <see cref="markerSize"/>, so up close it looks as it always has.
+    /// The root cancels the enemy's scale, so a local size here is metres.
+    /// </summary>
+    void SizeMarker()
+    {
+        if (_marker == null) return;
+
+        float s = markerSize;
+        if (MobileInput.Active && touchMarkerMm > 0f)
+        {
+            float d = Vector3.Distance(_marker.position, _camera.transform.position);
+            float metresPerPixel = 2f * d * Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad)
+                                   / Mathf.Max(1, _camera.pixelHeight);
+            s = Mathf.Max(markerSize, TouchMetrics.MillimetresToPixels(touchMarkerMm) * metresPerPixel);
+        }
+
+        if (Mathf.Abs(_marker.localScale.x - s) < 0.001f) return;
+        _marker.localScale = new Vector3(s, s, 1f);
+        _marker.localPosition = new Vector3(0f, size.y * 0.5f + s, _marker.localPosition.z);
     }
 
     bool ShouldShow()

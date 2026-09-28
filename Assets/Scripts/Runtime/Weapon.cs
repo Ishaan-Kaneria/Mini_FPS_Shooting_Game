@@ -737,9 +737,11 @@ public class Weapon : MonoBehaviour
         bool running = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f;
         // The player's field of view, read live so the setting takes as it is dragged. The
         // sights still zoom to their own fixed value from it.
-        float baseFov = GameSettings.FieldOfView;
+        // Both corrected for a screen wider than 16:9, so a phone sees what a monitor sees.
+        float aspect = fpsCamera.aspect;
+        float baseFov = GameSettings.VerticalFovFor(GameSettings.FieldOfView, aspect);
         float sprintFov = running ? baseFov * 1.05f : baseFov;
-        float targetFov = Mathf.Lerp(sprintFov, data.adsFieldOfView, AimProgress);
+        float targetFov = Mathf.Lerp(sprintFov, GameSettings.VerticalFovFor(data.adsFieldOfView, aspect), AimProgress);
 
         fpsCamera.fieldOfView = Mathf.Lerp(fpsCamera.fieldOfView, targetFov,
                                            Mathf.Clamp01(data.adsSpeed * Time.deltaTime));

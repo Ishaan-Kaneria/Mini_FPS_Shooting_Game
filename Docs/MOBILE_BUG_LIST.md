@@ -178,6 +178,49 @@ Build Dashboard, and the rebuilds/verifies named per item.
       calling `SettingsPanel.Show(canvas).ShowTab("Profile")` would do it. Needs Build Dashboard.
     - Verify: `VerifyHudLayout` (clicks every Settings tab) and `VerifyControls`.
 
+## F. Enemies too small at range; dashboard space and text size
+
+23. **Everything was drawn about a fifth smaller on a phone.** **FIXED**
+    (`GameSettings.VerticalFovFor`, used in `Weapon`). The FOV setting (default 75) went
+    straight into `Camera.fieldOfView`, which is *vertical*. So a 20:9 phone saw about 120°
+    side to side where a 16:9 monitor saw about 107°. The setting now means "as on 16:9",
+    and anything wider keeps the same horizontal view. At 20:9, 75 becomes a vertical of
+    about 63°, so enemies are about 25% larger. The ADS angle gets the same correction.
+    Screens 16:9 or narrower are unchanged.
+
+24. **Distant enemies hard to find on touch.** **FIXED** (`EnemyHealthBar`). On touch, every
+    living enemy within `touchMarkerRange` (70 m) carries the red diamond, not only ones that
+    have spotted the player. The diamond grows with distance so it's never under
+    `touchMarkerMm` (2.5 mm) on the glass; up close it's the old 0.2 m. It's still the opaque
+    HealthBar material, so walls hide it and it doesn't show anyone through cover. Desktop is
+    unchanged. Check with `CaptureViews` on a handset profile.
+    - Not done: spawning nearer on phones (`LevelManager.min/maxSpawnDistanceFromPlayer`,
+      14–34 m). That changes balance and the leash check, so it's left for a design call.
+
+25. **The Dossier ("The list") had no title, and its rows used half the width** (screenshot).
+    **FIXED**.
+    - The overlay shell puts its title at 88–97% of the screen, under the top bar, which stays
+      up. `MainMenuController.InsetForTopBar` moves the Instructions and Dossier screens'
+      top edge below the bar.
+    - On a phone the Dossier switches its second column off, but the row's layout never
+      recalculated, so the remaining column kept half the width. It now rebuilds after the
+      toggle (`DossierPanel.OnOpened`).
+    - The font is fixed by item 10 (Build Dashboard).
+
+26. **Arena row cut the second card through its text.** **FIXED** (`MainMenuController.FitGrid`,
+    handset branch). Cards were sized to the row's height, so one card plus about 70% of the
+    next showed. When more than a third of a card would be left over, the cards shrink so one
+    more fits whole. The row still scrolls. This supersedes item 18.
+
+27. **Text floor raised from 12dp to 14dp** (`UITextFloor.GlobalMinimumDp`), applied on top of
+    whatever each text serialized. This touches every menu and the HUD, so check for
+    overflow/ellipsis with `VerifyHudLayout`, `VerifyDevices` and the UI gallery.
+
+28. **Still open on the dashboard:** the mission card has empty space under ALL LEVELS on a
+    phone. On `Form.Handset`, either centre its contents vertically or move the arena
+    description/rank line into it. Arena card descriptions are also one line with an
+    ellipsis; allow two lines on a handset.
+
 ## How the fixes were checked
 
 No Unity in the session, so nothing was compiled. Each change was read against the APIs it

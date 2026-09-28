@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// THE LIST: the eight, who is still standing, and what each one said on the way down.
@@ -64,6 +65,12 @@ public class DossierPanel : OverlayPanel
 
         for (int i = 0; i < columns.Length; i++)
             if (columns[i] != null) columns[i].gameObject.SetActive(i < used);
+
+        // Switching a column off does not mark the row it sits in for layout, so on a phone
+        // the one column left kept the half width it had with two, and the list used the
+        // left half of the screen. Rebuilt now, so it takes the full width.
+        if (columns[0] != null && columns[0].parent is RectTransform row)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(row);
 
         int names = campaign.siblings != null ? campaign.siblings.Count : 0;
         int down = 0;

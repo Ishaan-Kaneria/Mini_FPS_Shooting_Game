@@ -119,6 +119,8 @@ public class MainMenuController : MonoBehaviour
 
         PhoneUI.Apply(GetComponentInParent<Canvas>());
         ApplyFormLayout();
+        InsetForTopBar(instructions);
+        InsetForTopBar(dossier);
 
         _granted = Campaign.RefreshUnlocks(campaign, catalog, store != null ? store.catalog : null);
         PlayerStats.RefreshFromCatalog(catalog);
@@ -354,11 +356,25 @@ public class MainMenuController : MonoBehaviour
         float gap = _layout.spacing.x;
         if (handset)
         {
+            // Whole cards only. Sized to the row's height, one card and most of the next
+            // showed, and the second was cut through its lock note, title and description
+            // at the mission panel's edge, which read as broken rather than as "scrolls".
+            // When more than a third of a card would be left over, the cards shrink until
+            // one more fits whole; the row still scrolls for the rest.
             float h = view.y;
+            float w = h * cardAspect;
+            int fit = Mathf.Max(1, Mathf.FloorToInt((view.x + gap) / (w + gap)));
+            float spare = view.x - (fit * w + (fit - 1) * gap);
+            if (spare > w * 0.35f)
+            {
+                int n = fit + 1;
+                w = (view.x - gap * (n - 1)) / n;
+                h = w / cardAspect;
+            }
             _layout.startAxis = GridLayoutGroup.Axis.Vertical;
             _layout.constraint = GridLayoutGroup.Constraint.FixedRowCount;
             _layout.constraintCount = 1;
-            _layout.cellSize = new Vector2(h * cardAspect, h);
+            _layout.cellSize = new Vector2(w, h);
             cardScroll.horizontal = true;
             cardScroll.vertical = false;
         }
@@ -685,6 +701,23 @@ public class MainMenuController : MonoBehaviour
         if (dossier != null) InsetForRail(dossier.panel);
         if (levelSelect != null) InsetForRail(levelSelect.panel);
     }
+
+    /// <summary>
+    /// Moves a builder overlay's top edge below the top bar. Instructions and the list are
+    /// full-screen shells whose title sits at 88-97% of their height, and the top bar stays
+    /// up over them, so the title was drawn underneath it: the list opened with a bare
+    /// orange rule and no heading. Everything in the shell is placed in fractions of it, so
+    /// the whole screen moves down together. Applied once, on every form.
+    /// </summary>
+    void InsetForTopBar(OverlayPanel overlay)
+    {
+        if (overlay == null || overlay.panel == null || topBar == null) return;
+        if (!(overlay.panel.transform is RectTransform rt) || _topInset.Contains(rt)) return;
+        _topInset.Add(rt);
+        rt.offsetMax = new Vector2(rt.offsetMax.x, rt.offsetMax.y - topBarHeight);
+    }
+
+    readonly HashSet<RectTransform> _topInset = new HashSet<RectTransform>();
 
     /// <summary>
     /// Moves a screen's left edge clear of the rail. A no-op when the rail is not in use, and

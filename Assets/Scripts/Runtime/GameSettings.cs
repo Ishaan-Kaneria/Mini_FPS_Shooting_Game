@@ -177,11 +177,32 @@ public static class GameSettings
         set => SetFloat("mouseSens", Mathf.Clamp(value, 0.2f, 3f));
     }
 
-    /// <summary>Horizontal-ish field of view in degrees, 70 to 110. Aiming down sights still zooms from it.</summary>
+    /// <summary>
+    /// Field of view in degrees, 70 to 110, as seen on a 16:9 screen. Aiming down sights
+    /// still zooms from it. Read it through <see cref="VerticalFovFor"/> before giving it
+    /// to a camera.
+    /// </summary>
     public static float FieldOfView
     {
         get => Mathf.Clamp(GetFloat("fov", 75f), 70f, 110f);
         set => SetFloat("fov", Mathf.Clamp(Mathf.Round(value), 70f, 110f));
+    }
+
+    /// <summary>
+    /// The camera's vertical angle for a field of view authored on a 16:9 screen, keeping
+    /// the width of view the same on anything wider.
+    ///
+    /// The setting went straight into Camera.fieldOfView, which is vertical, so a 20:9
+    /// phone saw about 120 degrees across where a monitor saw 107. Everything, enemies
+    /// included, was drawn about a fifth smaller on the phone, and players had to strain
+    /// to see anyone at range. A screen 16:9 or narrower is unchanged.
+    /// </summary>
+    public static float VerticalFovFor(float fov16x9, float aspect)
+    {
+        const float Reference = 16f / 9f;
+        if (aspect <= Reference) return fov16x9;
+        float halfWidth = Mathf.Tan(fov16x9 * 0.5f * Mathf.Deg2Rad) * Reference;
+        return 2f * Mathf.Atan(halfWidth / aspect) * Mathf.Rad2Deg;
     }
 
     /// <summary>Wait for the display's refresh on a desktop. Phones and browsers pace themselves.</summary>

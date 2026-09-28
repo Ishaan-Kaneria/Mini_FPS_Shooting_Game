@@ -278,8 +278,6 @@ public class SettingsPanel : OverlayPanel
                   () => GameSettings.GyroSensitivity, v => GameSettings.GyroSensitivity = v, Times, t);
 
         Heading(page, "Buttons", t);
-        AddChoice(page, "Aim button", "Hold to aim, or tap to switch it on and off.", new[] { "Hold", "Tap" },
-                  () => (int)GameSettings.TouchAimMode, i => GameSettings.TouchAimMode = (GameSettings.AimMode)i, t);
         AddSwitch(page, "Auto-fire", "Fires while the crosshair is on an enemy.",
                   () => GameSettings.AutoFire, v => GameSettings.AutoFire = v, t);
         AddSwitch(page, "Left-handed layout", "Stick on the right, buttons on the left.",

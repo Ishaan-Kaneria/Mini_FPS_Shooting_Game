@@ -311,7 +311,7 @@ public class InstructionsPanel : OverlayPanel
             new Page("Fight", new List<Line>
             {
                 new Line(T(GameAction.Fire), "Press and keep dragging -- it keeps firing while you aim."),
-                new Line(T(GameAction.Aim), "Down sights. Tap or hold, in Settings."),
+                new Line("Two fingers", "Spread them on the right to aim down sights, pinch to stop."),
                 new Line(T(GameAction.Reload), "Reload."),
                 new Line(T(GameAction.Melee), "Punch, up close. Saves a round."),
                 new Line(T(GameAction.Jump), "Jump."),

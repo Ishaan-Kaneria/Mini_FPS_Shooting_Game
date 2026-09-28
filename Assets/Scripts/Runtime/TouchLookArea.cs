@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -46,8 +47,75 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
     /// <summary>Carried between frames only when the profile asks for smoothing.</summary>
     Vector2 _smoothed;
 
+    [Tooltip("Spread apart past this many millimetres to aim, pinch together to stop. " +
+             "The profile's value wins when there is one.")]
+    public float pinchAimMm = 10f;
+
+    /// <summary>
+    /// Every finger down on this surface, by pointer id, at its last position. A plain
+    /// class, so made on demand rather than in a field initialiser (domain reload is off).
+    /// </summary>
+    Dictionary<int, Vector2> _fingers;
+    Dictionary<int, Vector2> Fingers => _fingers ??= new Dictionary<int, Vector2>();
+
+    /// <summary>Two fingers are down: this is a pinch, and nothing turns the view.</summary>
+    bool _pinching;
+
+    /// <summary>The spread when the pinch began, in screen pixels.</summary>
+    float _pinchFrom;
+
+    /// <summary>One pinch is one decision, so wobbling back and forth does not flicker the sights.</summary>
+    bool _pinchDecided;
+
+    float PinchMm => profile != null ? profile.pinchAimMm : pinchAimMm;
+
+    /// <summary>
+    /// Pinch to aim, the way a phone zooms a photo: spread two fingers to go down the
+    /// sights, pinch them together to come back out. It replaces the ADS button, which
+    /// was one more thing under the right thumb. It stays on after the fingers lift, like
+    /// the button's tap mode did, so the right thumb is free for FIRE.
+    /// </summary>
+    void TrackFinger(PointerEventData e, bool down)
+    {
+        if (down) Fingers[e.pointerId] = e.position;
+        else Fingers.Remove(e.pointerId);
+
+        if (Fingers.Count == 2 && !_pinching)
+        {
+            _pinching = true;
+            _pinchDecided = false;
+            _pinchFrom = Spread();
+            _smoothed = Vector2.zero;
+        }
+        else if (Fingers.Count < 2)
+        {
+            _pinching = false;
+        }
+    }
+
+    float Spread()
+    {
+        Vector2 a = default, b = default;
+        int i = 0;
+        foreach (var p in Fingers.Values) { if (i == 0) a = p; else b = p; if (++i == 2) break; }
+        return Vector2.Distance(a, b);
+    }
+
+    void UpdatePinch(PointerEventData e)
+    {
+        if (!Fingers.ContainsKey(e.pointerId)) return;
+        Fingers[e.pointerId] = e.position;
+        if (_pinchDecided) return;
+
+        float moved = (Spread() - _pinchFrom) / Mathf.Max(0.01f, TouchMetrics.PixelsPerMillimetre);
+        if (moved >= PinchMm) { MobileInput.Aim = true; _pinchDecided = true; }
+        else if (moved <= -PinchMm) { MobileInput.Aim = false; _pinchDecided = true; }
+    }
+
     public void OnPointerDown(PointerEventData eventData)
     {
+        TrackFinger(eventData, down: true);
+
         // A finger already looking keeps the surface. The handover happens on release
         // instead, which is the case that actually occurs: a thumb lifts while the other
         // hand is still resting somewhere on the right of the screen.
@@ -60,6 +128,13 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 
     public void OnDrag(PointerEventData eventData)
     {
+        // Two fingers down is a pinch, and a pinch never turns the view.
+        if (_pinching)
+        {
+            UpdatePinch(eventData);
+            return;
+        }
+
         // Adopt a drag from a finger that arrived while another owned the surface. The
         // owner has since let go -- OnPointerUp cleared it -- and this finger is already
         // moving, so waiting for it to lift and press again would lose the gesture.
@@ -103,12 +178,15 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        bool wasPinch = _pinching;
+        TrackFinger(eventData, down: false);
+
         if (eventData.pointerId != _pointerId) return;
 
         _pointerId = int.MinValue;
         _smoothed = Vector2.zero;
 
-        if (!TapFires) return;
+        if (!TapFires || wasPinch) return;
         if (Time.unscaledTime - _pressTime > tapMaxDuration) return;
         if (_dragDistance > tapMaxDrag) return;
 
@@ -142,6 +220,8 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
     {
         _pointerId = int.MinValue;
         _smoothed = Vector2.zero;
+        _fingers?.Clear();
+        _pinching = false;
 
         if (_fireUntil <= 0f) return;
 

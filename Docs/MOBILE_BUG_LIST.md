@@ -136,6 +136,28 @@ Build Dashboard, and the rebuilds/verifies named per item.
 20. **Results card: "TIME LIMIT" sits alone under "43s / 43s"** as if it were a fourth
     stat row. OPEN, cosmetic (`ResultsView`). Put it inline, e.g. "43s / 43s LIMIT".
 
+## D. Requested change: pinch to aim instead of an ADS button
+
+21. **Touch ADS button removed; spread two fingers to aim, pinch to stop.** **DONE**.
+    - `TouchLookArea` tracks every finger on the look surface (the right 62% of the screen,
+      mirrored for left-handed players). With two fingers down it is a pinch, which never
+      turns the view. Spreading past `TouchProfile.pinchAimMm` (new knob, 10 mm) sets
+      `MobileInput.Aim`; pinching in by the same amount clears it. It stays on after the
+      fingers lift, like the old tap mode, so the right thumb is free for FIRE.
+    - `FPSKitMobileControls` no longer builds the ADS button. PUNCH moves into its cell
+      beside FIRE, so it's no longer by the gun near screen centre. This only applies after
+      the touch scenes are re-staged (next WebGL/Android build).
+    - Settings: the touch "Aim button: Hold/Tap" choice is removed. `GameSettings.TouchAimMode`
+      is left in place, unused on touch.
+    - How to Play (touch): the aim line now says to spread two fingers.
+    - Bomb HUD on touch: shows just the range. "[aim] TO LOCK" named a button that no longer
+      exists. A pinch while aiming a bomb still toggles the range lock through
+      `MobileInput.Aim`, which is harmless.
+    - Depends on fix 1 (multi-touch UI bindings). Without it the second finger never reaches
+      the look area. Check `VerifyTouch`, then try it on a phone.
+    - Not done: zooming toward the point between the fingers. The sights zoom on the
+      crosshair, and aim assist pulls onto a nearby enemy.
+
 ## How the fixes were checked
 
 No Unity in the session, so nothing was compiled. Each change was read against the APIs it

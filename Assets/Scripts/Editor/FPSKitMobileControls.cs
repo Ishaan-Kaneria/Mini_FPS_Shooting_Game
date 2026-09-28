@@ -346,9 +346,8 @@ namespace FPSKit.EditorTools
                                   false, Neutral, profile);
             Slot(cluster, jump, column: 0, row: 1);
 
-            var ads = MakeButton(parent, "AimButton", "ADS", TouchButton.ActionKind.Aim,
-                                 true, Neutral, profile);
-            Slot(cluster, ads, column: 1, row: 0);
+            // No ADS button: spreading two fingers on the look area aims, pinching them
+            // stops (TouchLookArea). Its cell, beside FIRE, is PUNCH's now -- see below.
 
             var reload = MakeButton(parent, "ReloadButton", "RELOAD", TouchButton.ActionKind.Reload,
                                     false, Neutral, profile);
@@ -383,16 +382,15 @@ namespace FPSKit.EditorTools
                                     true, Neutral, profile);
             Slot(cluster, crouch, column: 1, row: 2);
 
-            // Punch, on the bottom row beyond the bomb: a free cell, so the button is
-            // always there and nothing else in the cluster moves to make room. Not in the
-            // top row: on a phone, above the jump is under the pause button and above the
-            // bomb is over the objective strip.
+            // Punch, beside FIRE on the bottom row, in the cell the ADS button had. It used
+            // to sit beyond the bomb, which on a phone put it by the gun near the middle
+            // of the screen, the furthest button from the thumb.
             // Always shown rather than situational -- the fists are never out of stock,
             // and a button that appeared only when an enemy got close would jump into
             // view under a thumb in the middle of the fight it was for.
             var punch = MakeButton(parent, "PunchButton", "PUNCH", TouchButton.ActionKind.Melee,
                                    false, Neutral, profile);
-            Slot(cluster, punch, column: 3, row: 0);
+            Slot(cluster, punch, column: 1, row: 0);
 
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no

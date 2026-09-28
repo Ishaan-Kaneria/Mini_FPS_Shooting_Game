@@ -62,6 +62,13 @@ public class TouchProfile : ScriptableObject
     public bool sprintLatches = true;
 
     // ==================================================================
+    [Header("Pinch to aim")]
+    [Tooltip("How far two fingers on the look area must spread apart to go down the " +
+             "sights, or pinch together to come back out, in millimetres. There is no " +
+             "aim button on touch: spreading two fingers over an enemy is the zoom.")]
+    [Min(2f)] public float pinchAimMm = 10f;
+
+    // ==================================================================
     [Header("Fire")]
     [Tooltip("Keep firing while the thumb slides off the fire button, and let that slide " +
              "turn the view.\n\n" +

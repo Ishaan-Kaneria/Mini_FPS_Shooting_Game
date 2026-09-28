@@ -998,7 +998,11 @@ public class HUDController : MonoBehaviour
 
         bombRangeText.text = bombs.RangeLocked
             ? $"<color=#66F0FF>{range} m  LOCKED</color>"
-            : $"{range} m   <size=70%>{Prompt(GameAction.Aim, AimKey())} TO LOCK</size>";
+            : GameInput.Scheme == InputScheme.Touch
+                // No aim button on touch (a pinch aims), so no key to name. The range
+                // follows how far down the player looks, which the ring already shows.
+                ? $"{range} m"
+                : $"{range} m   <size=70%>{Prompt(GameAction.Aim, AimKey())} TO LOCK</size>";
     }
 
     void UpdateBelt()

@@ -164,7 +164,7 @@ public class MainMenuController : MonoBehaviour
         {
             if (topBar.tabs != null) topBar.tabs.onChanged.AddListener(OnTab);
             if (topBar.railTabs != null) topBar.railTabs.onChanged.AddListener(OnTab);
-            Wire(topBar.settingsButton, () => SettingsPanel.Show(canvas));
+            Wire(topBar.settingsButton, OpenSettings);
             Wire(topBar.infoButton, OpenInfo);
             Wire(topBar.quitButton, AskToExit);
         }
@@ -197,6 +197,18 @@ public class MainMenuController : MonoBehaviour
     }
 
     NameDialog _nameDialog;
+
+    /// <summary>
+    /// Settings, with the dashboard re-read when it closes: the Profile tab can rename
+    /// the player, and the welcome line should say the new name straight away.
+    /// </summary>
+    void OpenSettings()
+    {
+        var settings = SettingsPanel.Show(GetComponentInParent<Canvas>());
+        if (settings == null) return;
+        settings.Closed -= Refresh;
+        settings.Closed += Refresh;
+    }
 
     void OnDestroy()
     {

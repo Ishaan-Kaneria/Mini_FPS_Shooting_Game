@@ -96,6 +96,7 @@ public class SettingsPanel : OverlayPanel
         names.Add("Video");
         names.Add("Audio");
         names.Add("HUD");
+        names.Add("Profile");
         _tabs = UIKit.TabBar(card.transform, "Tabs", names.ToArray(), t);
         _tabs.onChanged.AddListener(ShowPage);
 
@@ -126,6 +127,7 @@ public class SettingsPanel : OverlayPanel
         BuildDisplay(Page(content, "Video"), t);
         BuildAudio(Page(content, "Audio"), t);
         BuildHud(Page(content, "HUD"), t);
+        BuildProfile(Page(content, "Profile"), t);
 
         // Footer.
         var footer = UIKit.Rect(card.transform, "Footer");
@@ -193,6 +195,59 @@ public class SettingsPanel : OverlayPanel
     // ==================================================================
     // Pages.
     // ==================================================================
+
+    /// <summary>
+    /// Who is playing: the name, which can be changed here after the first-run prompt,
+    /// the story's one question, and the career totals, read-only. Everything is read
+    /// from the PlayerPrefs accessors each time the panel opens, so nothing here can
+    /// go stale.
+    /// </summary>
+    void BuildProfile(RectTransform page, UITheme t)
+    {
+        Heading(page, "Player", t);
+        UIKit.SettingRow(page, "Name", "Name", "What the dashboard calls you.", out var slot, t);
+        var field = NameDialog.Field(slot, "Your name", t);
+        UIKit.Fill((RectTransform)field.transform);
+        // A pad lands on a page's first control; landing must not start typing.
+        field.shouldActivateOnSelect = false;
+        field.onEndEdit.AddListener(typed =>
+        {
+            typed = (typed ?? "").Trim();
+            if (typed.Length > 0) PlayerProfile.Name = typed;
+            else field.SetTextWithoutNotify(PlayerProfile.Name);
+        });
+        _refreshers.Add(() => field.SetTextWithoutNotify(PlayerProfile.Name));
+
+        AddChoice(page, "In the story", "Were you a boy or a girl, twenty years ago.",
+                  new[] { "A boy", "A girl", "Rather not say" },
+                  () => Campaign.Who == Campaign.Identity.Unset ? 2 : (int)Campaign.Who - 1,
+                  i => Campaign.Who = (Campaign.Identity)(i + 1), t);
+
+        Heading(page, "Career", t);
+        AddStat(page, "Rank", () =>
+        {
+            PlayerRank.Progress(out int into, out int span);
+            return $"{PlayerRank.TitleFor(PlayerRank.Rank).ToUpperInvariant()}{UIText.Separator}LV {PlayerRank.Rank}" +
+                   $"{UIText.Separator}{into:N0} / {span:N0} XP";
+        }, t);
+        AddStat(page, "Coins", () => Wallet.Format(Wallet.Balance), t);
+        AddStat(page, "Coins earned", () => Wallet.Format(Wallet.LifetimeEarned), t);
+        AddStat(page, "Best score", () => PlayerProfile.BestScore.ToString("N0"), t);
+        AddStat(page, "Levels played", () => PlayerProfile.Runs.ToString("N0"), t);
+        AddStat(page, "Enemies down", () => PlayerProfile.TotalKills.ToString("N0"), t);
+    }
+
+    /// <summary>A read-only row: a label and a value, refreshed each time the panel opens.</summary>
+    void AddStat(RectTransform page, string label, Func<string> value, UITheme t)
+    {
+        UIKit.SettingRow(page, "Stat_" + label, label, null, out var slot, t);
+        var text = UIKit.Text(slot, "Value", "", UIKit.TextRole.Body, t);
+        UIKit.Fill(text.rectTransform);
+        text.alignment = TextAlignmentOptions.MidlineRight;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.raycastTarget = false;
+        _refreshers.Add(() => text.text = value());
+    }
 
     void BuildControls(RectTransform page, UITheme t)
     {

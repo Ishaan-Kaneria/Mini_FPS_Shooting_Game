@@ -90,8 +90,8 @@ public class NameDialog : OverlayPanel
         panel.SetActive(false);
     }
 
-    /// <summary>A flat text field, the same one the HUD editor names layouts with.</summary>
-    static TMP_InputField Field(RectTransform parent, string placeholder, UITheme t)
+    /// <summary>A flat text field, the same one the HUD editor names layouts with. Settings' Profile page uses it too.</summary>
+    public static TMP_InputField Field(RectTransform parent, string placeholder, UITheme t)
     {
         var face = UIKit.Panel(parent, "Name", UIKit.PanelTone.Raised, t);
         face.raycastTarget = true;

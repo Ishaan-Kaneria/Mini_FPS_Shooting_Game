@@ -158,6 +158,26 @@ Build Dashboard, and the rebuilds/verifies named per item.
     - Not done: zooming toward the point between the fingers. The sights zoom on the
       crosshair, and aim assist pulls onto a nearby enemy.
 
+## E. Requested feature: view and rename the player
+
+22. **Settings > Profile tab.** **DONE** (`SettingsPanel.BuildProfile`). It is the last tab,
+    so Settings still opens on Controls, including from the pause menu.
+    - **Name:** an editable field (the same one `NameDialog` uses). It saves on end-edit,
+      and an empty entry puts the old name back. `shouldActivateOnSelect` is off, so a
+      gamepad landing on the page doesn't start typing.
+    - **In the story:** A boy / A girl / Rather not say, over `Campaign.Who`, so the
+      opening's answer can be changed later.
+    - **Career, read-only:** rank title, LV and XP; coins; coins earned; best score; levels
+      played; enemies down. All are read from the PlayerPrefs accessors each time the panel
+      opens.
+    - The dashboard re-reads itself when Settings closes (`MainMenuController.OpenSettings`),
+      so "WELCOME BACK, <name>" updates straight away.
+    - "Reset to defaults" doesn't touch any of this (`GameSettings.ResetAll` lists its keys).
+    - Not done: tapping the name/rank on the dashboard to open this tab. A small
+      `UIKit.IconButton` ("user" icon) beside the welcome line in `FPSKitMenuBuilder`
+      calling `SettingsPanel.Show(canvas).ShowTab("Profile")` would do it. Needs Build Dashboard.
+    - Verify: `VerifyHudLayout` (clicks every Settings tab) and `VerifyControls`.
+
 ## How the fixes were checked
 
 No Unity in the session, so nothing was compiled. Each change was read against the APIs it

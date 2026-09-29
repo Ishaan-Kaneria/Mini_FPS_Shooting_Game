@@ -209,8 +209,11 @@ public class ResultsView : MonoBehaviour
         }
 
         // Against the limit, never a par: the clock is what ends a level.
-        timeValue.text = t.Tabular(LevelButton.Clock(r.timeTaken) + " / " + LevelButton.Clock(r.timeLimit));
-        timeNote.text = newBest ? "NEW BEST" : r.ending == LevelResult.Ending.Cleared ? "" : "TIME LIMIT";
+        // "LIMIT" rides on the figure itself: on its own line under it, "TIME LIMIT" read as
+        // a fourth stat with no value.
+        timeValue.text = t.Tabular(LevelButton.Clock(r.timeTaken) + " / " + LevelButton.Clock(r.timeLimit)) +
+                         (newBest || r.ending == LevelResult.Ending.Cleared ? "" : " <size=45%>LIMIT</size>");
+        timeNote.text = newBest ? "NEW BEST" : "";
         timeNote.color = newBest ? t.accent : t.textDisabled;
         killsValue.text = t.Tabular($"{r.killed}/{r.total}");
         scoreValue.text = t.Tabular(r.score.ToString("N0"));

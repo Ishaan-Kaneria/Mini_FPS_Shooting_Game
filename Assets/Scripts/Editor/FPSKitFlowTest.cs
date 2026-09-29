@@ -56,6 +56,11 @@ namespace FPSKit.EditorTools
         /// <summary>The tester's own answer to the one question, put back in Detach.</summary>
         static int _identityBackup = -1;
 
+        /// <summary>The tester's own player name (null: none saved), put back in Detach.</summary>
+        static string _nameBackup;
+        static bool _nameBorrowed, _nameAsked, _nameClosed;
+        const string NameKey = "FPSKit.PlayerName"; // PlayerProfile's key
+
         /// <summary>Zone openings this test suppresses, and what they were.</summary>
         const int OpeningsCleared = 8;
 
@@ -127,6 +132,12 @@ namespace FPSKit.EditorTools
                 // the developer's own campaign at the start would be a check that broke
                 // the game to pass.
                 _identityBackup = (int)Campaign.Who;
+
+                // Same for the name prompt, which asks once per profile after the opening.
+                _nameBackup = PlayerPrefs.HasKey(NameKey) ? PlayerPrefs.GetString(NameKey) : null;
+                _nameBorrowed = true;
+                _nameAsked = _nameClosed = false;
+                PlayerPrefs.DeleteKey(NameKey);
                 Campaign.Who = Campaign.Identity.Unset;
 
                 // The zone openings are shown once each, so on any machine that has run
@@ -223,6 +234,17 @@ namespace FPSKit.EditorTools
                         // screen is a full-screen raycast target over every button on the
                         // dashboard, which is the exact failure VerifyFlow exists for.
                         _storyClosed = menu.story == null || !menu.story.IsOpen;
+
+                        // The name prompt follows the opening on an unnamed profile. It is a
+                        // full-screen shade too, so it is answered (skipped) before anything
+                        // behind it is raycast, as a player would.
+                        var names = menu.GetComponentInParent<Canvas>().GetComponentInChildren<NameDialog>(true);
+                        _nameAsked = names != null && names.IsOpen;
+                        if (_nameAsked)
+                        {
+                            if (names.backButton != null) names.backButton.onClick.Invoke();
+                            _nameClosed = !names.IsOpen && PlayerProfile.HasName;
+                        }
 
                         _catalogCount = menu.catalog.arenas.Count;
 
@@ -691,8 +713,8 @@ namespace FPSKit.EditorTools
         /// <summary>Internal so FPSKitStoreTest can raycast the store the same way.</summary>
         internal static string UnclickableButtonIn(MainMenuController menu)
         {
-            var raycaster = menu.GetComponent<UnityEngine.UI.GraphicRaycaster>();
-            if (raycaster == null) return "the dashboard canvas has no GraphicRaycaster";
+            if (menu.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+                return "the dashboard canvas has no GraphicRaycaster";
 
             var events = UnityEngine.EventSystems.EventSystem.current;
             if (events == null) return "the dashboard scene has no EventSystem";
@@ -722,6 +744,11 @@ namespace FPSKit.EditorTools
                 if (mask != null && !RectTransformUtility.RectangleContainsScreenPoint(mask.rectTransform, pointer.position, null))
                     continue;
 
+                // Through the button's own canvas: a dialog on a nested, sorted canvas
+                // (ConfirmDialog, NameDialog) has its own raycaster, and the root one
+                // does not see its graphics at all.
+                var raycaster = button.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>();
+                if (raycaster == null) return button.name;
                 var hits = new List<UnityEngine.EventSystems.RaycastResult>();
                 raycaster.Raycast(pointer, hits);
 
@@ -819,6 +846,14 @@ namespace FPSKit.EditorTools
                 PlayerPrefs.Save();
             }
 
+            if (_nameBorrowed)
+            {
+                _nameBorrowed = false;
+                if (_nameBackup != null) PlayerPrefs.SetString(NameKey, _nameBackup);
+                else PlayerPrefs.DeleteKey(NameKey);
+                PlayerPrefs.Save();
+            }
+
             FPSKitPlayMode.RestoreStartScene();
 
             EditorApplication.update -= Tick;
@@ -888,6 +923,14 @@ namespace FPSKit.EditorTools
             if (!_storyClosed)
                 problems.Append("\n  - the story card is still up after being answered: it " +
                                 "covers the whole dashboard, so nothing behind it can be clicked");
+
+            if (_storyOpened && !_nameAsked)
+                problems.Append("\n  - a profile with no name was never asked for one, so the " +
+                                "dashboard greets everybody as OPERATIVE");
+
+            if (_nameAsked && !_nameClosed)
+                problems.Append("\n  - skipping the name prompt did not close it and store a " +
+                                "default, so it covers the dashboard or asks again every visit");
 
             if (!_dialogOpened)
                 problems.Append("\n  - the Exit button did not open a confirmation");

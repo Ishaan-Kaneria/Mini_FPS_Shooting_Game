@@ -69,8 +69,8 @@ public class DossierPanel : OverlayPanel
         // Switching a column off does not mark the row it sits in for layout, so on a phone
         // the one column left kept the half width it had with two, and the list used the
         // left half of the screen. Rebuilt now, so it takes the full width.
-        if (columns[0] != null && columns[0].parent is RectTransform row)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(row);
+        if (columns[0] != null && columns[0].parent is RectTransform columnRow)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(columnRow);
 
         int names = campaign.siblings != null ? campaign.siblings.Count : 0;
         int down = 0;

@@ -76,7 +76,16 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         name = $"Store_{c.title}";
 
         if (titleText != null) titleText.text = (c.title ?? "").ToUpperInvariant();
-        if (descriptionText != null) descriptionText.text = c.description ?? "";
+        if (descriptionText != null)
+        {
+            descriptionText.text = c.description ?? "";
+
+            // One line cut "useless pa..." on a phone, where the card is half a 147mm
+            // screen wide. Two lines there; the desktop card has the width for one.
+            bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+            descriptionText.textWrappingMode = handset ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+            descriptionText.maxVisibleLines = handset ? 2 : 99999;
+        }
         if (statsText != null) statsText.text = c.stats ?? "";
         if (stateText != null)
         {
@@ -104,7 +113,11 @@ public class StoreItemCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         bool afford = Wallet.CanAfford(price);
         if (priceText != null)
         {
-            priceText.text = t.Tabular(Wallet.Format(price));
+            // Touch has no hover to explain a red price, so the shortfall is said on the card.
+            priceText.text = afford
+                ? t.Tabular(Wallet.Format(price))
+                : t.Tabular(Wallet.Format(price)) +
+                  $" <size=55%>NEED {Wallet.Format(price - Wallet.Balance)}</size>";
             priceText.color = afford ? t.accent : t.danger;
         }
         if (priceIcon != null) priceIcon.color = afford ? t.accent : t.danger;

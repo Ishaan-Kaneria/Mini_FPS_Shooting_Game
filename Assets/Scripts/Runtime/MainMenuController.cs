@@ -53,6 +53,8 @@ public class MainMenuController : MonoBehaviour
 
     [Header("Play")]
     public TMP_Text welcomeText;
+    [Tooltip("Beside the welcome line: opens Settings on the Profile tab, to see or change the name.")]
+    public Button profileButton;
     [Tooltip("Rank and XP on one line, shown on a handset where the top bar has no room for them.")]
     public TMP_Text rankLine;
     public ScrollRect cardScroll;
@@ -166,7 +168,8 @@ public class MainMenuController : MonoBehaviour
         {
             if (topBar.tabs != null) topBar.tabs.onChanged.AddListener(OnTab);
             if (topBar.railTabs != null) topBar.railTabs.onChanged.AddListener(OnTab);
-            Wire(topBar.settingsButton, OpenSettings);
+            Wire(topBar.settingsButton, () => OpenSettings());
+            Wire(profileButton, OpenProfile);
             Wire(topBar.infoButton, OpenInfo);
             Wire(topBar.quitButton, AskToExit);
         }
@@ -204,12 +207,19 @@ public class MainMenuController : MonoBehaviour
     /// Settings, with the dashboard re-read when it closes: the Profile tab can rename
     /// the player, and the welcome line should say the new name straight away.
     /// </summary>
-    void OpenSettings()
+    SettingsPanel OpenSettings()
     {
         var settings = SettingsPanel.Show(GetComponentInParent<Canvas>());
-        if (settings == null) return;
+        if (settings == null) return null;
         settings.Closed -= Refresh;
         settings.Closed += Refresh;
+        return settings;
+    }
+
+    void OpenProfile()
+    {
+        var settings = OpenSettings();
+        if (settings != null) settings.ShowTab("Profile");
     }
 
     void OnDestroy()

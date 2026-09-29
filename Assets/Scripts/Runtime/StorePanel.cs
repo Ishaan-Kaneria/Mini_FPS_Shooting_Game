@@ -752,8 +752,15 @@ public class StorePanel : MonoBehaviour
 
     void ShowBalance()
     {
-        if (balanceText != null)
-            balanceText.text = $"{Wallet.Format(Wallet.Balance)} <size=65%>COINS</size>";
+        if (balanceText == null) return;
+        balanceText.text = $"{Wallet.Format(Wallet.Balance)} <size=65%>COINS</size>";
+
+        // The dashboard's top bar already shows the balance. On a handset the second copy
+        // costs the shelf a row, so the header keeps only its heading there.
+        bool show = DeviceProfile.CurrentForm != DeviceProfile.Form.Handset;
+        balanceText.gameObject.SetActive(show);
+        var coin = balanceText.transform.parent != null ? balanceText.transform.parent.Find("Coin") : null;
+        if (coin != null) coin.gameObject.SetActive(show);
     }
 
     void Report(string message)

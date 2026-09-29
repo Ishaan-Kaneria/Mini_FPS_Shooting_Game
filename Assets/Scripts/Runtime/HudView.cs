@@ -166,7 +166,7 @@ public class HudView : MonoBehaviour
         MarkTargets();
 
         _built = true;
-        if (isActiveAndEnabled) Subscribe();
+        if (isActiveAndEnabled) { Subscribe(); s_live = this; }
     }
 
     bool _built, _subscribed;
@@ -188,7 +188,35 @@ public class HudView : MonoBehaviour
     void OnEnable()
     {
         if (_built) Subscribe();
+        if (_built) s_live = this;
     }
+
+    /// <summary>The HUD on screen now, for <see cref="Covers"/>. Null between levels.</summary>
+    static HudView s_live;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => s_live = null;
+
+    /// <summary>
+    /// Whether a screen point lies under one of the HUD's corner or top panels.
+    ///
+    /// The panels are translucent, so a world-space enemy marker behind one showed through
+    /// and read as part of the readout -- a red diamond sitting on the objective's "11/24".
+    /// <see cref="EnemyHealthBar"/> asks this and drops the marker there instead.
+    /// </summary>
+    public static bool Covers(Vector2 screenPoint)
+    {
+        var v = s_live;
+        if (v == null || !v.isActiveAndEnabled || v._canvas == null) return false;
+        var cam = v._canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : v._canvas.worldCamera;
+        return Under(v._mission, screenPoint, cam) || Under(v._runPanel, screenPoint, cam) ||
+               Under(v._minimap, screenPoint, cam) ||
+               (v._objectiveStrip != null && Under(v._objectiveStrip.transform as RectTransform, screenPoint, cam));
+    }
+
+    static bool Under(RectTransform rt, Vector2 point, Camera cam)
+        => rt != null && rt.gameObject.activeInHierarchy &&
+           RectTransformUtility.RectangleContainsScreenPoint(rt, point, cam);
 
     void Subscribe()
     {
@@ -232,6 +260,7 @@ public class HudView : MonoBehaviour
 
     void OnDisable()
     {
+        if (s_live == this) s_live = null;
         if (!_subscribed) return;
         _subscribed = false;
         if (_level != null)
@@ -416,6 +445,14 @@ public class HudView : MonoBehaviour
         UIKit.Size(killsLabel, flexWidth: 1f);
         _runKillsText = Label(killsRow, "Value", "0 / 0", UIKit.TextRole.Label, _t.textPrimary);
         _killsBar = UIKit.ProgressBar(panel.transform, "KillsBar", _t.accent, 4f, false, _t);
+
+        // The mission strip already counts kills against the level. On a handset the second
+        // copy is two rows of a panel that sits over the fight, so it goes.
+        if (DeviceProfile.CurrentForm == DeviceProfile.Form.Handset)
+        {
+            killsRow.gameObject.SetActive(false);
+            _killsBar.gameObject.SetActive(false);
+        }
 
         var coinRow = UIKit.Rect(panel.transform, "Coins");
         UIKit.Row(coinRow, 8f, null, TextAnchor.MiddleLeft).childControlHeight = true;

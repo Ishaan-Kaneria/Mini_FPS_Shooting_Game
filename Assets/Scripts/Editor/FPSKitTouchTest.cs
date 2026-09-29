@@ -135,6 +135,13 @@ namespace FPSKit.EditorTools
             if (profile == null || !profile.showSprintButton)
                 optional.Add(TouchButton.ActionKind.Sprint);
 
+            // No ADS button: spreading two fingers on the look area aims. So the button is
+            // not required, but the pinch that replaced it must be able to fire.
+            optional.Add(TouchButton.ActionKind.Aim);
+            if (look != null && (look.profile != null ? look.profile.pinchAimMm : look.pinchAimMm) <= 0f)
+                problems.Add("there is no aim button and the look area's pinch threshold is " +
+                             "zero, so a touch player cannot aim down sights");
+
             foreach (TouchButton.ActionKind kind in Enum.GetValues(typeof(TouchButton.ActionKind)))
             {
                 if (!seen.ContainsKey(kind))

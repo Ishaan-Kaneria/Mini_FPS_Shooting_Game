@@ -215,7 +215,15 @@ public class EnemyHealthBar : MonoBehaviour
         if (_camera != null && range > 0f &&
             (transform.position - _camera.transform.position).sqrMagnitude > range * range)
             return false;
-        return touch || (_ai != null && _ai.HasSpotted) || !_health.IsFull;
+        if (!(touch || (_ai != null && _ai.HasSpotted) || !_health.IsFull)) return false;
+
+        // Behind a translucent HUD panel the diamond reads as part of the readout.
+        if (touch && _camera != null && _marker != null)
+        {
+            Vector3 p = _camera.WorldToScreenPoint(_marker.position);
+            if (p.z > 0f && HudView.Covers(p)) return false;
+        }
+        return true;
     }
 
     /// <summary>

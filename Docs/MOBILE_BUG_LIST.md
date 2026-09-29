@@ -1,10 +1,10 @@
 # Mobile bug list (web build on an Android phone, landscape)
 
 Found from phone screenshots of minifpsshootinggame.netlify.app plus a read of the code.
-Items marked **FIXED** are fixed in code on branch `claude/clever-noether-zhthto`.
-That session had no Unity, so nothing below is compiled or run yet.
-**First step:** `Tools/unity-batch.sh` (compile check). Then `FPSKitBatch.ImportUiKit`,
-Build Dashboard, and the rebuilds/verifies named per item.
+Items marked **FIXED** were fixed on branch `claude/clever-noether-zhthto` (cloud, no Unity),
+then merged to `main` and finished locally on 2026-09-29: compiled (one CS0136 in
+`DossierPanel` fixed), `ResetCampaign`, `ResetLevelSets`, `ImportUiKit` and Build Dashboard run,
+and the remaining OPEN items fixed. See "Second pass" at the bottom.
 
 ## A. Reported by Ishaan
 
@@ -227,3 +227,40 @@ No Unity in the session, so nothing was compiled. Each change was read against t
 uses (UIKit, OverlayPanel, TMP_SpriteAsset, InputSystem bindings) and follows existing
 patterns (`ConfirmDialog`, `HudEditor.NameField`). Run the compile check and the verifies
 above before building for WebGL.
+
+## Second pass (local, 2026-09-29)
+
+- **3. Button placement: already addressed by item 21; arc tried and rejected.** The
+  screenshots predate the cloud pass, which moved PUNCH from beside the gun into ADS's cell
+  next to FIRE. An arc round FIRE was built and measured: touch hit areas are squares, and
+  keeping 5mm between squares on diagonals pushed the cluster to 62x56mm, against 54x54mm
+  for the current grid. Its inner ring landed on the grid's own cells (RELOAD at 31.9/31.9mm
+  vs 31.75/31.75mm). The grid is the tighter thumb-safe packing, so it stays. If the phone
+  still feels wrong, the next lever is `TouchCluster.secondaryMm`/`gapMm`, tried on the device.
+- **VerifyTouch** required an Aim button the cloud pass had removed; it now accepts pinch-to-aim
+  instead and fails if the pinch threshold is zero.
+- **4. Text size: FIXED.** HUD reference scale on a handset 0.80 → 0.70. Store and arena card
+  descriptions wrap to two lines on `Form.Handset` (runtime, in `StoreItemCard`/`ArenaCard`).
+- **6. Fist glyph: FIXED.** `ImportUiKit` run; `fist` is in the Glyphs sprite asset.
+- **10. Theme font on story/dossier/instructions: FIXED.** Build Dashboard run.
+- **12. Red diamond over the objective strip: FIXED.** It was the enemy's world-space touch
+  marker showing through the translucent strip, not the damage arc. On touch the marker is
+  dropped while it sits under a HUD panel (`HudView.Covers`).
+- **13. "--" in story text: FIXED.** Em dashes in `FPSKitCampaign` (identity question, the
+  opening, two stakes lines); Barlow is a dynamic TMP font, so the glyph renders.
+- **14. Store shortfall: FIXED.** A red price now reads "250 NEED 132".
+- **15. Coins twice: FIXED.** The store header drops its balance on a handset.
+- **19. KILLS twice: FIXED.** KILLS row and bar hidden on a handset.
+- **20. "TIME LIMIT" as a fourth row: FIXED.** Now inline: "43s / 43s LIMIT".
+- **22. Profile from the dashboard: FIXED.** A user icon button beside WELCOME BACK opens
+  Settings on the Profile tab.
+- **28. Mission card empty space: FIXED.** Compact card keeps the objective line and centres
+  its contents vertically.
+
+Left on purpose:
+- **2 (note).** BOMB stays hidden with no bombs: CLAUDE.md says to show controls only for
+  equipment the player has.
+- **16 (note).** Briefing length vs the 3 s countdown: a design call (shorter text or a longer
+  `briefingTime`), not changed.
+- **24 (note).** Spawning nearer on phones: changes balance and the leash; not changed.
+- Everything here still needs a play on the phone after the next deploy.

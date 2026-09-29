@@ -43,7 +43,16 @@ namespace FPSKit.EditorTools
             lcol.childForceExpandHeight = false;
             menu.leftColumn = left;
 
-            menu.welcomeText = UIKit.Text(left, "Welcome", "WELCOME BACK, OPERATIVE", UIKit.TextRole.Title, t);
+            // The name, with the way to change it beside it: the Profile tab in Settings.
+            var welcomeRow = UIKit.Rect(left, "WelcomeRow");
+            var wrow = UIKit.Row(welcomeRow, 12f, null, TextAnchor.MiddleLeft);
+            wrow.childForceExpandWidth = false;
+            wrow.childControlHeight = true;
+            menu.welcomeText = UIKit.Text(welcomeRow, "Welcome", "WELCOME BACK, OPERATIVE", UIKit.TextRole.Title, t);
+            menu.welcomeText.textWrappingMode = TextWrappingModes.NoWrap;
+            menu.welcomeText.overflowMode = TextOverflowModes.Ellipsis;
+            UIKit.Size(menu.welcomeText, flexWidth: 1f);
+            menu.profileButton = UIKit.IconButton(welcomeRow, "Profile", "user", "Profile", UIKit.ControlHeight, t);
             menu.rankLine = UIKit.Text(left, "RankLine", "", UIKit.TextRole.Label, t);
             var heading = UIKit.Text(left, "SelectArena", "Select arena", UIKit.TextRole.Heading, t);
             heading.color = t.textSecondary;

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Levels_AbandonedSubway
   m_EditorClassIdentifier: Assembly-CSharp::LevelSet
   arenaScene: AbandonedSubway
-  stakes: The ground here is older than the fence around it. When the floodlights go, the holes you have been walking round stop being visible -- and they are still exactly where they were.
+  stakes: "The ground here is older than the fence around it. When the floodlights go, the holes you have been walking round stop being visible \u2014 and they are still exactly where they were."
   levels:
   - displayName: WAY OUT
     brief: Dev turned the lights on for you. Only some of them. 6 hostiles. Clear them, then reach the way out.

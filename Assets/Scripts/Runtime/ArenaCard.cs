@@ -64,6 +64,12 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         if (descriptionText != null)
         {
             descriptionText.text = entry.description ?? "";
+
+            // One line with an ellipsis is all a desktop card needs; a handset card is
+            // narrower and the sentence was cut to a few words, so it gets two.
+            bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+            descriptionText.textWrappingMode = handset ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+            descriptionText.maxVisibleLines = handset ? 2 : 99999;
             descriptionText.color = unlocked ? t.textSecondary : t.textDisabled;
         }
         if (progressText != null)

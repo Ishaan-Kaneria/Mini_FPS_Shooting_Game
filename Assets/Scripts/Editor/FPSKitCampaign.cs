@@ -276,7 +276,7 @@ namespace FPSKit.EditorTools
                 "children.\n\n" +
                 "The old man is twenty years dead. The eight are still holding his sites.";
 
-            data.identityQuestion = "Before we start -- were you a boy, or a girl?";
+            data.identityQuestion = "Before we start — were you a boy, or a girl?";
 
             // The beats, in the same order as the table above. Split from the names
             // rather than written beside them so the names stay a table two generators
@@ -285,7 +285,7 @@ namespace FPSKit.EditorTools
             {
                 "Tove signed the report that called it a gas fault. She did not deny it " +
                 "and she did not apologise for it. What she said, at the end, was that " +
-                "the gate your mother put you through was not an escape -- it was a " +
+                "the gate your mother put you through was not an escape — it was a " +
                 "transfer, and it was arranged.",
 
                 "Kestrel kept the charges her father bought and never had to use. You are " +
@@ -434,7 +434,7 @@ namespace FPSKit.EditorTools
         {
             "Industrial Warehouse" =>
                 "The plant runs to a shift clock and the gates seal when it ends. Finish " +
-                "this before they do -- nobody opens them from the outside, and nobody is " +
+                "this before they do — nobody opens them from the outside, and nobody is " +
                 "coming to look.",
 
             "Snowbound Station" =>
@@ -453,7 +453,7 @@ namespace FPSKit.EditorTools
 
             "Abandoned Subway" =>
                 "The ground here is older than the fence around it. When the floodlights " +
-                "go, the holes you have been walking round stop being visible -- and they " +
+                "go, the holes you have been walking round stop being visible — and they " +
                 "are still exactly where they were.",
 
             "Mars Colony" =>

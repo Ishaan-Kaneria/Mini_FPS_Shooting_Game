@@ -39,6 +39,14 @@ public class MissionCard : MonoBehaviour
         _compact = compact;
         if (Entry != null) Bind(Entry);
         foreach (var go in compactHidden) if (go != null) go.SetActive(!compact);
+
+        // With the picture gone the column had a hand's width of nothing under ALL LEVELS.
+        // The objective line comes back to fill some of it (two lines at most), and what is
+        // left is shared above and below rather than pooled at the bottom.
+        if (compact && objectiveText != null && objectiveText.transform.parent != null)
+            objectiveText.transform.parent.gameObject.SetActive(true);
+        var column = GetComponent<VerticalLayoutGroup>();
+        if (column != null) column.childAlignment = compact ? TextAnchor.MiddleLeft : TextAnchor.UpperLeft;
     }
 
     bool _compact;

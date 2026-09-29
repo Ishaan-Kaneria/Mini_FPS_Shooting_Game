@@ -21,7 +21,7 @@ MonoBehaviour:
     timeLimit: 32
     maxAliveAtOnce: 4
     spawnInterval: 0.8
-    briefingTime: 4.5
+    briefingTime: 8
     objective: 5
     objectiveWeight: 4
     hasBoss: 0
@@ -44,7 +44,7 @@ MonoBehaviour:
     timeLimit: 43
     maxAliveAtOnce: 5
     spawnInterval: 0.7285714
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 6
     objectiveWeight: 4
     hasBoss: 0
@@ -67,7 +67,7 @@ MonoBehaviour:
     timeLimit: 69
     maxAliveAtOnce: 6
     spawnInterval: 0.6571429
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 0
     objectiveWeight: 5
     hasBoss: 1
@@ -90,7 +90,7 @@ MonoBehaviour:
     timeLimit: 63
     maxAliveAtOnce: 7
     spawnInterval: 0.5857143
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 2
     objectiveWeight: 7
     hasBoss: 0
@@ -113,7 +113,7 @@ MonoBehaviour:
     timeLimit: 73
     maxAliveAtOnce: 8
     spawnInterval: 0.5142857
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 1
     objectiveWeight: 8
     hasBoss: 0
@@ -136,7 +136,7 @@ MonoBehaviour:
     timeLimit: 99
     maxAliveAtOnce: 9
     spawnInterval: 0.44285715
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 0
     objectiveWeight: 9
     hasBoss: 1
@@ -159,7 +159,7 @@ MonoBehaviour:
     timeLimit: 94
     maxAliveAtOnce: 10
     spawnInterval: 0.37142858
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 3
     objectiveWeight: 11
     hasBoss: 0
@@ -182,7 +182,7 @@ MonoBehaviour:
     timeLimit: 120
     maxAliveAtOnce: 11
     spawnInterval: 0.3
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 0
     objectiveWeight: 12
     hasBoss: 1

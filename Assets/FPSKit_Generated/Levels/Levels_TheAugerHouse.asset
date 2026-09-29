@@ -21,7 +21,7 @@ MonoBehaviour:
     timeLimit: 87
     maxAliveAtOnce: 8
     spawnInterval: 0.8
-    briefingTime: 4.5
+    briefingTime: 8
     objective: 2
     objectiveWeight: 10
     hasBoss: 0
@@ -44,7 +44,7 @@ MonoBehaviour:
     timeLimit: 134
     maxAliveAtOnce: 10
     spawnInterval: 0.55
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 1
     objectiveWeight: 16
     hasBoss: 0
@@ -67,7 +67,7 @@ MonoBehaviour:
     timeLimit: 198
     maxAliveAtOnce: 12
     spawnInterval: 0.3
-    briefingTime: 3
+    briefingTime: 7.5
     objective: 0
     objectiveWeight: 22
     hasBoss: 1

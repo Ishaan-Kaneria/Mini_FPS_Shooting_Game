@@ -760,14 +760,7 @@ public class HUDController : MonoBehaviour
         bool counting = levelManager.IsBriefing && !levelManager.IsFinished;
         int seconds = counting ? Mathf.CeilToInt(levelManager.BriefingRemaining) : Hidden;
 
-        // The equipment hint is part of this label, so everything it depends on is part
-        // of the key -- the counts included, because the hint prints them and a player
-        // can drink during the briefing. Keying on the seconds alone would leave the
-        // number stale until the countdown next ticked over.
-        int charges = bombs != null && bombs.data != null ? Mathf.Clamp(bombs.charges, 0, 31) : 0;
-        int drinks = belt != null && belt.data != null ? Mathf.Clamp(belt.Count, 0, 31) : 0;
-
-        int keyed = counting ? seconds * 1024 + charges * 32 + drinks : Hidden;
+        int keyed = counting ? seconds : Hidden;
 
         if (keyed == _shownBriefing) return;
 
@@ -800,96 +793,12 @@ public class HUDController : MonoBehaviour
         string accent = ColorUtility.ToHtmlStringRGB(UITheme.Active.accent);
         string header = $"<size=85%><color=#{accent}>GET READY{UIText.Separator}{seconds}</color></size>";
 
+        // No controls here. The card used to teach the bomb and the drink as well, which
+        // made it a paragraph to read in a three-second countdown over a level about to
+        // start; How to Play (dashboard and pause menu) is where the controls live now.
         briefingText.text = string.IsNullOrWhiteSpace(brief)
-            ? $"{header}{why}{EquipmentHint()}"
-            : $"{header}\n{brief}{why}{EquipmentHint()}";
-    }
-
-    /// <summary>
-    /// How to use whatever the player brought with them, said once at the start of the
-    /// level while there is nothing else happening.
-    ///
-    /// The top strip names the keys for the whole level, but a key listed in a strip is
-    /// something you notice on your third run. A bomb is the least guessable control in
-    /// the game -- it is *held*, not tapped, and the release is the throw -- so it is
-    /// worth a sentence at the one moment the player has time to read one.
-    ///
-    /// Only for equipment actually being carried. Teaching somebody a bomb key when they
-    /// own no bomb is worse than saying nothing: they try it, nothing happens, and now
-    /// they distrust the rest of the strip.
-    /// </summary>
-    string EquipmentHint()
-    {
-        bool hasBomb = bombs != null && bombs.data != null && bombs.charges > 0;
-        bool hasDrink = belt != null && belt.data != null && belt.Count > 0;
-
-        if (!hasBomb && !hasDrink) return string.Empty;
-
-        const string Dim = "<color=#B8AFA0>";
-        var hint = new System.Text.StringBuilder("\n<size=72%>");
-
-        // How the bomb is *placed* is named too, and it is named differently for the
-        // two ways of placing it. The key teaches itself the moment a ring appears on
-        // the floor; what does not is whether the thing that moves it is the mouse or
-        // your head, and a player who guesses wrong concludes the control is broken.
-        if (hasBomb)
-        {
-            string place = GameInput.Scheme == InputScheme.Gamepad
-                ? $"TO AIM A BOMB, {InputPrompts.For(GameAction.Look)} PLACES IT"
-                : bombs.UsingCursor
-                    ? "TO AIM A BOMB, MOVE THE MOUSE TO PLACE IT"
-                    : "TO AIM A BOMB, LOOK DOWN TO BRING THE RING IN";
-
-            // On a phone the throw is one gesture on the BOMB button, so one short line.
-            if (GameInput.Scheme == InputScheme.Touch)
-            {
-                hint.Append($"{Dim}HOLD </color>{Prompt(GameAction.Bomb, BombKey())}" +
-                            $"{Dim} AND SLIDE TO PLACE A BOMB, RELEASE TO THROW</color>");
-            }
-            else
-            {
-                // Both ways of ending it are named. The tap is the one a laptop player
-                // needs -- a held key stops their touchpad reporting motion at all -- and
-                // it is the one nobody discovers on their own.
-                hint.Append($"TAP {Prompt(GameAction.Bomb, BombKey())} {Dim}{place}, TAP AGAIN TO THROW</color>" +
-                            $"\n<size=90%>{Dim}OR HOLD </color>{Prompt(GameAction.Bomb, BombKey())}" +
-                            $"{Dim} AND RELEASE, {Prompt(GameAction.Aim, AimKey())} LOCKS THE RANGE</color></size>");
-            }
-        }
-
-        if (hasBomb && hasDrink) hint.Append("\n");
-
-        // Named, and with what it gives back, because "drinks an energy drink" tells a
-        // player nothing they could not guess from the word on the button -- what they
-        // need to know at three hit points is that this is the key that heals them.
-        if (hasDrink)
-        {
-            string name = string.IsNullOrWhiteSpace(belt.data.displayName)
-                ? "A DRINK"
-                : belt.data.displayName.ToUpperInvariant();
-
-            hint.Append($"{Prompt(GameAction.UseItem, ItemKey())} {Dim}DRINKS {name} FOR {Restores(belt.data)}, " +
-                        $"{UIText.Count(belt.Count)} LEFT</color>");
-        }
-
-        hint.Append("</size>");
-        return hint.ToString();
-    }
-
-    /// <summary>
-    /// What a consumable gives back, in three words, read off the asset rather than
-    /// written out -- so a drink retuned to restore no shield stops claiming it does.
-    /// </summary>
-    static string Restores(ConsumableData item)
-    {
-        bool health = item.healthRestore > 0f;
-        bool shield = item.shieldRestore > 0f;
-
-        if (health && shield) return "HEALTH AND SHIELD";
-        if (shield) return "SHIELD";
-        if (health) return "HEALTH";
-
-        return "A SECOND WIND";
+            ? $"{header}{why}"
+            : $"{header}\n{brief}{why}";
     }
 
     /// <summary>

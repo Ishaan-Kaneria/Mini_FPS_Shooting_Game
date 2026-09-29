@@ -264,3 +264,24 @@ Left on purpose:
   `briefingTime`), not changed.
 - **24 (note).** Spawning nearer on phones: changes balance and the leash; not changed.
 - Everything here still needs a play on the phone after the next deploy.
+
+## Third pass (local, 2026-09-29): briefing, How to Play, pause
+
+- **Level-start card trimmed.** The bomb and drink instructions are gone from it
+  (`HUDController.UpdateBriefingText`); it is the countdown, the mission line and the arena's
+  one-line stakes. The controls live on How to Play.
+- **Level-start card lasts 7.5 s (8 s on each arena's first level)** (`FPSKitLevels`, applied
+  with `ResetLevelSets`). The level clock does not run during it.
+- **Level-start card is animated** (`BriefingReveal`): pops in, the words rise into place
+  letter by letter, it pulses on each countdown tick, a bar drains with the countdown, and
+  it lifts away when the fight starts.
+- **How to Play rebuilt** (`InstructionsPanel`, now runtime-built): a "beat the clock" goal
+  banner, one card per section with its icon, keys drawn as keycaps (mouse glyphs no longer
+  vanish), an icon per action, cards pop in one after another. Same screen on the dashboard
+  and in the pause menu. `InstructionRow` and the builder's page are gone.
+- **Pause menu:** ACHIEVEMENTS replaced by HOW TO PLAY.
+- **HUD panels overlapping on phones** (run panel over the mission strip, weapon card over the
+  health bars): caused by the 14dp text floor (#27). The in-level HUD keeps a 12dp floor;
+  menus keep 14dp. Handset HUD scale reverted to 0.80.
+- **Still open:** on an iPhone-15-sized screen the DRINK button (third column, middle row) sits
+  near the crosshair (`FPSKitDeviceShots` flags it). Needs a layout call for the cluster.

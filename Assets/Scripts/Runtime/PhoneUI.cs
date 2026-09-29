@@ -64,7 +64,7 @@ public static class PhoneUI
     /// </summary>
     static float ReferenceScaleFor(DeviceProfile.Form form, Surface surface) => form switch
     {
-        DeviceProfile.Form.Handset => surface == Surface.Hud ? 0.70f : 0.56f,
+        DeviceProfile.Form.Handset => surface == Surface.Hud ? 0.80f : 0.56f,
         DeviceProfile.Form.Tablet => surface == Surface.Hud ? 0.92f : 0.78f,
         _ => 1f,
     };

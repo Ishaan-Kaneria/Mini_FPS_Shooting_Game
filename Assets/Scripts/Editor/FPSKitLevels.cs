@@ -257,8 +257,10 @@ namespace FPSKit.EditorTools
                     maxAliveAtOnce = themeName == FPSKitThemes.FinaleName ? 8 + 2 * i : 4 + i,
                     spawnInterval = Mathf.Lerp(0.8f, 0.3f, i / (float)Mathf.Max(1, count - 1)),
 
-                    // The first level has more to read on it than the rest.
-                    briefingTime = number == 1 ? 4.5f : 3f,
+                    // Long enough to read the mission and the stakes as the card animates
+                    // in; the first level has the most to take in. The clock does not run
+                    // during it.
+                    briefingTime = number == 1 ? 8f : 7.5f,
 
                     hasBoss = boss,
 

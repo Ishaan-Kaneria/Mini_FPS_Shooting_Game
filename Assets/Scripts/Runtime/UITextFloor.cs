@@ -29,7 +29,11 @@ public class UITextFloor : MonoBehaviour
     /// </summary>
     public const float GlobalMinimumDp = 14f;
 
+    /// <summary>The in-level HUD's floor: see Apply.</summary>
+    public const float HudMinimumDp = 12f;
+
     [SerializeField] float _authored = -1f;
+    int _onHud = -1;
     TMP_Text _text;
     float _scale = -1f;
     float _lastSet = -1f;
@@ -72,7 +76,19 @@ public class UITextFloor : MonoBehaviour
         // phone when a monitor reports 96, which is right for sizing a thumb target and would
         // put 30px type on every desktop here.
         float dpi = TouchMetrics.ScreenDpi > 0f ? TouchMetrics.ScreenDpi : 160f;
-        float floorPixels = Mathf.Max(minimumDp, GlobalMinimumDp) * dpi / 160f;
+        // The HUD keeps its own field. Its panels sit at fixed places round the touch
+        // cluster, and the 14dp menu floor grew their text until the weapon card lay over
+        // the health bars and the run panel over the mission strip. HUD labels are glanced
+        // at mid-fight, not read; the menus are where the larger floor earns its room.
+        // Asked of the nearest canvas, so a screen opened over the HUD on its own canvas
+        // (settings, how to play) still reads as a menu.
+        if (_onHud < 0)
+        {
+            var nearest = GetComponentInParent<Canvas>(true);
+            _onHud = nearest != null && nearest.GetComponentInChildren<HUDController>(true) != null ? 1 : 0;
+        }
+        float floorDp = _onHud == 1 ? HudMinimumDp : Mathf.Max(minimumDp, GlobalMinimumDp);
+        float floorPixels = floorDp * dpi / 160f;
         float floorUnits = floorPixels / scale;
         _text.fontSize = Mathf.Max(_authored, floorUnits);
         _lastSet = _text.fontSize;

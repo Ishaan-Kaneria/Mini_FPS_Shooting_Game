@@ -144,6 +144,12 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc_punch", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "punch", Wait = 14f, After = 0.12f },
                 new Shot { File = "iphone15_punch", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "punch", Wait = 14f, After = 0.12f },
                 new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
+                new Shot { File = "pc_howto", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "howto", Wait = 2.5f },
+                new Shot { File = "iphone15_howto", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "howto", Wait = 2.5f },
+                new Shot { File = "pc_pause_howto", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Pause = true, Open = "pause_howto", Wait = 6f },
+                new Shot { File = "pc_briefing_arrive", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Wait = 1.2f, After = 0.35f },
+                new Shot { File = "pc_briefing", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Wait = 4f },
+                new Shot { File = "iphone15_briefing", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Wait = 4f },
             };
             string only = Arg("-fpskitOnly");
             if (!string.IsNullOrEmpty(only))
@@ -375,6 +381,14 @@ namespace FPSKit.EditorTools
                             if (shot.Open.EndsWith("crosshair")) editor.ShowTab(1);
                             else editor.SelectById(shot.Device.touch ? "touch.fire" : "hud.minimap");
                         }
+                        else if (shot.Open == "pause_howto")
+                        {
+                            // Through the pause card's own button, so the shot proves it is wired.
+                            var button = Object.FindObjectsByType<FlatButton>(FindObjectsInactive.Exclude)
+                                .FirstOrDefault(b => b.name == "HowToPlay");
+                            if (button == null) throw new Exception("the pause card has no How to play button");
+                            button.onClick.Invoke();
+                        }
                         else if (!string.IsNullOrEmpty(shot.Open))
                         {
                             var menu = Object.FindAnyObjectByType<MainMenuController>();
@@ -386,6 +400,7 @@ namespace FPSKit.EditorTools
                                 case "quit": menu.AskToExit(); break;
                                 case "store": menu.OpenStore(); break;
                                 case "achievements": menu.OpenAchievements(); break;
+                                case "howto": menu.OpenInstructions(); break;
                                 case "levels":
                                     // Straight to the panel rather than through Choose, which reads
                                     // a zone's opening card first; Snowbound, because its bosses

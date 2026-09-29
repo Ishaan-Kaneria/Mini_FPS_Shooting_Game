@@ -795,16 +795,30 @@ public class HudView : MonoBehaviour
         text.color = _t.textPrimary;
         text.raycastTarget = false;
 
+        // A thin bar under the words that drains with the countdown.
+        var gap = UIKit.Rect(card.transform, "Gap");
+        UIKit.Size(gap, height: 12f);
+        var bar = UIKit.ProgressBar(card.transform, "Countdown", _t.accent, 3f, false, _t);
+
         _briefCard = card.gameObject;
         _briefCard.SetActive(false);
+
+        // The animation owns showing and hiding it from here: see BriefingReveal.
+        _reveal = gameObject.AddComponent<BriefingReveal>();
+        _reveal.card = rt;
+        _reveal.group = card.gameObject.AddComponent<CanvasGroup>();
+        _reveal.group.interactable = _reveal.group.blocksRaycasts = false;
+        _reveal.text = text;
+        _reveal.bar = bar;
+        _reveal.level = _level;
     }
 
-    /// <summary>Shown only while HUDController has a briefing in the label.</summary>
+    BriefingReveal _reveal;
+
+    /// <summary>The card itself follows the level (BriefingReveal); only the editor hides it.</summary>
     void UpdateBriefingCard()
     {
-        if (_briefCard == null || _hud.briefingText == null) return;
-        bool show = !_editing && !string.IsNullOrEmpty(_hud.briefingText.text);
-        if (_briefCard.activeSelf != show) _briefCard.SetActive(show);
+        if (_reveal != null) _reveal.suppressed = _editing;
     }
 
     void OnReach(MeleeStrike m, bool inReach)
@@ -856,8 +870,15 @@ public class HudView : MonoBehaviour
         restart.onClick.AddListener(() => { if (_director != null) _director.RestartRun(); });
         var settings = UIKit.Button(card.transform, "Settings", "Settings", FlatButton.Variant.Secondary, "settings", _t);
         settings.gameObject.AddComponent<OpenSettingsButton>();
-        var achievements = UIKit.Button(card.transform, "Achievements", "Achievements", FlatButton.Variant.Secondary, "trophy", _t);
-        achievements.onClick.AddListener(() => AchievementsPanel.Create(_canvas).Open());
+        // How to play rather than achievements: mid-level, "what was the bomb key" is the
+        // question a pause is for, and the level briefing no longer lists the controls.
+        var howTo = UIKit.Button(card.transform, "HowToPlay", "How to play", FlatButton.Variant.Secondary, "help-circle", _t);
+        howTo.onClick.AddListener(() =>
+        {
+            var motor = FindAnyObjectByType<PlayerMotor>();
+            var page = InstructionsPanel.Create(_canvas, motor != null ? motor.controls : null);
+            if (page != null) page.Open();
+        });
         // Its own button, not the HUDController's quit: leaving asks first.
         var quit = UIKit.Button(card.transform, "Quit", "Quit to menu", FlatButton.Variant.Secondary, "power", _t);
         quit.onClick.AddListener(AskToQuit);

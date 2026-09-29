@@ -1,9 +1,18 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
-/// How to play, written from the live bindings.
+/// How to play, written from the live bindings and drawn as cards: one per section, each
+/// with its icon, and every control drawn as the keys you press next to an icon for what
+/// it does.
+///
+/// <b>Built at runtime, like <see cref="AchievementsPanel"/>, so the same screen opens from
+/// the dashboard and from the pause menu.</b> It used to be a builder-made page of text in
+/// four columns, which the level briefing then repeated at the start of every level
+/// because the page could not be reached from inside one. The briefing now leaves the
+/// controls to this screen.
 ///
 /// <b>Nothing here is hard-coded, and that is not tidiness.</b> The bindings live in a
 /// <see cref="ControlSettings"/> asset with three presets, so a panel that spelled out
@@ -11,186 +20,343 @@ using UnityEngine;
 /// player who follows written instructions and gets nothing concludes the game is broken
 /// rather than that the page is stale.
 ///
-/// <b>Touch and pointer get different pages, not one page with a line crossed out.</b> On a
-/// handset none of these keys exist and the answer to every question is a different gesture,
-/// so the pointer page would be a page of things that are not true. Which page is shown is
-/// <see cref="DeviceProfile.Touched"/>, so a tablet with a keyboard gets the keys and a
-/// laptop with a touchscreen does not.
-///
-/// The two least guessable controls lead, because they are the two nobody finds by
-/// experiment: the bomb is <i>held</i> and releasing is the throw, and the drink is a key
-/// with no on-screen presence at all.
+/// <b>Touch, pad and keys get different pages, not one page with a line crossed out.</b>
+/// Which page is shown is what the player is holding now (<see cref="GameInput.Scheme"/>),
+/// with a touch device read as touch, and it rewrites itself if that changes while open.
 /// </summary>
 public class InstructionsPanel : OverlayPanel
 {
-    [Header("Content")]
-    [Tooltip("Hidden row cloned once per instruction.")]
-    public InstructionRow rowTemplate;
-
-    [Tooltip("Where rows are parented, one per column.")]
-    public RectTransform[] columns;
-
-    [Tooltip("Heading above each column.")]
-    public TMP_Text[] columnHeadings;
-
-    [Tooltip("One line under the title saying which controls these are.")]
-    public TMP_Text subtitleText;
-
-    [Tooltip("Bindings to read. Left empty, the panel finds the one the player rig uses.")]
+    [Tooltip("Bindings to read. Left empty, the panel describes the shipped preset.")]
     public ControlSettings controls;
 
-    readonly List<InstructionRow> _rows = new();
+    UITheme _t;
+    TMP_Text _subtitle;
+    Image _schemeIcon;
+    RectTransform _columnsRoot;
+    readonly List<RectTransform> _columns = new();
+    readonly List<GameObject> _cards = new();
 
-    /// <summary>Switches a whole column off. The rows hang off the scroll view's content,
-    /// so the object to switch is its grandparent -- the viewport is in between.</summary>
-    void SetColumnShown(int index, bool shown)
+    /// <summary>The screen on this canvas, built the first time it is asked for.</summary>
+    public static InstructionsPanel Create(Canvas canvas, ControlSettings controls = null)
     {
-        var column = columns[index];
-        var viewport = column.parent as RectTransform;
-        var root = viewport != null ? viewport.parent as RectTransform : null;
+        if (canvas == null) return null;
+        var existing = canvas.GetComponentInChildren<InstructionsPanel>(true);
+        if (existing != null)
+        {
+            if (controls != null) existing.controls = controls;
+            return existing;
+        }
 
-        (root != null ? root.gameObject : column.gameObject).SetActive(shown);
+        var host = new GameObject("InstructionsHost", typeof(RectTransform));
+        host.transform.SetParent(canvas.transform, false);
+        UIKit.Fill((RectTransform)host.transform);
+        var own = host.AddComponent<Canvas>();
+        own.overrideSorting = true;
+        own.sortingOrder = 760;
+        host.AddComponent<GraphicRaycaster>();
+
+        var p = host.AddComponent<InstructionsPanel>();
+        p.controls = controls;
+        p.Build();
+        return p;
+    }
+
+    void Build()
+    {
+        _t = UITheme.Active;
+
+        var shade = UIKit.Panel(transform, "Instructions", UIKit.PanelTone.Background, _t);
+        shade.borderColor = new Color(0, 0, 0, 0);
+        shade.raycastTarget = true;
+        UIKit.Fill(shade.rectTransform);
+        panel = shade.gameObject;
+
+        var root = UIKit.Rect(shade.transform, "Content");
+        UIKit.Fill(root);
+        var fit = root.gameObject.AddComponent<SafeAreaFitter>();
+        fit.paddingMm = 0f;
+        fit.fitVertically = false;
+        fit.Apply();
+
+        bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+        int side = handset ? 20 : 40;
+        var col = UIKit.Column(root, handset ? 10f : 16f, new RectOffset(side, side, handset ? 14 : 28, handset ? 14 : 28));
+        col.childForceExpandHeight = false;
+        col.childControlHeight = true;
+
+        // Header: which controls these are, the title, the way out.
+        var header = UIKit.Rect(root, "Header");
+        UIKit.Row(header, 16f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Size(header).minHeight = 52f;
+        var badge = UIKit.Panel(header, "Scheme", UIKit.PanelTone.Raised, _t);
+        UIKit.Size(badge, 52f, 52f);
+        _schemeIcon = UIKit.Icon(badge.transform, "Icon", "keyboard", 30f, _t.accent, _t);
+        Centre(_schemeIcon.rectTransform);
+        var titles = UIKit.Rect(header, "Titles");
+        var tcol = UIKit.Column(titles, 2f);
+        tcol.childForceExpandHeight = false;
+        UIKit.Size(titles, flexWidth: 1f);
+        UIKit.Text(titles, "Title", "How to play", UIKit.TextRole.Title, _t);
+        _subtitle = UIKit.Text(titles, "Subtitle", "", UIKit.TextRole.Caption, _t);
+        var back = UIKit.Button(header, "Back", "Back", FlatButton.Variant.Quiet, "arrow-left", _t);
+        back.onClick.AddListener(Close);
+        backButton = back;
+
+        Goal(root);
+
+        // The cards, in columns, in a list that scrolls when a phone cannot hold them.
+        var viewport = UIKit.Rect(root, "Cards");
+        UIKit.Size(viewport, flexHeight: 1f);
+        viewport.gameObject.AddComponent<RectMask2D>();
+        var hit = viewport.gameObject.AddComponent<FlatRect>();
+        hit.color = new Color(0, 0, 0, 0);
+        hit.raycastTarget = true;
+        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = viewport;
+        scroll.horizontal = false;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 40f;
+
+        _columnsRoot = UIKit.Rect(viewport, "Columns");
+        _columnsRoot.anchorMin = new Vector2(0f, 1f); _columnsRoot.anchorMax = new Vector2(1f, 1f);
+        _columnsRoot.pivot = new Vector2(0.5f, 1f);
+        _columnsRoot.offsetMin = _columnsRoot.offsetMax = Vector2.zero;
+        var row = UIKit.Row(_columnsRoot, handset ? 10f : 16f, null, TextAnchor.UpperLeft);
+        row.childForceExpandWidth = true;
+        _columnsRoot.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scroll.content = _columnsRoot;
+
+        shade.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// The rule of the game, before any key: nothing else on the screen makes sense without
+    /// it, and it is the one thing the controls cannot teach.
+    /// </summary>
+    void Goal(RectTransform parent)
+    {
+        var goal = UIKit.Panel(parent, "Goal", UIKit.PanelTone.Panel, _t);
+        goal.stripeSide = FlatRect.Side.Left;
+        goal.stripeColor = _t.accent;
+        goal.stripePixels = _t.stripePixels;
+        UIKit.Row(goal, 16f, new RectOffset(20, 20, 12, 12), TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Icon(goal.transform, "Icon", "clock", 30f, _t.accent, _t);
+        var text = UIKit.Text(goal.transform, "Text",
+            "<b>Beat the clock.</b> Every kill scores, and stars go by how many you take down: " +
+            "three for clearing the arena. The level ends when time runs out, cleared or not.",
+            UIKit.TextRole.Body, _t);
+        UIKit.Size(text, flexWidth: 1f);
     }
 
     protected override void OnOpened()
     {
-        if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
         // The player's own keys, not the asset's: this page describes what they will press.
         KeyBindings.Apply(controls);
 
-        foreach (var row in _rows)
-            if (row != null) Destroy(row.gameObject);
-        _rows.Clear();
+        foreach (var card in _cards) if (card != null) Destroy(card);
+        _cards.Clear();
 
-        // By what the player is holding now, not by what the device is: a phone with a
-        // pad paired is read the pad page, and picking the pad up mid-read rewrites it.
         var scheme = GameInput.Scheme;
         if (scheme == InputScheme.KeyboardMouse && DeviceProfile.Touched) scheme = InputScheme.Touch;
 
-        if (subtitleText != null)
-            subtitleText.text = scheme switch
-            {
-                InputScheme.Touch => "On-screen controls. Drag the fire button to keep shooting while you aim.",
-                InputScheme.Gamepad => "Gamepad. Stick sensitivity, deadzone and aim assist are in Settings.",
-                _ => "Keyboard and mouse.",
-            };
+        _subtitle.text = scheme switch
+        {
+            InputScheme.Touch => "On-screen controls. Drag FIRE to keep shooting while you aim.",
+            InputScheme.Gamepad => "Gamepad. Stick sensitivity, deadzone and aim assist are in Settings.",
+            _ => "Keyboard and mouse. Keys can be changed in Settings.",
+        };
+        _schemeIcon.sprite = _t.IconSprite(scheme switch
+        {
+            InputScheme.Touch => "hand-finger",
+            InputScheme.Gamepad => "device-gamepad-2",
+            _ => "keyboard",
+        });
 
-        var groups = scheme switch
+        var pages = scheme switch
         {
             InputScheme.Touch => TouchPages(),
             InputScheme.Gamepad => PadPages(),
             _ => KeyPages(),
         };
 
-        // Same rule as the achievements screen: a handset gets one column and a tablet two,
-        // because four columns on a 147mm screen are four strips too narrow to hold a
-        // sentence. The pages keep their order, so the screen is the same screen.
-        int wide = DeviceProfile.CurrentForm switch
+        // Four across on a desktop; two on anything handheld, where four columns on a 147mm
+        // screen are four strips too narrow to hold a sentence.
+        int wide = DeviceProfile.Handheld ? 2 : Mathf.Max(1, pages.Count);
+        while (_columns.Count < wide)
         {
-            DeviceProfile.Form.Handset => 1,
-            DeviceProfile.Form.Tablet => 2,
-            _ => groups.Count,
-        };
-
-        bool headingsAbove = wide >= groups.Count;
-
-        if (columns != null)
-            for (int c = 0; c < columns.Length; c++)
-                if (columns[c] != null)
-                    SetColumnShown(c, c < wide);
-
-        if (columnHeadings != null)
-            for (int h = 0; h < columnHeadings.Length; h++)
-                if (columnHeadings[h] != null)
-                    columnHeadings[h].gameObject.SetActive(headingsAbove && h < wide);
-
-        for (int i = 0; i < groups.Count; i++)
-        {
-            int target = wide <= 0 ? 0 : i % wide;
-
-            if (columns == null || target >= columns.Length || columns[target] == null) continue;
-
-            if (headingsAbove)
-            {
-                if (columnHeadings != null && i < columnHeadings.Length && columnHeadings[i] != null)
-                    columnHeadings[i].text = groups[i].Heading.ToUpperInvariant();
-            }
-            else if (rowTemplate != null)
-            {
-                // The heading travels with its rows when a column holds more than one page,
-                // or it would label only the first of them.
-                var heading = Instantiate(rowTemplate, columns[target]);
-                heading.gameObject.SetActive(true);
-                heading.Bind("", groups[i].Heading.ToUpperInvariant());
-                if (heading.saysText != null) heading.saysText.color = UITheme.Hazard;
-                _rows.Add(heading);
-            }
-
-            foreach (var line in groups[i].Lines)
-            {
-                var row = Instantiate(rowTemplate, columns[target]);
-                row.gameObject.SetActive(true);
-                row.Bind(line.Control, line.Says);
-                _rows.Add(row);
-            }
+            var column = UIKit.Rect(_columnsRoot, "Column" + _columns.Count);
+            var c = UIKit.Column(column, 16f);
+            c.childForceExpandHeight = false;
+            UIKit.Size(column, flexWidth: 1f);
+            _columns.Add(column);
         }
+        for (int i = 0; i < _columns.Count; i++) _columns[i].gameObject.SetActive(i < wide);
+
+        for (int i = 0; i < pages.Count; i++)
+            _cards.Add(Card(_columns[i % wide], pages[i]));
+
+        StopAllCoroutines();
+        StartCoroutine(Arrive());
     }
 
+    /// <summary>
+    /// The cards pop in one after another. Scale and fade only: they are placed by a layout
+    /// group, so their positions are not this code's to move. Unscaled, because the screen
+    /// also opens from the pause menu, where time is stopped.
+    /// </summary>
+    System.Collections.IEnumerator Arrive()
+    {
+        var groups = new List<CanvasGroup>();
+        foreach (var card in _cards)
+        {
+            if (card == null) continue;
+            var g = card.GetComponent<CanvasGroup>();
+            if (g == null) g = card.AddComponent<CanvasGroup>();
+            g.alpha = 0f;
+            card.transform.localScale = Vector3.one * 0.94f;
+            groups.Add(g);
+        }
+
+        const float Stagger = 0.07f, Each = 0.32f;
+        float start = Time.unscaledTime;
+        float end = Stagger * groups.Count + Each;
+        while (Time.unscaledTime - start < end)
+        {
+            float t = Time.unscaledTime - start;
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (groups[i] == null) continue;
+                float k = Mathf.Clamp01((t - Stagger * i) / Each);
+                float e = 1f - Mathf.Pow(1f - k, 3f);
+                groups[i].alpha = e;
+                groups[i].transform.localScale = Vector3.one * Mathf.Lerp(0.94f, 1f, e);
+            }
+            yield return null;
+        }
+
+        foreach (var g in groups)
+            if (g != null) { g.alpha = 1f; g.transform.localScale = Vector3.one; }
+    }
+
+    GameObject Card(RectTransform parent, Page page)
+    {
+        var card = UIKit.Panel(parent, "Card_" + page.Heading, UIKit.PanelTone.Panel, _t);
+        card.stripeSide = FlatRect.Side.Top;
+        card.stripeColor = _t.accent;
+        card.stripePixels = _t.stripePixels;
+        var col = UIKit.Column(card, 12f, new RectOffset(18, 18, 16, 18));
+        col.childForceExpandHeight = false;
+
+        var head = UIKit.Rect(card.transform, "Heading");
+        UIKit.Row(head, 10f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Icon(head, "Icon", page.Icon, 24f, _t.accent, _t);
+        var title = UIKit.Text(head, "Text", page.Heading, UIKit.TextRole.Heading, _t);
+        title.color = _t.accent;
+
+        // The key column is as wide as this card's widest row of keys, so four keys for
+        // walking do not run into the text, and the descriptions still line up.
+        int caps = 1;
+        foreach (var line in page.Lines) if (line.Keys != null) caps = Mathf.Max(caps, line.Keys.Length);
+        float keysWidth = Mathf.Max(DeviceProfile.Handheld ? 118f : 132f, caps * 40f + (caps - 1) * 6f + 8f);
+
+        foreach (var line in page.Lines) Row(card.transform, line, keysWidth);
+        return card.gameObject;
+    }
+
+    /// <summary>Keys on the left as keycaps, then the action's icon and what it does.</summary>
+    void Row(Transform parent, Line line, float keysWidth)
+    {
+        bool continuation = line.Keys == null || line.Keys.Length == 0;
+
+        var row = UIKit.Rect(parent, "Row");
+        UIKit.Row(row, 12f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Size(row).minHeight = continuation ? 24f : 44f;
+
+        // A fixed-width key column, so the descriptions line up down the card.
+        var keys = UIKit.Rect(row, "Keys");
+        UIKit.Row(keys, 6f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+        UIKit.Size(keys, keysWidth);
+        if (!continuation)
+            foreach (var key in line.Keys)
+                if (!string.IsNullOrEmpty(key)) Keycap(keys, key);
+
+        if (!string.IsNullOrEmpty(line.Icon))
+            UIKit.Icon(row, "Icon", line.Icon, 20f, continuation ? _t.textDisabled : _t.textSecondary, _t);
+
+        var says = UIKit.Text(row, "Says", line.Says, continuation ? UIKit.TextRole.Caption : UIKit.TextRole.Body, _t);
+        says.color = continuation ? _t.textSecondary : _t.textPrimary;
+        UIKit.Size(says, flexWidth: 1f);
+    }
 
     /// <summary>
-    /// Whether the story has handed the bomb over, and what to say when it has not.
-    ///
-    /// <b>A page that explains a control the player does not have is worse than a page
-    /// that omits it.</b> The bomb is the campaign's first reward, taken off the first
-    /// of the Augers to fall, so before that there is no bomb key, no bomb button in the
-    /// thumb cluster and nothing in the HUD -- and this panel was still teaching all
-    /// three. What that produces is a player following written instructions, finding no
-    /// button where the game says there is one, and concluding the controls are broken.
-    /// Ishaan reported exactly that: "there is no bomb symbol, so why".
-    ///
-    /// So the row stays, because the answer to "why" has to be somewhere, and it says
-    /// what it is and where it comes from.
-    ///
-    /// <b>The line names no number.</b> It used to quote the star gate, which was true
-    /// of exactly one version of the campaign: which zone hands the bomb over is written
-    /// on <see cref="CampaignData"/> now and is meant to be moved, so a page repeating a
-    /// figure from the asset is a page that goes quietly wrong the first time somebody
-    /// drags a zone.
+    /// One key, drawn as a key: a raised face with its legend. Sized by its legend, with a
+    /// square minimum so a single letter is not a sliver. Glyph legends (mouse buttons, pad
+    /// faces) get the same face, and it is tall enough for the glyph -- the old page gave
+    /// them a text line that was not, and they vanished.
     /// </summary>
-    bool BombEarned => Campaign.HasPower(Campaign.BombPower);
+    void Keycap(RectTransform parent, string legend)
+    {
+        var cap = UIKit.Panel(parent, "Key", UIKit.PanelTone.Raised, _t);
+        cap.borderColor = _t.borderHover;
+        var h = UIKit.Row(cap, 0f, new RectOffset(10, 10, 4, 4), TextAnchor.MiddleCenter);
+        h.childForceExpandWidth = false;
+        var le = UIKit.Size(cap, height: 40f);
+        le.minWidth = 40f;
+        var text = UIKit.Text(cap.transform, "Legend", legend, UIKit.TextRole.Label, _t);
+        text.color = _t.textPrimary;
+        text.alignment = TextAlignmentOptions.Center;
+    }
 
-    string BombLockLine()
-        => "Locked. It belonged to one of the Augers -- the story hands it over when " +
-           "the first of them goes down.";
+    static void Centre(RectTransform rt)
+    {
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        var le = rt.GetComponent<LayoutElement>();
+        if (le != null) le.ignoreLayout = true;
+    }
+
+    // ======================================================================
+    // Content.
+    // ======================================================================
+
+    /// <summary>
+    /// Whether the story has handed the bomb over. <b>A page that explains a control the
+    /// player does not have is worse than a page that omits it</b>, so before that the
+    /// row says what the bomb is and where it comes from instead. It names no number: which
+    /// zone hands it over is on <see cref="CampaignData"/> and is meant to move.
+    /// </summary>
+    static bool BombEarned => Campaign.HasPower(Campaign.BombPower);
+
+    const string BombLockLine = "Locked. The story hands it over when the first of the Augers goes down.";
 
     readonly struct Line
     {
-        public readonly string Control;
+        public readonly string[] Keys;
+        public readonly string Icon;
         public readonly string Says;
-        public Line(string control, string says) { Control = control; Says = says; }
+        public Line(string[] keys, string icon, string says) { Keys = keys; Icon = icon; Says = says; }
     }
 
     readonly struct Page
     {
-        public readonly string Heading;
+        public readonly string Heading, Icon;
         public readonly List<Line> Lines;
-        public Page(string heading, List<Line> lines) { Heading = heading; Lines = lines; }
+        public Page(string heading, string icon, List<Line> lines) { Heading = heading; Icon = icon; Lines = lines; }
     }
 
+    static Line L(string icon, string says, params string[] keys) => new Line(keys, icon, says);
+    static Line More(string says) => new Line(null, null, says);
+
     /// <summary>
-    /// The bindings to describe.
-    ///
-    /// The dashboard has no player rig, so there is nothing in this scene to read them
-    /// off. The builder wires the same asset the arenas use; <see cref="ControlSettings.CreateDefault"/>
-    /// is the fallback rather than a hard-coded list, so even an unwired panel describes
-    /// the shipped preset instead of describing nothing.
+    /// The bindings to describe. The dashboard has no player rig to read them off, so the
+    /// caller hands in the arenas' asset; <see cref="ControlSettings.CreateDefault"/> is the
+    /// fallback, so even an unwired screen describes the shipped preset.
     /// </summary>
     ControlSettings Bindings
     {
         get
         {
             if (controls != null) return controls;
-
             _fallback ??= ControlSettings.CreateDefault();
             return _fallback;
         }
@@ -198,10 +364,8 @@ public class InstructionsPanel : OverlayPanel
 
     ControlSettings _fallback;
 
-    string K(KeyCode key) => InputPrompts.KeyText(key);
-
+    static string K(KeyCode key) => InputPrompts.KeyText(key);
     static string P(GameAction a) => InputPrompts.For(a, InputScheme.Gamepad, GameInput.Pad);
-    static string T(GameAction a) => InputPrompts.For(a, InputScheme.Touch, GameInput.Pad);
 
     void OnEnable() => GameInput.SchemeChanged += OnSchemeChanged;
     void OnDisable() => GameInput.SchemeChanged -= OnSchemeChanged;
@@ -211,46 +375,6 @@ public class InstructionsPanel : OverlayPanel
         if (IsOpen) OnOpened();
     }
 
-    List<Page> PadPages()
-        => new List<Page>
-        {
-            new Page("Move", new List<Line>
-            {
-                new Line(P(GameAction.Move), "Walk"),
-                new Line(P(GameAction.Look), "Look"),
-                new Line(P(GameAction.Sprint), "Sprint. Click once; it holds until you stop."),
-                new Line(P(GameAction.Jump), "Jump"),
-                new Line(P(GameAction.Crouch), "Crouch. Press again to stand."),
-            }),
-
-            new Page("Fight", new List<Line>
-            {
-                new Line(P(GameAction.Fire), "Fire"),
-                new Line(P(GameAction.Aim), "Aim down sights"),
-                new Line(P(GameAction.Reload), "Reload"),
-                new Line(P(GameAction.Melee), "Punch, up close. Saves a round."),
-            }),
-
-            new Page("Equipment", BombEarned
-                ? new List<Line>
-                {
-                    new Line(P(GameAction.Bomb), "Tap to aim the bomb, tap again to throw."),
-                    new Line(P(GameAction.Look), "Moves the marker while you aim."),
-                    new Line(P(GameAction.UseItem), "Drink. Restores health."),
-                }
-                : new List<Line>
-                {
-                    new Line("BOMB", BombLockLine()),
-                    new Line(P(GameAction.UseItem), "Drink. Restores health."),
-                }),
-
-            new Page("Level", new List<Line>
-            {
-                new Line(P(GameAction.Pause), "Pause"),
-                new Line(InputPrompts.Back, "Back, and resume from pause"),
-            }),
-        };
-
     List<Page> KeyPages()
     {
         var c = Bindings;
@@ -258,82 +382,124 @@ public class InstructionsPanel : OverlayPanel
 
         return new List<Page>
         {
-            new Page("Move", new List<Line>
+            new Page("Move", "run", new List<Line>
             {
-                new Line($"{K(c.altForward)} {K(c.altLeft)} {K(c.altBack)} {K(c.altRight)}", "Walk"),
-                new Line($"{K(c.moveForward)} {K(c.moveLeft)} {K(c.moveBack)} {K(c.moveRight)}", "Walk, the other way"),
-                new Line(K(c.sprintKey), "Sprint. Held on its own it runs forward."),
-                new Line(K(c.jump), "Jump"),
-                new Line(K(c.crouch), "Crouch"),
+                L("hand-move", "Walk", K(c.altForward), K(c.altLeft), K(c.altBack), K(c.altRight)),
+                L("mouse", "Look around", InputPrompts.Glyph("mouse_move")),
+                L("run", "Sprint. Held on its own it runs forward.", K(c.sprintKey)),
+                L("arrow-up", "Jump", K(c.jump)),
+                L("arrow-bar-to-down", "Crouch", K(c.crouch)),
             }),
 
-            new Page("Fight", new List<Line>
+            new Page("Fight", "crosshair", new List<Line>
             {
-                new Line(K(c.fire), "Fire"),
-                new Line(K(c.aim), "Aim down sights"),
-                new Line(K(c.reload), "Reload"),
-                new Line(K(c.melee), "Punch, up close. Saves a round."),
+                L("bullet", "Fire", K(c.fire)),
+                L("crosshair", "Aim down sights", K(c.aim)),
+                L("magazine", "Reload", K(c.reload)),
+                L("fist", "Punch, up close. Saves a round.", K(c.melee)),
             }),
 
-            // The two nobody finds by experiment, and the reason this panel exists.
-            new Page("Equipment", BombEarned
+            // The two nobody finds by experiment.
+            new Page("Equipment", "backpack", BombEarned
                 ? new List<Line>
                 {
-                    new Line(K(c.bomb), "Hold to aim the bomb. Let go to throw it."),
-                    new Line("", "Tap it instead and the ring stays up. Tap again to throw."),
-                    new Line("", "The mouse moves the marker, not your head."),
-                    new Line(K(c.useItem), "Drink. Restores health."),
+                    L("bomb", "Hold to aim the bomb, let go to throw.", K(c.bomb)),
+                    More("Or tap to raise the ring and tap again to throw. The mouse moves the ring."),
+                    L("flask", "Drink. Restores health and shield.", K(c.useItem)),
                 }
                 : new List<Line>
                 {
-                    new Line("BOMB", BombLockLine()),
-                    new Line(K(c.useItem), "Drink. Restores health."),
+                    L("lock", BombLockLine, "BOMB"),
+                    L("flask", "Drink. Restores health and shield.", K(c.useItem)),
                 }),
 
-            new Page("Level", new List<Line>
+            new Page("Level", "player-pause", new List<Line>
             {
-                new Line("ESC  P", "Pause"),
-                new Line("R", "Resume"),
-                new Line("Q", "Leave the level"),
+                L("player-pause", "Pause", UIText.KeyLabel(KeyCode.Escape), "P"),
+                L("player-play", "Resume", "R"),
+                L("power", "Leave the level", "Q"),
             }),
         };
     }
 
-    List<Page> TouchPages()
+    List<Page> PadPages()
         => new List<Page>
         {
-            new Page("Move", new List<Line>
+            new Page("Move", "run", new List<Line>
             {
-                new Line("Left stick", "Walk. Push it to the edge to sprint."),
-                new Line("Right side", "Drag anywhere to look."),
+                L("hand-move", "Walk", P(GameAction.Move)),
+                L("mouse", "Look", P(GameAction.Look)),
+                L("run", "Sprint. Click once; it holds until you stop.", P(GameAction.Sprint)),
+                L("arrow-up", "Jump", P(GameAction.Jump)),
+                L("arrow-bar-to-down", "Crouch. Press again to stand.", P(GameAction.Crouch)),
             }),
 
-            new Page("Fight", new List<Line>
+            new Page("Fight", "crosshair", new List<Line>
             {
-                new Line(T(GameAction.Fire), "Press and keep dragging -- it keeps firing while you aim."),
-                new Line("Two fingers", "Spread them on the right to aim down sights, pinch to stop."),
-                new Line(T(GameAction.Reload), "Reload."),
-                new Line(T(GameAction.Melee), "Punch, up close. Saves a round."),
-                new Line(T(GameAction.Jump), "Jump."),
-                new Line(T(GameAction.Crouch), "Crouch."),
+                L("bullet", "Fire", P(GameAction.Fire)),
+                L("crosshair", "Aim down sights", P(GameAction.Aim)),
+                L("magazine", "Reload", P(GameAction.Reload)),
+                L("fist", "Punch, up close. Saves a round.", P(GameAction.Melee)),
             }),
 
-            new Page("Equipment", BombEarned
+            new Page("Equipment", "backpack", BombEarned
                 ? new List<Line>
                 {
-                    new Line(T(GameAction.Bomb), "Hold it. Look further down to throw shorter, up to throw further."),
-                    new Line("", "Let go to throw."),
-                    new Line(T(GameAction.UseItem), "Restores health."),
+                    L("bomb", "Tap to aim the bomb, tap again to throw.", P(GameAction.Bomb)),
+                    More("The right stick moves the ring while you aim."),
+                    L("flask", "Drink. Restores health and shield.", P(GameAction.UseItem)),
                 }
                 : new List<Line>
                 {
-                    new Line("BOMB", BombLockLine()),
-                    new Line(T(GameAction.UseItem), "Restores health."),
+                    L("lock", BombLockLine, "BOMB"),
+                    L("flask", "Drink. Restores health and shield.", P(GameAction.UseItem)),
                 }),
 
-            new Page("Level", new List<Line>
+            new Page("Level", "player-pause", new List<Line>
             {
-                new Line(T(GameAction.Pause), "Top right. Pause -- it is the only way out of a level."),
+                L("player-pause", "Pause", P(GameAction.Pause)),
+                L("arrow-left", "Back, and resume from pause", InputPrompts.Back),
             }),
         };
+
+    List<Page> TouchPages()
+    {
+        static string T(GameAction a) => InputPrompts.For(a, InputScheme.Touch, GameInput.Pad);
+
+        return new List<Page>
+        {
+            new Page("Move", "run", new List<Line>
+            {
+                L("hand-move", "Walk. Push to the edge to sprint.", "LEFT STICK"),
+                L("hand-finger", "Drag anywhere on the right to look.", "DRAG"),
+            }),
+
+            new Page("Fight", "crosshair", new List<Line>
+            {
+                L("bullet", "Fire. Keep dragging to aim while it fires.", T(GameAction.Fire)),
+                L("crosshair", "Spread two fingers to aim down sights, pinch to stop.", "PINCH"),
+                L("magazine", "Reload", T(GameAction.Reload)),
+                L("fist", "Punch, up close. Saves a round.", T(GameAction.Melee)),
+                L("arrow-up", "Jump", T(GameAction.Jump)),
+                L("arrow-bar-to-down", "Crouch", T(GameAction.Crouch)),
+            }),
+
+            new Page("Equipment", "backpack", BombEarned
+                ? new List<Line>
+                {
+                    L("bomb", "Hold, slide to place the ring, let go to throw.", T(GameAction.Bomb)),
+                    L("flask", "Drink. Restores health and shield.", T(GameAction.UseItem)),
+                }
+                : new List<Line>
+                {
+                    L("lock", BombLockLine, "BOMB"),
+                    L("flask", "Drink. Restores health and shield.", T(GameAction.UseItem)),
+                }),
+
+            new Page("Level", "player-pause", new List<Line>
+            {
+                L("player-pause", "Top right. The only way out of a level.", T(GameAction.Pause)),
+            }),
+        };
+    }
 }

@@ -629,12 +629,11 @@ namespace FPSKit.EditorTools
             BuildStory(root, menu);
             BuildDossier(root, menu);
 
-            // The dashboard has no player rig to read bindings off, so the panel is handed
-            // the same asset the arenas use. Loaded rather than left null so the screen
-            // describes the keys the game is actually bound to and not the shipped default.
-            BuildInstructions(root, menu,
-                AssetDatabase.LoadAssetAtPath<ControlSettings>(
-                    "Assets/FPSKit_Generated/Controls.asset"));
+            // How to play is built at runtime (InstructionsPanel.Create), so the pause menu
+            // can open the same screen. The dashboard has no player rig to read bindings off,
+            // so it is handed the same asset the arenas use.
+            menu.controls = AssetDatabase.LoadAssetAtPath<ControlSettings>(
+                "Assets/FPSKit_Generated/Controls.asset");
 
             // Screens opened from the top bar start below it, so the bar stays up over them
             // and the player can always see which tab they are on and reach the others.
@@ -734,58 +733,6 @@ namespace FPSKit.EditorTools
             shade.gameObject.SetActive(false);
         }
 
-
-        // ------------------------------------------------------------------
-        /// <summary>
-        /// How to play, in four columns, written from the live bindings at runtime.
-        /// </summary>
-        static void BuildInstructions(RectTransform parent, MainMenuController menu,
-                                      ControlSettings controls)
-        {
-            var panel = menu.gameObject.AddComponent<InstructionsPanel>();
-
-            var shade = BuildOverlayShell(parent, "Instructions", "How to play",
-                                          "", out var subtitle, out var back, out var body);
-
-            var columns = BuildColumns(body, 4, out var headings);
-
-            panel.panel = shade.gameObject;
-            panel.backButton = back;
-            panel.subtitleText = subtitle;
-            panel.columns = columns;
-            panel.columnHeadings = headings;
-            panel.controls = controls;
-            panel.rowTemplate = BuildInstructionRowTemplate(shade.rectTransform);
-
-            menu.instructions = panel;
-            shade.gameObject.SetActive(false);
-        }
-
-        static InstructionRow BuildInstructionRowTemplate(RectTransform parent)
-        {
-            var rowGo = new GameObject("InstructionRowTemplate", typeof(RectTransform));
-            rowGo.transform.SetParent(parent, false);
-            var rect = (RectTransform)rowGo.transform;
-            rect.sizeDelta = new Vector2(0f, 62f);
-
-            var element = rowGo.AddComponent<LayoutElement>();
-            element.preferredHeight = 62f;
-            element.minHeight = 44f;
-
-            var row = rowGo.AddComponent<InstructionRow>();
-
-            row.controlText = Label(rect, "Control", "KEY", 19,
-                                    TextAlignmentOptions.TopLeft, Accent);
-            Span(row.controlText.rectTransform, 0.52f, 1f, 4f, 4f);
-
-            row.saysText = Label(rect, "Says", "what it does", 16,
-                                 TextAlignmentOptions.TopLeft, Ink);
-            Span(row.saysText.rectTransform, 0f, 0.52f, 4f, 4f);
-            row.saysText.textWrappingMode = TextWrappingModes.Normal;
-
-            rowGo.SetActive(false);
-            return row;
-        }
 
         // ------------------------------------------------------------------
         /// <summary>

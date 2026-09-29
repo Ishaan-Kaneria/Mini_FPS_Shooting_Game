@@ -38,7 +38,10 @@ public class MainMenuController : MonoBehaviour
     public LevelSelectPanel levelSelect;
     public StorePanel store;
     public AchievementsPanel achievements;
+    [Tooltip("Built at runtime from the bindings below, so the pause menu can open the same screen.")]
     public InstructionsPanel instructions;
+    [Tooltip("The bindings How to Play describes: the same asset the arenas use.")]
+    public ControlSettings controls;
     public StoryPanel story;
     public DossierPanel dossier;
 
@@ -121,7 +124,9 @@ public class MainMenuController : MonoBehaviour
 
         PhoneUI.Apply(GetComponentInParent<Canvas>());
         ApplyFormLayout();
-        InsetForTopBar(instructions);
+        // Built here rather than by the dashboard builder, so the pause menu can build the
+        // same screen. It sits on its own canvas above the top bar, with its own way back.
+        if (instructions == null) instructions = InstructionsPanel.Create(GetComponentInParent<Canvas>(), controls);
         InsetForTopBar(dossier);
 
         _granted = Campaign.RefreshUnlocks(campaign, catalog, store != null ? store.catalog : null);

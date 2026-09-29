@@ -16,186 +16,866 @@ MonoBehaviour:
   stakes: "The plant runs to a shift clock and the gates seal when it ends. Finish this before they do \u2014 nobody opens them from the outside, and nobody is coming to look."
   levels:
   - displayName: FIRST CONTACT
-    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 6 hostiles. Clear them for three stars.
-    enemyCount: 6
-    timeLimit: 32
-    maxAliveAtOnce: 4
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 25 hostiles. Clear them for three stars.
+    enemyCount: 25
+    timeLimit: 150
+    maxAliveAtOnce: 5
     spawnInterval: 0.8
-    briefingTime: 8
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
     objective: 0
-    objectiveWeight: 4
+    objectiveWeight: 11
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1
     damageMultiplier: 1
     speedMultiplier: 1
     aggression: 0
     rosterStep: 1
-    reserveMagazines: 8
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 9 hostiles and one magazine, nothing spare. Kills drop ammunition.
-    enemyCount: 9
-    timeLimit: 43
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 26 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 26
+    timeLimit: 155
     maxAliveAtOnce: 5
-    spawnInterval: 0.7285714
-    briefingTime: 7.5
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
     objective: 1
-    objectiveWeight: 4
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.1
-    damageMultiplier: 1.06
-    speedMultiplier: 1.03
-    aggression: 0.12857142
-    rosterStep: 3
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.032258
+    damageMultiplier: 1.0193548
+    speedMultiplier: 1.0080645
+    aggression: 0.029032256
+    rosterStep: 1
     reserveMagazines: 0
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 12 hostiles and a boss. The boss is most of the score.
-    enemyCount: 12
-    timeLimit: 69
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 26 hostiles and a boss. The boss is most of the score.
+    enemyCount: 26
+    timeLimit: 155
     maxAliveAtOnce: 6
-    spawnInterval: 0.6571429
-    briefingTime: 7.5
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
     objective: 0
-    objectiveWeight: 5
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: 
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.2
-    damageMultiplier: 1.12
-    speedMultiplier: 1.06
-    aggression: 0.25714284
-    rosterStep: 4
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.0645161
+    damageMultiplier: 1.0387096
+    speedMultiplier: 1.016129
+    aggression: 0.058064513
+    rosterStep: 1
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: The shift supervisors have stopped pretending this is a drill. 15 hostiles. Stand on the marked ground and keep standing.
-    enemyCount: 15
-    timeLimit: 63
-    maxAliveAtOnce: 7
-    spawnInterval: 0.5857143
-    briefingTime: 7.5
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 27 hostiles. Stand on the marked ground and keep standing.
+    enemyCount: 27
+    timeLimit: 160
+    maxAliveAtOnce: 6
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
     objective: 3
-    objectiveWeight: 7
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.3
-    damageMultiplier: 1.18
-    speedMultiplier: 1.09
-    aggression: 0.38571426
-    rosterStep: 6
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.0967742
+    damageMultiplier: 1.0580645
+    speedMultiplier: 1.0241935
+    aggression: 0.087096766
+    rosterStep: 3
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: The shift supervisors have stopped pretending this is a drill. 18 hostiles, and the lights are not yours.
-    enemyCount: 18
-    timeLimit: 73
-    maxAliveAtOnce: 8
-    spawnInterval: 0.5142857
-    briefingTime: 7.5
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 28 hostiles, and the lights are not yours.
+    enemyCount: 28
+    timeLimit: 165
+    maxAliveAtOnce: 6
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1548387
     objective: 4
-    objectiveWeight: 8
+    objectiveWeight: 13
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.4
-    damageMultiplier: 1.24
-    speedMultiplier: 1.12
-    aggression: 0.5142857
-    rosterStep: 7
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.1290323
+    damageMultiplier: 1.0774194
+    speedMultiplier: 1.032258
+    aggression: 0.116129026
+    rosterStep: 3
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: The shift supervisors have stopped pretending this is a drill. 21 hostiles and a boss. The boss is most of the score.
-    enemyCount: 21
-    timeLimit: 99
-    maxAliveAtOnce: 9
-    spawnInterval: 0.44285715
-    briefingTime: 7.5
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 29 hostiles and a boss. The boss is most of the score.
+    enemyCount: 29
+    timeLimit: 170
+    maxAliveAtOnce: 6
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1935484
     objective: 0
-    objectiveWeight: 9
+    objectiveWeight: 13
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
-    bossWeight: 7
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.5
-    damageMultiplier: 1.3
-    speedMultiplier: 1.15
-    aggression: 0.64285713
-    rosterStep: 9
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.1612903
+    damageMultiplier: 1.0967742
+    speedMultiplier: 1.0403225
+    aggression: 0.14516129
+    rosterStep: 3
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
-    brief: They are pulling people off the line to hold the floor now. 24 hostiles. Clear them, then reach the way out.
-    enemyCount: 24
-    timeLimit: 94
-    maxAliveAtOnce: 10
-    spawnInterval: 0.37142858
-    briefingTime: 7.5
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 30 hostiles. Clear them, then reach the way out.
+    enemyCount: 30
+    timeLimit: 175
+    maxAliveAtOnce: 7
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.2322581
     objective: 5
-    objectiveWeight: 11
+    objectiveWeight: 14
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 7.5
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.6
-    damageMultiplier: 1.36
-    speedMultiplier: 1.18
-    aggression: 0.7714285
+    bossWeight: 5
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.1935484
+    damageMultiplier: 1.116129
+    speedMultiplier: 1.048387
+    aggression: 0.17419353
+    rosterStep: 3
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 33 hostiles and 5 charges. Reach a charge or lose the clock.
+    enemyCount: 33
+    timeLimit: 185
+    maxAliveAtOnce: 7
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.2709677
+    objective: 6
+    objectiveWeight: 15
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.2258065
+    damageMultiplier: 1.1354839
+    speedMultiplier: 1.0564516
+    aggression: 0.20322579
+    rosterStep: 4
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 34 hostiles and a boss. The boss is most of the score.
+    enemyCount: 34
+    timeLimit: 190
+    maxAliveAtOnce: 7
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 15
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.2580645
+    damageMultiplier: 1.1548387
+    speedMultiplier: 1.0645161
+    aggression: 0.23225805
+    rosterStep: 4
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 35 hostiles. Reach 3 marked points across the map.
+    enemyCount: 35
+    timeLimit: 195
+    maxAliveAtOnce: 8
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.3483871
+    objective: 7
+    objectiveWeight: 16
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.2903225
+    damageMultiplier: 1.1741935
+    speedMultiplier: 1.0725807
+    aggression: 0.2612903
+    rosterStep: 4
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 36 hostiles. One of them runs -- that one is the level.
+    enemyCount: 36
+    timeLimit: 200
+    maxAliveAtOnce: 8
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 2
+    objectiveWeight: 16
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.3225806
+    damageMultiplier: 1.1935484
+    speedMultiplier: 1.0806452
+    aggression: 0.29032257
+    rosterStep: 4
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: Tove's plant still runs three shifts. Nobody has told the yard why. 38 hostiles and a boss. The boss is most of the score.
+    enemyCount: 38
+    timeLimit: 210
+    maxAliveAtOnce: 8
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 17
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.3548387
+    damageMultiplier: 1.2129033
+    speedMultiplier: 1.0887097
+    aggression: 0.31935483
+    rosterStep: 4
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: The shift supervisors have stopped pretending this is a drill. 39 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 39
+    timeLimit: 215
+    maxAliveAtOnce: 8
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 1
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.3870968
+    damageMultiplier: 1.2322581
+    speedMultiplier: 1.0967742
+    aggression: 0.34838706
+    rosterStep: 6
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: The shift supervisors have stopped pretending this is a drill. 40 hostiles. Stand on the marked ground and keep standing.
+    enemyCount: 40
+    timeLimit: 220
+    maxAliveAtOnce: 9
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 3
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.4193548
+    damageMultiplier: 1.2516129
+    speedMultiplier: 1.1048387
+    aggression: 0.37741932
+    rosterStep: 6
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: The shift supervisors have stopped pretending this is a drill. 43 hostiles and a boss. The boss is most of the score.
+    enemyCount: 43
+    timeLimit: 230
+    maxAliveAtOnce: 9
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 19
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.451613
+    damageMultiplier: 1.2709677
+    speedMultiplier: 1.1129032
+    aggression: 0.40645158
+    rosterStep: 6
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: The shift supervisors have stopped pretending this is a drill. 44 hostiles, and the lights are not yours.
+    enemyCount: 44
+    timeLimit: 235
+    maxAliveAtOnce: 9
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 4
+    objectiveWeight: 20
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.483871
+    damageMultiplier: 1.2903225
+    speedMultiplier: 1.1209677
+    aggression: 0.43548384
+    rosterStep: 6
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: The shift supervisors have stopped pretending this is a drill. 45 hostiles. Clear them, then reach the way out.
+    enemyCount: 45
+    timeLimit: 240
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 13.16129
+    spawnReach: 1.6193548
+    objective: 5
+    objectiveWeight: 20
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.516129
+    damageMultiplier: 1.3096775
+    speedMultiplier: 1.1290323
+    aggression: 0.4645161
+    rosterStep: 7
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 6
+    brief: The shift supervisors have stopped pretending this is a drill. 47 hostiles and a boss. The boss is most of the score.
+    enemyCount: 47
+    timeLimit: 250
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.483871
+    spawnReach: 1.6580646
+    objective: 0
+    objectiveWeight: 21
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.548387
+    damageMultiplier: 1.3290323
+    speedMultiplier: 1.1370968
+    aggression: 0.4935484
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The shift supervisors have stopped pretending this is a drill. 48 hostiles and 6 charges. Reach a charge or lose the clock.
+    enemyCount: 48
+    timeLimit: 255
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.806452
+    spawnReach: 1.6967742
+    objective: 6
+    objectiveWeight: 22
+    objectiveStages: 6
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.5806451
+    damageMultiplier: 1.3483871
+    speedMultiplier: 1.1451613
+    aggression: 0.5225806
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The shift supervisors have stopped pretending this is a drill. 51 hostiles. Reach 4 marked points across the map.
+    enemyCount: 51
+    timeLimit: 265
+    maxAliveAtOnce: 11
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 7
+    objectiveWeight: 23
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.6129032
+    damageMultiplier: 1.367742
+    speedMultiplier: 1.1532258
+    aggression: 0.5516129
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: The shift supervisors have stopped pretending this is a drill. 52 hostiles and a boss. The boss is most of the score.
+    enemyCount: 52
+    timeLimit: 270
+    maxAliveAtOnce: 11
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 23
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.6451613
+    damageMultiplier: 1.3870968
+    speedMultiplier: 1.1612903
+    aggression: 0.58064514
+    rosterStep: 9
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: The shift supervisors have stopped pretending this is a drill. 54 hostiles. 2 of them run, one at a time -- catch each.
+    enemyCount: 54
+    timeLimit: 280
+    maxAliveAtOnce: 11
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 2
+    objectiveWeight: 24
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.6774194
+    damageMultiplier: 1.4064516
+    speedMultiplier: 1.1693548
+    aggression: 0.60967743
+    rosterStep: 9
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: The shift supervisors have stopped pretending this is a drill. 56 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 56
+    timeLimit: 285
+    maxAliveAtOnce: 11
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 1
+    objectiveWeight: 25
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 1.7096775
+    damageMultiplier: 1.4258064
+    speedMultiplier: 1.1774193
+    aggression: 0.63870966
+    rosterStep: 9
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: The shift supervisors have stopped pretending this is a drill. 58 hostiles and a boss. The boss is most of the score.
+    enemyCount: 58
+    timeLimit: 295
+    maxAliveAtOnce: 12
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 26
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 1.7419355
+    damageMultiplier: 1.4451613
+    speedMultiplier: 1.1854839
+    aggression: 0.66774195
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: They are pulling people off the line to hold the floor now. 60 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 60
+    timeLimit: 305
+    maxAliveAtOnce: 12
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 3
+    objectiveWeight: 27
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 1.7741935
+    damageMultiplier: 1.4645162
+    speedMultiplier: 1.1935484
+    aggression: 0.6967741
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: They are pulling people off the line to hold the floor now. 61 hostiles, and the lights are not yours.
+    enemyCount: 61
+    timeLimit: 310
+    maxAliveAtOnce: 12
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 4
+    objectiveWeight: 27
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 1.8064516
+    damageMultiplier: 1.483871
+    speedMultiplier: 1.201613
+    aggression: 0.7258064
     rosterStep: 10
-    reserveMagazines: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: They are pulling people off the line to hold the floor now. 64 hostiles and a boss. The boss is most of the score.
+    enemyCount: 64
+    timeLimit: 320
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 29
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 1.8387096
+    damageMultiplier: 1.5032258
+    speedMultiplier: 1.2096775
+    aggression: 0.75483865
+    rosterStep: 10
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: They are pulling people off the line to hold the floor now. 65 hostiles. Clear them, then reach the way out.
+    enemyCount: 65
+    timeLimit: 325
+    maxAliveAtOnce: 13
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 5
+    objectiveWeight: 29
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 1.8709677
+    damageMultiplier: 1.5225806
+    speedMultiplier: 1.217742
+    aggression: 0.78387094
+    rosterStep: 10
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: They are pulling people off the line to hold the floor now. 68 hostiles and 8 charges. Reach a charge or lose the clock.
+    enemyCount: 68
+    timeLimit: 335
+    maxAliveAtOnce: 13
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 6
+    objectiveWeight: 31
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 1.9032258
+    damageMultiplier: 1.5419354
+    speedMultiplier: 1.2258065
+    aggression: 0.81290317
+    rosterStep: 10
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 10
+    brief: They are pulling people off the line to hold the floor now. 70 hostiles and a boss. The boss is most of the score.
+    enemyCount: 70
+    timeLimit: 345
+    maxAliveAtOnce: 13
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.35484
+    spawnReach: 2.1225808
+    objective: 0
+    objectiveWeight: 32
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 1.9354839
+    damageMultiplier: 1.5612904
+    speedMultiplier: 1.233871
+    aggression: 0.84193546
+    rosterStep: 12
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: They are pulling people off the line to hold the floor now. 71 hostiles. Reach 5 marked points across the map.
+    enemyCount: 71
+    timeLimit: 350
+    maxAliveAtOnce: 14
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 7
+    objectiveWeight: 32
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 1.967742
+    damageMultiplier: 1.5806452
+    speedMultiplier: 1.2419355
+    aggression: 0.8709677
+    rosterStep: 12
+    reserveMagazines: 16
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: TOVE AUGER
-    brief: Tove is on the hall roof. She has not tried to leave. 27 between you and Tove.
-    enemyCount: 27
-    timeLimit: 120
-    maxAliveAtOnce: 11
+    brief: Tove is on the hall roof. She has not tried to leave. 74 between you and Tove.
+    enemyCount: 74
+    timeLimit: 360
+    maxAliveAtOnce: 14
     spawnInterval: 0.3
-    briefingTime: 7.5
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 18
+    spawnReach: 2.2
     objective: 0
-    objectiveWeight: 12
+    objectiveWeight: 33
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: c29c16c406db1bd4ea57e9fcc3d4b7c9, type: 2}
     bossName: Tove Auger
-    bossWeight: 8
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.7
-    damageMultiplier: 1.42
-    speedMultiplier: 1.21
+    bossWeight: 9
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2
+    damageMultiplier: 1.6
+    speedMultiplier: 1.25
     aggression: 0.9
     rosterStep: 12
-    reserveMagazines: 8
+    reserveMagazines: 16
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

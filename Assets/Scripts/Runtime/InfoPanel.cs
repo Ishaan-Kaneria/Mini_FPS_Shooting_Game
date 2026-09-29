@@ -34,10 +34,11 @@ public class InfoPanel : OverlayPanel
         var card = UIKit.Panel(shade.transform, "Card", UIKit.PanelTone.Panel, t);
         var rt = card.rectTransform;
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(680f, 0f);
+        // Wide enough that the credits sit on one line each at a readable size on a laptop.
+        rt.sizeDelta = new Vector2(DeviceProfile.Handheld ? 680f : 940f, 0f);
         card.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         card.gameObject.AddComponent<FitInsideParent>();
-        var col = UIKit.Column(card, 12f, new RectOffset(32, 32, 26, 28));
+        var col = UIKit.Column(card, 14f, new RectOffset(40, 40, 30, 34));
         col.childForceExpandHeight = false;
         col.childControlHeight = true;
 
@@ -61,8 +62,10 @@ public class InfoPanel : OverlayPanel
 
         var name = UIKit.Text(card.transform, "Game", "Mini FPS", UIKit.TextRole.Display, t);
         name.color = t.textPrimary;
-        UIKit.Text(card.transform, "Version",
-            UIText.Row("SINGLE PLAYER CAMPAIGN", $"VERSION {Application.version}"), UIKit.TextRole.Label, t).color = t.textSecondary;
+        var version = UIKit.Text(card.transform, "Version",
+            UIText.Row("SINGLE PLAYER CAMPAIGN", $"VERSION {Application.version}"), UIKit.TextRole.Label, t);
+        version.color = t.textSecondary;
+        version.fontSize = t.sizeLabel + 3f;
 
         Section(card.transform, "Credits",
             "Made by Ishaan Kaneria.\n" +
@@ -78,10 +81,15 @@ public class InfoPanel : OverlayPanel
 
     static void Section(Transform parent, string heading, string body, UITheme t)
     {
-        UIKit.Text(parent, heading + "Heading", heading, UIKit.TextRole.Label, t).color = t.textSecondary;
-        var text = UIKit.Text(parent, heading, body, UIKit.TextRole.Caption, t);
+        // Body size rather than caption, and the heading in the accent: at caption size the
+        // credits were a strain to read on a laptop.
+        var head = UIKit.Text(parent, heading + "Heading", heading, UIKit.TextRole.Heading, t);
+        head.color = t.accent;
+        var text = UIKit.Text(parent, heading, body, UIKit.TextRole.Body, t);
+        text.color = t.textPrimary;
+        text.fontSize = t.sizeBody + 2f;
         text.textWrappingMode = TMPro.TextWrappingModes.Normal;
-        text.lineSpacing = 8f;
+        text.lineSpacing = 10f;
     }
 
     protected override void OnOpened() { }

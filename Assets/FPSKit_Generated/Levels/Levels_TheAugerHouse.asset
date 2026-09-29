@@ -15,72 +15,867 @@ MonoBehaviour:
   arenaScene: TheAugerHouse
   stakes: Nobody is coming and nothing here is on a timer but her patience. When it runs out the shutters come down on the whole house, and the last thing this family does is keep you in it.
   levels:
-  - displayName: THE RUNNER
-    brief: The gate is open and nobody is on it. 22 hostiles. One of them runs -- that one is the level.
-    enemyCount: 22
-    timeLimit: 87
-    maxAliveAtOnce: 8
+  - displayName: RECON
+    brief: The gate is open and nobody is on it. 27 hostiles. Reach 2 marked points across the map.
+    enemyCount: 27
+    timeLimit: 150
+    maxAliveAtOnce: 9
     spawnInterval: 0.8
-    briefingTime: 8
-    objective: 2
-    objectiveWeight: 10
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
+    objective: 7
+    objectiveWeight: 12
+    objectiveStages: 2
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.3
     damageMultiplier: 1.18
     speedMultiplier: 1.12
     aggression: 0.24
     rosterStep: 7
-    reserveMagazines: 8
+    reserveMagazines: 11
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: The gate is open and nobody is on it. 29 hostiles. One of them runs -- that one is the level.
+    enemyCount: 29
+    timeLimit: 160
+    maxAliveAtOnce: 9
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
+    objective: 2
+    objectiveWeight: 13
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.3322581
+    damageMultiplier: 1.1993549
+    speedMultiplier: 1.1280645
+    aggression: 0.26903224
+    rosterStep: 7
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 1
+    brief: The gate is open and nobody is on it. 33 hostiles and a boss. The boss is most of the score.
+    enemyCount: 33
+    timeLimit: 175
+    maxAliveAtOnce: 10
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
+    objective: 0
+    objectiveWeight: 15
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.3645161
+    damageMultiplier: 1.2187097
+    speedMultiplier: 1.136129
+    aggression: 0.2980645
+    rosterStep: 7
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
     brief: The gate is open and nobody is on it. 36 hostiles and one magazine, nothing spare. Kills drop ammunition.
     enemyCount: 36
-    timeLimit: 134
+    timeLimit: 190
     maxAliveAtOnce: 10
-    spawnInterval: 0.55
-    briefingTime: 7.5
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
     objective: 1
     objectiveWeight: 16
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.4
-    damageMultiplier: 1.24
-    speedMultiplier: 1.15
-    aggression: 0.69
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.3967742
+    damageMultiplier: 1.2380645
+    speedMultiplier: 1.1441935
+    aggression: 0.32709676
     rosterStep: 9
     reserveMagazines: 0
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: MARIT AUGER
-    brief: Marit is in his study, with the file open, waiting. 50 between you and Marit.
-    enemyCount: 50
-    timeLimit: 198
-    maxAliveAtOnce: 12
-    spawnInterval: 0.3
-    briefingTime: 7.5
+  - displayName: HOLD THE LINE
+    brief: The gate is open and nobody is on it. 40 hostiles. Stand on the marked ground and keep standing.
+    enemyCount: 40
+    timeLimit: 210
+    maxAliveAtOnce: 10
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 9.290322
+    spawnReach: 1.1548387
+    objective: 3
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.4290322
+    damageMultiplier: 1.2574193
+    speedMultiplier: 1.152258
+    aggression: 0.35612902
+    rosterStep: 9
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 2
+    brief: The gate is open and nobody is on it. 44 hostiles and a boss. The boss is most of the score.
+    enemyCount: 44
+    timeLimit: 225
+    maxAliveAtOnce: 10
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 9.612904
+    spawnReach: 1.1935484
     objective: 0
+    objectiveWeight: 20
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.4612904
+    damageMultiplier: 1.2767742
+    speedMultiplier: 1.1603225
+    aggression: 0.38516128
+    rosterStep: 9
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: The gate is open and nobody is on it. 48 hostiles, and the lights are not yours.
+    enemyCount: 48
+    timeLimit: 245
+    maxAliveAtOnce: 11
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 9.935484
+    spawnReach: 1.2322581
+    objective: 4
     objectiveWeight: 22
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.4935484
+    damageMultiplier: 1.296129
+    speedMultiplier: 1.168387
+    aggression: 0.41419354
+    rosterStep: 9
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: The gate is open and nobody is on it. 53 hostiles. Clear them, then reach the way out.
+    enemyCount: 53
+    timeLimit: 265
+    maxAliveAtOnce: 11
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 10.258064
+    spawnReach: 1.2709677
+    objective: 5
+    objectiveWeight: 24
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.5258064
+    damageMultiplier: 1.3154839
+    speedMultiplier: 1.1764516
+    aggression: 0.4432258
+    rosterStep: 10
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: The gate is open and nobody is on it. 58 hostiles and a boss. The boss is most of the score.
+    enemyCount: 58
+    timeLimit: 290
+    maxAliveAtOnce: 11
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 10.580645
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 26
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.5580645
+    damageMultiplier: 1.3348387
+    speedMultiplier: 1.1845161
+    aggression: 0.47225803
+    rosterStep: 10
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The gate is open and nobody is on it. 63 hostiles and 8 charges. Reach a charge or lose the clock.
+    enemyCount: 63
+    timeLimit: 310
+    maxAliveAtOnce: 12
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 10.903226
+    spawnReach: 1.3483871
+    objective: 6
+    objectiveWeight: 28
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.5903226
+    damageMultiplier: 1.3541936
+    speedMultiplier: 1.1925807
+    aggression: 0.5012903
+    rosterStep: 10
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The gate is open and nobody is on it. 67 hostiles. Reach 4 marked points across the map.
+    enemyCount: 67
+    timeLimit: 330
+    maxAliveAtOnce: 12
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 7
+    objectiveWeight: 30
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.6225806
+    damageMultiplier: 1.3735484
+    speedMultiplier: 1.2006452
+    aggression: 0.53032255
+    rosterStep: 10
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: The gate is open and nobody is on it. 73 hostiles and a boss. The boss is most of the score.
+    enemyCount: 73
+    timeLimit: 355
+    maxAliveAtOnce: 12
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 33
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.6548387
+    damageMultiplier: 1.3929032
+    speedMultiplier: 1.2087097
+    aggression: 0.55935484
+    rosterStep: 10
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Her people are in the house, and they were told to expect you. 79 hostiles. 3 of them run, one at a time -- catch each.
+    enemyCount: 79
+    timeLimit: 380
+    maxAliveAtOnce: 12
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 2
+    objectiveWeight: 36
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.6870967
+    damageMultiplier: 1.412258
+    speedMultiplier: 1.2167742
+    aggression: 0.5883871
+    rosterStep: 12
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Her people are in the house, and they were told to expect you. 85 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 85
+    timeLimit: 405
+    maxAliveAtOnce: 13
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 1
+    objectiveWeight: 38
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.7193549
+    damageMultiplier: 1.4316128
+    speedMultiplier: 1.2248387
+    aggression: 0.6174193
+    rosterStep: 12
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: Her people are in the house, and they were told to expect you. 91 hostiles and a boss. The boss is most of the score.
+    enemyCount: 91
+    timeLimit: 430
+    maxAliveAtOnce: 13
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 41
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.7516129
+    damageMultiplier: 1.4509678
+    speedMultiplier: 1.2329032
+    aggression: 0.6464516
+    rosterStep: 12
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Her people are in the house, and they were told to expect you. 96 hostiles. Hold 3 marked grounds across the map, one after another.
+    enemyCount: 96
+    timeLimit: 455
+    maxAliveAtOnce: 13
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 3
+    objectiveWeight: 43
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.7838709
+    damageMultiplier: 1.4703226
+    speedMultiplier: 1.2409678
+    aggression: 0.6754838
+    rosterStep: 12
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Her people are in the house, and they were told to expect you. 102 hostiles, and the lights are not yours.
+    enemyCount: 102
+    timeLimit: 480
+    maxAliveAtOnce: 14
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 13.16129
+    spawnReach: 1.6193548
+    objective: 4
+    objectiveWeight: 46
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.816129
+    damageMultiplier: 1.4896774
+    speedMultiplier: 1.2490323
+    aggression: 0.7045161
+    rosterStep: 13
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 6
+    brief: Her people are in the house, and they were told to expect you. 108 hostiles and a boss. The boss is most of the score.
+    enemyCount: 108
+    timeLimit: 505
+    maxAliveAtOnce: 14
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 13.483871
+    spawnReach: 1.6580646
+    objective: 0
+    objectiveWeight: 49
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.8483871
+    damageMultiplier: 1.5090322
+    speedMultiplier: 1.2570968
+    aggression: 0.7335484
+    rosterStep: 13
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: Her people are in the house, and they were told to expect you. 115 hostiles. Clear them, then reach the way out.
+    enemyCount: 115
+    timeLimit: 530
+    maxAliveAtOnce: 14
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 23
+    waveRest: 13.806452
+    spawnReach: 1.6967742
+    objective: 5
+    objectiveWeight: 52
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.8806452
+    damageMultiplier: 1.5283871
+    speedMultiplier: 1.2651613
+    aggression: 0.76258063
+    rosterStep: 13
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: Her people are in the house, and they were told to expect you. 121 hostiles and 14 charges. Reach a charge or lose the clock.
+    enemyCount: 121
+    timeLimit: 555
+    maxAliveAtOnce: 15
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 23
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 6
+    objectiveWeight: 54
+    objectiveStages: 14
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 15
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.9129032
+    damageMultiplier: 1.547742
+    speedMultiplier: 1.2732258
+    aggression: 0.7916129
+    rosterStep: 13
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: Her people are in the house, and they were told to expect you. 128 hostiles and a boss. The boss is most of the score.
+    enemyCount: 128
+    timeLimit: 585
+    maxAliveAtOnce: 15
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 24
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 58
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 15
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.9451612
+    damageMultiplier: 1.5670968
+    speedMultiplier: 1.2812903
+    aggression: 0.8206451
+    rosterStep: 15
+    reserveMagazines: 21
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Her people are in the house, and they were told to expect you. 134 hostiles. Reach 8 marked points across the map.
+    enemyCount: 134
+    timeLimit: 610
+    maxAliveAtOnce: 15
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 24
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 7
+    objectiveWeight: 60
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 16
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.9774194
+    damageMultiplier: 1.5864516
+    speedMultiplier: 1.2893548
+    aggression: 0.8496774
+    rosterStep: 15
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Her people are in the house, and they were told to expect you. 142 hostiles. 4 of them run, one at a time -- catch each.
+    enemyCount: 142
+    timeLimit: 640
+    maxAliveAtOnce: 15
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 25
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 2
+    objectiveWeight: 64
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 17
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 2.0096774
+    damageMultiplier: 1.6058065
+    speedMultiplier: 1.2974193
+    aggression: 0.8787096
+    rosterStep: 15
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: Her people are in the house, and they were told to expect you. 148 hostiles and a boss. The boss is most of the score.
+    enemyCount: 148
+    timeLimit: 665
+    maxAliveAtOnce: 16
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 25
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 67
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 18
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 2.0419354
+    damageMultiplier: 1.6251613
+    speedMultiplier: 1.3054838
+    aggression: 0.9077419
+    rosterStep: 15
+    reserveMagazines: 23
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Every door on this floor has somebody behind it. 156 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 156
+    timeLimit: 695
+    maxAliveAtOnce: 16
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 26
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 1
+    objectiveWeight: 70
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 19
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 2.0741935
+    damageMultiplier: 1.6445161
+    speedMultiplier: 1.3135483
+    aggression: 0.93677413
+    rosterStep: 15
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Every door on this floor has somebody behind it. 163 hostiles. Hold 5 marked grounds across the map, one after another.
+    enemyCount: 163
+    timeLimit: 725
+    maxAliveAtOnce: 16
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 26
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 3
+    objectiveWeight: 73
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 20
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 2.1064515
+    damageMultiplier: 1.6638709
+    speedMultiplier: 1.321613
+    aggression: 0.9658064
+    rosterStep: 16
+    reserveMagazines: 24
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: Every door on this floor has somebody behind it. 170 hostiles and a boss. The boss is most of the score.
+    enemyCount: 170
+    timeLimit: 750
+    maxAliveAtOnce: 17
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 26
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 76
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 20
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 2.1387095
+    damageMultiplier: 1.6832258
+    speedMultiplier: 1.3296775
+    aggression: 0.99483865
+    rosterStep: 16
+    reserveMagazines: 25
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Every door on this floor has somebody behind it. 178 hostiles, and the lights are not yours.
+    enemyCount: 178
+    timeLimit: 780
+    maxAliveAtOnce: 17
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 27
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 4
+    objectiveWeight: 80
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 21
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 2.1709678
+    damageMultiplier: 1.7025807
+    speedMultiplier: 1.337742
+    aggression: 1
+    rosterStep: 16
+    reserveMagazines: 25
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: Every door on this floor has somebody behind it. 186 hostiles. Clear them, then reach the way out.
+    enemyCount: 186
+    timeLimit: 810
+    maxAliveAtOnce: 17
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 27
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 5
+    objectiveWeight: 84
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 22
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 2.2032259
+    damageMultiplier: 1.7219355
+    speedMultiplier: 1.3458065
+    aggression: 1
+    rosterStep: 16
+    reserveMagazines: 26
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 10
+    brief: Every door on this floor has somebody behind it. 193 hostiles and a boss. The boss is most of the score.
+    enemyCount: 193
+    timeLimit: 840
+    maxAliveAtOnce: 17
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 28
+    waveRest: 17.35484
+    spawnReach: 2.1225808
+    objective: 0
+    objectiveWeight: 87
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 23
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 2.235484
+    damageMultiplier: 1.7412903
+    speedMultiplier: 1.35
+    aggression: 1
+    rosterStep: 18
+    reserveMagazines: 27
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: Every door on this floor has somebody behind it. 201 hostiles and 20 charges. Reach a charge or lose the clock.
+    enemyCount: 201
+    timeLimit: 870
+    maxAliveAtOnce: 18
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 28
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 6
+    objectiveWeight: 90
+    objectiveStages: 20
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 24
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 2.267742
+    damageMultiplier: 1.7606452
+    speedMultiplier: 1.35
+    aggression: 1
+    rosterStep: 18
+    reserveMagazines: 27
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: MARIT AUGER
+    brief: Marit is in his study, with the file open, waiting. 210 between you and Marit.
+    enemyCount: 210
+    timeLimit: 900
+    maxAliveAtOnce: 18
+    spawnInterval: 0.3
+    briefingTime: 9
+    waveSize: 29
+    waveRest: 18
+    spawnReach: 2.2
+    objective: 0
+    objectiveWeight: 94
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 2899886d6c24335f8a5f28b5c3262280, type: 2}
     bossName: Marit Auger
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.5
-    damageMultiplier: 1.3
-    speedMultiplier: 1.18
+    bossWeight: 25
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2.3
+    damageMultiplier: 1.78
+    speedMultiplier: 1.35
     aggression: 1
-    rosterStep: 10
-    reserveMagazines: 8
+    rosterStep: 18
+    reserveMagazines: 28
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

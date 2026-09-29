@@ -16,186 +16,866 @@ MonoBehaviour:
   stakes: The convoy window is the only traffic through here all day. Miss it and you are walking, and the distances out here are not walkable.
   levels:
   - displayName: HOLD THE LINE
-    brief: Aurel's road carries everything the company still owns. 6 hostiles. Stand on the marked ground and keep standing.
-    enemyCount: 6
-    timeLimit: 32
-    maxAliveAtOnce: 4
+    brief: Aurel's road carries everything the company still owns. 25 hostiles. Stand on the marked ground and keep standing.
+    enemyCount: 25
+    timeLimit: 150
+    maxAliveAtOnce: 6
     spawnInterval: 0.8
-    briefingTime: 8
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
     objective: 3
-    objectiveWeight: 4
+    objectiveWeight: 11
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.1
     damageMultiplier: 1.06
     speedMultiplier: 1.04
     aggression: 0.08
     rosterStep: 3
-    reserveMagazines: 8
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: Aurel's road carries everything the company still owns. 9 hostiles, and the lights are not yours.
-    enemyCount: 9
-    timeLimit: 43
-    maxAliveAtOnce: 5
-    spawnInterval: 0.7285714
-    briefingTime: 7.5
+    brief: Aurel's road carries everything the company still owns. 26 hostiles, and the lights are not yours.
+    enemyCount: 26
+    timeLimit: 155
+    maxAliveAtOnce: 6
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
     objective: 4
-    objectiveWeight: 4
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.2
-    damageMultiplier: 1.12
-    speedMultiplier: 1.07
-    aggression: 0.20857142
-    rosterStep: 5
-    reserveMagazines: 8
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.132258
+    damageMultiplier: 1.0793549
+    speedMultiplier: 1.0480645
+    aggression: 0.10903225
+    rosterStep: 3
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: Aurel's road carries everything the company still owns. 12 hostiles and a boss. The boss is most of the score.
-    enemyCount: 12
-    timeLimit: 69
+    brief: Aurel's road carries everything the company still owns. 28 hostiles and a boss. The boss is most of the score.
+    enemyCount: 28
+    timeLimit: 165
     maxAliveAtOnce: 6
-    spawnInterval: 0.6571429
-    briefingTime: 7.5
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
     objective: 0
-    objectiveWeight: 5
+    objectiveWeight: 13
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: 
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.3
-    damageMultiplier: 1.18
-    speedMultiplier: 1.1
-    aggression: 0.33714285
-    rosterStep: 6
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.1645161
+    damageMultiplier: 1.0987097
+    speedMultiplier: 1.056129
+    aggression: 0.1380645
+    rosterStep: 3
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
-    brief: The convoy escort has been doubled since the quarry went quiet. 15 hostiles. Clear them, then reach the way out.
-    enemyCount: 15
-    timeLimit: 63
-    maxAliveAtOnce: 7
-    spawnInterval: 0.5857143
-    briefingTime: 7.5
+    brief: Aurel's road carries everything the company still owns. 30 hostiles. Clear them, then reach the way out.
+    enemyCount: 30
+    timeLimit: 175
+    maxAliveAtOnce: 6
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
     objective: 5
-    objectiveWeight: 7
+    objectiveWeight: 14
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.4
-    damageMultiplier: 1.24
-    speedMultiplier: 1.13
-    aggression: 0.46571428
-    rosterStep: 8
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.1967742
+    damageMultiplier: 1.1180645
+    speedMultiplier: 1.0641935
+    aggression: 0.16709676
+    rosterStep: 5
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
-    brief: The convoy escort has been doubled since the quarry went quiet. 18 hostiles and four charges. Reach a charge or lose the clock.
-    enemyCount: 18
-    timeLimit: 73
-    maxAliveAtOnce: 8
-    spawnInterval: 0.5142857
-    briefingTime: 7.5
+    brief: Aurel's road carries everything the company still owns. 32 hostiles and 5 charges. Reach a charge or lose the clock.
+    enemyCount: 32
+    timeLimit: 185
+    maxAliveAtOnce: 7
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1548387
     objective: 6
-    objectiveWeight: 8
+    objectiveWeight: 14
+    objectiveStages: 5
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.5
-    damageMultiplier: 1.3
-    speedMultiplier: 1.16
-    aggression: 0.5942857
-    rosterStep: 9
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.2290323
+    damageMultiplier: 1.1374193
+    speedMultiplier: 1.0722581
+    aggression: 0.19612902
+    rosterStep: 5
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: The convoy escort has been doubled since the quarry went quiet. 21 hostiles and a boss. The boss is most of the score.
-    enemyCount: 21
-    timeLimit: 99
-    maxAliveAtOnce: 9
-    spawnInterval: 0.44285715
-    briefingTime: 7.5
+    brief: Aurel's road carries everything the company still owns. 34 hostiles and a boss. The boss is most of the score.
+    enemyCount: 34
+    timeLimit: 195
+    maxAliveAtOnce: 7
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1935484
     objective: 0
-    objectiveWeight: 9
+    objectiveWeight: 15
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
-    bossWeight: 7
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.6
-    damageMultiplier: 1.36
-    speedMultiplier: 1.1899999
-    aggression: 0.7228571
-    rosterStep: 11
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.2612903
+    damageMultiplier: 1.1567742
+    speedMultiplier: 1.0803226
+    aggression: 0.22516128
+    rosterStep: 5
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Aurel's road carries everything the company still owns. 36 hostiles. Reach 3 marked points across the map.
+    enemyCount: 36
+    timeLimit: 205
+    maxAliveAtOnce: 7
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 9.935484
+    spawnReach: 1.2322581
+    objective: 7
+    objectiveWeight: 16
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.2935483
+    damageMultiplier: 1.176129
+    speedMultiplier: 1.0883871
+    aggression: 0.25419354
+    rosterStep: 5
+    reserveMagazines: 13
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
-    brief: They have stopped moving freight and started moving people. 24 hostiles. One of them runs -- that one is the level.
-    enemyCount: 24
-    timeLimit: 94
-    maxAliveAtOnce: 10
-    spawnInterval: 0.37142858
-    briefingTime: 7.5
+    brief: Aurel's road carries everything the company still owns. 39 hostiles. One of them runs -- that one is the level.
+    enemyCount: 39
+    timeLimit: 215
+    maxAliveAtOnce: 8
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 10.258064
+    spawnReach: 1.2709677
     objective: 2
-    objectiveWeight: 11
+    objectiveWeight: 18
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 7.5
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.7
-    damageMultiplier: 1.42
-    speedMultiplier: 1.22
-    aggression: 0.85142857
+    bossWeight: 5
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.3258065
+    damageMultiplier: 1.1954839
+    speedMultiplier: 1.0964516
+    aggression: 0.2832258
+    rosterStep: 6
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: Aurel's road carries everything the company still owns. 42 hostiles and a boss. The boss is most of the score.
+    enemyCount: 42
+    timeLimit: 230
+    maxAliveAtOnce: 8
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.580645
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 19
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.3580645
+    damageMultiplier: 1.2148387
+    speedMultiplier: 1.1045161
+    aggression: 0.31225803
+    rosterStep: 6
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Aurel's road carries everything the company still owns. 44 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 44
+    timeLimit: 240
+    maxAliveAtOnce: 8
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.903226
+    spawnReach: 1.3483871
+    objective: 1
+    objectiveWeight: 20
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.3903226
+    damageMultiplier: 1.2341936
+    speedMultiplier: 1.1125807
+    aggression: 0.3412903
+    rosterStep: 6
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Aurel's road carries everything the company still owns. 47 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 47
+    timeLimit: 255
+    maxAliveAtOnce: 9
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 3
+    objectiveWeight: 21
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.4225806
+    damageMultiplier: 1.2535484
+    speedMultiplier: 1.1206452
+    aggression: 0.37032256
+    rosterStep: 6
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: Aurel's road carries everything the company still owns. 49 hostiles and a boss. The boss is most of the score.
+    enemyCount: 49
+    timeLimit: 265
+    maxAliveAtOnce: 9
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 22
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.4548388
+    damageMultiplier: 1.2729032
+    speedMultiplier: 1.1287097
+    aggression: 0.39935482
+    rosterStep: 6
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: The convoy escort has been doubled since the quarry went quiet. 52 hostiles, and the lights are not yours.
+    enemyCount: 52
+    timeLimit: 280
+    maxAliveAtOnce: 9
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 4
+    objectiveWeight: 23
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.4870968
+    damageMultiplier: 1.292258
+    speedMultiplier: 1.1367742
+    aggression: 0.42838708
+    rosterStep: 8
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: The convoy escort has been doubled since the quarry went quiet. 56 hostiles. Clear them, then reach the way out.
+    enemyCount: 56
+    timeLimit: 295
+    maxAliveAtOnce: 9
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 5
+    objectiveWeight: 25
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.5193548
+    damageMultiplier: 1.311613
+    speedMultiplier: 1.1448387
+    aggression: 0.45741934
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: The convoy escort has been doubled since the quarry went quiet. 59 hostiles and a boss. The boss is most of the score.
+    enemyCount: 59
+    timeLimit: 310
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 27
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.5516129
+    damageMultiplier: 1.3309678
+    speedMultiplier: 1.1529032
+    aggression: 0.4864516
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The convoy escort has been doubled since the quarry went quiet. 61 hostiles and 8 charges. Reach a charge or lose the clock.
+    enemyCount: 61
+    timeLimit: 320
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 6
+    objectiveWeight: 27
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.583871
+    damageMultiplier: 1.3503226
+    speedMultiplier: 1.1609677
+    aggression: 0.51548386
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The convoy escort has been doubled since the quarry went quiet. 64 hostiles. Reach 4 marked points across the map.
+    enemyCount: 64
+    timeLimit: 335
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 13.16129
+    spawnReach: 1.6193548
+    objective: 7
+    objectiveWeight: 29
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.616129
+    damageMultiplier: 1.3696774
+    speedMultiplier: 1.1690322
+    aggression: 0.5445161
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 6
+    brief: The convoy escort has been doubled since the quarry went quiet. 68 hostiles and a boss. The boss is most of the score.
+    enemyCount: 68
+    timeLimit: 350
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.483871
+    spawnReach: 1.6580646
+    objective: 0
+    objectiveWeight: 31
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.6483871
+    damageMultiplier: 1.3890322
+    speedMultiplier: 1.1770967
+    aggression: 0.5735484
+    rosterStep: 9
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: The convoy escort has been doubled since the quarry went quiet. 71 hostiles. 2 of them run, one at a time -- catch each.
+    enemyCount: 71
+    timeLimit: 365
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.806452
+    spawnReach: 1.6967742
+    objective: 2
+    objectiveWeight: 32
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.6806451
+    damageMultiplier: 1.4083871
+    speedMultiplier: 1.1851612
+    aggression: 0.6025806
+    rosterStep: 9
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: The convoy escort has been doubled since the quarry went quiet. 74 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 74
+    timeLimit: 380
+    maxAliveAtOnce: 11
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 1
+    objectiveWeight: 33
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.7129033
+    damageMultiplier: 1.427742
+    speedMultiplier: 1.1932259
+    aggression: 0.6316129
+    rosterStep: 9
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: The convoy escort has been doubled since the quarry went quiet. 78 hostiles and a boss. The boss is most of the score.
+    enemyCount: 78
+    timeLimit: 395
+    maxAliveAtOnce: 11
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 35
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.7451613
+    damageMultiplier: 1.4470968
+    speedMultiplier: 1.2012904
+    aggression: 0.6606451
+    rosterStep: 11
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: The convoy escort has been doubled since the quarry went quiet. 81 hostiles. Hold 3 marked grounds across the map, one after another.
+    enemyCount: 81
+    timeLimit: 410
+    maxAliveAtOnce: 12
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 3
+    objectiveWeight: 36
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.7774193
+    damageMultiplier: 1.4664516
+    speedMultiplier: 1.2093549
+    aggression: 0.6896774
+    rosterStep: 11
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: The convoy escort has been doubled since the quarry went quiet. 85 hostiles, and the lights are not yours.
+    enemyCount: 85
+    timeLimit: 425
+    maxAliveAtOnce: 12
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 4
+    objectiveWeight: 38
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 1.8096774
+    damageMultiplier: 1.4858065
+    speedMultiplier: 1.2174194
+    aggression: 0.71870965
+    rosterStep: 11
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: The convoy escort has been doubled since the quarry went quiet. 89 hostiles and a boss. The boss is most of the score.
+    enemyCount: 89
+    timeLimit: 445
+    maxAliveAtOnce: 12
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 40
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 1.8419355
+    damageMultiplier: 1.5051613
+    speedMultiplier: 1.2254839
+    aggression: 0.74774194
+    rosterStep: 11
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: They have stopped moving freight and started moving people. 93 hostiles. Clear them, then reach the way out.
+    enemyCount: 93
+    timeLimit: 460
+    maxAliveAtOnce: 13
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 5
+    objectiveWeight: 42
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 1.8741935
+    damageMultiplier: 1.5245161
+    speedMultiplier: 1.2335484
+    aggression: 0.77677417
+    rosterStep: 11
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: They have stopped moving freight and started moving people. 96 hostiles and 12 charges. Reach a charge or lose the clock.
+    enemyCount: 96
+    timeLimit: 475
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 6
+    objectiveWeight: 43
+    objectiveStages: 12
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 1.9064516
+    damageMultiplier: 1.543871
+    speedMultiplier: 1.2416129
+    aggression: 0.80580646
     rosterStep: 12
-    reserveMagazines: 8
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: They have stopped moving freight and started moving people. 100 hostiles and a boss. The boss is most of the score.
+    enemyCount: 100
+    timeLimit: 490
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 45
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 1.9387096
+    damageMultiplier: 1.5632259
+    speedMultiplier: 1.2496774
+    aggression: 0.8348387
+    rosterStep: 12
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: They have stopped moving freight and started moving people. 105 hostiles. Reach 7 marked points across the map.
+    enemyCount: 105
+    timeLimit: 510
+    maxAliveAtOnce: 13
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 7
+    objectiveWeight: 47
+    objectiveStages: 7
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 1.9709678
+    damageMultiplier: 1.5825807
+    speedMultiplier: 1.2577419
+    aggression: 0.863871
+    rosterStep: 12
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: They have stopped moving freight and started moving people. 108 hostiles. 4 of them run, one at a time -- catch each.
+    enemyCount: 108
+    timeLimit: 525
+    maxAliveAtOnce: 14
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 2
+    objectiveWeight: 49
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 2.0032258
+    damageMultiplier: 1.6019355
+    speedMultiplier: 1.2658064
+    aggression: 0.89290315
+    rosterStep: 12
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 10
+    brief: They have stopped moving freight and started moving people. 112 hostiles and a boss. The boss is most of the score.
+    enemyCount: 112
+    timeLimit: 540
+    maxAliveAtOnce: 14
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.35484
+    spawnReach: 2.1225808
+    objective: 0
+    objectiveWeight: 50
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 2.0354838
+    damageMultiplier: 1.6212903
+    speedMultiplier: 1.273871
+    aggression: 0.92193544
+    rosterStep: 14
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: They have stopped moving freight and started moving people. 117 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 117
+    timeLimit: 560
+    maxAliveAtOnce: 14
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 1
+    objectiveWeight: 53
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 2.0677419
+    damageMultiplier: 1.6406451
+    speedMultiplier: 1.2819355
+    aggression: 0.95096767
+    rosterStep: 14
+    reserveMagazines: 0
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: AUREL AUGER
-    brief: Aurel is at the crossing, with the manifests, waiting to explain. 27 between you and Aurel.
-    enemyCount: 27
-    timeLimit: 120
-    maxAliveAtOnce: 11
+    brief: Aurel is at the crossing, with the manifests, waiting to explain. 121 between you and Aurel.
+    enemyCount: 121
+    timeLimit: 575
+    maxAliveAtOnce: 15
     spawnInterval: 0.3
-    briefingTime: 7.5
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 18
+    spawnReach: 2.2
     objective: 0
-    objectiveWeight: 12
+    objectiveWeight: 54
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6dc741d47098d52029bd0e69551d1e60, type: 2}
     bossName: Aurel Auger
-    bossWeight: 8
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.8
-    damageMultiplier: 1.48
-    speedMultiplier: 1.25
+    bossWeight: 15
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2.1
+    damageMultiplier: 1.66
+    speedMultiplier: 1.29
     aggression: 0.97999996
     rosterStep: 14
-    reserveMagazines: 8
+    reserveMagazines: 21
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

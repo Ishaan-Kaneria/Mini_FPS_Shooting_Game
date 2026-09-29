@@ -364,7 +364,9 @@ namespace FPSKit.EditorTools
 
             var drink = MakeButton(parent, "ItemButton", "DRINK", TouchButton.ActionKind.UseItem,
                                    false, DrinkTint, profile);
-            Slot(cluster, drink, column: 2, row: 1, situational: true);
+            // Top row, beside CROUCH, not the middle row: on a narrow phone the third column's
+            // middle cell sat beside the sights. The middle of the screen stays empty.
+            Slot(cluster, drink, column: 2, row: 2, situational: true);
 
             // Both off by default. They are still built so that flipping the profile is
             // the whole change, rather than a code edit and a rebuild.

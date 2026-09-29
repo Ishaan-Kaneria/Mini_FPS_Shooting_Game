@@ -317,6 +317,26 @@ public class LevelSelectPanel : MonoBehaviour
         }
 
         _layout.startAxis = GridLayoutGroup.Axis.Horizontal;
+
+        // A long ladder (32 levels) cannot be fitted whole: it would shrink every tile to
+        // the floor and run off the bottom. Laid out at the width there is, scrolling
+        // down (six across, so a tile's lines are not cut); a short one is still laid
+        // out whole with nothing to scroll.
+        const int LongLadder = 12;
+        if (_tiles.Count > LongLadder && scroll != null)
+        {
+            int columns = 6;
+            float cell = (width - _layout.padding.left - _layout.padding.right
+                          - _layout.spacing.x * (columns - 1)) / columns;
+            _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            _layout.constraintCount = columns;
+            _layout.cellSize = new Vector2(cell, cell * tileAspect);
+            // The grid's ContentSizeFitter makes it as tall as its rows, which is what scrolls.
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            return;
+        }
+
         if (scroll != null) { scroll.horizontal = false; scroll.vertical = false; }
         UIGrid.Fit(_layout, box, _tiles.Count, tileAspect, 200f, Mathf.Max(1, gridColumns));
     }

@@ -61,7 +61,13 @@ public class LevelSet : ScriptableObject
         Extraction = 5,
 
         /// <summary>Charges on timers. Reach one to make it safe, or lose clock to it.</summary>
-        Disposal = 6
+        Disposal = 6,
+
+        /// <summary>
+        /// Reach a chain of marked points across the arena, one after another. The long
+        /// levels' reason to cross the map rather than hold one corner of it.
+        /// </summary>
+        Recon = 7
     }
 
     [Serializable]
@@ -96,6 +102,20 @@ public class LevelSet : ScriptableObject
                  "not be running while the player is still reading what the level is.")]
         [Min(0f)] public float briefingTime = 3f;
 
+        [Header("Waves")]
+        [Tooltip("Enemies per wave. Each wave comes from one side of the map, and the next " +
+                 "from another. 0 is the old continuous stream, which a short level wants.")]
+        [Min(0)] public int waveSize;
+
+        [Tooltip("Seconds of quiet between waves at most. It ends early once the last wave " +
+                 "is down, so a fast player is not kept waiting.")]
+        [Min(0f)] public float waveRest;
+
+        [Tooltip("How far out enemies arrive, against the arena's own spawn ring. 1 is the " +
+                 "ring as authored; 2 is twice as far, which a big arena and a long level " +
+                 "want so a fight comes from across the map rather than round the corner.")]
+        [Min(1f)] public float spawnReach = 1f;
+
         [Header("Objective")]
         [Tooltip("What this level asks for beyond the roster. See the enum: none of these " +
                  "may change what ends a level, only what scores.")]
@@ -106,6 +126,11 @@ public class LevelSet : ScriptableObject
                  "with an objective has more to earn and the roster alone is no longer " +
                  "three stars -- which is the point of having one.")]
         [Min(0f)] public float objectiveWeight = 6f;
+
+        [Tooltip("How many times the objective comes round in this level: hold sites, " +
+                 "runners, charges or recon points, each in a new place across the map. A " +
+                 "long level has several; the weight is shared between them.")]
+        [Min(1)] public int objectiveStages = 1;
 
         [Header("Boss")]
         [Tooltip("Adds a boss on top of the count above. It arrives with the level rather " +
@@ -203,6 +228,7 @@ public class LevelSet : ScriptableObject
             Objective.Hold => objectiveWeight,
             Objective.Extraction => objectiveWeight,
             Objective.Disposal => objectiveWeight,
+            Objective.Recon => objectiveWeight,
             _ => 0f
         };
     }

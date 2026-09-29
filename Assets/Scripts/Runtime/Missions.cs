@@ -94,6 +94,7 @@ public static class Missions
         LevelSet.Objective.Blackout => "BLACKOUT",
         LevelSet.Objective.Extraction => "EXTRACTION",
         LevelSet.Objective.Disposal => "DISPOSAL",
+        LevelSet.Objective.Recon => "RECON",
         _ => "CLEAR THE ARENA",
     };
 
@@ -143,6 +144,7 @@ public static class Missions
         LevelSet.Objective.Hold => "HOLD THE GROUND",
         LevelSet.Objective.Extraction => "REACH THE WAY OUT",
         LevelSet.Objective.Disposal => "REACH A CHARGE",
+        LevelSet.Objective.Recon => "REACH EVERY POINT",
         _ => "",
     };
 

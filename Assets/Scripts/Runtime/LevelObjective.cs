@@ -57,6 +57,14 @@ public class LevelObjective : MonoBehaviour
 
     LevelSet.Objective Kind => _level != null ? _level.objective : LevelSet.Objective.Clear;
 
+    /// <summary>How many times this level's objective comes round (hold sites, runners, points).</summary>
+    int Stages => _level != null ? Mathf.Max(1, _level.objectiveStages) : 1;
+
+    /// <summary>How far across the map a site may be, stretched with the level's spawn reach.</summary>
+    float Reach => _level != null ? Mathf.Max(1f, _level.spawnReach) : 1f;
+
+    int _stagesDone;
+
     float Weight => _level != null ? _level.ObjectiveWeight : 0f;
 
     // ---- the hunt ----------------------------------------------------------------
@@ -158,7 +166,7 @@ public class LevelObjective : MonoBehaviour
 
             case LevelSet.Objective.Hunt:
                 Satisfied = true;
-                HudLine = "HUNT: FIND THE RUNNER";
+                HudLine = Stages > 1 ? $"HUNT 1/{Stages}: FIND THE RUNNER" : "HUNT: FIND THE RUNNER";
                 break;
 
             case LevelSet.Objective.Hold:
@@ -176,6 +184,10 @@ public class LevelObjective : MonoBehaviour
             case LevelSet.Objective.Disposal:
                 BeginDisposal();
                 break;
+
+            case LevelSet.Objective.Recon:
+                BeginRecon();
+                break;
         }
     }
 
@@ -189,6 +201,7 @@ public class LevelObjective : MonoBehaviour
             case LevelSet.Objective.Hold: TickHold(); break;
             case LevelSet.Objective.Extraction: TickExtraction(); break;
             case LevelSet.Objective.Disposal: TickDisposal(); break;
+            case LevelSet.Objective.Recon: TickRecon(); break;
         }
     }
 
@@ -239,7 +252,7 @@ public class LevelObjective : MonoBehaviour
             if (_quarryBeacon != null)
                 _quarryBeacon.position = _quarry.transform.position + Vector3.up * 2.6f;
 
-            HudLine = "HUNT: THE RUNNER IS MARKED";
+            HudLine = HuntPrefix + ": THE RUNNER IS MARKED";
             return;
         }
 
@@ -247,11 +260,14 @@ public class LevelObjective : MonoBehaviour
         // the enemy most likely to put itself somewhere the level takes it back. Either
         // way the hunt has to have somebody in it, or a level whose runner fell down a
         // hole is a level with an objective nobody can complete and no way to know.
+        if (_stagesDone >= Stages) return;
         if (Time.time < _nextQuarryScan) return;
 
         _nextQuarryScan = Time.time + 1.5f;
         MarkAQuarry();
     }
+
+    string HuntPrefix => Stages > 1 ? $"HUNT {Mathf.Min(_stagesDone + 1, Stages)}/{Stages}" : "HUNT";
 
     void MarkAQuarry()
     {
@@ -296,7 +312,7 @@ public class LevelObjective : MonoBehaviour
         _quarryBeacon = Beacon("Quarry", best.transform.position + Vector3.up * 2.6f,
                                UITheme.Hazard, 0.7f, 3.2f, marker: true, pip: true);
 
-        HudLine = "HUNT: THE RUNNER IS MARKED";
+        HudLine = HuntPrefix + ": THE RUNNER IS MARKED";
     }
 
     /// <summary>
@@ -309,12 +325,18 @@ public class LevelObjective : MonoBehaviour
         if (Kind != LevelSet.Objective.Hunt || body == null) return;
         if (_quarry == null || _quarry.gameObject != body) return;
 
-        EarnedWeight += Weight;
+        EarnedWeight += Weight / Stages;
+        _stagesDone++;
         _quarry = null;
         _quarryHealth = null;
 
         DestroyIfAny(ref _quarryBeacon);
-        HudLine = "HUNT: THE RUNNER IS DOWN";
+
+        // A long level marks another a few seconds later, until every runner is down.
+        _nextQuarryScan = Time.time + 4f;
+        HudLine = _stagesDone >= Stages
+            ? (Stages > 1 ? "HUNT: EVERY RUNNER IS DOWN" : "HUNT: THE RUNNER IS DOWN")
+            : $"HUNT {_stagesDone}/{Stages}: DOWN. THE NEXT ONE IS COMING";
     }
 
     // ==================================================================
@@ -330,12 +352,12 @@ public class LevelObjective : MonoBehaviour
         // A fifth of the clock, floored and capped. Derived rather than authored so a
         // level retuned to twice the length does not quietly become a level where the
         // ground is held for a tenth of it.
-        _holdRequired = Mathf.Clamp(_level.timeLimit * 0.22f, 12f, 40f);
+        _holdRequired = Mathf.Clamp(_level.timeLimit * 0.22f / Stages, 12f, 40f);
 
         Satisfied = false;
         HudLine = "HOLD THE MARKED GROUND";
 
-        if (!PlaceSite(out _sitePoint, 18f, 42f))
+        if (!PlaceSite(out _sitePoint, 18f, 42f * Reach))
         {
             // Nowhere to put it. The level still plays and still scores its kills; what
             // it must not do is sit there asking for something that does not exist.
@@ -360,14 +382,29 @@ public class LevelObjective : MonoBehaviour
 
         float progress = Mathf.Clamp01(_held / Mathf.Max(0.01f, _holdRequired));
 
-        EarnedWeight = Weight * progress;
-        Satisfied = progress >= 1f;
+        EarnedWeight = Weight * (_stagesDone + progress) / Stages;
+
+        // Held, in a long level: the ground moves somewhere else across the map. Only once
+        // there is somewhere reachable to put it; until then this one stays held.
+        if (progress >= 1f && _stagesDone + 1 < Stages && PlaceSite(out var next, 35f, 70f * Reach))
+        {
+            _stagesDone++;
+            _held = 0f;
+            _sitePoint = next;
+            DestroyIfAny(ref _site);
+            _site = Beacon("HoldSite", _sitePoint, UITheme.Coolant, HoldRadius, 6f, marker: true, pip: false);
+            HudLine = $"GROUND HELD. NEXT SITE MARKED  {_stagesDone + 1}/{Stages}";
+            return;
+        }
+
+        Satisfied = progress >= 1f && _stagesDone + 1 >= Stages;
+        string count = Stages > 1 ? $"  {_stagesDone + 1}/{Stages}" : "";
 
         HudLine = Satisfied
             ? "GROUND HELD"
             : inside
-                ? $"HOLDING  {_held:0}s / {_holdRequired:0}s"
-                : $"HOLD THE MARKED GROUND  {_held:0}s / {_holdRequired:0}s";
+                ? $"HOLDING{count}  {_held:0}s / {_holdRequired:0}s"
+                : $"HOLD THE MARKED GROUND{count}  {_held:0}s / {_holdRequired:0}s";
     }
 
     // ==================================================================
@@ -447,7 +484,7 @@ public class LevelObjective : MonoBehaviour
         Satisfied = false;
         HudLine = "CLEAR THE AREA, THEN GET OUT";
 
-        if (!PlaceSite(out _sitePoint, 30f, 70f))
+        if (!PlaceSite(out _sitePoint, 30f, 70f * Reach))
         {
             Satisfied = true;
             HudLine = "";
@@ -502,7 +539,7 @@ public class LevelObjective : MonoBehaviour
     // ==================================================================
     void BeginDisposal()
     {
-        _chargesPlanned = 4;
+        _chargesPlanned = Mathf.Max(4, Stages);
         _nextCharge = Time.time + 4f;
 
         Satisfied = false;
@@ -571,7 +608,7 @@ public class LevelObjective : MonoBehaviour
 
     void PlaceCharge()
     {
-        if (!PlaceSite(out Vector3 at, 14f, 45f)) return;
+        if (!PlaceSite(out Vector3 at, 14f, 45f * Mathf.Min(Reach, 1.6f))) return;
 
         _chargesPlaced++;
 
@@ -618,6 +655,65 @@ public class LevelObjective : MonoBehaviour
     /// and every arena is full of the first. A hold site on the roof of a container is
     /// an objective the player can see, cannot get to, and is scored against.
     /// </summary>
+    // ==================================================================
+    // Recon: a chain of points across the arena, reached one after another. The
+    // long levels' reason to cross the map rather than hold one corner of it.
+    // ==================================================================
+    void BeginRecon()
+    {
+        Satisfied = false;
+        NextReconPoint();
+    }
+
+    float _nextReconTry;
+
+    void NextReconPoint()
+    {
+        DestroyIfAny(ref _site);
+        if (_stagesDone >= Stages) return;
+
+        if (!PlaceSite(out _sitePoint, 35f, 70f * Reach))
+        {
+            // Nowhere reachable from here just now; ask again shortly rather than give up.
+            _nextReconTry = Time.time + 2f;
+            HudLine = $"RECON  {_stagesDone}/{Stages}";
+            return;
+        }
+
+        _site = Beacon("Recon", _sitePoint, UITheme.Plasma, 2.4f, 9f, marker: true, pip: true);
+    }
+
+    void TickRecon()
+    {
+        if (_manager.player == null || Satisfied) return;
+
+        if (_site == null)
+        {
+            if (Time.time >= _nextReconTry) NextReconPoint();
+            return;
+        }
+
+        float away = Flat(_manager.player.position - _sitePoint);
+        if (away <= ReachRadius)
+        {
+            _stagesDone++;
+            EarnedWeight = Weight * _stagesDone / Stages;
+
+            if (_stagesDone >= Stages)
+            {
+                DestroyIfAny(ref _site);
+                Satisfied = true;
+                HudLine = "RECON COMPLETE";
+                return;
+            }
+
+            NextReconPoint();
+            return;
+        }
+
+        HudLine = $"RECON  {_stagesDone}/{Stages}  -  {away:0}m";
+    }
+
     bool PlaceSite(out Vector3 point, float min, float max)
     {
         point = Vector3.zero;

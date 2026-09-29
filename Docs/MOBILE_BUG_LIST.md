@@ -285,3 +285,26 @@ Left on purpose:
   menus keep 14dp. Handset HUD scale reverted to 0.80.
 - **Still open:** on an iPhone-15-sized screen the DRINK button (third column, middle row) sits
   near the crosshair (`FPSKitDeviceShots` flags it). Needs a layout call for the cluster.
+
+## Fourth pass (local, 2026-09-29): long levels, big arenas
+
+- **32 levels in every arena, the finale included** (`FPSKitLevels.LevelsPerArena`).
+- **Level length:** every arena opens at 2:30 and climbs to its longest level: 6:00 in the
+  Warehouse, rising along the campaign to 15:00 in Mars Colony and The Auger House.
+  About one enemy per 5 s of clock (25 at 2:30, ~200 at 15:00).
+- **Waves** (`LevelSet.Level.waveSize/waveRest`): past ~3:20 enemies come in waves from one
+  side of the map at a time, the next wave from elsewhere; the rest ends early once the arena
+  is empty. **Spawn reach** (`spawnReach`, 1 → 2.2 up the ladder) moves the spawn ring out so
+  late levels are fought across the arena; the leash grows with it.
+- **Map objectives scale with length** (`objectiveStages`): several runners in turn, several
+  hold sites across the map, a charge every ~40 s, and the new **RECON** objective (a chain of
+  points across the arena, one after another).
+- Toughness, aggression and roster mix follow each level's place on its ladder, so the curve
+  has the same shape at 32 levels as at 8. Spare magazines grow with the clock.
+- Level select scrolls six across on a desktop when a ladder is long.
+- Level-start card: 9 s, no per-second pulse, FIRE skips it after 1.2 s ("[fire] TO START").
+- DRINK moved to the top row beside CROUCH; the cluster also tightens itself on any phone
+  where a button would enter an 8 mm square round the crosshair.
+- About and How to Play are larger on laptops (How to Play is two columns of bigger cards).
+- Profile button beside WELCOME BACK removed.
+- Note: the next arena still unlocks when the previous arena's holder (now level 32) is down.

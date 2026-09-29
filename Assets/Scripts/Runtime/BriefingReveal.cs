@@ -3,8 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// Plays the level-start card: it pops in, its words rise into place one letter after
-/// another, it pulses once on every tick of the countdown, a bar under the words drains
-/// with the countdown, and when the fight starts it lifts away rather than blinking out.
+/// another, a bar under the words drains with the countdown, and when the fight starts it
+/// lifts away rather than blinking out. No per-second pulse: Ishaan found a card pumping
+/// every second hard to focus past.
 ///
 /// <b>Driven by the level, not by the label.</b> HUDController empties the label the frame
 /// the briefing ends, so a card shown "while the label has text" can only vanish. This
@@ -50,7 +51,6 @@ public class BriefingReveal : MonoBehaviour
     float _since;
     float _total;
     string _lastText = "";
-    float _pulseAt = -10f;
     Vector2 _home;
     bool _homeKnown;
 
@@ -80,8 +80,8 @@ public class BriefingReveal : MonoBehaviour
                     Leave();
                     break;
                 }
-                // The countdown rewrote the label: one pulse per tick.
-                if (text.text != _lastText) { _lastText = text.text; _pulseAt = Time.unscaledTime; }
+                // Kept for the exit, which plays after HUDController empties the label.
+                _lastText = text.text;
                 if (bar != null && _total > 0f) bar.Value = Mathf.Clamp01(level.BriefingRemaining / _total);
                 break;
 
@@ -141,8 +141,6 @@ public class BriefingReveal : MonoBehaviour
             scale = Mathf.LerpUnclamped(0.86f, 1f, BackOut(k));
             lift = Mathf.Lerp(-24f, 0f, CubicOut(k));
 
-            float p = Mathf.Clamp01((Time.unscaledTime - _pulseAt) / 0.28f);
-            if (k >= 1f) scale *= 1f + 0.035f * (1f - CubicOut(p));
         }
         else
         {

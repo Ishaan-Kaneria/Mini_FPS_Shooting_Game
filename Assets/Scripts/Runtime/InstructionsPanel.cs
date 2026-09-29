@@ -30,6 +30,14 @@ public class InstructionsPanel : OverlayPanel
     public ControlSettings controls;
 
     UITheme _t;
+
+    /// <summary>
+    /// A laptop or desktop: two columns of larger cards rather than four narrow ones. Four
+    /// across put 16pt type in strips a third of the screen tall, which read as small on a
+    /// laptop; two across gives the same content room to be drawn at reading size.
+    /// </summary>
+    static bool Roomy => !DeviceProfile.Handheld;
+    static float Grow => Roomy ? 1.25f : 1f;
     TMP_Text _subtitle;
     Image _schemeIcon;
     RectTransform _columnsRoot;
@@ -140,11 +148,12 @@ public class InstructionsPanel : OverlayPanel
         goal.stripeColor = _t.accent;
         goal.stripePixels = _t.stripePixels;
         UIKit.Row(goal, 16f, new RectOffset(20, 20, 12, 12), TextAnchor.MiddleLeft).childForceExpandWidth = false;
-        UIKit.Icon(goal.transform, "Icon", "clock", 30f, _t.accent, _t);
+        UIKit.Icon(goal.transform, "Icon", "clock", 30f * Grow, _t.accent, _t);
         var text = UIKit.Text(goal.transform, "Text",
             "<b>Beat the clock.</b> Every kill scores, and stars go by how many you take down: " +
             "three for clearing the arena. The level ends when time runs out, cleared or not.",
             UIKit.TextRole.Body, _t);
+        text.fontSize = _t.sizeBody * Grow;
         UIKit.Size(text, flexWidth: 1f);
     }
 
@@ -179,9 +188,9 @@ public class InstructionsPanel : OverlayPanel
             _ => KeyPages(),
         };
 
-        // Four across on a desktop; two on anything handheld, where four columns on a 147mm
-        // screen are four strips too narrow to hold a sentence.
-        int wide = DeviceProfile.Handheld ? 2 : Mathf.Max(1, pages.Count);
+        // Two across everywhere: on a handset four columns are strips too narrow to hold a
+        // sentence, and on a laptop two leave room for type at reading size (Roomy).
+        int wide = 2;
         while (_columns.Count < wide)
         {
             var column = UIKit.Rect(_columnsRoot, "Column" + _columns.Count);
@@ -249,15 +258,17 @@ public class InstructionsPanel : OverlayPanel
 
         var head = UIKit.Rect(card.transform, "Heading");
         UIKit.Row(head, 10f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
-        UIKit.Icon(head, "Icon", page.Icon, 24f, _t.accent, _t);
+        UIKit.Icon(head, "Icon", page.Icon, 24f * Grow, _t.accent, _t);
         var title = UIKit.Text(head, "Text", page.Heading, UIKit.TextRole.Heading, _t);
         title.color = _t.accent;
+        title.fontSize = _t.sizeHeading * Grow;
 
         // The key column is as wide as this card's widest row of keys, so four keys for
         // walking do not run into the text, and the descriptions still line up.
         int caps = 1;
         foreach (var line in page.Lines) if (line.Keys != null) caps = Mathf.Max(caps, line.Keys.Length);
-        float keysWidth = Mathf.Max(DeviceProfile.Handheld ? 118f : 132f, caps * 40f + (caps - 1) * 6f + 8f);
+        float cap = 40f * Grow;
+        float keysWidth = Mathf.Max(DeviceProfile.Handheld ? 118f : 170f, caps * cap + (caps - 1) * 6f + 8f);
 
         foreach (var line in page.Lines) Row(card.transform, line, keysWidth);
         return card.gameObject;
@@ -270,7 +281,7 @@ public class InstructionsPanel : OverlayPanel
 
         var row = UIKit.Rect(parent, "Row");
         UIKit.Row(row, 12f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
-        UIKit.Size(row).minHeight = continuation ? 24f : 44f;
+        UIKit.Size(row).minHeight = (continuation ? 24f : 44f) * Grow;
 
         // A fixed-width key column, so the descriptions line up down the card.
         var keys = UIKit.Rect(row, "Keys");
@@ -281,10 +292,11 @@ public class InstructionsPanel : OverlayPanel
                 if (!string.IsNullOrEmpty(key)) Keycap(keys, key);
 
         if (!string.IsNullOrEmpty(line.Icon))
-            UIKit.Icon(row, "Icon", line.Icon, 20f, continuation ? _t.textDisabled : _t.textSecondary, _t);
+            UIKit.Icon(row, "Icon", line.Icon, 20f * Grow, continuation ? _t.textDisabled : _t.textSecondary, _t);
 
         var says = UIKit.Text(row, "Says", line.Says, continuation ? UIKit.TextRole.Caption : UIKit.TextRole.Body, _t);
         says.color = continuation ? _t.textSecondary : _t.textPrimary;
+        says.fontSize = (continuation ? _t.sizeCaption : _t.sizeBody) * Grow;
         UIKit.Size(says, flexWidth: 1f);
     }
 
@@ -300,9 +312,10 @@ public class InstructionsPanel : OverlayPanel
         cap.borderColor = _t.borderHover;
         var h = UIKit.Row(cap, 0f, new RectOffset(10, 10, 4, 4), TextAnchor.MiddleCenter);
         h.childForceExpandWidth = false;
-        var le = UIKit.Size(cap, height: 40f);
-        le.minWidth = 40f;
+        var le = UIKit.Size(cap, height: 40f * Grow);
+        le.minWidth = 40f * Grow;
         var text = UIKit.Text(cap.transform, "Legend", legend, UIKit.TextRole.Label, _t);
+        text.fontSize = _t.sizeLabel * Grow;
         text.color = _t.textPrimary;
         text.alignment = TextAlignmentOptions.Center;
     }

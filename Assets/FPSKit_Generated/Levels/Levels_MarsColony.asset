@@ -16,186 +16,866 @@ MonoBehaviour:
   stakes: The rock here is still cooling and the river is still molten. His sister has learned when the vents go. Be off the open ground when they do, because they will go whether or not you are.
   levels:
   - displayName: DISPOSAL
-    brief: Roan's camp has been silent since the last shuttle lifted off. 6 hostiles and four charges. Reach a charge or lose the clock.
-    enemyCount: 6
-    timeLimit: 32
-    maxAliveAtOnce: 4
+    brief: Roan's camp has been silent since the last shuttle lifted off. 25 hostiles and 4 charges. Reach a charge or lose the clock.
+    enemyCount: 25
+    timeLimit: 150
+    maxAliveAtOnce: 6
     spawnInterval: 0.8
-    briefingTime: 8
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
     objective: 6
-    objectiveWeight: 4
+    objectiveWeight: 11
+    objectiveStages: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.25
     damageMultiplier: 1.15
     speedMultiplier: 1.1
     aggression: 0.19999999
     rosterStep: 6
-    reserveMagazines: 8
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: THE RUNNER
-    brief: Roan's camp has been silent since the last shuttle lifted off. 9 hostiles. One of them runs -- that one is the level.
-    enemyCount: 9
-    timeLimit: 43
-    maxAliveAtOnce: 5
-    spawnInterval: 0.7285714
-    briefingTime: 7.5
-    objective: 2
-    objectiveWeight: 4
+  - displayName: RECON
+    brief: Roan's camp has been silent since the last shuttle lifted off. 27 hostiles. Reach 2 marked points across the map.
+    enemyCount: 27
+    timeLimit: 160
+    maxAliveAtOnce: 7
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
+    objective: 7
+    objectiveWeight: 12
+    objectiveStages: 2
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.35
-    damageMultiplier: 1.21
-    speedMultiplier: 1.13
-    aggression: 0.3285714
-    rosterStep: 8
-    reserveMagazines: 8
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.282258
+    damageMultiplier: 1.1693548
+    speedMultiplier: 1.1080645
+    aggression: 0.22903225
+    rosterStep: 6
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: Roan's camp has been silent since the last shuttle lifted off. 12 hostiles and a boss. The boss is most of the score.
-    enemyCount: 12
-    timeLimit: 69
-    maxAliveAtOnce: 6
-    spawnInterval: 0.6571429
-    briefingTime: 7.5
+    brief: Roan's camp has been silent since the last shuttle lifted off. 30 hostiles and a boss. The boss is most of the score.
+    enemyCount: 30
+    timeLimit: 175
+    maxAliveAtOnce: 7
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
     objective: 0
-    objectiveWeight: 5
+    objectiveWeight: 14
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: 
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.45
-    damageMultiplier: 1.27
-    speedMultiplier: 1.16
-    aggression: 0.45714286
-    rosterStep: 9
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.3145162
+    damageMultiplier: 1.1887096
+    speedMultiplier: 1.116129
+    aggression: 0.2580645
+    rosterStep: 6
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Roan's camp has been silent since the last shuttle lifted off. 33 hostiles. One of them runs -- that one is the level.
+    enemyCount: 33
+    timeLimit: 190
+    maxAliveAtOnce: 7
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
+    objective: 2
+    objectiveWeight: 15
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.3467742
+    damageMultiplier: 1.2080646
+    speedMultiplier: 1.1241935
+    aggression: 0.28709677
+    rosterStep: 8
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: The crews out here were told you are a contractor. They know better now. 15 hostiles and one magazine, nothing spare. Kills drop ammunition.
-    enemyCount: 15
-    timeLimit: 63
-    maxAliveAtOnce: 7
-    spawnInterval: 0.5857143
-    briefingTime: 7.5
+    brief: Roan's camp has been silent since the last shuttle lifted off. 37 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 37
+    timeLimit: 210
+    maxAliveAtOnce: 8
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 10
+    waveRest: 9.290322
+    spawnReach: 1.1548387
     objective: 1
-    objectiveWeight: 7
+    objectiveWeight: 17
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.3790323
+    damageMultiplier: 1.2274194
+    speedMultiplier: 1.132258
+    aggression: 0.31612903
+    rosterStep: 8
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 2
+    brief: Roan's camp has been silent since the last shuttle lifted off. 40 hostiles and a boss. The boss is most of the score.
+    enemyCount: 40
+    timeLimit: 225
+    maxAliveAtOnce: 8
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 10
+    waveRest: 9.612904
+    spawnReach: 1.1935484
+    objective: 0
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.4112903
+    damageMultiplier: 1.2467742
+    speedMultiplier: 1.1403226
+    aggression: 0.3451613
+    rosterStep: 8
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Roan's camp has been silent since the last shuttle lifted off. 44 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 44
+    timeLimit: 245
+    maxAliveAtOnce: 8
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 9.935484
+    spawnReach: 1.2322581
+    objective: 3
+    objectiveWeight: 20
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.4435484
+    damageMultiplier: 1.266129
+    speedMultiplier: 1.1483871
+    aggression: 0.37419352
+    rosterStep: 8
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Roan's camp has been silent since the last shuttle lifted off. 48 hostiles, and the lights are not yours.
+    enemyCount: 48
+    timeLimit: 265
+    maxAliveAtOnce: 9
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 10.258064
+    spawnReach: 1.2709677
+    objective: 4
+    objectiveWeight: 22
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 6
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.55
-    damageMultiplier: 1.33
-    speedMultiplier: 1.1899999
-    aggression: 0.5857143
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.4758065
+    damageMultiplier: 1.2854838
+    speedMultiplier: 1.1564516
+    aggression: 0.40322578
+    rosterStep: 9
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: Roan's camp has been silent since the last shuttle lifted off. 54 hostiles and a boss. The boss is most of the score.
+    enemyCount: 54
+    timeLimit: 290
+    maxAliveAtOnce: 9
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.580645
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 24
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.5080645
+    damageMultiplier: 1.3048387
+    speedMultiplier: 1.1645161
+    aggression: 0.43225804
+    rosterStep: 9
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: Roan's camp has been silent since the last shuttle lifted off. 58 hostiles. Clear them, then reach the way out.
+    enemyCount: 58
+    timeLimit: 310
+    maxAliveAtOnce: 9
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.903226
+    spawnReach: 1.3483871
+    objective: 5
+    objectiveWeight: 26
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.5403225
+    damageMultiplier: 1.3241936
+    speedMultiplier: 1.1725806
+    aggression: 0.4612903
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: Roan's camp has been silent since the last shuttle lifted off. 62 hostiles and 8 charges. Reach a charge or lose the clock.
+    enemyCount: 62
+    timeLimit: 330
+    maxAliveAtOnce: 9
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 6
+    objectiveWeight: 28
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.5725807
+    damageMultiplier: 1.3435484
+    speedMultiplier: 1.1806451
+    aggression: 0.49032256
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: Roan's camp has been silent since the last shuttle lifted off. 67 hostiles and a boss. The boss is most of the score.
+    enemyCount: 67
+    timeLimit: 355
+    maxAliveAtOnce: 10
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 30
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.6048387
+    damageMultiplier: 1.3629032
+    speedMultiplier: 1.1887096
+    aggression: 0.5193548
+    rosterStep: 9
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The crews out here were told you are a contractor. They know better now. 72 hostiles. Reach 5 marked points across the map.
+    enemyCount: 72
+    timeLimit: 380
+    maxAliveAtOnce: 10
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 7
+    objectiveWeight: 32
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.6370968
+    damageMultiplier: 1.382258
+    speedMultiplier: 1.1967742
+    aggression: 0.54838705
+    rosterStep: 11
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: The crews out here were told you are a contractor. They know better now. 78 hostiles. 3 of them run, one at a time -- catch each.
+    enemyCount: 78
+    timeLimit: 405
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 2
+    objectiveWeight: 35
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.6693548
+    damageMultiplier: 1.4016129
+    speedMultiplier: 1.2048388
+    aggression: 0.57741934
+    rosterStep: 11
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: The crews out here were told you are a contractor. They know better now. 83 hostiles and a boss. The boss is most of the score.
+    enemyCount: 83
+    timeLimit: 430
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 37
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.701613
+    damageMultiplier: 1.4209677
+    speedMultiplier: 1.2129033
+    aggression: 0.6064516
+    rosterStep: 11
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: The crews out here were told you are a contractor. They know better now. 89 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 89
+    timeLimit: 455
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 1
+    objectiveWeight: 40
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.733871
+    damageMultiplier: 1.4403226
+    speedMultiplier: 1.2209678
+    aggression: 0.63548386
     rosterStep: 11
     reserveMagazines: 0
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: The crews out here were told you are a contractor. They know better now. 18 hostiles. Stand on the marked ground and keep standing.
-    enemyCount: 18
-    timeLimit: 73
-    maxAliveAtOnce: 8
-    spawnInterval: 0.5142857
-    briefingTime: 7.5
+    brief: The crews out here were told you are a contractor. They know better now. 94 hostiles. Hold 3 marked grounds across the map, one after another.
+    enemyCount: 94
+    timeLimit: 480
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 13.16129
+    spawnReach: 1.6193548
     objective: 3
-    objectiveWeight: 8
+    objectiveWeight: 42
+    objectiveStages: 3
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.65
-    damageMultiplier: 1.39
-    speedMultiplier: 1.22
-    aggression: 0.7142857
+    bossWeight: 11
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.766129
+    damageMultiplier: 1.4596775
+    speedMultiplier: 1.2290323
+    aggression: 0.6645161
     rosterStep: 12
-    reserveMagazines: 8
+    reserveMagazines: 19
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
-    brief: The crews out here were told you are a contractor. They know better now. 21 hostiles and a boss. The boss is most of the score.
-    enemyCount: 21
-    timeLimit: 99
-    maxAliveAtOnce: 9
-    spawnInterval: 0.44285715
-    briefingTime: 7.5
+  - displayName: BOSS 6
+    brief: The crews out here were told you are a contractor. They know better now. 100 hostiles and a boss. The boss is most of the score.
+    enemyCount: 100
+    timeLimit: 505
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.483871
+    spawnReach: 1.6580646
     objective: 0
-    objectiveWeight: 9
+    objectiveWeight: 45
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
-    bossWeight: 7
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.75
-    damageMultiplier: 1.45
-    speedMultiplier: 1.25
-    aggression: 0.8428571
-    rosterStep: 14
-    reserveMagazines: 8
+    bossWeight: 12
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.7983872
+    damageMultiplier: 1.4790323
+    speedMultiplier: 1.2370968
+    aggression: 0.6935484
+    rosterStep: 12
+    reserveMagazines: 19
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: Someone at the camp has learned to read the vents, and is reading them against him. 24 hostiles, and the lights are not yours.
-    enemyCount: 24
-    timeLimit: 94
-    maxAliveAtOnce: 10
-    spawnInterval: 0.37142858
-    briefingTime: 7.5
+    brief: The crews out here were told you are a contractor. They know better now. 105 hostiles, and the lights are not yours.
+    enemyCount: 105
+    timeLimit: 530
+    maxAliveAtOnce: 12
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.806452
+    spawnReach: 1.6967742
     objective: 4
-    objectiveWeight: 11
+    objectiveWeight: 47
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 7.5
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.85
-    damageMultiplier: 1.51
-    speedMultiplier: 1.28
-    aggression: 0.9714286
+    bossWeight: 13
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.8306452
+    damageMultiplier: 1.4983871
+    speedMultiplier: 1.2451613
+    aggression: 0.7225806
+    rosterStep: 12
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: The crews out here were told you are a contractor. They know better now. 111 hostiles. Clear them, then reach the way out.
+    enemyCount: 111
+    timeLimit: 555
+    maxAliveAtOnce: 12
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 5
+    objectiveWeight: 50
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.8629032
+    damageMultiplier: 1.5177419
+    speedMultiplier: 1.2532258
+    aggression: 0.7516129
+    rosterStep: 12
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: The crews out here were told you are a contractor. They know better now. 117 hostiles and a boss. The boss is most of the score.
+    enemyCount: 117
+    timeLimit: 585
+    maxAliveAtOnce: 12
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 53
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.8951613
+    damageMultiplier: 1.5370967
+    speedMultiplier: 1.2612903
+    aggression: 0.78064513
+    rosterStep: 14
+    reserveMagazines: 21
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The crews out here were told you are a contractor. They know better now. 123 hostiles and 15 charges. Reach a charge or lose the clock.
+    enemyCount: 123
+    timeLimit: 610
+    maxAliveAtOnce: 13
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 6
+    objectiveWeight: 55
+    objectiveStages: 15
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 15
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.9274194
+    damageMultiplier: 1.5564517
+    speedMultiplier: 1.2693548
+    aggression: 0.8096774
+    rosterStep: 14
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The crews out here were told you are a contractor. They know better now. 130 hostiles. Reach 9 marked points across the map.
+    enemyCount: 130
+    timeLimit: 640
+    maxAliveAtOnce: 13
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 7
+    objectiveWeight: 58
+    objectiveStages: 9
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 16
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 1.9596775
+    damageMultiplier: 1.5758065
+    speedMultiplier: 1.2774193
+    aggression: 0.83870965
+    rosterStep: 14
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: The crews out here were told you are a contractor. They know better now. 136 hostiles and a boss. The boss is most of the score.
+    enemyCount: 136
+    timeLimit: 665
+    maxAliveAtOnce: 13
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 61
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 16
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 1.9919355
+    damageMultiplier: 1.5951613
+    speedMultiplier: 1.2854838
+    aggression: 0.86774194
+    rosterStep: 14
+    reserveMagazines: 23
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 143 hostiles. 5 of them run, one at a time -- catch each.
+    enemyCount: 143
+    timeLimit: 695
+    maxAliveAtOnce: 13
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 2
+    objectiveWeight: 64
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 17
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 2.0241935
+    damageMultiplier: 1.6145161
+    speedMultiplier: 1.2935483
+    aggression: 0.8967742
+    rosterStep: 14
+    reserveMagazines: 23
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 149 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 149
+    timeLimit: 725
+    maxAliveAtOnce: 14
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 1
+    objectiveWeight: 67
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 18
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 2.0564516
+    damageMultiplier: 1.633871
+    speedMultiplier: 1.3016129
+    aggression: 0.92580646
     rosterStep: 15
-    reserveMagazines: 8
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 155 hostiles and a boss. The boss is most of the score.
+    enemyCount: 155
+    timeLimit: 750
+    maxAliveAtOnce: 14
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 70
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 19
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 2.0887096
+    damageMultiplier: 1.6532258
+    speedMultiplier: 1.3096774
+    aggression: 0.95483863
+    rosterStep: 15
+    reserveMagazines: 25
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 162 hostiles. Hold 5 marked grounds across the map, one after another.
+    enemyCount: 162
+    timeLimit: 780
+    maxAliveAtOnce: 14
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 3
+    objectiveWeight: 73
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 19
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 2.1209679
+    damageMultiplier: 1.6725807
+    speedMultiplier: 1.317742
+    aggression: 0.9838709
+    rosterStep: 15
+    reserveMagazines: 25
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 170 hostiles, and the lights are not yours.
+    enemyCount: 170
+    timeLimit: 810
+    maxAliveAtOnce: 15
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 4
+    objectiveWeight: 76
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 20
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 2.153226
+    damageMultiplier: 1.6919355
+    speedMultiplier: 1.3258065
+    aggression: 1
+    rosterStep: 15
+    reserveMagazines: 26
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 10
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 177 hostiles and a boss. The boss is most of the score.
+    enemyCount: 177
+    timeLimit: 840
+    maxAliveAtOnce: 15
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.35484
+    spawnReach: 2.1225808
+    objective: 0
+    objectiveWeight: 80
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 21
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 2.185484
+    damageMultiplier: 1.7112904
+    speedMultiplier: 1.333871
+    aggression: 1
+    rosterStep: 17
+    reserveMagazines: 27
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: Someone at the camp has learned to read the vents, and is reading them against him. 184 hostiles. Clear them, then reach the way out.
+    enemyCount: 184
+    timeLimit: 870
+    maxAliveAtOnce: 15
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 5
+    objectiveWeight: 83
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 22
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 2.217742
+    damageMultiplier: 1.7306452
+    speedMultiplier: 1.3419355
+    aggression: 1
+    rosterStep: 17
+    reserveMagazines: 27
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ROAN AUGER
-    brief: Roan is out on the open rock, suit cracked, with one question left to ask you. 27 between you and Roan.
-    enemyCount: 27
-    timeLimit: 120
-    maxAliveAtOnce: 11
+    brief: Roan is out on the open rock, suit cracked, with one question left to ask you. 191 between you and Roan.
+    enemyCount: 191
+    timeLimit: 900
+    maxAliveAtOnce: 16
     spawnInterval: 0.3
-    briefingTime: 7.5
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 18
+    spawnReach: 2.2
     objective: 0
-    objectiveWeight: 12
+    objectiveWeight: 86
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 4d402ffa29c575e85a6bb6b075faf1a3, type: 2}
     bossName: Roan Auger
-    bossWeight: 8
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.95
-    damageMultiplier: 1.5699999
-    speedMultiplier: 1.31
+    bossWeight: 23
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2.25
+    damageMultiplier: 1.75
+    speedMultiplier: 1.35
     aggression: 1
     rosterStep: 17
-    reserveMagazines: 8
+    reserveMagazines: 28
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

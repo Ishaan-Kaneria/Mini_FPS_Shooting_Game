@@ -56,8 +56,6 @@ public class MainMenuController : MonoBehaviour
 
     [Header("Play")]
     public TMP_Text welcomeText;
-    [Tooltip("Beside the welcome line: opens Settings on the Profile tab, to see or change the name.")]
-    public Button profileButton;
     [Tooltip("Rank and XP on one line, shown on a handset where the top bar has no room for them.")]
     public TMP_Text rankLine;
     public ScrollRect cardScroll;
@@ -174,7 +172,6 @@ public class MainMenuController : MonoBehaviour
             if (topBar.tabs != null) topBar.tabs.onChanged.AddListener(OnTab);
             if (topBar.railTabs != null) topBar.railTabs.onChanged.AddListener(OnTab);
             Wire(topBar.settingsButton, () => OpenSettings());
-            Wire(profileButton, OpenProfile);
             Wire(topBar.infoButton, OpenInfo);
             Wire(topBar.quitButton, AskToExit);
         }
@@ -219,12 +216,6 @@ public class MainMenuController : MonoBehaviour
         settings.Closed -= Refresh;
         settings.Closed += Refresh;
         return settings;
-    }
-
-    void OpenProfile()
-    {
-        var settings = OpenSettings();
-        if (settings != null) settings.ShowTab("Profile");
     }
 
     void OnDestroy()

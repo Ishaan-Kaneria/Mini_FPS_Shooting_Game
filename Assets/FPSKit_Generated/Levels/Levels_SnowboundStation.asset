@@ -16,18 +16,22 @@ MonoBehaviour:
   stakes: The storm closes the pass on a schedule the weather does not negotiate. Be finished before it shuts, or the station keeps you until spring, and it will not be keeping you alive.
   levels:
   - displayName: ONE MAGAZINE
-    brief: Kestrel lit the yard a week ago and has kept it lit. 6 hostiles and one magazine, nothing spare. Kills drop ammunition.
-    enemyCount: 6
-    timeLimit: 32
-    maxAliveAtOnce: 4
+    brief: Kestrel lit the yard a week ago and has kept it lit. 25 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 25
+    timeLimit: 150
+    maxAliveAtOnce: 5
     spawnInterval: 0.8
-    briefingTime: 8
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
     objective: 1
-    objectiveWeight: 4
+    objectiveWeight: 11
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.05
     damageMultiplier: 1.03
@@ -39,163 +43,839 @@ MonoBehaviour:
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: Kestrel lit the yard a week ago and has kept it lit. 9 hostiles. Stand on the marked ground and keep standing.
-    enemyCount: 9
-    timeLimit: 43
-    maxAliveAtOnce: 5
-    spawnInterval: 0.7285714
-    briefingTime: 7.5
+    brief: Kestrel lit the yard a week ago and has kept it lit. 26 hostiles. Stand on the marked ground and keep standing.
+    enemyCount: 26
+    timeLimit: 155
+    maxAliveAtOnce: 6
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
     objective: 3
-    objectiveWeight: 4
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.15
-    damageMultiplier: 1.09
-    speedMultiplier: 1.05
-    aggression: 0.16857143
-    rosterStep: 4
-    reserveMagazines: 8
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.0822581
+    damageMultiplier: 1.0493548
+    speedMultiplier: 1.0280645
+    aggression: 0.06903225
+    rosterStep: 2
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE FOREMAN
-    brief: Kestrel lit the yard a week ago and has kept it lit. 12 hostiles and a boss. The boss is most of the score.
-    enemyCount: 12
-    timeLimit: 69
+    brief: Kestrel lit the yard a week ago and has kept it lit. 27 hostiles and a boss. The boss is most of the score.
+    enemyCount: 27
+    timeLimit: 160
     maxAliveAtOnce: 6
-    spawnInterval: 0.6571429
-    briefingTime: 7.5
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
     objective: 0
-    objectiveWeight: 5
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: The Foreman
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.25
-    damageMultiplier: 1.15
-    speedMultiplier: 1.08
-    aggression: 0.29714286
-    rosterStep: 5
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.1145161
+    damageMultiplier: 1.0687097
+    speedMultiplier: 1.036129
+    aggression: 0.09806451
+    rosterStep: 2
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BLACKOUT
-    brief: Her people know the ground and are letting you have the open part of it. 15 hostiles, and the lights are not yours.
-    enemyCount: 15
-    timeLimit: 63
-    maxAliveAtOnce: 7
-    spawnInterval: 0.5857143
-    briefingTime: 7.5
+    brief: Kestrel lit the yard a week ago and has kept it lit. 28 hostiles, and the lights are not yours.
+    enemyCount: 28
+    timeLimit: 165
+    maxAliveAtOnce: 6
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
     objective: 4
-    objectiveWeight: 7
+    objectiveWeight: 13
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.35
-    damageMultiplier: 1.21
-    speedMultiplier: 1.11
-    aggression: 0.42571428
-    rosterStep: 7
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.1467742
+    damageMultiplier: 1.0880646
+    speedMultiplier: 1.0441935
+    aggression: 0.12709677
+    rosterStep: 4
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
-    brief: Her people know the ground and are letting you have the open part of it. 18 hostiles. Clear them, then reach the way out.
-    enemyCount: 18
-    timeLimit: 73
-    maxAliveAtOnce: 8
-    spawnInterval: 0.5142857
-    briefingTime: 7.5
+    brief: Kestrel lit the yard a week ago and has kept it lit. 30 hostiles. Clear them, then reach the way out.
+    enemyCount: 30
+    timeLimit: 175
+    maxAliveAtOnce: 6
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1548387
     objective: 5
-    objectiveWeight: 8
+    objectiveWeight: 14
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.45
-    damageMultiplier: 1.27
-    speedMultiplier: 1.14
-    aggression: 0.5542857
-    rosterStep: 8
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.1790322
+    damageMultiplier: 1.1074194
+    speedMultiplier: 1.052258
+    aggression: 0.15612902
+    rosterStep: 4
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE SHOTFIRER
-    brief: Her people know the ground and are letting you have the open part of it. 21 hostiles and a boss. The boss is most of the score.
-    enemyCount: 21
-    timeLimit: 99
-    maxAliveAtOnce: 9
-    spawnInterval: 0.44285715
-    briefingTime: 7.5
+    brief: Kestrel lit the yard a week ago and has kept it lit. 32 hostiles and a boss. The boss is most of the score.
+    enemyCount: 32
+    timeLimit: 185
+    maxAliveAtOnce: 7
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1935484
     objective: 0
-    objectiveWeight: 9
+    objectiveWeight: 14
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: The Shotfirer
-    bossWeight: 7
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.55
-    damageMultiplier: 1.33
-    speedMultiplier: 1.17
-    aggression: 0.6828571
-    rosterStep: 10
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.2112904
+    damageMultiplier: 1.1267742
+    speedMultiplier: 1.0603225
+    aggression: 0.18516128
+    rosterStep: 4
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
-    brief: The quarry crews have stopped working and started waiting. 24 hostiles and four charges. Reach a charge or lose the clock.
-    enemyCount: 24
-    timeLimit: 94
-    maxAliveAtOnce: 10
-    spawnInterval: 0.37142858
-    briefingTime: 7.5
+    brief: Kestrel lit the yard a week ago and has kept it lit. 33 hostiles and 5 charges. Reach a charge or lose the clock.
+    enemyCount: 33
+    timeLimit: 190
+    maxAliveAtOnce: 7
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.2322581
     objective: 6
-    objectiveWeight: 11
+    objectiveWeight: 15
+    objectiveStages: 5
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 7.5
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.65
-    damageMultiplier: 1.39
-    speedMultiplier: 1.2
-    aggression: 0.81142855
+    bossWeight: 5
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.2435484
+    damageMultiplier: 1.146129
+    speedMultiplier: 1.0683872
+    aggression: 0.21419354
+    rosterStep: 4
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Kestrel lit the yard a week ago and has kept it lit. 36 hostiles. Reach 3 marked points across the map.
+    enemyCount: 36
+    timeLimit: 200
+    maxAliveAtOnce: 7
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 10.258064
+    spawnReach: 1.2709677
+    objective: 7
+    objectiveWeight: 16
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.2758064
+    damageMultiplier: 1.1654838
+    speedMultiplier: 1.0764517
+    aggression: 0.2432258
+    rosterStep: 5
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: Kestrel lit the yard a week ago and has kept it lit. 38 hostiles and a boss. The boss is most of the score.
+    enemyCount: 38
+    timeLimit: 210
+    maxAliveAtOnce: 8
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.580645
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 17
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.3080645
+    damageMultiplier: 1.1848387
+    speedMultiplier: 1.0845162
+    aggression: 0.27225804
+    rosterStep: 5
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Kestrel lit the yard a week ago and has kept it lit. 40 hostiles. One of them runs -- that one is the level.
+    enemyCount: 40
+    timeLimit: 220
+    maxAliveAtOnce: 8
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.903226
+    spawnReach: 1.3483871
+    objective: 2
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.3403226
+    damageMultiplier: 1.2041936
+    speedMultiplier: 1.0925807
+    aggression: 0.3012903
+    rosterStep: 5
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Kestrel lit the yard a week ago and has kept it lit. 41 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 41
+    timeLimit: 225
+    maxAliveAtOnce: 8
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 1
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.3725806
+    damageMultiplier: 1.2235484
+    speedMultiplier: 1.1006452
+    aggression: 0.33032256
+    rosterStep: 5
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: Kestrel lit the yard a week ago and has kept it lit. 43 hostiles and a boss. The boss is most of the score.
+    enemyCount: 43
+    timeLimit: 235
+    maxAliveAtOnce: 8
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 19
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.4048387
+    damageMultiplier: 1.2429032
+    speedMultiplier: 1.1087097
+    aggression: 0.35935482
+    rosterStep: 5
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Her people know the ground and are letting you have the open part of it. 45 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 45
+    timeLimit: 245
+    maxAliveAtOnce: 9
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 3
+    objectiveWeight: 20
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.4370967
+    damageMultiplier: 1.262258
+    speedMultiplier: 1.1167742
+    aggression: 0.38838708
+    rosterStep: 7
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Her people know the ground and are letting you have the open part of it. 47 hostiles, and the lights are not yours.
+    enemyCount: 47
+    timeLimit: 255
+    maxAliveAtOnce: 9
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 4
+    objectiveWeight: 21
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.4693549
+    damageMultiplier: 1.2816129
+    speedMultiplier: 1.1248387
+    aggression: 0.41741934
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: Her people know the ground and are letting you have the open part of it. 51 hostiles and a boss. The boss is most of the score.
+    enemyCount: 51
+    timeLimit: 270
+    maxAliveAtOnce: 9
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 23
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.5016129
+    damageMultiplier: 1.3009677
+    speedMultiplier: 1.1329032
+    aggression: 0.44645157
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: Her people know the ground and are letting you have the open part of it. 53 hostiles. Clear them, then reach the way out.
+    enemyCount: 53
+    timeLimit: 280
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 5
+    objectiveWeight: 24
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.5338709
+    damageMultiplier: 1.3203226
+    speedMultiplier: 1.1409677
+    aggression: 0.47548383
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: Her people know the ground and are letting you have the open part of it. 55 hostiles and 7 charges. Reach a charge or lose the clock.
+    enemyCount: 55
+    timeLimit: 290
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 13.16129
+    spawnReach: 1.6193548
+    objective: 6
+    objectiveWeight: 25
+    objectiveStages: 7
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.566129
+    damageMultiplier: 1.3396775
+    speedMultiplier: 1.1490322
+    aggression: 0.5045161
+    rosterStep: 8
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 6
+    brief: Her people know the ground and are letting you have the open part of it. 57 hostiles and a boss. The boss is most of the score.
+    enemyCount: 57
+    timeLimit: 300
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.483871
+    spawnReach: 1.6580646
+    objective: 0
+    objectiveWeight: 26
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.5983871
+    damageMultiplier: 1.3590323
+    speedMultiplier: 1.1570967
+    aggression: 0.5335484
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Her people know the ground and are letting you have the open part of it. 60 hostiles. Reach 4 marked points across the map.
+    enemyCount: 60
+    timeLimit: 310
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.806452
+    spawnReach: 1.6967742
+    objective: 7
+    objectiveWeight: 27
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.6306452
+    damageMultiplier: 1.3783871
+    speedMultiplier: 1.1651613
+    aggression: 0.5625806
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Her people know the ground and are letting you have the open part of it. 62 hostiles. 2 of them run, one at a time -- catch each.
+    enemyCount: 62
+    timeLimit: 320
+    maxAliveAtOnce: 11
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 2
+    objectiveWeight: 28
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.6629032
+    damageMultiplier: 1.3977419
+    speedMultiplier: 1.1732258
+    aggression: 0.5916129
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: Her people know the ground and are letting you have the open part of it. 65 hostiles and a boss. The boss is most of the score.
+    enemyCount: 65
+    timeLimit: 335
+    maxAliveAtOnce: 11
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 29
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.6951612
+    damageMultiplier: 1.4170967
+    speedMultiplier: 1.1812903
+    aggression: 0.6206451
+    rosterStep: 10
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Her people know the ground and are letting you have the open part of it. 68 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 68
+    timeLimit: 345
+    maxAliveAtOnce: 11
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 1
+    objectiveWeight: 31
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.7274194
+    damageMultiplier: 1.4364517
+    speedMultiplier: 1.1893549
+    aggression: 0.6496774
+    rosterStep: 10
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Her people know the ground and are letting you have the open part of it. 70 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 70
+    timeLimit: 355
+    maxAliveAtOnce: 12
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 3
+    objectiveWeight: 32
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 1.7596774
+    damageMultiplier: 1.4558065
+    speedMultiplier: 1.1974194
+    aggression: 0.6787096
+    rosterStep: 10
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: Her people know the ground and are letting you have the open part of it. 74 hostiles and a boss. The boss is most of the score.
+    enemyCount: 74
+    timeLimit: 370
+    maxAliveAtOnce: 12
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 33
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 1.7919354
+    damageMultiplier: 1.4751613
+    speedMultiplier: 1.2054839
+    aggression: 0.7077419
+    rosterStep: 10
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: The quarry crews have stopped working and started waiting. 76 hostiles, and the lights are not yours.
+    enemyCount: 76
+    timeLimit: 380
+    maxAliveAtOnce: 12
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 4
+    objectiveWeight: 34
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 1.8241935
+    damageMultiplier: 1.4945161
+    speedMultiplier: 1.2135484
+    aggression: 0.73677415
+    rosterStep: 10
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: The quarry crews have stopped working and started waiting. 80 hostiles. Clear them, then reach the way out.
+    enemyCount: 80
+    timeLimit: 395
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 5
+    objectiveWeight: 36
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 1.8564516
+    damageMultiplier: 1.513871
+    speedMultiplier: 1.2216129
+    aggression: 0.76580644
     rosterStep: 11
-    reserveMagazines: 8
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: The quarry crews have stopped working and started waiting. 82 hostiles and a boss. The boss is most of the score.
+    enemyCount: 82
+    timeLimit: 405
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 37
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 1.8887097
+    damageMultiplier: 1.5332258
+    speedMultiplier: 1.2296774
+    aggression: 0.79483867
+    rosterStep: 11
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The quarry crews have stopped working and started waiting. 86 hostiles and 10 charges. Reach a charge or lose the clock.
+    enemyCount: 86
+    timeLimit: 420
+    maxAliveAtOnce: 13
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 6
+    objectiveWeight: 39
+    objectiveStages: 10
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 1.9209677
+    damageMultiplier: 1.5525807
+    speedMultiplier: 1.237742
+    aggression: 0.82387096
+    rosterStep: 11
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The quarry crews have stopped working and started waiting. 88 hostiles. Reach 6 marked points across the map.
+    enemyCount: 88
+    timeLimit: 430
+    maxAliveAtOnce: 13
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 7
+    objectiveWeight: 40
+    objectiveStages: 6
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 1.9532257
+    damageMultiplier: 1.5719355
+    speedMultiplier: 1.2458065
+    aggression: 0.8529032
+    rosterStep: 11
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 10
+    brief: The quarry crews have stopped working and started waiting. 92 hostiles and a boss. The boss is most of the score.
+    enemyCount: 92
+    timeLimit: 445
+    maxAliveAtOnce: 14
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.35484
+    spawnReach: 2.1225808
+    objective: 0
+    objectiveWeight: 41
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 1.9854839
+    damageMultiplier: 1.5912904
+    speedMultiplier: 1.253871
+    aggression: 0.8819355
+    rosterStep: 13
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: The quarry crews have stopped working and started waiting. 94 hostiles. 3 of them run, one at a time -- catch each.
+    enemyCount: 94
+    timeLimit: 455
+    maxAliveAtOnce: 14
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 2
+    objectiveWeight: 42
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 2.017742
+    damageMultiplier: 1.6106452
+    speedMultiplier: 1.2619355
+    aggression: 0.9109677
+    rosterStep: 13
+    reserveMagazines: 18
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: KESTREL AUGER
-    brief: Kestrel is at the cut face, standing where the charges are kept. 27 between you and Kestrel.
-    enemyCount: 27
-    timeLimit: 120
-    maxAliveAtOnce: 11
+    brief: Kestrel is at the cut face, standing where the charges are kept. 98 between you and Kestrel.
+    enemyCount: 98
+    timeLimit: 470
+    maxAliveAtOnce: 14
     spawnInterval: 0.3
-    briefingTime: 7.5
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 18
+    spawnReach: 2.2
     objective: 0
-    objectiveWeight: 12
+    objectiveWeight: 44
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 0674b300a8bef6e2c92b0b2b34a85aba, type: 2}
     bossName: Kestrel Auger
-    bossWeight: 8
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.75
-    damageMultiplier: 1.45
-    speedMultiplier: 1.23
+    bossWeight: 12
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2.05
+    damageMultiplier: 1.63
+    speedMultiplier: 1.27
     aggression: 0.94
     rosterStep: 13
-    reserveMagazines: 8
+    reserveMagazines: 18
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

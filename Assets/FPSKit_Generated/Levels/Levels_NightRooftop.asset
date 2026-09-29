@@ -16,186 +16,866 @@ MonoBehaviour:
   stakes: Ilsa holds the lifts and the lights. When her cycle ends the roof seals with whoever is on it still on it, and the only way down from here is the fast one.
   levels:
   - displayName: BLACKOUT
-    brief: Ilsa has had you on camera since the airport. 6 hostiles, and the lights are not yours.
-    enemyCount: 6
-    timeLimit: 32
-    maxAliveAtOnce: 4
+    brief: Ilsa has had you on camera since the airport. 25 hostiles, and the lights are not yours.
+    enemyCount: 25
+    timeLimit: 150
+    maxAliveAtOnce: 6
     spawnInterval: 0.8
-    briefingTime: 8
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
     objective: 4
-    objectiveWeight: 4
+    objectiveWeight: 11
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.15
     damageMultiplier: 1.09
     speedMultiplier: 1.06
     aggression: 0.12
     rosterStep: 4
-    reserveMagazines: 8
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: WAY OUT
-    brief: Ilsa has had you on camera since the airport. 9 hostiles. Clear them, then reach the way out.
-    enemyCount: 9
-    timeLimit: 43
-    maxAliveAtOnce: 5
-    spawnInterval: 0.7285714
-    briefingTime: 7.5
+    brief: Ilsa has had you on camera since the airport. 26 hostiles. Clear them, then reach the way out.
+    enemyCount: 26
+    timeLimit: 155
+    maxAliveAtOnce: 6
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
     objective: 5
-    objectiveWeight: 4
+    objectiveWeight: 12
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.25
-    damageMultiplier: 1.15
-    speedMultiplier: 1.09
-    aggression: 0.24857143
-    rosterStep: 6
-    reserveMagazines: 8
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.182258
+    damageMultiplier: 1.1093549
+    speedMultiplier: 1.0680646
+    aggression: 0.14903225
+    rosterStep: 4
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: Ilsa has had you on camera since the airport. 12 hostiles and a boss. The boss is most of the score.
-    enemyCount: 12
-    timeLimit: 69
+    brief: Ilsa has had you on camera since the airport. 28 hostiles and a boss. The boss is most of the score.
+    enemyCount: 28
+    timeLimit: 165
     maxAliveAtOnce: 6
-    spawnInterval: 0.6571429
-    briefingTime: 7.5
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
     objective: 0
-    objectiveWeight: 5
+    objectiveWeight: 13
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: 
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.35
-    damageMultiplier: 1.21
-    speedMultiplier: 1.12
-    aggression: 0.37714285
-    rosterStep: 7
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.2145162
+    damageMultiplier: 1.1287097
+    speedMultiplier: 1.0761291
+    aggression: 0.17806451
+    rosterStep: 4
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
-    brief: She is not hiding the cameras. She is showing you where they are. 15 hostiles and four charges. Reach a charge or lose the clock.
-    enemyCount: 15
-    timeLimit: 63
+    brief: Ilsa has had you on camera since the airport. 31 hostiles and 4 charges. Reach a charge or lose the clock.
+    enemyCount: 31
+    timeLimit: 180
     maxAliveAtOnce: 7
-    spawnInterval: 0.5857143
-    briefingTime: 7.5
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
     objective: 6
-    objectiveWeight: 7
+    objectiveWeight: 14
+    objectiveStages: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.45
-    damageMultiplier: 1.27
-    speedMultiplier: 1.15
-    aggression: 0.5057143
-    rosterStep: 9
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.2467742
+    damageMultiplier: 1.1480645
+    speedMultiplier: 1.0841936
+    aggression: 0.20709677
+    rosterStep: 6
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: THE RUNNER
-    brief: She is not hiding the cameras. She is showing you where they are. 18 hostiles. One of them runs -- that one is the level.
-    enemyCount: 18
-    timeLimit: 73
-    maxAliveAtOnce: 8
-    spawnInterval: 0.5142857
-    briefingTime: 7.5
-    objective: 2
-    objectiveWeight: 8
+  - displayName: RECON
+    brief: Ilsa has had you on camera since the airport. 33 hostiles. Reach 3 marked points across the map.
+    enemyCount: 33
+    timeLimit: 190
+    maxAliveAtOnce: 7
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.1548387
+    objective: 7
+    objectiveWeight: 15
+    objectiveStages: 3
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.55
-    damageMultiplier: 1.33
-    speedMultiplier: 1.18
-    aggression: 0.6342857
-    rosterStep: 10
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.2790322
+    damageMultiplier: 1.1674193
+    speedMultiplier: 1.0922581
+    aggression: 0.23612902
+    rosterStep: 6
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 2
-    brief: She is not hiding the cameras. She is showing you where they are. 21 hostiles and a boss. The boss is most of the score.
-    enemyCount: 21
-    timeLimit: 99
-    maxAliveAtOnce: 9
-    spawnInterval: 0.44285715
-    briefingTime: 7.5
+    brief: Ilsa has had you on camera since the airport. 36 hostiles and a boss. The boss is most of the score.
+    enemyCount: 36
+    timeLimit: 205
+    maxAliveAtOnce: 7
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 10
+    waveRest: 9.612904
+    spawnReach: 1.1935484
     objective: 0
-    objectiveWeight: 9
+    objectiveWeight: 16
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
-    bossWeight: 7
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.65
-    damageMultiplier: 1.39
-    speedMultiplier: 1.21
-    aggression: 0.76285714
-    rosterStep: 12
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.3112903
+    damageMultiplier: 1.1867741
+    speedMultiplier: 1.1003226
+    aggression: 0.26516128
+    rosterStep: 6
+    reserveMagazines: 13
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Ilsa has had you on camera since the airport. 39 hostiles. One of them runs -- that one is the level.
+    enemyCount: 39
+    timeLimit: 220
+    maxAliveAtOnce: 8
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 9.935484
+    spawnReach: 1.2322581
+    objective: 2
+    objectiveWeight: 18
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.3435484
+    damageMultiplier: 1.2061291
+    speedMultiplier: 1.1083871
+    aggression: 0.29419354
+    rosterStep: 6
+    reserveMagazines: 13
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: Every lift in the block has been called to the top floor. 24 hostiles and one magazine, nothing spare. Kills drop ammunition.
-    enemyCount: 24
-    timeLimit: 94
-    maxAliveAtOnce: 10
-    spawnInterval: 0.37142858
-    briefingTime: 7.5
+    brief: Ilsa has had you on camera since the airport. 42 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 42
+    timeLimit: 235
+    maxAliveAtOnce: 8
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 10.258064
+    spawnReach: 1.2709677
     objective: 1
-    objectiveWeight: 11
+    objectiveWeight: 19
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 7.5
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.75
-    damageMultiplier: 1.45
-    speedMultiplier: 1.24
-    aggression: 0.89142853
+    bossWeight: 5
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.3758065
+    damageMultiplier: 1.2254839
+    speedMultiplier: 1.1164516
+    aggression: 0.3232258
+    rosterStep: 7
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: Ilsa has had you on camera since the airport. 46 hostiles and a boss. The boss is most of the score.
+    enemyCount: 46
+    timeLimit: 250
+    maxAliveAtOnce: 8
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.580645
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 21
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.4080645
+    damageMultiplier: 1.2448387
+    speedMultiplier: 1.1245161
+    aggression: 0.35225806
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Ilsa has had you on camera since the airport. 49 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 49
+    timeLimit: 265
+    maxAliveAtOnce: 9
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.903226
+    spawnReach: 1.3483871
+    objective: 3
+    objectiveWeight: 22
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.4403225
+    damageMultiplier: 1.2641935
+    speedMultiplier: 1.1325806
+    aggression: 0.38129032
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Ilsa has had you on camera since the airport. 52 hostiles, and the lights are not yours.
+    enemyCount: 52
+    timeLimit: 280
+    maxAliveAtOnce: 9
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 4
+    objectiveWeight: 23
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.4725807
+    damageMultiplier: 1.2835484
+    speedMultiplier: 1.1406451
+    aggression: 0.41032255
+    rosterStep: 7
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: Ilsa has had you on camera since the airport. 55 hostiles and a boss. The boss is most of the score.
+    enemyCount: 55
+    timeLimit: 295
+    maxAliveAtOnce: 9
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 25
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.5048387
+    damageMultiplier: 1.3029032
+    speedMultiplier: 1.1487097
+    aggression: 0.4393548
+    rosterStep: 7
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: She is not hiding the cameras. She is showing you where they are. 59 hostiles. Clear them, then reach the way out.
+    enemyCount: 59
+    timeLimit: 315
+    maxAliveAtOnce: 9
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 5
+    objectiveWeight: 27
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.5370967
+    damageMultiplier: 1.3222581
+    speedMultiplier: 1.1567742
+    aggression: 0.46838707
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: She is not hiding the cameras. She is showing you where they are. 63 hostiles and 8 charges. Reach a charge or lose the clock.
+    enemyCount: 63
+    timeLimit: 330
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 6
+    objectiveWeight: 28
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.5693548
+    damageMultiplier: 1.3416129
+    speedMultiplier: 1.1648387
+    aggression: 0.49741933
+    rosterStep: 9
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: She is not hiding the cameras. She is showing you where they are. 67 hostiles and a boss. The boss is most of the score.
+    enemyCount: 67
+    timeLimit: 350
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 30
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.6016129
+    damageMultiplier: 1.3609678
+    speedMultiplier: 1.1729032
+    aggression: 0.5264516
+    rosterStep: 9
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: She is not hiding the cameras. She is showing you where they are. 70 hostiles. Reach 5 marked points across the map.
+    enemyCount: 70
+    timeLimit: 365
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 7
+    objectiveWeight: 32
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.633871
+    damageMultiplier: 1.3803226
+    speedMultiplier: 1.1809677
+    aggression: 0.5554838
+    rosterStep: 9
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: She is not hiding the cameras. She is showing you where they are. 75 hostiles. 3 of them run, one at a time -- catch each.
+    enemyCount: 75
+    timeLimit: 385
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 13.16129
+    spawnReach: 1.6193548
+    objective: 2
+    objectiveWeight: 34
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.666129
+    damageMultiplier: 1.3996774
+    speedMultiplier: 1.1890322
+    aggression: 0.5845161
+    rosterStep: 10
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 6
+    brief: She is not hiding the cameras. She is showing you where they are. 78 hostiles and a boss. The boss is most of the score.
+    enemyCount: 78
+    timeLimit: 400
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.483871
+    spawnReach: 1.6580646
+    objective: 0
+    objectiveWeight: 35
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.6983871
+    damageMultiplier: 1.4190323
+    speedMultiplier: 1.1970968
+    aggression: 0.6135484
+    rosterStep: 10
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: She is not hiding the cameras. She is showing you where they are. 82 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 82
+    timeLimit: 420
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.806452
+    spawnReach: 1.6967742
+    objective: 1
+    objectiveWeight: 37
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.7306452
+    damageMultiplier: 1.4383872
+    speedMultiplier: 1.2051613
+    aggression: 0.6425806
+    rosterStep: 10
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: She is not hiding the cameras. She is showing you where they are. 87 hostiles. Hold 3 marked grounds across the map, one after another.
+    enemyCount: 87
+    timeLimit: 440
+    maxAliveAtOnce: 11
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 3
+    objectiveWeight: 39
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.7629032
+    damageMultiplier: 1.457742
+    speedMultiplier: 1.2132258
+    aggression: 0.6716129
+    rosterStep: 10
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: She is not hiding the cameras. She is showing you where they are. 91 hostiles and a boss. The boss is most of the score.
+    enemyCount: 91
+    timeLimit: 460
+    maxAliveAtOnce: 12
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 41
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 11
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.7951612
+    damageMultiplier: 1.4770968
+    speedMultiplier: 1.2212903
+    aggression: 0.70064515
+    rosterStep: 12
+    reserveMagazines: 18
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: She is not hiding the cameras. She is showing you where they are. 96 hostiles, and the lights are not yours.
+    enemyCount: 96
+    timeLimit: 480
+    maxAliveAtOnce: 12
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 4
+    objectiveWeight: 43
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.8274194
+    damageMultiplier: 1.4964516
+    speedMultiplier: 1.2293549
+    aggression: 0.72967744
+    rosterStep: 12
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: She is not hiding the cameras. She is showing you where they are. 101 hostiles. Clear them, then reach the way out.
+    enemyCount: 101
+    timeLimit: 500
+    maxAliveAtOnce: 12
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 5
+    objectiveWeight: 45
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 1.8596774
+    damageMultiplier: 1.5158064
+    speedMultiplier: 1.2374194
+    aggression: 0.7587096
+    rosterStep: 12
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: She is not hiding the cameras. She is showing you where they are. 105 hostiles and a boss. The boss is most of the score.
+    enemyCount: 105
+    timeLimit: 520
+    maxAliveAtOnce: 13
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 47
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 1.8919355
+    damageMultiplier: 1.5351613
+    speedMultiplier: 1.2454839
+    aggression: 0.7877419
+    rosterStep: 12
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: Every lift in the block has been called to the top floor. 110 hostiles and 14 charges. Reach a charge or lose the clock.
+    enemyCount: 110
+    timeLimit: 540
+    maxAliveAtOnce: 13
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 6
+    objectiveWeight: 50
+    objectiveStages: 14
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 1.9241935
+    damageMultiplier: 1.5545161
+    speedMultiplier: 1.2535484
+    aggression: 0.81677413
+    rosterStep: 12
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Every lift in the block has been called to the top floor. 115 hostiles. Reach 7 marked points across the map.
+    enemyCount: 115
+    timeLimit: 560
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 7
+    objectiveWeight: 52
+    objectiveStages: 7
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 1.9564517
+    damageMultiplier: 1.573871
+    speedMultiplier: 1.2616129
+    aggression: 0.8458064
+    rosterStep: 13
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: Every lift in the block has been called to the top floor. 119 hostiles and a boss. The boss is most of the score.
+    enemyCount: 119
+    timeLimit: 580
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 54
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 1.9887097
+    damageMultiplier: 1.5932258
+    speedMultiplier: 1.2696774
+    aggression: 0.87483865
+    rosterStep: 13
+    reserveMagazines: 21
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: Every lift in the block has been called to the top floor. 124 hostiles. 4 of them run, one at a time -- catch each.
+    enemyCount: 124
+    timeLimit: 600
+    maxAliveAtOnce: 14
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 2
+    objectiveWeight: 56
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 15
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 2.0209677
+    damageMultiplier: 1.6125807
+    speedMultiplier: 1.2777419
+    aggression: 0.90387094
+    rosterStep: 13
+    reserveMagazines: 21
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: Every lift in the block has been called to the top floor. 129 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 129
+    timeLimit: 620
+    maxAliveAtOnce: 14
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 1
+    objectiveWeight: 58
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 15
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 2.0532258
+    damageMultiplier: 1.6319355
+    speedMultiplier: 1.2858064
+    aggression: 0.9329032
     rosterStep: 13
     reserveMagazines: 0
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: ILSA AUGER
-    brief: Ilsa is on the last roof, and she has turned the recording on. 27 between you and Ilsa.
-    enemyCount: 27
-    timeLimit: 120
-    maxAliveAtOnce: 11
-    spawnInterval: 0.3
-    briefingTime: 7.5
+  - displayName: BOSS 10
+    brief: Every lift in the block has been called to the top floor. 134 hostiles and a boss. The boss is most of the score.
+    enemyCount: 134
+    timeLimit: 640
+    maxAliveAtOnce: 14
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.35484
+    spawnReach: 2.1225808
     objective: 0
-    objectiveWeight: 12
+    objectiveWeight: 60
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 16
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 2.0854838
+    damageMultiplier: 1.6512903
+    speedMultiplier: 1.2938709
+    aggression: 0.96193546
+    rosterStep: 15
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Every lift in the block has been called to the top floor. 140 hostiles. Hold 4 marked grounds across the map, one after another.
+    enemyCount: 140
+    timeLimit: 665
+    maxAliveAtOnce: 15
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 3
+    objectiveWeight: 63
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 17
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 2.1177418
+    damageMultiplier: 1.6706451
+    speedMultiplier: 1.3019354
+    aggression: 0.9909677
+    rosterStep: 15
+    reserveMagazines: 23
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ILSA AUGER
+    brief: Ilsa is on the last roof, and she has turned the recording on. 145 between you and Ilsa.
+    enemyCount: 145
+    timeLimit: 685
+    maxAliveAtOnce: 15
+    spawnInterval: 0.3
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 18
+    spawnReach: 2.2
+    objective: 0
+    objectiveWeight: 65
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 3d7d6c9f4c5947374bb27cf22b10b6c5, type: 2}
     bossName: Ilsa Auger
-    bossWeight: 8
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.85
-    damageMultiplier: 1.51
-    speedMultiplier: 1.27
+    bossWeight: 17
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2.15
+    damageMultiplier: 1.69
+    speedMultiplier: 1.31
     aggression: 1
     rosterStep: 15
-    reserveMagazines: 8
+    reserveMagazines: 23
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

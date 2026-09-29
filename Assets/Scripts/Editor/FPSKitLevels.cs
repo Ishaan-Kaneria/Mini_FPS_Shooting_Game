@@ -30,7 +30,7 @@ namespace FPSKit.EditorTools
         /// long enough that unlocking means something, short enough that a player who
         /// likes one arena can finish it.
         /// </summary>
-        public const int LevelsPerArena = 8;
+        public const int LevelsPerArena = 32;
 
         /// <summary>
         /// How many levels an arena's ladder holds.
@@ -41,8 +41,12 @@ namespace FPSKit.EditorTools
         /// last fight would turn the ending into a chore with a cutscene at the end of
         /// it. Three is a way in, a room to get through, and Marit.
         /// </summary>
-        public static int LevelsFor(string themeName)
-            => themeName == FPSKitThemes.FinaleName ? 3 : LevelsPerArena;
+        /// <summary>
+        /// Thirty-two in every arena, the finale included: the arenas are big, and eight
+        /// two-minute levels never took a player far enough from where they started to see
+        /// more than a corner of one.
+        /// </summary>
+        public static int LevelsFor(string themeName) => LevelsPerArena;
 
         // ==================================================================
         [MenuItem("FPSKit/Create Level Sets", false, 44)]
@@ -155,27 +159,46 @@ namespace FPSKit.EditorTools
         // ==================================================================
         // The curve
         //
-        // Every level is the same shape -- a fixed crowd against a strict clock -- so
-        // the difficulty is in four numbers moving together: more enemies, less time
-        // each, tougher bodies and a nastier mix. The clock is the one that has to be
-        // right: it is derived from the enemy count rather than chosen, because a time
-        // limit picked by feel is either free at the bottom of the ladder or impossible
-        // at the top, and neither is a difficulty curve.
-        //
-        // The arena index shifts the whole ladder. The six arenas are all open from the
-        // start, so without it the sixth is the first one played again with a different
-        // skybox; with it, the later arenas are somewhere to go once the earlier ones
-        // stop being a fight.
+        // Every level is a fixed crowd against a strict clock, now long enough to use
+        // the arena: two and a half minutes at the bottom of every ladder, climbing to the
+        // arena's longest (LongestClock: six minutes in the first arena, fifteen by the
+        // sixth). The clock is chosen and the crowd follows from it at about five seconds
+        // an enemy, arriving in waves from one side of the map at a time and from further
+        // out as the ladder climbs; the objective comes round several times in a long
+        // level, each time somewhere new. Toughness, aggression and the mix move with the
+        // level's place on its ladder (t), so the curve has the same shape at 32 rungs as
+        // it had at 8. The arena index shifts the whole ladder, as before.
         // ==================================================================
 
-        /// <summary>Seconds of clock per enemy, before the flat allowance.</summary>
-        const float SecondsPerEnemy = 3.4f;
+        /// <summary>Every arena's first level: two and a half minutes.</summary>
+        const float FirstClock = 150f;
 
-        /// <summary>Flat seconds every level gets, which is mostly walking to the fight.</summary>
-        const float BaseSeconds = 12f;
+        /// <summary>
+        /// The longest level in an arena, by where the arena sits in the campaign: six
+        /// minutes in the first, reaching fifteen by the sixth, which the finale keeps.
+        /// </summary>
+        static float LongestClock(int arenaIndex) => Mathf.Lerp(360f, 900f, Mathf.Clamp01(arenaIndex / 5f));
 
-        /// <summary>And what a boss is worth on the clock, over and above its escort.</summary>
-        const float BossSeconds = 16f;
+        /// <summary>
+        /// Seconds of clock per enemy. About five: a long level is a fight across the map,
+        /// with objectives to walk to, not a queue at the door. A little tighter up the
+        /// ladder, and in the finale.
+        /// </summary>
+        static float SecondsPerEnemy(float t, bool finale) => Mathf.Lerp(5.2f, 4.6f, t) - (finale ? 0.4f : 0f);
+
+        /// <summary>
+        /// How often an objective comes round in a level of this length: a runner or a
+        /// hold site every two and a half minutes, a charge every forty seconds, a recon
+        /// point every seventy-five.
+        /// </summary>
+        static int StagesFor(LevelSet.Objective objective, float clock) => objective switch
+        {
+            LevelSet.Objective.Hunt => Mathf.Clamp(Mathf.RoundToInt(clock / 150f), 1, 6),
+            LevelSet.Objective.Hold => Mathf.Clamp(Mathf.RoundToInt(clock / 150f), 1, 6),
+            LevelSet.Objective.Disposal => Mathf.Clamp(Mathf.RoundToInt(clock / 40f), 4, 20),
+            LevelSet.Objective.Recon => Mathf.Clamp(Mathf.RoundToInt(clock / 75f), 2, 12),
+            _ => 1,
+        };
 
         static void Configure(LevelSet set, string themeName, int arenaIndex)
         {
@@ -198,9 +221,16 @@ namespace FPSKit.EditorTools
             // same ladder the same objective while leaving another one unused.
             int fought = 0;
 
+            bool finale = themeName == FPSKitThemes.FinaleName;
+
             for (int i = 0; i < count; i++)
             {
                 int number = i + 1;
+
+                // Where this level sits on its ladder, 0 at the bottom and 1 at the top.
+                // Everything that used to step per level is a function of this, so the
+                // curve has the same shape at 32 levels as it had at 8.
+                float t = i / (float)Mathf.Max(1, count - 1);
 
                 // A boss every third level, and always on the last one -- the top of a
                 // ladder has to be something rather than one more of the same.
@@ -209,12 +239,11 @@ namespace FPSKit.EditorTools
                 // The finale opens where an ordinary ladder ends and climbs from there.
                 // The player arrives having cleared six arenas; starting them back at six
                 // hostiles would say the last zone is easier than the one before it.
-                int enemies = themeName == FPSKitThemes.FinaleName
-                    ? 22 + 14 * i
-                    : 6 + 3 * i;
-
-                float clock = Mathf.Round(enemies * SecondsPerEnemy + BaseSeconds
-                                          + (boss ? BossSeconds : 0f));
+                // The clock is chosen and the crowd follows from it: two and a half minutes
+                // at the bottom of every ladder, rising (slowly at first) to the arena's
+                // longest, rounded to five seconds so the tile reads cleanly.
+                float clock = Mathf.Round(Mathf.Lerp(FirstClock, LongestClock(arenaIndex), Mathf.Pow(t, 1.25f)) / 5f) * 5f;
+                int enemies = Mathf.Max(6, Mathf.RoundToInt((clock - 20f) / SecondsPerEnemy(t, finale)));
 
                 var objective = ObjectiveFor(fought, boss, arenaIndex);
                 if (!boss) fought++;
@@ -228,7 +257,7 @@ namespace FPSKit.EditorTools
                         ? holder.ToUpperInvariant()
                         : LevelName(themeName, number, boss, objective),
 
-                    brief = Brief(themeName, i, enemies, boss, objective, last, holder),
+                    brief = Brief(themeName, i, count, enemies, boss, objective, StagesFor(objective, clock), last, holder),
 
                     // Named on the level rather than taken from the archetype, so the
                     // banner when the boss walks in says who it is rather than which
@@ -245,6 +274,7 @@ namespace FPSKit.EditorTools
                     // between two and three. Scaled with the level so it keeps that share
                     // as the crowd grows rather than becoming a rounding error by level 8.
                     objectiveWeight = Mathf.Round(Mathf.Max(4f, enemies * 0.45f)),
+                    objectiveStages = StagesFor(objective, clock),
 
                     enemyCount = enemies,
                     timeLimit = clock,
@@ -254,13 +284,20 @@ namespace FPSKit.EditorTools
                     // And they arrive thicker. Twelve at once against the fourteen an
                     // eighth-rung level tops out at is what "waves" means here: the
                     // arena is never not full for the whole of the last fight.
-                    maxAliveAtOnce = themeName == FPSKitThemes.FinaleName ? 8 + 2 * i : 4 + i,
-                    spawnInterval = Mathf.Lerp(0.8f, 0.3f, i / (float)Mathf.Max(1, count - 1)),
+                    maxAliveAtOnce = Mathf.RoundToInt(finale ? Mathf.Lerp(9f, 18f, t) : Mathf.Lerp(5f, 14f, t) + arenaIndex * 0.3f),
+                    spawnInterval = Mathf.Lerp(0.8f, 0.3f, t),
+
+                    // Waves from one side of the map at a time, and from further out as the
+                    // ladder climbs, so a long level is fought across the arena. The short
+                    // levels at the bottom keep the continuous stream.
+                    waveSize = clock < 200f ? 0 : Mathf.RoundToInt((finale ? Mathf.Lerp(9f, 18f, t) : Mathf.Lerp(5f, 14f, t)) * 1.6f),
+                    waveRest = clock < 200f ? 0f : Mathf.Lerp(8f, 18f, t),
+                    spawnReach = Mathf.Lerp(1f, 2.2f, t),
 
                     // Long enough to read the mission and the stakes as the card animates
                     // in; the first level has the most to take in. The clock does not run
                     // during it.
-                    briefingTime = number == 1 ? 8f : 7.5f,
+                    briefingTime = 9f,
 
                     hasBoss = boss,
 
@@ -271,24 +308,27 @@ namespace FPSKit.EditorTools
                         : last && !string.IsNullOrEmpty(holder)
                             ? FPSKitEnemyRoster.GetOrCreate(holder)
                             : BossFor(number, bosses),
-                    bossWeight = 4f + 0.5f * number,
-                    bossHealthMultiplier = 1f + 0.3f * (number / 3),
+                    // About a ninth of the level, so leaving the boss alive still costs a star
+                    // on a level of a hundred and fifty.
+                    bossWeight = Mathf.Round(Mathf.Max(5f, enemies * 0.12f)),
+                    bossHealthMultiplier = 1f + 2.4f * t,
 
-                    healthMultiplier = 1f + 0.10f * i + 0.05f * arenaIndex,
-                    damageMultiplier = 1f + 0.06f * i + 0.03f * arenaIndex,
+                    healthMultiplier = 1f + 1.0f * t + 0.05f * arenaIndex,
+                    damageMultiplier = 1f + 0.6f * t + 0.03f * arenaIndex,
 
                     // Capped well under the player's walk of 5.6 m/s. See the combat
                     // rules in CLAUDE.md: disengaging has to stay possible.
-                    speedMultiplier = Mathf.Min(1.35f, 1f + 0.03f * i + 0.02f * arenaIndex),
+                    speedMultiplier = Mathf.Min(1.35f, 1f + 0.25f * t + 0.02f * arenaIndex),
 
-                    aggression = Mathf.Clamp01(i / (float)Mathf.Max(1, count - 1) * 0.9f
-                                               + 0.04f * arenaIndex),
+                    aggression = Mathf.Clamp01(t * 0.9f + 0.04f * arenaIndex),
 
-                    rosterStep = RosterStep(i) + arenaIndex,
+                    rosterStep = RosterStep(Mathf.RoundToInt(t * 7f)) + arenaIndex,
 
                     // Eight spare magazines everywhere but One Magazine, which starts dry and is
                     // fed by kills. The drop chance is on top of each enemy's own.
-                    reserveMagazines = objective == LevelSet.Objective.OneMagazine ? 0 : 8,
+                    // More spare for a longer level: a fifteen-minute fight is well over a
+                    // thousand rounds, and the drops alone would leave long gaps dry.
+                    reserveMagazines = objective == LevelSet.Objective.OneMagazine ? 0 : 8 + Mathf.RoundToInt(clock / 45f),
                     ammoDropChance = 0.12f,
 
                     twoStarScore = 0.8f,
@@ -384,7 +424,8 @@ namespace FPSKit.EditorTools
                 LevelSet.Objective.Hold,
                 LevelSet.Objective.Blackout,
                 LevelSet.Objective.Extraction,
-                LevelSet.Objective.Disposal
+                LevelSet.Objective.Disposal,
+                LevelSet.Objective.Recon
             };
 
             return rotation[(fought + arenaIndex) % rotation.Length];
@@ -410,6 +451,7 @@ namespace FPSKit.EditorTools
                 case LevelSet.Objective.Blackout: return "BLACKOUT";
                 case LevelSet.Objective.Extraction: return "WAY OUT";
                 case LevelSet.Objective.Disposal: return "DISPOSAL";
+                case LevelSet.Objective.Recon: return "RECON";
             }
 
             string[] names = { "FIRST CONTACT", "PUSHBACK", "OVERRUN", "NO COVER", "LAST STAND" };
@@ -420,22 +462,22 @@ namespace FPSKit.EditorTools
         /// The line under the name on the tile, and the first thing on screen when a
         /// level starts. It says what the level wants, not how it was generated.
         /// </summary>
-        static string Brief(string themeName, int index, int enemies, bool boss,
-                            LevelSet.Objective objective, bool last, string holder)
+        static string Brief(string themeName, int index, int count, int enemies, bool boss,
+                            LevelSet.Objective objective, int stages, bool last, string holder)
         {
             // Where the player is, then what the level wants. Four rungs of story for
             // eight levels, so the arena is saying something different at the bottom of
             // the ladder and at the top without anybody writing forty-eight lines that
             // could each be wrong about the level they sit on.
-            int rung = last ? 3 : index < 3 ? 0 : index < 6 ? 1 : 2;
+            int rung = last ? 3 : index < count * 3 / 8 ? 0 : index < count * 6 / 8 ? 1 : 2;
             string story = FPSKitCampaign.StoryClause(themeName, rung);
 
-            string task = Task(enemies, boss, objective, last, holder);
+            string task = Task(enemies, boss, objective, stages, last, holder);
 
             return string.IsNullOrEmpty(story) ? task : $"{story} {task}";
         }
 
-        static string Task(int enemies, bool boss, LevelSet.Objective objective, bool last,
+        static string Task(int enemies, bool boss, LevelSet.Objective objective, int stages, bool last,
                            string holder)
         {
             if (last && !string.IsNullOrEmpty(holder))
@@ -446,13 +488,17 @@ namespace FPSKit.EditorTools
             switch (objective)
             {
                 case LevelSet.Objective.Hunt:
-                    return $"{enemies} hostiles. One of them runs -- that one is the level.";
+                    return stages > 1
+                        ? $"{enemies} hostiles. {stages} of them run, one at a time -- catch each."
+                        : $"{enemies} hostiles. One of them runs -- that one is the level.";
 
                 case LevelSet.Objective.OneMagazine:
                     return $"{enemies} hostiles and one magazine, nothing spare. Kills drop ammunition.";
 
                 case LevelSet.Objective.Hold:
-                    return $"{enemies} hostiles. Stand on the marked ground and keep standing.";
+                    return stages > 1
+                        ? $"{enemies} hostiles. Hold {stages} marked grounds across the map, one after another."
+                        : $"{enemies} hostiles. Stand on the marked ground and keep standing.";
 
                 case LevelSet.Objective.Blackout:
                     return $"{enemies} hostiles, and the lights are not yours.";
@@ -461,7 +507,10 @@ namespace FPSKit.EditorTools
                     return $"{enemies} hostiles. Clear them, then reach the way out.";
 
                 case LevelSet.Objective.Disposal:
-                    return $"{enemies} hostiles and four charges. Reach a charge or lose the clock.";
+                    return $"{enemies} hostiles and {stages} charges. Reach a charge or lose the clock.";
+ 
+                case LevelSet.Objective.Recon:
+                    return $"{enemies} hostiles. Reach {stages} marked points across the map.";
             }
 
             return $"{enemies} hostiles. Clear them for three stars.";

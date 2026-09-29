@@ -791,7 +791,9 @@ public class HUDController : MonoBehaviour
             : $"\n<size=78%><color=#B8AFA0>{stakes}</color></size>";
 
         string accent = ColorUtility.ToHtmlStringRGB(UITheme.Active.accent);
-        string header = $"<size=85%><color=#{accent}>GET READY{UIText.Separator}{seconds}</color></size>";
+        // FIRE starts the level early (LevelManager.BriefingSkipAfter), said once, small.
+        string skip = $"<size=70%><color=#B8AFA0>{InputPrompts.For(GameAction.Fire)} TO START</color></size>";
+        string header = $"<size=85%><color=#{accent}>GET READY{UIText.Separator}{seconds}</color></size>   {skip}";
 
         // No controls here. The card used to teach the bomb and the drink as well, which
         // made it a paragraph to read in a three-second countdown over a level about to

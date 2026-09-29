@@ -187,6 +187,9 @@ public class LevelManager : MonoBehaviour
     public bool IsBriefing { get; private set; }
     public float BriefingRemaining { get; private set; }
 
+    /// <summary>Seconds the level-start card is up before FIRE may skip it.</summary>
+    public const float BriefingSkipAfter = 1.2f;
+
     public bool IsRunning { get; private set; }
     public bool IsFinished { get; private set; }
 
@@ -360,11 +363,11 @@ public class LevelManager : MonoBehaviour
         // A leash shorter than the spawn ring deletes enemies the instant they arrive,
         // which reads as "nothing ever spawns" and is miserable to diagnose from the
         // symptom. Push it clear of the ring and say so rather than let it happen.
-        float minimumLeash = maxSpawnDistanceFromPlayer * 1.4f;
+        float minimumLeash = MaxSpawnDistance * 1.4f;
         if (despawnDistance > 0f && despawnDistance < minimumLeash)
         {
             Debug.LogWarning($"[LevelManager] Despawn Distance ({despawnDistance:0}m) is too close to " +
-                             $"Max Spawn Distance ({maxSpawnDistanceFromPlayer:0}m); enemies would be " +
+                             $"the spawn ring ({MaxSpawnDistance:0}m); enemies would be " +
                              $"culled on arrival. Raised to {minimumLeash:0}m.", this);
             despawnDistance = minimumLeash;
         }
@@ -558,9 +561,21 @@ public class LevelManager : MonoBehaviour
         IsBriefing = true;
         BriefingRemaining = Level.briefingTime;
 
+        // FIRE skips it, once it has been up long enough that the press is a choice
+        // rather than the click that started the level. Touch is read as the edge of the
+        // on-screen FIRE button, which GameInput does not see; and never while paused,
+        // where a click belongs to the pause menu.
+        bool fireWasDown = MobileInput.Fire;
         while (BriefingRemaining > 0f && !IsFinished)
         {
             BriefingRemaining -= Time.deltaTime;
+
+            bool fireDown = MobileInput.Fire;
+            bool pressed = GameInput.Pressed(GameAction.Fire) || (fireDown && !fireWasDown);
+            fireWasDown = fireDown;
+            if (pressed && Time.timeScale > 0f && Level.briefingTime - BriefingRemaining >= BriefingSkipAfter)
+                BriefingRemaining = 0f;
+
             yield return null;
         }
 
@@ -646,8 +661,25 @@ public class LevelManager : MonoBehaviour
         const int failureLimit = 40;
         const float retryInterval = 0.1f;
 
+        // Waves: this many from one side, a rest, then the next from somewhere else. The
+        // rest ends early once the arena is empty, so it never makes a quick player wait.
+        int inWave = 0;
+        _waveBearing = UnityEngine.Random.value * Mathf.PI * 2f;
+
         while (_pendingSpawns > 0 && !IsFinished)
         {
+            if (Level.waveSize > 0 && inWave >= Level.waveSize)
+            {
+                inWave = 0;
+                _waveBearing = Mathf.Repeat(_waveBearing + UnityEngine.Random.Range(2.1f, 4.2f), Mathf.PI * 2f);
+                float restUntil = Time.time + Level.waveRest;
+                float earliest = Time.time + Mathf.Min(3f, Level.waveRest);
+                while (!IsFinished && Time.time < restUntil &&
+                       !(Time.time >= earliest && _alive.Count <= (HasBoss && ActiveBoss != null ? 1 : 0)))
+                    yield return null;
+                continue;
+            }
+
             if (_alive.Count >= Mathf.Max(1, Level.maxAliveAtOnce))
             {
                 yield return null;
@@ -657,6 +689,7 @@ public class LevelManager : MonoBehaviour
             if (SpawnOne())
             {
                 _pendingSpawns--;
+                inWave++;
                 consecutiveFailures = 0;
 
                 yield return new WaitForSeconds(Level.spawnInterval);
@@ -1114,8 +1147,7 @@ public class LevelManager : MonoBehaviour
             for (int attempt = 0; attempt < 24; attempt++)
             {
                 float angle = NextSpawnAngle();
-                float distance = UnityEngine.Random.Range(minSpawnDistanceFromPlayer,
-                                                          maxSpawnDistanceFromPlayer);
+                float distance = UnityEngine.Random.Range(MinSpawnDistance, MaxSpawnDistance);
 
                 Vector3 candidate = origin + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
 
@@ -1149,11 +1181,25 @@ public class LevelManager : MonoBehaviour
     /// </summary>
     float NextSpawnAngle()
     {
+        // In waves, a wave comes from one side: a sector round this wave's bearing.
+        if (Level != null && Level.waveSize > 0)
+            return _waveBearing + UnityEngine.Random.Range(-0.9f, 0.9f);
+
         const float goldenAngle = 2.39996323f;   // radians; pi * (3 - sqrt 5)
 
         _spawnAngle = Mathf.Repeat(_spawnAngle + goldenAngle, Mathf.PI * 2f);
         return _spawnAngle + UnityEngine.Random.Range(-0.35f, 0.35f);
     }
+
+    /// <summary>The bearing the current wave comes from, in radians. Moved on between waves.</summary>
+    float _waveBearing;
+
+    /// <summary>
+    /// The spawn ring for this level. The level's reach stretches the far edge, and the
+    /// near edge half as much, so a long level in a big arena is fought from across it.
+    /// </summary>
+    float MaxSpawnDistance => maxSpawnDistanceFromPlayer * Mathf.Max(1f, Level != null ? Level.spawnReach : 1f);
+    float MinSpawnDistance => minSpawnDistanceFromPlayer * (1f + (Mathf.Max(1f, Level != null ? Level.spawnReach : 1f) - 1f) * 0.5f);
 
     /// <summary>Rotation that faces the player, so nothing arrives with its back turned.</summary>
     Quaternion FacePlayerFrom(Vector3 position)

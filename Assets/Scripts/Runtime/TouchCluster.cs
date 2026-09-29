@@ -74,6 +74,12 @@ public class TouchCluster : MonoBehaviour
              "gesture bars along the bottom.")]
     [Range(2f, 16f)] public float marginMm = 6f;
 
+    [Tooltip("Half the side of the square round the crosshair that no button may enter, in " +
+             "millimetres. On a narrow phone the third column reached into it (the drink " +
+             "button sat beside the sights on an iPhone 15), so the cluster tightens itself " +
+             "until it clears, down to the profile's minimum button size.")]
+    [Range(0f, 20f)] public float crosshairClearMm = 8f;
+
     [Tooltip("How often the situational buttons re-ask whether the player is carrying " +
              "the equipment they drive, in seconds. Cheap, and it has to happen at all: " +
              "the loadout is applied in its own Start, and which of the two Starts Unity " +
@@ -163,6 +169,9 @@ public class TouchCluster : MonoBehaviour
         float secondary = Mathf.Max(secondaryMm, floorMm) * unit;
         float gap = gapMm * unit;
         float margin = marginMm * unit;
+        float floor = floorMm * unit;
+        // Never under the clearance VerifyTouch holds every pair to (4mm), with a margin.
+        float minGap = Mathf.Min(gap, 4.5f * unit);
 
         _carryingBomb = Carrying(TouchButton.ActionKind.Bomb);
         _carryingDrink = Carrying(TouchButton.ActionKind.UseItem);
@@ -182,6 +191,50 @@ public class TouchCluster : MonoBehaviour
         // Column widths and row heights come from what is actually on screen, so a
         // situational button that is not being carried collapses its column rather than
         // leaving a hole the thumb has to travel across.
+        // Tighter, a step at a time, until nothing covers the sights. A roomy phone never
+        // enters the loop; a narrow one trades a millimetre of button for a clear aim.
+        for (int step = 0; step < 24; step++)
+        {
+            Place(live, primary, secondary, gap, margin);
+            if (!IntrudesOnCrosshair(live, unit)) break;
+            if (secondary <= floor + 0.01f && gap <= minGap + 0.01f) break;
+            secondary = Mathf.Max(floor, secondary - 0.5f * unit);
+            gap = Mathf.Max(minGap, gap - 0.25f * unit);
+        }
+
+        // Where the cluster put it is the default; the player's layout goes on top, once.
+        foreach (var slot in live)
+            HudLayoutTarget.Mark(slot.button, TouchLayout.TargetId(slot.button.action),
+                                 TouchLayout.TargetLabel(slot.button.action)).Settle();
+    }
+
+    /// <summary>Whether any shown button's square enters the clear zone round the screen centre.</summary>
+    bool IntrudesOnCrosshair(List<Slot> live, float unit)
+    {
+        if (crosshairClearMm <= 0f) return false;
+        // The crosshair is the middle of the root canvas. Asked of the canvas rather than
+        // of Screen, which a simulated device (ScreenInfo) does not change.
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return false;
+        var root = (RectTransform)canvas.rootCanvas.transform;
+        Vector2 local = _rect.InverseTransformPoint(root.TransformPoint(root.rect.center));
+
+        float clear = crosshairClearMm * unit;
+        var zone = new Rect(local.x - clear, local.y - clear, clear * 2f, clear * 2f);
+        foreach (var slot in live)
+        {
+            var rt = (RectTransform)slot.button.transform;
+            Vector2 anchor = new Vector2(Mathf.Lerp(_rect.rect.xMin, _rect.rect.xMax, rt.anchorMin.x),
+                                         Mathf.Lerp(_rect.rect.yMin, _rect.rect.yMax, rt.anchorMin.y));
+            Vector2 c = anchor + rt.anchoredPosition;
+            var r = new Rect(c - rt.sizeDelta * 0.5f, rt.sizeDelta);
+            if (r.Overlaps(zone)) return true;
+        }
+        return false;
+    }
+
+    void Place(List<Slot> live, float primary, float secondary, float gap, float margin)
+    {
         var colWidth = new Dictionary<int, float>();
         var rowHeight = new Dictionary<int, float>();
 
@@ -211,12 +264,8 @@ public class TouchCluster : MonoBehaviour
             rect.anchoredPosition = new Vector2(mirrored ? x : -x, y);
 
             Dress(slot.button, size);
-
-            // Where the cluster put it is the default; the player's layout goes on top.
-            HudLayoutTarget.Mark(slot.button, TouchLayout.TargetId(slot.button.action),
-                                 TouchLayout.TargetLabel(slot.button.action)).Settle();
-            }
         }
+    }
 
     /// <summary>
     /// Scales the parts inside a button to the size the button just became.

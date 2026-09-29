@@ -16,186 +16,866 @@ MonoBehaviour:
   stakes: "The ground here is older than the fence around it. When the floodlights go, the holes you have been walking round stop being visible \u2014 and they are still exactly where they were."
   levels:
   - displayName: WAY OUT
-    brief: Dev turned the lights on for you. Only some of them. 6 hostiles. Clear them, then reach the way out.
-    enemyCount: 6
-    timeLimit: 32
-    maxAliveAtOnce: 4
+    brief: Dev turned the lights on for you. Only some of them. 25 hostiles. Clear them, then reach the way out.
+    enemyCount: 25
+    timeLimit: 150
+    maxAliveAtOnce: 6
     spawnInterval: 0.8
-    briefingTime: 8
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1
     objective: 5
-    objectiveWeight: 4
+    objectiveWeight: 11
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 4.5
+    bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.2
     damageMultiplier: 1.12
     speedMultiplier: 1.08
     aggression: 0.16
     rosterStep: 5
-    reserveMagazines: 8
+    reserveMagazines: 11
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DISPOSAL
-    brief: Dev turned the lights on for you. Only some of them. 9 hostiles and four charges. Reach a charge or lose the clock.
-    enemyCount: 9
-    timeLimit: 43
-    maxAliveAtOnce: 5
-    spawnInterval: 0.7285714
-    briefingTime: 7.5
+    brief: Dev turned the lights on for you. Only some of them. 27 hostiles and 4 charges. Reach a charge or lose the clock.
+    enemyCount: 27
+    timeLimit: 160
+    maxAliveAtOnce: 6
+    spawnInterval: 0.783871
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0387096
     objective: 6
-    objectiveWeight: 4
+    objectiveWeight: 12
+    objectiveStages: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
     bossWeight: 5
-    bossHealthMultiplier: 1
-    healthMultiplier: 1.3
-    damageMultiplier: 1.18
-    speedMultiplier: 1.11
-    aggression: 0.28857142
-    rosterStep: 7
-    reserveMagazines: 8
+    bossHealthMultiplier: 1.0774194
+    healthMultiplier: 1.2322581
+    damageMultiplier: 1.1393548
+    speedMultiplier: 1.0880646
+    aggression: 0.18903226
+    rosterStep: 5
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: BOSS 1
-    brief: Dev turned the lights on for you. Only some of them. 12 hostiles and a boss. The boss is most of the score.
-    enemyCount: 12
-    timeLimit: 69
-    maxAliveAtOnce: 6
-    spawnInterval: 0.6571429
-    briefingTime: 7.5
+    brief: Dev turned the lights on for you. Only some of them. 29 hostiles and a boss. The boss is most of the score.
+    enemyCount: 29
+    timeLimit: 170
+    maxAliveAtOnce: 7
+    spawnInterval: 0.7677419
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.0774194
     objective: 0
-    objectiveWeight: 5
+    objectiveWeight: 13
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: 
-    bossWeight: 5.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.4
-    damageMultiplier: 1.24
-    speedMultiplier: 1.14
-    aggression: 0.41714284
-    rosterStep: 8
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.1548387
+    healthMultiplier: 1.2645161
+    damageMultiplier: 1.1587096
+    speedMultiplier: 1.0961291
+    aggression: 0.2180645
+    rosterStep: 5
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: Dev turned the lights on for you. Only some of them. 32 hostiles. Reach 2 marked points across the map.
+    enemyCount: 32
+    timeLimit: 185
+    maxAliveAtOnce: 7
+    spawnInterval: 0.7516129
+    briefingTime: 9
+    waveSize: 0
+    waveRest: 0
+    spawnReach: 1.116129
+    objective: 7
+    objectiveWeight: 14
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.2322581
+    healthMultiplier: 1.2967741
+    damageMultiplier: 1.1780645
+    speedMultiplier: 1.1041936
+    aggression: 0.24709676
+    rosterStep: 7
+    reserveMagazines: 12
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: THE RUNNER
-    brief: The rides are moving. Nobody is operating them. 15 hostiles. One of them runs -- that one is the level.
-    enemyCount: 15
-    timeLimit: 63
+    brief: Dev turned the lights on for you. Only some of them. 35 hostiles. One of them runs -- that one is the level.
+    enemyCount: 35
+    timeLimit: 200
     maxAliveAtOnce: 7
-    spawnInterval: 0.5857143
-    briefingTime: 7.5
+    spawnInterval: 0.7354839
+    briefingTime: 9
+    waveSize: 10
+    waveRest: 9.290322
+    spawnReach: 1.1548387
     objective: 2
-    objectiveWeight: 7
+    objectiveWeight: 16
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.5
-    damageMultiplier: 1.3
-    speedMultiplier: 1.17
-    aggression: 0.54571426
-    rosterStep: 10
-    reserveMagazines: 8
+    bossWeight: 5
+    bossHealthMultiplier: 1.3096775
+    healthMultiplier: 1.3290323
+    damageMultiplier: 1.1974194
+    speedMultiplier: 1.1122581
+    aggression: 0.276129
+    rosterStep: 7
+    reserveMagazines: 12
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 2
+    brief: Dev turned the lights on for you. Only some of them. 38 hostiles and a boss. The boss is most of the score.
+    enemyCount: 38
+    timeLimit: 215
+    maxAliveAtOnce: 8
+    spawnInterval: 0.71935487
+    briefingTime: 9
+    waveSize: 10
+    waveRest: 9.612904
+    spawnReach: 1.1935484
+    objective: 0
+    objectiveWeight: 17
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.3870968
+    healthMultiplier: 1.3612903
+    damageMultiplier: 1.2167742
+    speedMultiplier: 1.1203226
+    aggression: 0.30516127
+    rosterStep: 7
+    reserveMagazines: 13
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: ONE MAGAZINE
-    brief: The rides are moving. Nobody is operating them. 18 hostiles and one magazine, nothing spare. Kills drop ammunition.
-    enemyCount: 18
-    timeLimit: 73
+    brief: Dev turned the lights on for you. Only some of them. 41 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 41
+    timeLimit: 230
     maxAliveAtOnce: 8
-    spawnInterval: 0.5142857
-    briefingTime: 7.5
+    spawnInterval: 0.70322585
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 9.935484
+    spawnReach: 1.2322581
     objective: 1
-    objectiveWeight: 8
+    objectiveWeight: 18
+    objectiveStages: 1
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 6.5
-    bossHealthMultiplier: 1.3
-    healthMultiplier: 1.6
-    damageMultiplier: 1.36
-    speedMultiplier: 1.2
-    aggression: 0.6742857
+    bossWeight: 5
+    bossHealthMultiplier: 1.4645162
+    healthMultiplier: 1.3935484
+    damageMultiplier: 1.236129
+    speedMultiplier: 1.1283871
+    aggression: 0.33419353
+    rosterStep: 7
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: Dev turned the lights on for you. Only some of them. 45 hostiles. Hold 2 marked grounds across the map, one after another.
+    enemyCount: 45
+    timeLimit: 250
+    maxAliveAtOnce: 8
+    spawnInterval: 0.6870968
+    briefingTime: 9
+    waveSize: 11
+    waveRest: 10.258064
+    spawnReach: 1.2709677
+    objective: 3
+    objectiveWeight: 20
+    objectiveStages: 2
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 5
+    bossHealthMultiplier: 1.5419354
+    healthMultiplier: 1.4258064
+    damageMultiplier: 1.2554839
+    speedMultiplier: 1.1364516
+    aggression: 0.3632258
+    rosterStep: 8
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 3
+    brief: Dev turned the lights on for you. Only some of them. 50 hostiles and a boss. The boss is most of the score.
+    enemyCount: 50
+    timeLimit: 270
+    maxAliveAtOnce: 9
+    spawnInterval: 0.67096776
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.580645
+    spawnReach: 1.3096775
+    objective: 0
+    objectiveWeight: 22
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.6193548
+    healthMultiplier: 1.4580646
+    damageMultiplier: 1.2748387
+    speedMultiplier: 1.1445161
+    aggression: 0.39225805
+    rosterStep: 8
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: Dev turned the lights on for you. Only some of them. 53 hostiles, and the lights are not yours.
+    enemyCount: 53
+    timeLimit: 285
+    maxAliveAtOnce: 9
+    spawnInterval: 0.65483874
+    briefingTime: 9
+    waveSize: 12
+    waveRest: 10.903226
+    spawnReach: 1.3483871
+    objective: 4
+    objectiveWeight: 24
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 6
+    bossHealthMultiplier: 1.6967742
+    healthMultiplier: 1.4903226
+    damageMultiplier: 1.2941935
+    speedMultiplier: 1.1525806
+    aggression: 0.4212903
+    rosterStep: 8
+    reserveMagazines: 14
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: Dev turned the lights on for you. Only some of them. 57 hostiles. Clear them, then reach the way out.
+    enemyCount: 57
+    timeLimit: 305
+    maxAliveAtOnce: 9
+    spawnInterval: 0.63870966
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.225806
+    spawnReach: 1.3870968
+    objective: 5
+    objectiveWeight: 26
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.7741935
+    healthMultiplier: 1.5225806
+    damageMultiplier: 1.3135484
+    speedMultiplier: 1.1606451
+    aggression: 0.45032257
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 4
+    brief: Dev turned the lights on for you. Only some of them. 61 hostiles and a boss. The boss is most of the score.
+    enemyCount: 61
+    timeLimit: 325
+    maxAliveAtOnce: 9
+    spawnInterval: 0.62258065
+    briefingTime: 9
+    waveSize: 13
+    waveRest: 11.548387
+    spawnReach: 1.4258064
+    objective: 0
+    objectiveWeight: 27
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 7
+    bossHealthMultiplier: 1.8516129
+    healthMultiplier: 1.5548387
+    damageMultiplier: 1.3329033
+    speedMultiplier: 1.1687096
+    aggression: 0.47935483
+    rosterStep: 8
+    reserveMagazines: 15
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The rides are moving. Nobody is operating them. 65 hostiles and 9 charges. Reach a charge or lose the clock.
+    enemyCount: 65
+    timeLimit: 345
+    maxAliveAtOnce: 10
+    spawnInterval: 0.60645163
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 11.870968
+    spawnReach: 1.4645162
+    objective: 6
+    objectiveWeight: 29
+    objectiveStages: 9
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 1.9290323
+    healthMultiplier: 1.5870968
+    damageMultiplier: 1.3522581
+    speedMultiplier: 1.1767741
+    aggression: 0.5083871
+    rosterStep: 10
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: The rides are moving. Nobody is operating them. 70 hostiles. Reach 5 marked points across the map.
+    enemyCount: 70
+    timeLimit: 365
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5903226
+    briefingTime: 9
+    waveSize: 14
+    waveRest: 12.193548
+    spawnReach: 1.5032258
+    objective: 7
+    objectiveWeight: 32
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 8
+    bossHealthMultiplier: 2.0064516
+    healthMultiplier: 1.6193548
+    damageMultiplier: 1.3716129
+    speedMultiplier: 1.1848387
+    aggression: 0.5374193
+    rosterStep: 10
+    reserveMagazines: 16
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 5
+    brief: The rides are moving. Nobody is operating them. 75 hostiles and a boss. The boss is most of the score.
+    enemyCount: 75
+    timeLimit: 390
+    maxAliveAtOnce: 10
+    spawnInterval: 0.5741936
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.516129
+    spawnReach: 1.5419354
+    objective: 0
+    objectiveWeight: 34
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.083871
+    healthMultiplier: 1.6516129
+    damageMultiplier: 1.3909677
+    speedMultiplier: 1.1929033
+    aggression: 0.5664516
+    rosterStep: 10
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: The rides are moving. Nobody is operating them. 79 hostiles. 3 of them run, one at a time -- catch each.
+    enemyCount: 79
+    timeLimit: 410
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5580645
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 12.83871
+    spawnReach: 1.5806452
+    objective: 2
+    objectiveWeight: 36
+    objectiveStages: 3
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 9
+    bossHealthMultiplier: 2.1612904
+    healthMultiplier: 1.6838709
+    damageMultiplier: 1.4103225
+    speedMultiplier: 1.2009678
+    aggression: 0.59548384
+    rosterStep: 10
+    reserveMagazines: 17
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: The rides are moving. Nobody is operating them. 84 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 84
+    timeLimit: 430
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5419355
+    briefingTime: 9
+    waveSize: 15
+    waveRest: 13.16129
+    spawnReach: 1.6193548
+    objective: 1
+    objectiveWeight: 38
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 10
+    bossHealthMultiplier: 2.2387097
+    healthMultiplier: 1.7161291
+    damageMultiplier: 1.4296774
+    speedMultiplier: 1.2090323
+    aggression: 0.62451607
     rosterStep: 11
     reserveMagazines: 0
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
-    brief: The rides are moving. Nobody is operating them. 21 hostiles and a boss. The boss is most of the score.
-    enemyCount: 21
-    timeLimit: 99
-    maxAliveAtOnce: 9
-    spawnInterval: 0.44285715
-    briefingTime: 7.5
+  - displayName: BOSS 6
+    brief: The rides are moving. Nobody is operating them. 89 hostiles and a boss. The boss is most of the score.
+    enemyCount: 89
+    timeLimit: 455
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5258064
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.483871
+    spawnReach: 1.6580646
     objective: 0
-    objectiveWeight: 9
+    objectiveWeight: 40
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
-    bossWeight: 7
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.7
-    damageMultiplier: 1.42
-    speedMultiplier: 1.23
-    aggression: 0.8028571
-    rosterStep: 13
-    reserveMagazines: 8
+    bossWeight: 11
+    bossHealthMultiplier: 2.3161292
+    healthMultiplier: 1.7483871
+    damageMultiplier: 1.4490323
+    speedMultiplier: 1.2170968
+    aggression: 0.65354836
+    rosterStep: 11
+    reserveMagazines: 18
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: HOLD THE LINE
-    brief: He has opened the shafts that were fenced off. 24 hostiles. Stand on the marked ground and keep standing.
-    enemyCount: 24
-    timeLimit: 94
-    maxAliveAtOnce: 10
-    spawnInterval: 0.37142858
-    briefingTime: 7.5
+    brief: The rides are moving. Nobody is operating them. 94 hostiles. Hold 3 marked grounds across the map, one after another.
+    enemyCount: 94
+    timeLimit: 475
+    maxAliveAtOnce: 11
+    spawnInterval: 0.5096774
+    briefingTime: 9
+    waveSize: 16
+    waveRest: 13.806452
+    spawnReach: 1.6967742
     objective: 3
-    objectiveWeight: 11
+    objectiveWeight: 42
+    objectiveStages: 3
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
-    bossWeight: 7.5
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.8
-    damageMultiplier: 1.48
-    speedMultiplier: 1.26
-    aggression: 0.93142855
+    bossWeight: 11
+    bossHealthMultiplier: 2.3935485
+    healthMultiplier: 1.7806451
+    damageMultiplier: 1.4683871
+    speedMultiplier: 1.2251613
+    aggression: 0.6825806
+    rosterStep: 11
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: The rides are moving. Nobody is operating them. 99 hostiles, and the lights are not yours.
+    enemyCount: 99
+    timeLimit: 500
+    maxAliveAtOnce: 12
+    spawnInterval: 0.4935484
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.129032
+    spawnReach: 1.7354839
+    objective: 4
+    objectiveWeight: 45
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.4709678
+    healthMultiplier: 1.8129033
+    damageMultiplier: 1.487742
+    speedMultiplier: 1.2332258
+    aggression: 0.7116129
+    rosterStep: 11
+    reserveMagazines: 19
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 7
+    brief: The rides are moving. Nobody is operating them. 104 hostiles and a boss. The boss is most of the score.
+    enemyCount: 104
+    timeLimit: 520
+    maxAliveAtOnce: 12
+    spawnInterval: 0.47741938
+    briefingTime: 9
+    waveSize: 17
+    waveRest: 14.451612
+    spawnReach: 1.7741935
+    objective: 0
+    objectiveWeight: 47
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 12
+    bossHealthMultiplier: 2.548387
+    healthMultiplier: 1.8451613
+    damageMultiplier: 1.5070968
+    speedMultiplier: 1.2412903
+    aggression: 0.7406451
+    rosterStep: 13
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: WAY OUT
+    brief: The rides are moving. Nobody is operating them. 110 hostiles. Clear them, then reach the way out.
+    enemyCount: 110
+    timeLimit: 545
+    maxAliveAtOnce: 12
+    spawnInterval: 0.46129033
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 14.774194
+    spawnReach: 1.8129033
+    objective: 5
+    objectiveWeight: 50
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 13
+    bossHealthMultiplier: 2.6258066
+    healthMultiplier: 1.8774194
+    damageMultiplier: 1.5264516
+    speedMultiplier: 1.2493548
+    aggression: 0.7696774
+    rosterStep: 13
+    reserveMagazines: 20
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: DISPOSAL
+    brief: The rides are moving. Nobody is operating them. 115 hostiles and 14 charges. Reach a charge or lose the clock.
+    enemyCount: 115
+    timeLimit: 570
+    maxAliveAtOnce: 13
+    spawnInterval: 0.4451613
+    briefingTime: 9
+    waveSize: 18
+    waveRest: 15.096774
+    spawnReach: 1.8516129
+    objective: 6
+    objectiveWeight: 52
+    objectiveStages: 14
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 2.7032259
+    healthMultiplier: 1.9096774
+    damageMultiplier: 1.5458064
+    speedMultiplier: 1.2574193
+    aggression: 0.79870963
+    rosterStep: 13
+    reserveMagazines: 21
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 8
+    brief: The rides are moving. Nobody is operating them. 120 hostiles and a boss. The boss is most of the score.
+    enemyCount: 120
+    timeLimit: 590
+    maxAliveAtOnce: 13
+    spawnInterval: 0.42903227
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.419355
+    spawnReach: 1.8903226
+    objective: 0
+    objectiveWeight: 54
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 14
+    bossHealthMultiplier: 2.7806451
+    healthMultiplier: 1.9419355
+    damageMultiplier: 1.5651613
+    speedMultiplier: 1.2654839
+    aggression: 0.8277419
+    rosterStep: 13
+    reserveMagazines: 21
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: RECON
+    brief: He has opened the shafts that were fenced off. 126 hostiles. Reach 8 marked points across the map.
+    enemyCount: 126
+    timeLimit: 615
+    maxAliveAtOnce: 13
+    spawnInterval: 0.41290325
+    briefingTime: 9
+    waveSize: 19
+    waveRest: 15.741936
+    spawnReach: 1.9290323
+    objective: 7
+    objectiveWeight: 57
+    objectiveStages: 8
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 15
+    bossHealthMultiplier: 2.8580647
+    healthMultiplier: 1.9741936
+    damageMultiplier: 1.5845162
+    speedMultiplier: 1.2735484
+    aggression: 0.85677415
+    rosterStep: 13
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: THE RUNNER
+    brief: He has opened the shafts that were fenced off. 131 hostiles. 4 of them run, one at a time -- catch each.
+    enemyCount: 131
+    timeLimit: 640
+    maxAliveAtOnce: 13
+    spawnInterval: 0.3967742
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.064516
+    spawnReach: 1.967742
+    objective: 2
+    objectiveWeight: 59
+    objectiveStages: 4
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 16
+    bossHealthMultiplier: 2.935484
+    healthMultiplier: 2.0064516
+    damageMultiplier: 1.603871
+    speedMultiplier: 1.2816129
+    aggression: 0.88580644
     rosterStep: 14
-    reserveMagazines: 8
+    reserveMagazines: 22
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 9
+    brief: He has opened the shafts that were fenced off. 137 hostiles and a boss. The boss is most of the score.
+    enemyCount: 137
+    timeLimit: 665
+    maxAliveAtOnce: 14
+    spawnInterval: 0.3806452
+    briefingTime: 9
+    waveSize: 20
+    waveRest: 16.387096
+    spawnReach: 2.0064516
+    objective: 0
+    objectiveWeight: 62
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 16
+    bossHealthMultiplier: 3.0129032
+    healthMultiplier: 2.0387096
+    damageMultiplier: 1.6232258
+    speedMultiplier: 1.2896774
+    aggression: 0.9148387
+    rosterStep: 14
+    reserveMagazines: 23
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: ONE MAGAZINE
+    brief: He has opened the shafts that were fenced off. 143 hostiles and one magazine, nothing spare. Kills drop ammunition.
+    enemyCount: 143
+    timeLimit: 690
+    maxAliveAtOnce: 14
+    spawnInterval: 0.36451614
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 16.709677
+    spawnReach: 2.0451612
+    objective: 1
+    objectiveWeight: 64
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 17
+    bossHealthMultiplier: 3.0903227
+    healthMultiplier: 2.0709677
+    damageMultiplier: 1.6425806
+    speedMultiplier: 1.2977419
+    aggression: 0.94387096
+    rosterStep: 14
+    reserveMagazines: 0
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: HOLD THE LINE
+    brief: He has opened the shafts that were fenced off. 149 hostiles. Hold 5 marked grounds across the map, one after another.
+    enemyCount: 149
+    timeLimit: 715
+    maxAliveAtOnce: 14
+    spawnInterval: 0.34838712
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.032257
+    spawnReach: 2.083871
+    objective: 3
+    objectiveWeight: 67
+    objectiveStages: 5
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 18
+    bossHealthMultiplier: 3.167742
+    healthMultiplier: 2.1032257
+    damageMultiplier: 1.6619354
+    speedMultiplier: 1.3058064
+    aggression: 0.9729032
+    rosterStep: 14
+    reserveMagazines: 24
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BOSS 10
+    brief: He has opened the shafts that were fenced off. 155 hostiles and a boss. The boss is most of the score.
+    enemyCount: 155
+    timeLimit: 740
+    maxAliveAtOnce: 15
+    spawnInterval: 0.33225808
+    briefingTime: 9
+    waveSize: 21
+    waveRest: 17.35484
+    spawnReach: 2.1225808
+    objective: 0
+    objectiveWeight: 70
+    objectiveStages: 1
+    hasBoss: 1
+    bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
+    bossName: 
+    bossWeight: 19
+    bossHealthMultiplier: 3.2451613
+    healthMultiplier: 2.135484
+    damageMultiplier: 1.6812904
+    speedMultiplier: 1.3138709
+    aggression: 1
+    rosterStep: 16
+    reserveMagazines: 24
+    ammoDropChance: 0.12
+    twoStarScore: 0.8
+    oneStarScore: 0.5
+  - displayName: BLACKOUT
+    brief: He has opened the shafts that were fenced off. 161 hostiles, and the lights are not yours.
+    enemyCount: 161
+    timeLimit: 765
+    maxAliveAtOnce: 15
+    spawnInterval: 0.31612906
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 17.67742
+    spawnReach: 2.1612904
+    objective: 4
+    objectiveWeight: 72
+    objectiveStages: 1
+    hasBoss: 0
+    bossArchetype: {fileID: 0}
+    bossName: 
+    bossWeight: 19
+    bossHealthMultiplier: 3.3225806
+    healthMultiplier: 2.167742
+    damageMultiplier: 1.7006452
+    speedMultiplier: 1.3219354
+    aggression: 1
+    rosterStep: 16
+    reserveMagazines: 25
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
   - displayName: DEV AUGER
-    brief: Dev is waiting by the wheel, and he knows your first name. 27 between you and Dev.
-    enemyCount: 27
-    timeLimit: 120
-    maxAliveAtOnce: 11
+    brief: Dev is waiting by the wheel, and he knows your first name. 167 between you and Dev.
+    enemyCount: 167
+    timeLimit: 790
+    maxAliveAtOnce: 15
     spawnInterval: 0.3
-    briefingTime: 7.5
+    briefingTime: 9
+    waveSize: 22
+    waveRest: 18
+    spawnReach: 2.2
     objective: 0
-    objectiveWeight: 12
+    objectiveWeight: 75
+    objectiveStages: 1
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: de1d1c45acbd37be58aabf2af5006815, type: 2}
     bossName: Dev Auger
-    bossWeight: 8
-    bossHealthMultiplier: 1.6
-    healthMultiplier: 1.9
-    damageMultiplier: 1.54
-    speedMultiplier: 1.29
+    bossWeight: 20
+    bossHealthMultiplier: 3.4
+    healthMultiplier: 2.2
+    damageMultiplier: 1.72
+    speedMultiplier: 1.33
     aggression: 1
     rosterStep: 16
-    reserveMagazines: 8
+    reserveMagazines: 26
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5

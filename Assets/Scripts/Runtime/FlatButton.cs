@@ -21,7 +21,7 @@ using UnityEngine.UI;
 /// </summary>
 public class FlatButton : Button
 {
-    public enum Variant { Primary, Secondary, Quiet, Icon, Tab }
+    public enum Variant { Primary, Secondary, Quiet, Icon, Tab, Menu }
     public enum Look { Normal, Hover, Pressed, Disabled }
 
     [Header("Flat button")]
@@ -132,6 +132,20 @@ public class FlatButton : Button
                        : look == Look.Hover ? t.borderHover : clear;
                 break;
 
+            case Variant.Menu:
+                // A side menu entry: the chosen one is a raised, rounded block with the amber
+                // bar down its left edge; the rest are quiet until the pointer is on them.
+                fill = look == Look.Disabled ? clear
+                     : selected ? t.panelRaised
+                     : look == Look.Hover ? t.panelHover * new Color(1, 1, 1, 0.6f)
+                     : look == Look.Pressed ? t.background : clear;
+                border = clear;
+                content = look == Look.Disabled ? t.textDisabled
+                        : selected ? t.textPrimary
+                        : look != Look.Normal ? t.textPrimary : t.textSecondary;
+                stripe = selected && look != Look.Disabled ? t.accent : clear;
+                break;
+
             default: // Secondary and Icon share a face; an icon rests a step quieter.
                 // Pressed drops to the background: a button sits on a panel, so going to the
                 // panel's own colour would make it vanish into it rather than look pushed in.
@@ -173,7 +187,7 @@ public class FlatButton : Button
     /// </summary>
     void Press()
     {
-        float target = _look == Look.Pressed && _variant != Variant.Tab ? 0.96f : 1f;
+        float target = _look == Look.Pressed && _variant != Variant.Tab && _variant != Variant.Menu ? 0.96f : 1f;
         if (Mathf.Approximately(_scale, target)) return;
         float d = Mathf.Max(0.01f, Theme.motionFast);
         _scale = Mathf.MoveTowards(_scale, target, Time.unscaledDeltaTime / d * 0.04f * 2f);
@@ -200,8 +214,17 @@ public class FlatButton : Button
         {
             face.color = _fill;
             face.borderColor = _border;
+            if (_variant == Variant.Menu)
+            {
+                face.stripeSide = FlatRect.Side.Left;
+                face.stripePixels = Theme.stripePixels;
+                face.stripeColor = _stripe;
+            }
             if (_variant == Variant.Tab)
             {
+                // Square: a tab's selection is a line along one edge, and rounding bent the
+                // ends of the line up into the corners.
+                face.cornerRadius = 0f;
                 face.stripeSide = tabEdge;
                 face.stripePixels = Theme.selectionPixels;
                 face.stripeColor = _stripe;

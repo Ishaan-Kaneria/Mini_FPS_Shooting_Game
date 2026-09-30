@@ -91,6 +91,7 @@ namespace FPSKit.EditorTools
         static void BuildTopBar(RectTransform root, MainMenuController menu, UITheme t)
         {
             var bar = UIKit.Panel(root, "TopBar", UIKit.PanelTone.Panel, t);
+            bar.cornerRadius = 0f;
             bar.borderColor = new Color(0, 0, 0, 0);
             bar.stripeSide = FlatRect.Side.Bottom;
             bar.stripeColor = t.border;
@@ -174,6 +175,7 @@ namespace FPSKit.EditorTools
         static void BuildTabRail(RectTransform root, MainMenuController menu, UITheme t)
         {
             var rail = UIKit.Panel(root, "TabRail", UIKit.PanelTone.Panel, t);
+            rail.cornerRadius = 0f;
             rail.borderColor = new Color(0, 0, 0, 0);
             rail.stripeSide = FlatRect.Side.Right;
             rail.stripeColor = t.border;

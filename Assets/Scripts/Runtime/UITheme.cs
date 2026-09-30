@@ -194,6 +194,11 @@ public class UITheme : ScriptableObject
     [Tooltip("The amber line under a selected tab, in screen pixels.")]
     [Min(1f)] public float selectionPixels = 2f;
 
+    [Tooltip("How round every panel, card, button and field is, in canvas units. Slightly: " +
+             "soft enough to read as modern, small enough that the look stays flat and matte. " +
+             "Full-screen shades, bars across the screen and tabs stay square.")]
+    [Min(0f)] public float cornerRadius = 6f;
+
     // ==================================================================
     // Type.
     // ==================================================================

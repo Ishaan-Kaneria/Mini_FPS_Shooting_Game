@@ -74,10 +74,12 @@ public class SettingsPanel : OverlayPanel
         fitter.paddingMm = 0f;
         fitter.Apply();
 
+        // The layout Ishaan picked on 2026-09-30: categories down the left with icons, and each
+        // page's settings grouped into cards on the right, short choices as segmented buttons.
         bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
         var card = UIKit.Panel(safe, "Card", UIKit.PanelTone.Panel, t);
-        UIKit.Anchor(card.rectTransform, handset ? 0.03f : 0.18f, 0.05f, handset ? 0.97f : 0.82f, 0.95f);
-        var col = UIKit.Column(card, 12f, new RectOffset(32, 32, 24, 24));
+        UIKit.Anchor(card.rectTransform, handset ? 0.02f : 0.13f, handset ? 0.03f : 0.06f, handset ? 0.98f : 0.87f, handset ? 0.97f : 0.94f);
+        var col = UIKit.Column(card, 14f, new RectOffset(28, 28, 20, 20));
         col.childForceExpandHeight = false;
 
         // Header.
@@ -91,18 +93,28 @@ public class SettingsPanel : OverlayPanel
 
         // Tabs.
         var names = new List<string> { "Controls" };
+        var icons = new List<string> { "keyboard" };
         bool touch = DeviceProfile.Touched;
-        if (touch) names.Add("Touch");
-        names.Add("Video");
-        names.Add("Audio");
-        names.Add("HUD");
-        names.Add("Profile");
-        _tabs = UIKit.TabBar(card.transform, "Tabs", names.ToArray(), t);
+        if (touch) { names.Add("Touch"); icons.Add("hand-finger"); }
+        names.Add("Video"); icons.Add("device-desktop");
+        names.Add("Audio"); icons.Add("volume");
+        names.Add("HUD"); icons.Add("layout");
+        names.Add("Profile"); icons.Add("user");
+
+        var body = UIKit.Rect(card.transform, "Body");
+        UIKit.Size(body, flexHeight: 1f);
+        var brow = UIKit.Row(body, 24f, null, TextAnchor.UpperLeft);
+        brow.childForceExpandHeight = true;
+
+        _tabs = UIKit.SideMenu(body, "Tabs", names.ToArray(), icons.ToArray(), t);
+        var sle = UIKit.Size(_tabs, handset ? 190f : 220f);
+        sle.flexibleWidth = 0f;
         _tabs.onChanged.AddListener(ShowPage);
 
         // Pages, in one scrolling viewport.
-        var viewport = UIKit.Rect(card.transform, "Viewport");
-        UIKit.Size(viewport, flexHeight: 1f);
+        var viewport = UIKit.Rect(body, "Viewport");
+        var vle = UIKit.Size(viewport, flexWidth: 1f, flexHeight: 1f);
+        vle.minWidth = 0f; vle.preferredWidth = 0f;
         viewport.gameObject.AddComponent<RectMask2D>();
         var scroll = viewport.gameObject.AddComponent<ScrollRect>();
         scroll.horizontal = false;
@@ -116,7 +128,7 @@ public class SettingsPanel : OverlayPanel
         var content = UIKit.Rect(viewport, "Content");
         content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1);
         content.offsetMin = content.offsetMax = Vector2.zero;
-        var ccol = UIKit.Column(content, 0f);
+        var ccol = UIKit.Column(content, 0f, new RectOffset(0, 8, 0, 12));
         ccol.childForceExpandHeight = false;
         var fit = content.gameObject.AddComponent<ContentSizeFitter>();
         fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -157,6 +169,41 @@ public class SettingsPanel : OverlayPanel
         c.childForceExpandHeight = false;
         _pages.Add(page);
         return page;
+    }
+
+    /// <summary>The card each page is filling at the moment: the last section heading's.</summary>
+    readonly Dictionary<RectTransform, RectTransform> _sections = new Dictionary<RectTransform, RectTransform>();
+
+    /// <summary>
+    /// Where the next row goes: into the current section's card, after a hairline divider
+    /// when the card already has a row. A page with no heading yet gets a card of its own.
+    /// </summary>
+    RectTransform Into(RectTransform page)
+    {
+        var t = UITheme.Active;
+        if (!_sections.TryGetValue(page, out var card) || card == null)
+        {
+            card = SectionCard(page, t);
+            _sections[page] = card;
+        }
+        if (card.childCount > 0)
+        {
+            var rule = UIKit.Rect(card, "Divider").gameObject.AddComponent<FlatRect>();
+            rule.raycastTarget = false;
+            rule.cornerRadius = 0f;
+            rule.color = t.border;
+            UIKit.Size(rule, height: 1f);
+        }
+        return card;
+    }
+
+    static RectTransform SectionCard(RectTransform page, UITheme t)
+    {
+        var card = UIKit.Panel(page, "Card", UIKit.PanelTone.Raised, t);
+        card.color = Color.Lerp(t.panel, t.panelRaised, 0.55f);
+        var c = UIKit.Column(card, 0f, new RectOffset(20, 20, 4, 4));
+        c.childForceExpandHeight = false;
+        return card.rectTransform;
     }
 
     /// <summary>Opens a tab by its name ("Video", "Audio", "HUD"...), for a caller that knows which it wants.</summary>
@@ -205,7 +252,7 @@ public class SettingsPanel : OverlayPanel
     void BuildProfile(RectTransform page, UITheme t)
     {
         Heading(page, "Player", t);
-        UIKit.SettingRow(page, "Name", "Name", "What the dashboard calls you.", out var slot, t);
+        UIKit.SettingRow(Into(page), "Name", "Name", "What the dashboard calls you.", out var slot, t);
         var field = NameDialog.Field(slot, "Your name", t);
         UIKit.Fill((RectTransform)field.transform);
         // A pad lands on a page's first control; landing must not start typing.
@@ -240,7 +287,7 @@ public class SettingsPanel : OverlayPanel
     /// <summary>A read-only row: a label and a value, refreshed each time the panel opens.</summary>
     void AddStat(RectTransform page, string label, Func<string> value, UITheme t)
     {
-        UIKit.SettingRow(page, "Stat_" + label, label, null, out var slot, t);
+        UIKit.SettingRow(Into(page), "Stat_" + label, label, null, out var slot, t);
         var text = UIKit.Text(slot, "Value", "", UIKit.TextRole.Body, t);
         UIKit.Fill(text.rectTransform);
         text.alignment = TextAlignmentOptions.MidlineRight;
@@ -303,7 +350,7 @@ public class SettingsPanel : OverlayPanel
                   () => GameSettings.HudScale, v => GameSettings.HudScale = v, Percent, t);
 
         Heading(page, "Layout", t);
-        UIKit.SettingRow(page, "Customize", "Customize layout",
+        UIKit.SettingRow(Into(page), "Customize", "Customize layout",
             DeviceProfile.Touched ? "Move, resize and hide every panel and button, and style the crosshair."
                                   : "Move, resize and hide every panel, and style the crosshair.",
             out var slot, t);
@@ -316,7 +363,7 @@ public class SettingsPanel : OverlayPanel
             Close();
             HudEditor.OpenAnywhere();
         });
-        UIKit.SettingRow(page, "ResetLayout", "Reset layout", "Put every element back where it started, on this device.", out var slot2, t);
+        UIKit.SettingRow(Into(page), "ResetLayout", "Reset layout", "Put every element back where it started, on this device.", out var slot2, t);
         var reset = UIKit.Button(slot2, "Reset", "Reset", FlatButton.Variant.Secondary, "refresh", t);
         UIKit.Fill((RectTransform)reset.transform);
         reset.onClick.AddListener(HudLayout.Clear);
@@ -417,7 +464,7 @@ public class SettingsPanel : OverlayPanel
     /// <summary>One action and the key it is on. Pressing the button listens for the next key.</summary>
     void AddKey(RectTransform page, KeyBindings.Binding b, UITheme t)
     {
-        UIKit.SettingRow(page, "Key_" + b.Id, b.Label, null, out var slot, t);
+        UIKit.SettingRow(Into(page), "Key_" + b.Id, b.Label, null, out var slot, t);
         var button = UIKit.Button(slot, "Key", "", FlatButton.Variant.Secondary, null, t);
         UIKit.Fill((RectTransform)button.transform);
         string id = b.Id;
@@ -455,7 +502,8 @@ public class SettingsPanel : OverlayPanel
     /// <summary>A small crosshair drawn from the saved values, updated as they change.</summary>
     void AddCrosshairPreview(RectTransform page, UITheme t)
     {
-        var box = UIKit.Panel(page, "CrosshairPreview", UIKit.PanelTone.Raised, t);
+        var box = UIKit.Panel(Into(page), "CrosshairPreview", UIKit.PanelTone.Background, t);
+        box.cornerRadius = -1f;
         UIKit.Size(box, height: 120f);
         var centre = UIKit.Rect(box.transform, "Centre");
         centre.anchorMin = centre.anchorMax = centre.pivot = new Vector2(0.5f, 0.5f);
@@ -520,16 +568,19 @@ public class SettingsPanel : OverlayPanel
         return best;
     }
 
-    static void Heading(RectTransform page, string text, UITheme t)
+    /// <summary>A section: its name over a card, and the rows after it go in the card.</summary>
+    void Heading(RectTransform page, string text, UITheme t)
     {
         var h = UIKit.Text(page, "Heading_" + text, text, UIKit.TextRole.Label, t);
-        h.margin = new Vector4(0, 18, 0, 4);
-        UIKit.Size(h, height: 44f);
+        h.margin = new Vector4(4, 18, 0, 8);
+        h.color = t.accent;
+        UIKit.Size(h, height: 46f);
+        _sections[page] = SectionCard(page, t);
     }
 
     void AddSwitch(RectTransform page, string label, string hint, Func<bool> get, Action<bool> set, UITheme t)
     {
-        UIKit.SettingRow(page, label, label, hint, out var slot, t);
+        UIKit.SettingRow(Into(page), label, label, hint, out var slot, t);
         var sw = UIKit.Switch(slot, "Switch", t);
         sw.Changed += set;
         _refreshers.Add(() => sw.IsOn = get());
@@ -538,7 +589,7 @@ public class SettingsPanel : OverlayPanel
     void AddSlider(RectTransform page, string label, string hint, float min, float max,
                    Func<float> get, Action<float> set, Func<float, string> format, UITheme t)
     {
-        UIKit.SettingRow(page, label, label, hint, out var slot, t);
+        UIKit.SettingRow(Into(page), label, label, hint, out var slot, t);
         var slider = UIKit.Slider(slot, "Slider", min, max, out TMP_Text value, t);
         bool refreshing = false;
         slider.onValueChanged.AddListener(v =>
@@ -558,7 +609,18 @@ public class SettingsPanel : OverlayPanel
     void AddChoice(RectTransform page, string label, string hint, string[] options,
                    Func<int> get, Action<int> set, UITheme t)
     {
-        UIKit.SettingRow(page, label, label, hint, out var slot, t);
+        UIKit.SettingRow(Into(page), label, label, hint, out var slot, t);
+        // Two to four short options are all shown at once; a longer list (resolutions,
+        // six crosshair colours) keeps the arrows.
+        bool shortList = options.Length <= 4;
+        foreach (var o in options) if (o.Length > 10) shortList = false;
+        if (shortList)
+        {
+            var seg = UIKit.Segmented(slot, "Choice", options, t);
+            seg.Changed += set;
+            _refreshers.Add(() => seg.Index = get());
+            return;
+        }
         var choice = UIKit.Choice(slot, "Choice", options, t);
         choice.Changed += set;
         _refreshers.Add(() => choice.Index = get());

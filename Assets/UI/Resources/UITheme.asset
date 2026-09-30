@@ -48,6 +48,7 @@ MonoBehaviour:
   stripePixels: 3
   borderPixels: 1
   selectionPixels: 2
+  cornerRadius: 6
   headingFont: {fileID: 11400000, guid: 19e1fa23f84ab0ffdabccfc88b89d7cb, type: 2}
   bodyFont: {fileID: 11400000, guid: 0bfd4c543584cb11e90d1f0d84da4c09, type: 2}
   bodyStrongFont: {fileID: 11400000, guid: b7576ea8b721eeb8689010d4f2684371, type: 2}
@@ -179,6 +180,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 03801760965fe91f0a7d8a99127d7615, type: 3}
   - id: crosshair
     sprite: {fileID: 21300000, guid: 5b569dfda96fae9d09b24260a6a25996, type: 3}
+  - id: device-desktop
+    sprite: {fileID: 21300000, guid: 71caf221522381acb8a32e074f889cb7, type: 3}
   - id: device-gamepad-2
     sprite: {fileID: 21300000, guid: c2eba8a379b41c6b39dc4c0f4e33c55e, type: 3}
   - id: fist
@@ -253,6 +256,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 58311a025f517ae5f8b77a08d9595d34, type: 3}
   - id: user
     sprite: {fileID: 21300000, guid: f36b143fda5db67af9cc5ccd3037c767, type: 3}
+  - id: volume
+    sprite: {fileID: 21300000, guid: e8cd9e41c2d4b6f18ae183e73b7b1894, type: 3}
   - id: x
     sprite: {fileID: 21300000, guid: 95b90cb69632ead009e5a66bdfc4cf95, type: 3}
   iconSize: 24

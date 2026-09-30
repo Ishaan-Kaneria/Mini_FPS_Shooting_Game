@@ -191,6 +191,9 @@ public static class UIKit
         };
         r.borderColor = tone == PanelTone.Background ? new Color(0, 0, 0, 0) : t.border;
         r.borderPixels = t.borderPixels;
+        // A background is a sheet behind everything, usually the whole screen: square, or
+        // its corners would show whatever is under it.
+        if (tone == PanelTone.Background) r.cornerRadius = 0f;
         return r;
     }
 
@@ -274,6 +277,7 @@ public static class UIKit
         var bar = Rect(parent, name);
         var rule = bar.gameObject.AddComponent<FlatRect>();
         rule.raycastTarget = false;
+        rule.cornerRadius = 0f;
         rule.color = new Color(0, 0, 0, 0);
         rule.stripeSide = FlatRect.Side.Bottom;
         rule.stripeColor = t.border;
@@ -342,6 +346,101 @@ public static class UIKit
         tb.Wire();
         tb.Selected = 0;
         return tb;
+    }
+
+    /// <summary>
+    /// Categories down the side of a screen: an icon and a caption on each row, the chosen
+    /// one raised with an amber bar on its left edge. Settings uses it. A
+    /// <see cref="UITabBar"/>, so it switches pages exactly as a tab bar does.
+    /// </summary>
+    public static UITabBar SideMenu(Transform parent, string name, string[] captions, string[] iconIds, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var bar = Rect(parent, name);
+        var col = Column(bar, 6f, new RectOffset(0, 0, 0, 0), TextAnchor.UpperLeft);
+        col.childForceExpandWidth = true;
+
+        var tabs = new FlatButton[captions.Length];
+        for (int i = 0; i < captions.Length; i++)
+        {
+            var face = Panel(bar, "Tab_" + captions[i], PanelTone.Raised, t);
+            face.raycastTarget = true;
+            Row(face, 14f, new RectOffset(18, 12, 0, 0), TextAnchor.MiddleLeft);
+            Size(face, height: 52f);
+            Image icon = null;
+            if (iconIds != null && i < iconIds.Length && !string.IsNullOrEmpty(iconIds[i]))
+                icon = Icon(face.transform, "Icon", iconIds[i], 22f, t.textSecondary, t);
+            var label = Text(face.transform, "Label", captions[i], TextRole.Label, t);
+            label.fontSize = t.sizeLabel + 2f;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+
+            var b = face.gameObject.AddComponent<FlatButton>();
+            b.face = face;
+            b.label = label;
+            b.icon = icon;
+            b.targetGraphic = face;
+            b.variant = FlatButton.Variant.Menu;
+            UIButtonSound.On(face.gameObject);
+            tabs[i] = b;
+        }
+
+        var tb = bar.gameObject.AddComponent<UITabBar>();
+        tb.tabs = tabs;
+        tb.Wire();
+        tb.Selected = 0;
+        return tb;
+    }
+
+    /// <summary>
+    /// Two to four options side by side in one rounded well, the chosen one filled amber.
+    /// Every option is on screen, so there is nothing to step through to find out what the
+    /// choices are.
+    /// </summary>
+    public static UISegmented Segmented(Transform parent, string name, string[] options, UITheme t = null)
+    {
+        t = t != null ? t : UITheme.Active;
+        var well = Panel(parent, name, PanelTone.Background, t);
+        well.cornerRadius = -1f;
+        well.borderColor = t.border;
+        well.borderPixels = t.borderPixels;
+        well.raycastTarget = true;
+        Fill(well.rectTransform);
+        var row = Row(well, 4f, new RectOffset(4, 4, 4, 4), TextAnchor.MiddleCenter);
+        row.childForceExpandWidth = true;
+        row.childForceExpandHeight = true;
+
+        var buttons = new Button[options.Length];
+        var faces = new FlatRect[options.Length];
+        var labels = new TMP_Text[options.Length];
+        for (int i = 0; i < options.Length; i++)
+        {
+            var seg = Rect(well.transform, "Segment_" + options[i]);
+            var f = seg.gameObject.AddComponent<FlatRect>();
+            f.raycastTarget = true;
+            f.color = new Color(0, 0, 0, 0);
+            f.cornerRadius = Mathf.Max(0f, t.cornerRadius - 2f);
+            Size(f, flexWidth: 1f);
+            var l = Text(seg, "Label", options[i], TextRole.Label, t);
+            l.alignment = TextAlignmentOptions.Center;
+            l.fontSize = t.sizeLabel + 1f;
+            Fill(l.rectTransform);
+            var b = seg.gameObject.AddComponent<Button>();
+            b.transition = Selectable.Transition.None;
+            b.targetGraphic = f;
+            // Clickable, never focusable: the whole control is the stop, as with the chooser.
+            b.navigation = new Navigation { mode = Navigation.Mode.None };
+            buttons[i] = b; faces[i] = f; labels[i] = l;
+        }
+
+        var s = well.gameObject.AddComponent<UISegmented>();
+        s.face = well;
+        s.segments = buttons;
+        s.segmentFaces = faces;
+        s.segmentLabels = labels;
+        s.targetGraphic = well;
+        s.Wire();
+        s.Index = 0;
+        return s;
     }
 
     // ==================================================================
@@ -454,9 +553,11 @@ public static class UIKit
 
         var track = Panel(root, "Track", PanelTone.Raised, t);
         track.raycastTarget = true;
-        Size(track, 64f, 32f);
+        track.cornerRadius = 999f;
+        Size(track, 60f, 32f);
         var knob = Rect(track.transform, "Knob").gameObject.AddComponent<FlatRect>();
         knob.raycastTarget = false;
+        knob.cornerRadius = 999f;
 
         var sw = track.gameObject.AddComponent<UISwitch>();
         sw.track = track;
@@ -486,6 +587,7 @@ public static class UIKit
         track.anchorMin = new Vector2(0, 0.5f); track.anchorMax = new Vector2(1, 0.5f);
         track.sizeDelta = new Vector2(0, 6f);
         var tr = track.gameObject.AddComponent<FlatRect>();
+        tr.cornerRadius = 999f;
         tr.raycastTarget = false; tr.color = t.background; tr.borderColor = t.border; tr.borderPixels = t.borderPixels;
 
         var fillArea = Rect(sliderRect, "FillArea");
@@ -495,6 +597,7 @@ public static class UIKit
         fill.sizeDelta = Vector2.zero;
         var fr = fill.gameObject.AddComponent<FlatRect>();
         fr.raycastTarget = false; fr.color = t.accent;
+        fr.cornerRadius = 999f;
 
         var handleArea = Rect(sliderRect, "HandleArea");
         Fill(handleArea, 10f, 0f, 10f, 0f);
@@ -507,6 +610,7 @@ public static class UIKit
         var hr = handle.gameObject.AddComponent<FlatRect>();
         hr.raycastTarget = false; hr.color = t.accent;
         hr.borderColor = t.background; hr.borderPixels = 2f;
+        hr.cornerRadius = 999f;
 
         var slider = sliderRect.gameObject.AddComponent<Slider>();
         slider.transition = Selectable.Transition.None;

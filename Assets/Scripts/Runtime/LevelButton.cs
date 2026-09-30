@@ -17,13 +17,13 @@ using UnityEngine.UI;
 /// because the focus already chose it.
 ///
 /// <b>Locked is drawn, not hidden</b>, and the button is not interactable: a tile that lights
-/// up and then does nothing reads as broken. Hovering a locked tile still previews it in the
-/// pane, so what opens it is one glance away.
+/// up and then does nothing reads as broken. Clicking a locked tile still shows it in the
+/// pane, with PLAY replaced by what opens it.
 ///
 /// Built once by the dashboard builder as a hidden template and cloned per level at
 /// runtime, so a ladder's length is a property of its <see cref="LevelSet"/>, never of the scene.
 /// </summary>
-public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, ISelectHandler, IDeselectHandler
+public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, ISelectHandler, IDeselectHandler, IPointerClickHandler
 {
     [Header("Parts")]
     public Button button;
@@ -143,6 +143,14 @@ public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     }
 
     public void OnDeselect(BaseEventData e) => Paint();
+
+    /// <summary>A locked tile's button takes no click, but the tile still shows itself in the pane.</summary>
+    public void OnPointerClick(PointerEventData e)
+    {
+        if (Unlocked) return;
+        _focus?.Invoke(Index);
+        UISfx.Play(UISfx.Sound.Error, 1f, 0.5f);
+    }
 
     void Paint()
     {

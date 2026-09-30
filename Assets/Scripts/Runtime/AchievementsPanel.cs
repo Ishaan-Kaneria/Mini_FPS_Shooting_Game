@@ -101,7 +101,9 @@ public class AchievementsPanel : OverlayPanel
 
         _overall = UIKit.ProgressBar(root, "Overall", _t.accent, 8f, false, _t);
 
-        _filters = UIKit.TabBar(root, "Filters", new[] { "All", "Combat", "Progression", "Challenge", "Economy" }, _t);
+        // No ALL tab: the four categories are the whole list, and ALL was the same twenty
+        // rows in one long scroll.
+        _filters = UIKit.TabBar(root, "Filters", new[] { "Combat", "Progression", "Challenge", "Economy" }, _t);
         UIKit.Size(_filters).minHeight = 48f;
         _filters.onChanged.AddListener(i => { _filter = i; Refresh(); });
 
@@ -138,7 +140,7 @@ public class AchievementsPanel : OverlayPanel
 
         foreach (var a in Achievements.Catalogue)
         {
-            if (_filter > 0 && (int)a.Group != _filter - 1) continue;
+            if ((int)a.Group != _filter) continue;
             Row(a);
         }
     }

@@ -99,7 +99,11 @@ namespace FPSKit.EditorTools
             brow.childControlHeight = true;
 
             var viewport = UIKit.Rect(bodyRow, "Levels");
-            UIKit.Size(viewport, flexWidth: 1.9f, flexHeight: 1f);
+            // Fixed shares of the width, never content: the pane's width followed its longest
+            // line, so a different level resized the grid under the pointer, which chose a
+            // different tile, which resized it again -- the screen shook.
+            var vle = UIKit.Size(viewport, flexWidth: 1.9f, flexHeight: 1f);
+            vle.minWidth = 0f; vle.preferredWidth = 0f;
             viewport.gameObject.AddComponent<RectMask2D>();
             var hit = viewport.gameObject.AddComponent<FlatRect>();
             hit.color = new Color(0, 0, 0, 0);
@@ -230,7 +234,8 @@ namespace FPSKit.EditorTools
         static LevelDetail BuildLevelDetail(RectTransform parent, UITheme t)
         {
             var pane = UIKit.Panel(parent, "Detail", UIKit.PanelTone.Panel, t);
-            UIKit.Size(pane, flexWidth: 1f, flexHeight: 1f);
+            var ple0 = UIKit.Size(pane, flexWidth: 1f, flexHeight: 1f);
+            ple0.minWidth = 0f; ple0.preferredWidth = 0f;
             var pcol = UIKit.Column(pane, 0f, new RectOffset(1, 1, 1, 1));
             pcol.childForceExpandHeight = false;
             pcol.childControlHeight = true;

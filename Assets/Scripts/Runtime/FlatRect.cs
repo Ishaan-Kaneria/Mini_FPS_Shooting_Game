@@ -17,6 +17,13 @@ using UnityEngine.UI;
 ///
 /// No sprite, no texture, no nine-slicing: the colour on the Graphic is the fill, and
 /// everything else is a field here.
+///
+/// <b>Corners are slightly rounded</b> (the theme's <see cref="UITheme.cornerRadius"/>, 6 units),
+/// by Ishaan's call on 2026-09-30 -- still flat and matte, just softer. A shape can ask for its
+/// own radius, 0 for square (full-screen shades, the top bar, tabs), or a huge one for a pill
+/// (a switch); the radius is clamped to half the short side either way. Round shapes are laid
+/// as a fill fan and a border ring between two matching outlines, so fill and border still
+/// never overlap, and a stripe follows the curve of its side's corners.
 /// </summary>
 [RequireComponent(typeof(CanvasRenderer))]
 public class FlatRect : MaskableGraphic
@@ -40,7 +47,20 @@ public class FlatRect : MaskableGraphic
     [Tooltip("Stripe thickness in screen pixels.")]
     [SerializeField, Min(0f)] float _stripePixels = 3f;
 
+    [Header("Corners")]
+    [Tooltip("Corner radius in canvas units. Negative means the theme's radius; 0 is square; " +
+             "anything over half the short side makes a pill.")]
+    [SerializeField] float _cornerRadius = -1f;
+
     float _builtScale = -1f;
+
+    public float cornerRadius { get => _cornerRadius; set { if (Mathf.Approximately(_cornerRadius, value)) return; _cornerRadius = value; SetVerticesDirty(); } }
+
+    float Radius(Rect r)
+    {
+        float want = _cornerRadius >= 0f ? _cornerRadius : UITheme.Active != null ? UITheme.Active.cornerRadius : 0f;
+        return Mathf.Clamp(want, 0f, Mathf.Min(r.width, r.height) * 0.5f);
+    }
 
     protected override void OnEnable()
     {
@@ -103,6 +123,13 @@ public class FlatRect : MaskableGraphic
             left = right = top = bottom = b;
         }
 
+        float radius = Radius(r);
+        if (radius > 0.25f)
+        {
+            Rounded(vh, r, radius, left, right, top, bottom, s);
+            return;
+        }
+
         float x0 = r.xMin, x1 = r.xMax, y0 = r.yMin, y1 = r.yMax;
         float ix0 = x0 + left, ix1 = x1 - right, iy0 = y0 + bottom, iy1 = y1 - top;
 
@@ -119,6 +146,71 @@ public class FlatRect : MaskableGraphic
         if (bottom > 0f) Quad(vh, x0, y0, x1, iy0, Edge(Side.Bottom));
         if (left > 0f) Quad(vh, x0, iy0, ix0, iy1, Edge(Side.Left));
         if (right > 0f) Quad(vh, ix1, iy0, x1, iy1, Edge(Side.Right));
+    }
+
+    const int CornerSteps = 6;
+
+    /// <summary>
+    /// A rounded rectangle: the outline walked counter-clockwise from the right edge, with
+    /// the same number of points on the inner (fill) outline, so the border is a ring of
+    /// quads between them and the fill is a fan inside. Each ring quad takes the colour of the
+    /// side it is on, which is how a stripe sits along one side and bends into its corners.
+    /// </summary>
+    void Rounded(VertexHelper vh, Rect r, float radius, float left, float right, float top, float bottom, float stripe)
+    {
+        var outer = new System.Collections.Generic.List<Vector2>(4 * (CornerSteps + 1));
+        var inner = new System.Collections.Generic.List<Vector2>(4 * (CornerSteps + 1));
+        var sides = new System.Collections.Generic.List<Side>(4 * (CornerSteps + 1));
+
+        // Corner centres, and the insets that meet at each corner.
+        var corners = new[]
+        {
+            (c: new Vector2(r.xMax - radius, r.yMax - radius), from: 0f,   h: right, v: top,    a: Side.Right, b: Side.Top),
+            (c: new Vector2(r.xMin + radius, r.yMax - radius), from: 90f,  h: left,  v: top,    a: Side.Top,   b: Side.Left),
+            (c: new Vector2(r.xMin + radius, r.yMin + radius), from: 180f, h: left,  v: bottom, a: Side.Left,  b: Side.Bottom),
+            (c: new Vector2(r.xMax - radius, r.yMin + radius), from: 270f, h: right, v: bottom, a: Side.Bottom, b: Side.Right),
+        };
+        foreach (var k in corners)
+        {
+            for (int i = 0; i <= CornerSteps; i++)
+            {
+                float t = i / (float)CornerSteps;
+                float ang = (k.from + 90f * t) * Mathf.Deg2Rad;
+                var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                outer.Add(k.c + dir * radius);
+                // The inner outline is the outer one pulled in by each side's width: an
+                // ellipse where the two widths differ, so a thick stripe stays even.
+                inner.Add(k.c + new Vector2(dir.x * Mathf.Max(0f, radius - k.h), dir.y * Mathf.Max(0f, radius - k.v)));
+                sides.Add(t < 0.5f ? k.a : k.b);
+            }
+        }
+
+        // Fill: a fan from the centre over the inner outline. Emitted even when clear, for
+        // the raycast reason the square path gives.
+        Color32 fill = color;
+        int centre = vh.currentVertCount;
+        vh.AddVert(new Vector3(r.center.x, r.center.y), fill, Vector2.zero);
+        for (int i = 0; i < inner.Count; i++) vh.AddVert(inner[i], fill, Vector2.zero);
+        for (int i = 0; i < inner.Count; i++)
+            vh.AddTriangle(centre, centre + 1 + i, centre + 1 + (i + 1) % inner.Count);
+
+        // Border ring, a quad per segment, coloured by side.
+        for (int i = 0; i < outer.Count; i++)
+        {
+            int j = (i + 1) % outer.Count;
+            var side = sides[i];
+            Color c = side == _stripeSide && stripe > 0f ? _stripeColor : _borderColor;
+            if (c.a <= 0f) continue;
+            if ((inner[i] - outer[i]).sqrMagnitude < 1e-6f && (inner[j] - outer[j]).sqrMagnitude < 1e-6f) continue;
+            Color32 c32 = c;
+            int v = vh.currentVertCount;
+            vh.AddVert(outer[i], c32, Vector2.zero);
+            vh.AddVert(outer[j], c32, Vector2.zero);
+            vh.AddVert(inner[j], c32, Vector2.zero);
+            vh.AddVert(inner[i], c32, Vector2.zero);
+            vh.AddTriangle(v, v + 1, v + 2);
+            vh.AddTriangle(v + 2, v + 3, v);
+        }
     }
 
     static void Quad(VertexHelper vh, float x0, float y0, float x1, float y1, Color c, bool always = false)

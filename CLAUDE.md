@@ -157,6 +157,11 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Only the top `OverlayPanel` answers Back. One-line kit texts hold their line height
   (`UITextFloor`), so size card cells with `UIGrid.ContentHeight`, not an aspect alone.
 - Level select is choose-then-play: tiles choose, the `LevelDetail` pane has PLAY.
+  Hover never changes the pane, and the grid/pane split is fixed flex (content-sized widths
+  made the screen shake).
+- Corners are slightly rounded (`UITheme.cornerRadius`, `FlatRect.cornerRadius`; 0 = square for
+  full-screen sheets, bars across the screen and tabs; 999 = pill). Short choices (2-4) in
+  Settings are `UISegmented`; longer lists keep `UIChoice` arrows.
 
 ## Platforms
 

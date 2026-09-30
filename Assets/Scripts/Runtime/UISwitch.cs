@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// An on/off switch: a flat track with a square knob, amber when on. Clicked, tapped, or
+/// An on/off switch: a pill track with a round knob, amber when on. Clicked, tapped, or
 /// pressed with A while the focus ring is on it.
 ///
 /// A <see cref="Selectable"/> so the gamepad can land on it and the focus ring can find it;
@@ -93,7 +93,7 @@ public class UISwitch : Selectable, IPointerClickHandler, ISubmitHandler
             rt.anchorMax = new Vector2(Mathf.Lerp(0.5f, 1f, k), 1f);
             rt.offsetMin = new Vector2(3f, 3f);
             rt.offsetMax = new Vector2(-3f, -3f);
-            knob.color = disabled ? t.textDisabled : k > 0.5f ? t.textOnAccent : t.textSecondary;
+            knob.color = disabled ? t.textDisabled : k > 0.5f ? t.textPrimary : t.textSecondary;
         }
         if (stateLabel != null)
         {

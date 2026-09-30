@@ -241,12 +241,37 @@ namespace FPSKit.EditorTools
                 if (choice == null) Errors.Add("Settings' HUD page shows no chooser to click");
                 else
                 {
+                    // Toward whichever end has room, then back: the first chooser here is the
+                    // crosshair colour now (the style is segmented), and a layout set to the last
+                    // colour has nowhere to go forward -- and must be left as it was found.
                     int before = choice.Index;
-                    choice.next.onClick.Invoke();
+                    bool atEnd = before >= choice.options.Length - 1;
+                    (atEnd ? choice.previous : choice.next).onClick.Invoke();
                     int after = choice.Index;
-                    choice.previous.onClick.Invoke();
+                    (atEnd ? choice.next : choice.previous).onClick.Invoke();
                     if (after == before && choice.options.Length > 1)
                         Errors.Add("a Settings chooser's arrow did nothing when clicked");
+                    if (choice.Index != before)
+                        Errors.Add("a Settings chooser's arrows did not step back to where they started");
+                }
+            }
+
+            // A segmented choice (Video's Quality): clicking another segment has to pick it.
+            // Wired after the kit assigns the segments, for the reason the tabs are.
+            if (bar != null)
+            {
+                for (int i = 0; i < bar.tabs.Length; i++)
+                    if (bar.tabs[i].label != null && bar.tabs[i].label.text.ToUpperInvariant() == "VIDEO") bar.tabs[i].onClick.Invoke();
+                UISegmented seg = null;
+                foreach (var c in settings.panel.GetComponentsInChildren<UISegmented>(false)) { seg = c; break; }
+                if (seg == null) Errors.Add("Settings' Video page shows no segmented choice to click");
+                else
+                {
+                    int before = seg.Index;
+                    int other = (before + 1) % seg.Count;
+                    seg.segments[other].onClick.Invoke();
+                    if (seg.Index != other) Errors.Add("clicking a Settings segment did not choose it");
+                    seg.segments[before].onClick.Invoke();
                 }
             }
             settings.Close();

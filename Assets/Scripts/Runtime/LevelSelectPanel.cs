@@ -314,8 +314,12 @@ public class LevelSelectPanel : MonoBehaviour
         ShowDetail(index);
     }
 
-    /// <summary>The pointer over a tile shows it in the pane; off it, the pane goes back to the chosen one.</summary>
-    void Preview(int index, bool on) => ShowDetail(on ? index : _chosen);
+    /// <summary>
+    /// Hovering does not change the pane. It used to preview the tile under the pointer, and
+    /// crossing the grid flicked the pane between levels on every gap between tiles -- read
+    /// as the screen shaking. The pane changes when a level is chosen, and only then.
+    /// </summary>
+    void Preview(int index, bool on) { }
 
     void ShowDetail(int index)
     {

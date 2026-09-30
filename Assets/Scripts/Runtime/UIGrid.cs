@@ -84,4 +84,22 @@ public static class UIGrid
 
         return columns;
     }
+
+    /// <summary>
+    /// The tallest minimum height among a grid's live cards: what a cell must be, at the
+    /// least, for every line on the card to be drawn. Cards are columns whose texts hold
+    /// their line heights (<see cref="UITextFloor"/>), so this is the card's real content at
+    /// whatever size the phone's text floor has made it -- which no aspect ratio can know.
+    /// </summary>
+    public static float ContentHeight(Transform grid)
+    {
+        if (grid == null) return 0f;
+        float need = 0f;
+        for (int i = 0; i < grid.childCount; i++)
+        {
+            if (!(grid.GetChild(i) is RectTransform child) || !child.gameObject.activeSelf) continue;
+            need = Mathf.Max(need, LayoutUtility.GetMinHeight(child));
+        }
+        return need;
+    }
 }

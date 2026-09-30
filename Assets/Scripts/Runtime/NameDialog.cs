@@ -115,6 +115,8 @@ public class NameDialog : OverlayPanel
         field.targetGraphic = face;
         field.caretColor = t.accent;
         field.selectionColor = new Color(t.accent.r, t.accent.g, t.accent.b, 0.35f);
+        // On a touch screen, the game's own keyboard rather than the phone's.
+        OnScreenKeyboard.Attach(field, placeholder);
         return field;
     }
 
@@ -129,6 +131,13 @@ public class NameDialog : OverlayPanel
     {
         if (_field == null) return;
         _field.text = "";
+        // A touch screen goes straight to the game's keyboard, whose DONE confirms; the
+        // phone's own keyboard never opens. A desk types into the field as it always has.
+        if (OnScreenKeyboard.Wanted)
+        {
+            OnScreenKeyboard.Open(_field, "What do we call you?");
+            return;
+        }
         _field.Select();
         _field.ActivateInputField();
     }

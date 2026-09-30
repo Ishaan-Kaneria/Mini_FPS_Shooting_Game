@@ -33,6 +33,25 @@ public abstract class OverlayPanel : MonoBehaviour
     static int _open;
     static int _closedFrame = -1;
 
+    /// <summary>Open overlays, most recent last. Only the top one answers Back, so a keyboard
+    /// over the name dialog closes alone rather than taking the dialog with it.</summary>
+    static readonly System.Collections.Generic.List<OverlayPanel> _stack = new System.Collections.Generic.List<OverlayPanel>();
+
+    /// <summary>Whether this is the overlay a Back press belongs to.</summary>
+    protected bool IsTop
+    {
+        get
+        {
+            for (int i = _stack.Count - 1; i >= 0; i--)
+            {
+                var p = _stack[i];
+                if (p == null || !p.IsOpen) { _stack.RemoveAt(i); continue; }
+                return p == this;
+            }
+            return true;
+        }
+    }
+
     /// <summary>
     /// True while any overlay is open, and for the rest of the frame one closed in. Read by
     /// anything else that answers Escape or B -- the pause menu under a settings screen --
@@ -45,6 +64,8 @@ public abstract class OverlayPanel : MonoBehaviour
     {
         _open = 0;
         _closedFrame = -1;
+        _stack.Clear();
+        _backFrame = -1;
     }
 
     protected virtual void Awake() => HideAtLoad();
@@ -52,6 +73,7 @@ public abstract class OverlayPanel : MonoBehaviour
     protected virtual void OnDestroy()
     {
         if (IsOpen) _open = Mathf.Max(0, _open - 1);
+        _stack.Remove(this);
     }
 
     protected virtual void Start()
@@ -65,19 +87,26 @@ public abstract class OverlayPanel : MonoBehaviour
     protected virtual void Update()
     {
         if (!IsOpen) return;
+        Appear();
 
         // Escape and Q back out. A screen with no keyboard way out traps anyone whose
         // pointer is not where they expected it to be -- and on a browser Escape is also
         // what the player has just pressed to get their cursor back.
-        if (GameInput.BackPressed) Close();
+        if (GameInput.BackPressed && IsTop && _backFrame != Time.frameCount) Close();
     }
+
+    static int _backFrame = -1;
 
     public void Open()
     {
         if (panel == null) return;
 
         if (!panel.activeSelf) _open++;
+        _stack.Remove(this);
+        _stack.Add(this);
+        bool wasOpen = panel.activeSelf;
         panel.SetActive(true);
+        if (!wasOpen) BeginAppear();
         OnOpened();
     }
 
@@ -89,10 +118,44 @@ public abstract class OverlayPanel : MonoBehaviour
         {
             _open = Mathf.Max(0, _open - 1);
             _closedFrame = Time.frameCount;
+            // The press that closed this one is spent: the overlay under it, now on top,
+            // must not read the same press later in this frame.
+            if (GameInput.BackPressed) _backFrame = Time.frameCount;
         }
+        _stack.Remove(this);
         panel.SetActive(false);
         OnClosed();
         Closed?.Invoke();
+    }
+
+    // ---- arriving ------------------------------------------------------------------
+
+    CanvasGroup _group;
+    float _appear = 1f;
+
+    /// <summary>
+    /// A screen arrives rather than appears: it fades in over the theme's panel time and
+    /// settles from a hair smaller, the same 200ms everything that opens uses. Unscaled,
+    /// because the pause card and the results screen open with the clock stopped. Only the
+    /// look moves; clicks land from the first frame.
+    /// </summary>
+    void BeginAppear()
+    {
+        if (panel == null) return;
+        if (_group == null && !panel.TryGetComponent(out _group)) _group = panel.AddComponent<CanvasGroup>();
+        _appear = 0f;
+        Appear();
+    }
+
+    void Appear()
+    {
+        if (_appear >= 1f || panel == null) return;
+        float d = Mathf.Max(0.01f, UITheme.Active.motionSlow);
+        _appear = Mathf.Min(1f, _appear + Time.unscaledDeltaTime / d);
+        float e = UITheme.EaseOut(_appear);
+        if (_group != null) _group.alpha = e;
+        float k = Mathf.Lerp(0.985f, 1f, e);
+        panel.transform.localScale = new Vector3(k, k, 1f);
     }
 
     /// <summary>Fill the screen in. Called every time it opens, not once.</summary>

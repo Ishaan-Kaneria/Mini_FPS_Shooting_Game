@@ -461,6 +461,7 @@ public class HudEditor : OverlayPanel
         field.targetGraphic = face;
         field.caretColor = _t.accent;
         field.selectionColor = new Color(_t.accent.r, _t.accent.g, _t.accent.b, 0.35f);
+        OnScreenKeyboard.Attach(field, "Name this layout");
         return field;
     }
 

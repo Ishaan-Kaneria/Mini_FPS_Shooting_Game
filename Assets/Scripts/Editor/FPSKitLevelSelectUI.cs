@@ -8,9 +8,10 @@ namespace FPSKit.EditorTools
     /// <summary>
     /// The level select, built from the UI kit: the screen an arena card's ALL LEVELS opens.
     ///
-    ///   header   BACK, the arena's stripe and name, "14/24 ★", "5/8 CLEARED"
-    ///   story    whose zone this is and the zone's opening, at reading size
-    ///   grid     one card per level (see <see cref="LevelButton"/>)
+    ///   header   BACK, the arena's stripe and name, STORY (phone), "14/24 ★", "5/8 CLEARED"
+    ///   story    whose zone this is and the zone's opening (desk and tablet)
+    ///   grid     one compact tile per level (see <see cref="LevelButton"/>), scrolling down
+    ///   detail   the chosen level in full, and PLAY (see <see cref="LevelDetail"/>)
     ///
     /// Built into the dashboard scene rather than a scene of its own, because it is the same
     /// screen with the arenas swapped for that arena's ladder. Everything shown is bound at
@@ -47,7 +48,7 @@ namespace FPSKit.EditorTools
             UIKit.Size(header, height: 52f);
 
             var back = UIKit.Button(header, "Back", "Back", FlatButton.Variant.Secondary, "arrow-left", t);
-            back.gameObject.AddComponent<UIButtonSound>().voice = UIButtonSound.Voice.Back;
+            UIButtonSound.On(back.gameObject, UIButtonSound.Voice.Back);
 
             var stripe = UIKit.Rect(header, "Stripe").gameObject.AddComponent<FlatRect>();
             stripe.raycastTarget = false;
@@ -58,6 +59,9 @@ namespace FPSKit.EditorTools
             arenaName.textWrappingMode = TextWrappingModes.NoWrap;
             arenaName.overflowMode = TextOverflowModes.Ellipsis;
             UIKit.Size(arenaName, flexWidth: 1f);
+
+            var storyButton = UIKit.Button(header, "Story", "Story", FlatButton.Variant.Secondary, "book", t);
+            storyButton.gameObject.SetActive(false);
 
             var stars = UIKit.Text(header, "Stars", "0/24", UIKit.TextRole.Heading, t);
             stars.color = t.accent;
@@ -84,10 +88,18 @@ namespace FPSKit.EditorTools
             var storyText = UIKit.Text(story.transform, "Opening", "", UIKit.TextRole.Body, t);
             storyText.color = t.textPrimary;
             storyText.textWrappingMode = TextWrappingModes.Normal;
+            storyText.overflowMode = TextOverflowModes.Ellipsis;
+            storyText.maxVisibleLines = 2;
 
-            // ---- grid ----------------------------------------------------------------
-            var viewport = UIKit.Rect(content, "Levels");
-            UIKit.Size(viewport, flexHeight: 1f);
+            // ---- body: the grid, and the pane beside it ---------------------------------
+            var bodyRow = UIKit.Rect(content, "Body");
+            UIKit.Size(bodyRow, flexHeight: 1f);
+            var brow = UIKit.Row(bodyRow, 20f, null, TextAnchor.UpperLeft);
+            brow.childForceExpandHeight = true;
+            brow.childControlHeight = true;
+
+            var viewport = UIKit.Rect(bodyRow, "Levels");
+            UIKit.Size(viewport, flexWidth: 1.9f, flexHeight: 1f);
             viewport.gameObject.AddComponent<RectMask2D>();
             var hit = viewport.gameObject.AddComponent<FlatRect>();
             hit.color = new Color(0, 0, 0, 0);
@@ -97,21 +109,24 @@ namespace FPSKit.EditorTools
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 40f;
             scroll.horizontal = false;
-            scroll.vertical = false;
+            scroll.vertical = true;
 
             var grid = UIKit.Rect(viewport, "Grid");
-            grid.anchorMin = grid.anchorMax = grid.pivot = new Vector2(0.5f, 1f);
+            grid.anchorMin = grid.anchorMax = grid.pivot = new Vector2(0f, 1f);
             var layout = grid.gameObject.AddComponent<GridLayoutGroup>();
             // A starting size only: LevelSelectPanel works the cell out from the real box.
-            layout.cellSize = new Vector2(440f, 340f);
-            layout.spacing = new Vector2(16f, 16f);
+            layout.cellSize = new Vector2(140f, 110f);
+            layout.spacing = new Vector2(10f, 10f);
+            layout.padding = new RectOffset(2, 2, 2, 2);
             layout.childAlignment = TextAnchor.UpperLeft;
             layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            layout.constraintCount = 4;
+            layout.constraintCount = 8;
             var fit = grid.gameObject.AddComponent<ContentSizeFitter>();
             fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.content = grid;
+
+            var detail = BuildLevelDetail(bodyRow, t);
 
             // ---- status: only ever says something when the ladder itself is broken ----
             var status = UIKit.Text(shade.transform, "Status", "", UIKit.TextRole.Caption, t);
@@ -122,7 +137,9 @@ namespace FPSKit.EditorTools
 
             select.tileParent = grid;
             select.scroll = scroll;
-            select.tileTemplate = BuildLevelCardTemplate(shade.rectTransform, t);
+            select.tileTemplate = BuildLevelTileTemplate(shade.rectTransform, t);
+            select.detail = detail;
+            select.storyButton = storyButton;
             select.backButton = back;
             select.arenaNameText = arenaName;
             select.arenaStripe = stripe;
@@ -133,83 +150,133 @@ namespace FPSKit.EditorTools
             select.hintText = storyText;
             select.statusText = status;
             select.campaign = FPSKitCampaign.GetOrCreate();
-            select.gridColumns = 4;
-            select.tileAspect = 0.78f;
+            select.gridColumns = 8;
+            select.tileAspect = 0.8f;
+            select.minTileWidth = 132f;
 
             menu.levelSelect = select;
             shade.gameObject.SetActive(false);
         }
 
         /// <summary>
-        /// One level card, built once and left switched off. Parented to the panel rather than
+        /// One level tile, built once and left switched off. Parented to the panel rather than
         /// to the grid, for the reason the arena card template is: a template inside the grid
-        /// would be counted as a cell. The strip takes whatever height the text leaves, so a
-        /// card of any size keeps every line of its text.
+        /// would be counted as a cell.
+        ///
+        ///   01            NEXT  skull
+        ///   ONE MAGAZINE
+        ///   ★ ★ ☆    (a lock while locked)
         /// </summary>
-        static LevelButton BuildLevelCardTemplate(RectTransform parent, UITheme t)
+        static LevelButton BuildLevelTileTemplate(RectTransform parent, UITheme t)
         {
-            var frame = UIKit.Panel(parent, "LevelCardTemplate", UIKit.PanelTone.Panel, t);
+            var frame = UIKit.Panel(parent, "LevelTileTemplate", UIKit.PanelTone.Panel, t);
             frame.raycastTarget = true;
             var rt = frame.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(440f, 340f);
-            var col = UIKit.Column(frame, 0f, new RectOffset(1, 1, 1, 1));
+            rt.sizeDelta = new Vector2(140f, 110f);
+            var col = UIKit.Column(frame, 4f, new RectOffset(12, 10, 8, 10));
             col.childForceExpandHeight = false;
             col.childControlHeight = true;
             col.childForceExpandWidth = true;
 
-            // ---- strip -------------------------------------------------------------
-            var stripArea = UIKit.Rect(frame.transform, "Strip");
-            var sle = UIKit.Size(stripArea, flexHeight: 1f);
-            sle.minHeight = 48f;
-            var strip = UIKit.Rect(stripArea, "Image").gameObject.AddComponent<RawImage>();
-            strip.raycastTarget = false;
-            UIKit.Fill(strip.rectTransform);
+            var head = UIKit.Rect(frame.transform, "Head");
+            UIKit.Row(head, 6f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+            var number = UIKit.Text(head, "Number", "01", UIKit.TextRole.Number, t);
+            number.fontSize = t.sizeTitle - 2f;
+            UIKit.Size(number, flexWidth: 1f);
+            var next = Tag(head, "Next", "NEXT", t.accent, t.textOnAccent, t);
+            var boss = UIKit.Icon(head, "Boss", "skull", 18f, t.danger, t).gameObject;
 
-            var shade = UIKit.Panel(stripArea, "Locked", UIKit.PanelTone.Background, t);
-            shade.color = new Color(t.background.r, t.background.g, t.background.b, 0.6f);
-            shade.borderColor = new Color(0, 0, 0, 0);
-            UIKit.Fill(shade.rectTransform);
-            var lockRow = UIKit.Row(shade, 10f, null, TextAnchor.MiddleCenter);
-            lockRow.childForceExpandWidth = false;
-            UIKit.Icon(shade.transform, "Icon", "lock", 22f, t.textPrimary, t);
-            var lockText = UIKit.Text(shade.transform, "Requirement", "LOCKED", UIKit.TextRole.Label, t);
-            lockText.color = t.textPrimary;
-            lockText.textWrappingMode = TextWrappingModes.NoWrap;
+            var name = UIKit.Text(frame.transform, "Name", "LEVEL", UIKit.TextRole.Label, t);
+            name.textWrappingMode = TextWrappingModes.NoWrap;
+            name.overflowMode = TextOverflowModes.Ellipsis;
+            name.characterSpacing = t.labelSpacing * 0.4f;
 
-            var next = Tag(stripArea, "Next", "NEXT", t.accent, t.textOnAccent, left: true, t);
-            var boss = Tag(stripArea, "Boss", "BOSS", t.danger, t.textPrimary, left: false, t);
+            var flex = UIKit.Rect(frame.transform, "Flex");
+            UIKit.Size(flex, flexHeight: 1f);
 
-            var stripeRect = UIKit.Rect(frame.transform, "Stripe");
+            var foot = UIKit.Rect(frame.transform, "Foot");
+            UIKit.Row(foot, 0f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+            UIKit.Size(foot).minHeight = 18f;
+            var stars = UIKit.Rect(foot, "Stars");
+            UIKit.Row(stars, 3f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
+            var icons = new Image[3];
+            for (int i = 0; i < 3; i++) icons[i] = UIKit.Icon(stars, $"Star{i + 1}", "star", 17f, t.textDisabled, t);
+            var lockIcon = UIKit.Icon(foot, "Lock", "lock", 17f, t.textDisabled, t);
+
+            var button = frame.gameObject.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = frame;
+            UIButtonSound.On(frame.gameObject, UIButtonSound.Voice.Silent);
+
+            var tile = frame.gameObject.AddComponent<LevelButton>();
+            tile.button = button;
+            tile.frame = frame;
+            tile.numberText = number;
+            tile.nameText = name;
+            tile.starIcons = icons;
+            tile.starRow = stars.gameObject;
+            tile.lockIcon = lockIcon;
+            tile.bossTag = boss;
+            tile.nextTag = next;
+            frame.gameObject.SetActive(false);
+            return tile;
+        }
+
+        /// <summary>
+        /// The pane beside the grid. The picture takes whatever height the text leaves, and
+        /// PLAY sits at the bottom where a thumb or the eye ends up.
+        /// </summary>
+        static LevelDetail BuildLevelDetail(RectTransform parent, UITheme t)
+        {
+            var pane = UIKit.Panel(parent, "Detail", UIKit.PanelTone.Panel, t);
+            UIKit.Size(pane, flexWidth: 1f, flexHeight: 1f);
+            var pcol = UIKit.Column(pane, 0f, new RectOffset(1, 1, 1, 1));
+            pcol.childForceExpandHeight = false;
+            pcol.childControlHeight = true;
+            var detail = pane.gameObject.AddComponent<LevelDetail>();
+
+            // ---- level view ------------------------------------------------------------
+            var level = UIKit.Rect(pane.transform, "Level");
+            UIKit.Size(level, flexHeight: 1f);
+            var lcol = UIKit.Column(level, 0f);
+            lcol.childForceExpandHeight = false;
+            lcol.childControlHeight = true;
+
+            var pictureArea = UIKit.Rect(level, "Picture");
+            var ple = UIKit.Size(pictureArea, flexHeight: 1f);
+            ple.minHeight = 0f;
+            ple.preferredHeight = 240f;
+            pictureArea.gameObject.AddComponent<RectMask2D>();
+            var picture = UIKit.Rect(pictureArea, "Image").gameObject.AddComponent<RawImage>();
+            picture.raycastTarget = false;
+            UIKit.Fill(picture.rectTransform);
+            var nextTag = CornerTag(pictureArea, "Next", "NEXT", t.accent, t.textOnAccent, left: true, t);
+            var bossTag = CornerTag(pictureArea, "Boss", "BOSS", t.danger, t.textPrimary, left: false, t);
+
+            var stripeRect = UIKit.Rect(level, "Stripe");
             UIKit.Size(stripeRect, height: 3f);
             var stripe = stripeRect.gameObject.AddComponent<FlatRect>();
             stripe.raycastTarget = false;
 
-            // ---- body ----------------------------------------------------------------
-            var body = UIKit.Rect(frame.transform, "Body");
-            var bcol = UIKit.Column(body, 5f, new RectOffset(14, 14, 10, 12));
+            var body = UIKit.Rect(level, "Body");
+            var bcol = UIKit.Column(body, 6f, new RectOffset(22, 22, 16, 18));
             bcol.childForceExpandHeight = false;
             bcol.childControlHeight = true;
 
-            var head = UIKit.Rect(body, "Head");
-            UIKit.Row(head, 10f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
-            UIKit.Size(head).minHeight = 30f;
-            var number = UIKit.Text(head, "Number", "01", UIKit.TextRole.Number, t);
-            number.fontSize = t.sizeHeading;
+            var number = UIKit.Text(body, "Number", "LEVEL 01", UIKit.TextRole.Label, t);
             number.color = t.accent;
-            var name = UIKit.Text(head, "Name", "LEVEL", UIKit.TextRole.Heading, t);
-            name.textWrappingMode = TextWrappingModes.NoWrap;
+            var name = UIKit.Text(body, "Name", "LEVEL", UIKit.TextRole.Title, t);
+            name.fontSize = t.sizeTitle - 2f;
             name.overflowMode = TextOverflowModes.Ellipsis;
-            UIKit.Size(name, flexWidth: 1f);
 
             var facts = UIKit.Rect(body, "Facts");
-            UIKit.Row(facts, 6f, null, TextAnchor.MiddleLeft).childForceExpandWidth = false;
-            UIKit.Size(facts).minHeight = 22f;
-            UIKit.Icon(facts, "EnemiesIcon", "skull", 16f, t.textSecondary, t);
+            UIKit.Row(facts, 6f, new RectOffset(0, 0, 2, 4), TextAnchor.MiddleLeft).childForceExpandWidth = false;
+            UIKit.Icon(facts, "EnemiesIcon", "skull", 18f, t.textSecondary, t);
             var enemies = FactText(facts, "Enemies", t);
             var gap = UIKit.Rect(facts, "Gap");
-            UIKit.Size(gap, 10f);
-            UIKit.Icon(facts, "TimeIcon", "clock", 16f, t.textSecondary, t);
+            UIKit.Size(gap, 14f);
+            UIKit.Icon(facts, "TimeIcon", "clock", 18f, t.textSecondary, t);
             var time = FactText(facts, "Time", t);
 
             var rule = UIKit.Rect(body, "Rule").gameObject.AddComponent<FlatRect>();
@@ -222,14 +289,11 @@ namespace FPSKit.EditorTools
             for (int i = 0; i < 3; i++)
             {
                 var row = UIKit.Rect(body, $"Star{i + 1}");
-                var rowLayout = UIKit.Row(row, 8f, null, TextAnchor.MiddleLeft);
+                var rowLayout = UIKit.Row(row, 10f, new RectOffset(0, 0, 2, 2), TextAnchor.MiddleLeft);
                 rowLayout.childForceExpandWidth = false;
-                rowLayout.childControlHeight = true;
-                // A minimum, not a height: TMP with Ellipsis draws nothing at all when one line
-                // does not fit, and a handset's text floor makes the line taller than 20.
-                UIKit.Size(row).minHeight = 20f;
-                icons[i] = UIKit.Icon(row, "Icon", "star", 16f, t.textSecondary, t);
-                var text = UIKit.Text(row, "Condition", "", UIKit.TextRole.Caption, t);
+                icons[i] = UIKit.Icon(row, "Icon", "star", 20f, t.textSecondary, t);
+                var text = UIKit.Text(row, "Condition", "", UIKit.TextRole.Body, t);
+                text.fontSize = t.sizeBody - 1f;
                 text.textWrappingMode = TextWrappingModes.NoWrap;
                 text.overflowMode = TextOverflowModes.Ellipsis;
                 UIKit.Size(text, flexWidth: 1f);
@@ -239,38 +303,47 @@ namespace FPSKit.EditorTools
             var weight = UIKit.Text(body, "Weight", "", UIKit.TextRole.Caption, t);
             weight.textWrappingMode = TextWrappingModes.NoWrap;
             weight.overflowMode = TextOverflowModes.Ellipsis;
-            UIKit.Size(weight).minHeight = 18f;
+            weight.color = t.textDisabled;
 
             var best = UIKit.Text(body, "Best", "", UIKit.TextRole.Label, t);
             best.textWrappingMode = TextWrappingModes.NoWrap;
             best.overflowMode = TextOverflowModes.Ellipsis;
-            UIKit.Size(best).minHeight = 20f;
 
-            var button = frame.gameObject.AddComponent<Button>();
-            button.transition = Selectable.Transition.None;
-            button.targetGraphic = frame;
-            // A card starts a level, so it gets the two-note launch rather than a click.
-            frame.gameObject.AddComponent<UIButtonSound>().voice = UIButtonSound.Voice.Launch;
+            var play = UIKit.Button(body, "Play", "Play level", FlatButton.Variant.Primary, "player-play", t);
+            UIKit.Size(play, height: 56f);
+            play.label.fontSize = t.sizeHeading;
+            UIButtonSound.On(play.gameObject, UIButtonSound.Voice.Launch);
 
-            var card = frame.gameObject.AddComponent<LevelButton>();
-            card.button = button;
-            card.frame = frame;
-            card.strip = strip;
-            card.stripe = stripe;
-            card.lockShade = shade.gameObject;
-            card.lockText = lockText;
-            card.nextTag = next;
-            card.bossTag = boss;
-            card.numberText = number;
-            card.nameText = name;
-            card.enemiesText = enemies;
-            card.timeText = time;
-            card.starIcons = icons;
-            card.conditionTexts = texts;
-            card.weightText = weight;
-            card.bestText = best;
-            frame.gameObject.SetActive(false);
-            return card;
+            // ---- story view (handset) ----------------------------------------------------
+            var story = UIKit.Rect(pane.transform, "Story");
+            UIKit.Size(story, flexHeight: 1f);
+            var scol = UIKit.Column(story, 10f, new RectOffset(24, 24, 20, 20));
+            scol.childForceExpandHeight = false;
+            scol.childControlHeight = true;
+            var storyTitle = UIKit.Text(story, "Holder", "THE STORY", UIKit.TextRole.Label, t);
+            storyTitle.color = t.accent;
+            var storyText = UIKit.Text(story, "Opening", "", UIKit.TextRole.Body, t);
+            storyText.textWrappingMode = TextWrappingModes.Normal;
+            story.gameObject.SetActive(false);
+
+            detail.levelView = level.gameObject;
+            detail.picture = picture;
+            detail.stripe = stripe;
+            detail.nextTag = nextTag;
+            detail.bossTag = bossTag;
+            detail.numberText = number;
+            detail.nameText = name;
+            detail.enemiesText = enemies;
+            detail.timeText = time;
+            detail.starIcons = icons;
+            detail.conditionTexts = texts;
+            detail.weightText = weight;
+            detail.bestText = best;
+            detail.playButton = play;
+            detail.storyView = story.gameObject;
+            detail.storyTitleText = storyTitle;
+            detail.storyText = storyText;
+            return detail;
         }
 
         static TMP_Text FactText(RectTransform parent, string name, UITheme t)
@@ -280,8 +353,22 @@ namespace FPSKit.EditorTools
             return text;
         }
 
-        /// <summary>A solid tag in a corner of the strip: NEXT in amber, BOSS in red.</summary>
-        static GameObject Tag(RectTransform parent, string name, string caption, Color fill, Color ink, bool left, UITheme t)
+        /// <summary>A small solid tag in a row: NEXT on a tile.</summary>
+        static GameObject Tag(RectTransform parent, string name, string caption, Color fill, Color ink, UITheme t)
+        {
+            var tag = UIKit.Panel(parent, name, UIKit.PanelTone.Raised, t);
+            tag.color = fill;
+            tag.borderColor = new Color(0, 0, 0, 0);
+            UIKit.Row(tag, 0f, new RectOffset(6, 6, 1, 1), TextAnchor.MiddleCenter);
+            var text = UIKit.Text(tag.transform, "Label", caption, UIKit.TextRole.Label, t);
+            text.color = ink;
+            text.fontSize = t.sizeCaption;
+            text.characterSpacing = t.labelSpacing * 0.5f;
+            return tag.gameObject;
+        }
+
+        /// <summary>A solid tag in a corner of the picture: NEXT in amber, BOSS in red.</summary>
+        static GameObject CornerTag(RectTransform parent, string name, string caption, Color fill, Color ink, bool left, UITheme t)
         {
             var tag = UIKit.Panel(parent, name, UIKit.PanelTone.Raised, t);
             tag.color = fill;

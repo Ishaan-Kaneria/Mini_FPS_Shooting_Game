@@ -713,6 +713,33 @@ public class HudView : MonoBehaviour
         else Corner(_runPanel, new Vector2(0f, 1f), new Vector2(inset, -Margin));
 
         if (target != null) target.Settle();
+        PlaceObjectiveForTouch(inset);
+    }
+
+    /// <summary>
+    /// The objective strip, on a touch screen, goes under the run panel in the same free
+    /// corner. Centred under the mission panel it lay across the top row of the button
+    /// cluster on a wide phone, and the medkit button covered the words of the objective.
+    /// Measured with a combo line showing, so the strip is clear of the panel at its tallest.
+    /// </summary>
+    void PlaceObjectiveForTouch(float inset)
+    {
+        if (_objectiveStrip == null || _runPanel == null) return;
+        var strip = (RectTransform)_objectiveStrip.transform;
+        var target = strip.GetComponent<HudLayoutTarget>();
+        if (target != null) target.Apply(null);
+
+        string combo = _comboText != null ? _comboText.text : null;
+        if (_comboText != null) _comboText.text = "x";
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_runPanel);
+        float below = Margin + _runPanel.rect.height + 10f;
+        if (_comboText != null) _comboText.text = combo;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_runPanel);
+
+        if (GameSettings.LeftHanded) Corner(strip, new Vector2(1f, 1f), new Vector2(-inset, -below));
+        else Corner(strip, new Vector2(0f, 1f), new Vector2(inset, -below));
+
+        if (target != null) target.Settle();
     }
 
     void BuildHitMarker()
@@ -819,6 +846,9 @@ public class HudView : MonoBehaviour
     void UpdateBriefingCard()
     {
         if (_reveal != null) _reveal.suppressed = _editing;
+        if (_hud != null)
+            _hud.crosshairVeil = _reveal != null && _reveal.group != null && _briefCard != null && _briefCard.activeInHierarchy
+                ? _reveal.group.alpha : 0f;
     }
 
     void OnReach(MeleeStrike m, bool inReach)

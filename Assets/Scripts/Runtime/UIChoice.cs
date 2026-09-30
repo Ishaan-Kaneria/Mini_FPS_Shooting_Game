@@ -44,7 +44,10 @@ public class UIChoice : Selectable, IMoveHandler, ISubmitHandler
     public void Step(int delta)
     {
         if (!IsInteractable() || options.Length == 0) return;
-        Set(Mathf.Clamp(_index + delta, 0, options.Length - 1), notify: true);
+        int to = Mathf.Clamp(_index + delta, 0, options.Length - 1);
+        // At an end the arrow has nowhere to go; saying so beats a click that changes nothing.
+        UISfx.Play(to == _index ? UISfx.Sound.Error : UISfx.Sound.Toggle, 1f, to == _index ? 0.5f : 1f);
+        Set(to, notify: true);
     }
 
     [System.NonSerialized] Button _wiredPrevious, _wiredNext;

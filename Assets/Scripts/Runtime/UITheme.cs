@@ -303,6 +303,35 @@ public class UITheme : ScriptableObject
     [Min(0.2f)] public float warningPulseSeconds = 1f;
 
     // ==================================================================
+    // Sound.
+    // ==================================================================
+
+    [Header("Sound")]
+    [Tooltip("The interface's voice, filled in by FPSKit > UI Kit from Assets/Audio/UI. On the " +
+             "theme because the theme is the one asset every screen can already reach -- the " +
+             "pause card and the results screen live in arena scenes with no menu to borrow from.")]
+    public AudioClip soundClick;
+    public AudioClip soundHover, soundBack, soundLaunch, soundPurchase;
+
+    [Tooltip("A key on the on-screen keyboard.")]
+    public AudioClip soundKey;
+
+    [Tooltip("A switch flipping, a choice stepping.")]
+    public AudioClip soundToggle;
+
+    [Tooltip("A panel or dialog arriving.")]
+    public AudioClip soundOpen;
+
+    [Tooltip("A star landing on the results card. Pitched up a step per star.")]
+    public AudioClip soundStar;
+
+    [Tooltip("Refused: a locked level, a full name field.")]
+    public AudioClip soundError;
+
+    [Tooltip("How loud the interface is, before the player's master and effects volumes.")]
+    [Range(0f, 1f)] public float soundVolume = 0.55f;
+
+    // ==================================================================
     // Helpers.
     // ==================================================================
 

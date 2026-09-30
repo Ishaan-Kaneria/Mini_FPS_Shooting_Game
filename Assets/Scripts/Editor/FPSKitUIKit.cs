@@ -97,6 +97,7 @@ namespace FPSKit.EditorTools
             theme.hudHeadingMaterial = OutlineMaterial(heading, theme);
             theme.hudBodyMaterial = OutlineMaterial(body, theme);
             theme.icons = LoadIcons();
+            LoadSounds(theme);
             EditorUtility.SetDirty(theme);
             BuildGlyphSpriteAsset(theme);
             AssetDatabase.SaveAssets();
@@ -106,6 +107,25 @@ namespace FPSKit.EditorTools
         }
 
         static string Name(Object o) => o != null ? o.name : "MISSING";
+
+        /// <summary>The interface's clips, from Tools/generate-placeholder-audio.py's output.</summary>
+        static void LoadSounds(UITheme theme)
+        {
+            AudioClip Clip(string file) => AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/UI/" + file);
+            theme.soundClick = Clip("ui_click.wav");
+            theme.soundHover = Clip("ui_hover.wav");
+            theme.soundBack = Clip("ui_back.wav");
+            theme.soundLaunch = Clip("ui_launch.wav");
+            theme.soundPurchase = Clip("purchase.wav");
+            theme.soundKey = Clip("ui_key.wav");
+            theme.soundToggle = Clip("ui_toggle.wav");
+            theme.soundOpen = Clip("ui_open.wav");
+            theme.soundStar = Clip("star.wav");
+            theme.soundError = Clip("ui_error.wav");
+            foreach (var (n, c) in new (string, AudioClip)[] { ("click", theme.soundClick), ("key", theme.soundKey),
+                                                               ("star", theme.soundStar), ("error", theme.soundError) })
+                if (c == null) Debug.LogWarning($"[UI Kit] no UI sound '{n}' in Assets/Audio/UI.");
+        }
 
         static IEnumerable<string> IconFiles()
             => Directory.GetFiles(IconFolder, "*.png").Concat(Directory.Exists(GlyphFolder)

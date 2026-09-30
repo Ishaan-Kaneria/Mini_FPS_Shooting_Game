@@ -744,7 +744,7 @@ public class StorePanel : MonoBehaviour
 
     void Deny(string message)
     {
-        if (sounds != null) sounds.PlayBack();
+        UISfx.Play(UISfx.Sound.Error);
 
         Report(message);
         Rebuild();
@@ -791,9 +791,12 @@ public class StorePanel : MonoBehaviour
         float width = box.rect.width;
         float height = box.rect.height;
         if (width <= 1f || height <= 1f) return;
-        if (Mathf.Abs(width - _fittedWidth) < 0.5f && Mathf.Abs(height - _fittedHeight) < 0.5f) return;
+        float need = UIGrid.ContentHeight(cardParent);
+        if (Mathf.Abs(width - _fittedWidth) < 0.5f && Mathf.Abs(height - _fittedHeight) < 0.5f &&
+            Mathf.Abs(need - _fittedNeed) < 0.5f) return;
         _fittedWidth = width;
         _fittedHeight = height;
+        _fittedNeed = need;
         int columns = DeviceProfile.CurrentForm switch
         {
             DeviceProfile.Form.Handset => 2,
@@ -803,8 +806,12 @@ public class StorePanel : MonoBehaviour
         float cell = (width - _layout.padding.left - _layout.padding.right - _layout.spacing.x * (columns - 1)) / columns;
         _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         _layout.constraintCount = columns;
-        _layout.cellSize = new Vector2(cell, cell * cardAspect);
+        // Never shorter than what is on the card: a phone's text floor makes the lines taller
+        // than any aspect ratio allows for, and the name was the line that got squeezed out.
+        _layout.cellSize = new Vector2(cell, Mathf.Max(cell * cardAspect, need));
     }
+
+    float _fittedNeed = -1f;
 
     // ======================================================================
     // Confirmation.

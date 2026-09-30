@@ -35,7 +35,11 @@ public class UISwitch : Selectable, IPointerClickHandler, ISubmitHandler
         _on = on;
         if (!Application.isPlaying) _shown = on ? 1f : 0f;
         Paint();
-        if (changed && notify) Changed?.Invoke(on);
+        if (changed && notify)
+        {
+            UISfx.Play(UISfx.Sound.Toggle);
+            Changed?.Invoke(on);
+        }
     }
 
     public void OnPointerClick(PointerEventData e)

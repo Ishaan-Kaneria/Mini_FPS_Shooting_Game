@@ -37,6 +37,16 @@ public class UIButtonSound : MonoBehaviour, IPointerEnterHandler, IPointerClickH
     [Tooltip("Found in a parent when empty.")]
     public UISounds sounds;
 
+    /// <summary>The sound on a control, added if it has none. Kit buttons are born with one,
+    /// so a caller that wants a different voice sets it here rather than adding a second.</summary>
+    public static UIButtonSound On(GameObject go, Voice voice = Voice.Click)
+    {
+        var s = go.GetComponent<UIButtonSound>();
+        if (s == null) s = go.AddComponent<UIButtonSound>();
+        s.voice = voice;
+        return s;
+    }
+
     void Awake()
     {
         if (sounds == null) sounds = GetComponentInParent<UISounds>(true);
@@ -44,17 +54,33 @@ public class UIButtonSound : MonoBehaviour, IPointerEnterHandler, IPointerClickH
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        // A pointer, not a finger: a touch "enters" every button it lands on, and a hover
+        // blip under every tap is noise.
+        if (eventData != null && eventData.pointerId >= 0) return;
         if (sounds != null) sounds.PlayHover();
+        else UISfx.Play(UISfx.Sound.Hover);
     }
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (sounds == null) return;
-
         // A disabled control should stay silent, or an arena that cannot be loaded
         // sounds exactly like one that can.
         var selectable = GetComponent<UnityEngine.UI.Selectable>();
         if (selectable != null && !selectable.IsInteractable()) return;
+
+        // No menu voice above this one (a pause card, a results screen, a dialog built
+        // in an arena): the theme's sounds, through the one shared source.
+        if (sounds == null)
+        {
+            switch (voice)
+            {
+                case Voice.Launch: UISfx.Play(UISfx.Sound.Launch); break;
+                case Voice.Back: UISfx.Play(UISfx.Sound.Back); break;
+                case Voice.Silent: break;
+                default: UISfx.Play(UISfx.Sound.Click); break;
+            }
+            return;
+        }
 
         switch (voice)
         {

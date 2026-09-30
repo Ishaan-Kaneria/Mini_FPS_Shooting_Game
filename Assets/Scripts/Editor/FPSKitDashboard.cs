@@ -32,6 +32,13 @@ namespace FPSKit.EditorTools
 
             var backdrop = UIKit.Panel(root, "Backdrop", UIKit.PanelTone.Background, t);
             UIKit.Fill(backdrop.rectTransform);
+            var scene = UIKit.Rect(backdrop.transform, "Scene").gameObject.AddComponent<RawImage>();
+            scene.raycastTarget = false;
+            scene.color = new Color(1f, 1f, 1f, 0f);
+            UIKit.Fill(scene.rectTransform);
+            scene.gameObject.AddComponent<SafeAreaBleed>();
+            menu.backdropScene = scene;
+            menu.backdropStrength = 0.025f;
 
             var main = UIKit.Rect(root, "Play");
             UIKit.Fill(main, 40f, TopBarHeight + 24f, 40f, 44f);
@@ -227,59 +234,67 @@ namespace FPSKit.EditorTools
             menu.cardTemplate = BuildArenaCardTemplate(content, t);
         }
 
-        /// <summary>One arena card, cloned per arena at runtime. Parts anchored in fractions of the card.</summary>
+        /// <summary>
+        /// One arena card, cloned per arena at runtime. A column: the screenshot takes whatever
+        /// height the text leaves, so the name, the line about it and the progress row always
+        /// keep their lines. The previous card gave its text a fixed 40% of the card, and on a
+        /// phone -- where the text floor makes every line taller -- the name was squeezed to
+        /// nothing and the difficulty was drawn over the star count.
+        /// </summary>
         static ArenaCard BuildArenaCardTemplate(RectTransform parent, UITheme t)
         {
             var frame = UIKit.Panel(parent, "ArenaCardTemplate", UIKit.PanelTone.Panel, t);
             frame.raycastTarget = true;
             var root = frame.rectTransform;
-            const float split = 0.40f;
+            var fcol = UIKit.Column(frame, 0f, new RectOffset(1, 1, 1, 1));
+            fcol.childForceExpandHeight = false;
+            fcol.childControlHeight = true;
 
-            var thumbRect = UIKit.Rect(root, "Thumbnail");
-            UIKit.Anchor(thumbRect, 0f, split, 1f, 1f);
-            thumbRect.offsetMin = new Vector2(1f, 0f); thumbRect.offsetMax = new Vector2(-1f, -1f);
-            var thumb = thumbRect.gameObject.AddComponent<RawImage>();
+            var thumbRect = UIKit.Rect(root, "Picture");
+            var tle = UIKit.Size(thumbRect, flexHeight: 1f);
+            tle.minHeight = 40f;
+            thumbRect.gameObject.AddComponent<RectMask2D>();
+            var thumbImage = UIKit.Rect(thumbRect, "Thumbnail");
+            UIKit.Fill(thumbImage);
+            var thumb = thumbImage.gameObject.AddComponent<RawImage>();
             thumb.raycastTarget = false;
 
-            var stripeRect = UIKit.Rect(root, "Stripe");
-            stripeRect.anchorMin = new Vector2(0f, split); stripeRect.anchorMax = new Vector2(1f, split);
-            stripeRect.pivot = new Vector2(0.5f, 1f);
-            stripeRect.offsetMin = new Vector2(1f, -3f); stripeRect.offsetMax = new Vector2(-1f, 0f);
-            var stripe = stripeRect.gameObject.AddComponent<FlatRect>();
-            stripe.raycastTarget = false;
-
-            var shade = UIKit.Panel(root, "Locked", UIKit.PanelTone.Background, t);
-            shade.color = new Color(t.background.r, t.background.g, t.background.b, 0.55f);
-            UIKit.Anchor(shade.rectTransform, 0f, split, 1f, 1f);
-            var lockCol = UIKit.Column(shade, 6f, new RectOffset(16, 16, 12, 12), TextAnchor.MiddleCenter);
-            lockCol.childForceExpandWidth = true;
-            var lockIcon = UIKit.Icon(shade.transform, "Icon", "lock", 30f, t.textPrimary, t);
-            lockIcon.GetComponent<LayoutElement>().flexibleWidth = 0f;
+            var shade = UIKit.Panel(thumbRect, "Locked", UIKit.PanelTone.Background, t);
+            shade.color = new Color(t.background.r, t.background.g, t.background.b, 0.62f);
+            shade.borderColor = new Color(0, 0, 0, 0);
+            UIKit.Fill(shade.rectTransform);
+            var lockCol = UIKit.Column(shade, 8f, new RectOffset(16, 16, 12, 12), TextAnchor.MiddleCenter);
+            lockCol.childForceExpandWidth = false;
+            lockCol.childControlWidth = true;
+            UIKit.Icon(shade.transform, "Icon", "lock", 28f, t.textPrimary, t);
             var lockText = UIKit.Text(shade.transform, "Requirement", "LOCKED", UIKit.TextRole.Label, t);
             lockText.color = t.textPrimary;
             lockText.alignment = TextAlignmentOptions.Center;
             lockText.textWrappingMode = TextWrappingModes.Normal;
+            lockText.maxVisibleLines = 2;
+
+            var stripeRect = UIKit.Rect(root, "Stripe");
+            UIKit.Size(stripeRect, height: 3f);
+            var stripe = stripeRect.gameObject.AddComponent<FlatRect>();
+            stripe.raycastTarget = false;
 
             var info = UIKit.Rect(root, "Info");
-            UIKit.Anchor(info, 0f, 0f, 1f, split);
-            info.offsetMin = new Vector2(16f, 12f); info.offsetMax = new Vector2(-16f, -14f);
-            var col = UIKit.Column(info, 4f);
+            var col = UIKit.Column(info, 4f, new RectOffset(16, 16, 12, 12));
             col.childForceExpandHeight = false;
+            col.childControlHeight = true;
             var name = UIKit.Text(info, "Name", "ARENA", UIKit.TextRole.Heading, t);
-            name.fontSize = t.sizeHeading - 2f;
+            name.fontSize = t.sizeHeading - 1f;
             name.overflowMode = TextOverflowModes.Ellipsis;
             var desc = UIKit.Text(info, "Description", "", UIKit.TextRole.Caption, t);
             desc.textWrappingMode = TextWrappingModes.NoWrap;
             desc.overflowMode = TextOverflowModes.Ellipsis;
-            var flex = UIKit.Rect(info, "Flex");
-            UIKit.Size(flex, flexHeight: 1f);
 
             var bottom = UIKit.Rect(info, "Bottom");
-            UIKit.Row(bottom, 8f, null, TextAnchor.MiddleLeft);
-            UIKit.Size(bottom, height: 22f);
+            UIKit.Row(bottom, 8f, new RectOffset(0, 0, 6, 0), TextAnchor.MiddleLeft);
             var progress = UIKit.Text(bottom, "Progress", "", UIKit.TextRole.Label, t);
             progress.fontSize = t.sizeLabel - 1f;
             progress.characterSpacing = t.labelSpacing * 0.5f;
+            progress.overflowMode = TextOverflowModes.Ellipsis;
             UIKit.Size(progress, flexWidth: 1f);
             var bars = DifficultyBars(bottom, t);
             var diff = UIKit.Text(bottom, "Difficulty", "EASY", UIKit.TextRole.Label, t);
@@ -288,6 +303,7 @@ namespace FPSKit.EditorTools
             var button = frame.gameObject.AddComponent<Button>();
             button.transition = Selectable.Transition.None;
             button.targetGraphic = frame;
+            UIButtonSound.On(frame.gameObject);
 
             var card = frame.gameObject.AddComponent<ArenaCard>();
             card.button = button;
@@ -441,6 +457,7 @@ namespace FPSKit.EditorTools
             stars.fontSize = t.sizeLabel + 2f;
 
             var play = UIKit.Button(card.transform, "PlayMission", "Play mission", FlatButton.Variant.Primary, "player-play", t);
+            UIButtonSound.On(play.gameObject, UIButtonSound.Voice.Launch);
             UIKit.Size(play, height: 64f);
             play.label.fontSize = t.sizeHeading;
             if (play.icon != null) UIKit.Size(play.icon, 26f, 26f);

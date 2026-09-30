@@ -141,8 +141,8 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc_hudedit", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit", Wait = 8f },
                 new Shot { File = "pc_hudedit_crosshair", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit_crosshair", Wait = 8f },
                 new Shot { File = "iphone15_hudedit", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "hudedit", Wait = 8f },
-                new Shot { File = "pc_punch", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "punch", Wait = 14f, After = 0.12f },
-                new Shot { File = "iphone15_punch", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "punch", Wait = 14f, After = 0.12f },
+                new Shot { File = "pc_punch", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "punch", Wait = 20f, After = 0.12f },
+                new Shot { File = "iphone15_punch", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "punch", Wait = 20f, After = 0.12f },
                 new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
                 new Shot { File = "pc_howto", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "howto", Wait = 2.5f },
                 new Shot { File = "iphone15_howto", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "howto", Wait = 2.5f },
@@ -150,6 +150,12 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc_briefing_arrive", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Wait = 1.2f, After = 0.35f },
                 new Shot { File = "pc_briefing", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Wait = 4f },
                 new Shot { File = "iphone15_briefing", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Wait = 4f },
+                // The first-run name prompt: the game's own keyboard on a phone, the plain
+                // field on a desk.
+                new Shot { File = "iphone15_keyboard", Scene = MenuScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "name", Wait = 2.5f },
+                new Shot { File = "pixel7_keyboard", Scene = MenuScene, Device = Pixel7, Scheme = InputScheme.Touch, Open = "name", Wait = 2.5f },
+                new Shot { File = "pc_name", Scene = MenuScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "name", Wait = 2.5f },
+                new Shot { File = "pixel7_levels", Scene = MenuScene, Device = Pixel7, Scheme = InputScheme.Touch, Open = "levels", Wait = 2.5f },
             };
             string only = Arg("-fpskitOnly");
             if (!string.IsNullOrEmpty(only))
@@ -401,6 +407,9 @@ namespace FPSKit.EditorTools
                                 case "store": menu.OpenStore(); break;
                                 case "achievements": menu.OpenAchievements(); break;
                                 case "howto": menu.OpenInstructions(); break;
+                                case "name":
+                                    NameDialog.Show(menu.GetComponentInParent<Canvas>().rootCanvas, null);
+                                    break;
                                 case "levels":
                                     // Straight to the panel rather than through Choose, which reads
                                     // a zone's opening card first; Snowbound, because its bosses

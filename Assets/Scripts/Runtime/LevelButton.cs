@@ -4,149 +4,100 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// One level on the level select screen: a strip of the arena it is fought in, its number
-/// and name, how many enemies and how long the clock gives, a red BOSS tag when there is
-/// one, the three things each star asks for, and the best the player has done on it.
+/// One level on the level select: a compact tile with its number, its name, its three
+/// stars, a red skull when there is a boss and an amber NEXT when it is the one to play.
+///
+/// <b>A tile chooses; the detail pane plays.</b> With 32 rungs a ladder, the old card --
+/// strip, name, facts, three conditions, best -- could not fit six across: its best score
+/// spilled into the next row, the lock note ran under the BOSS tag and the strip shrank to
+/// a sliver of sky. So the tile says only what tells rungs apart at a glance, and the pane
+/// beside the grid (<see cref="LevelDetail"/>) shows everything about the one chosen, with
+/// PLAY under it -- the same choose-then-play the dashboard's arena cards and mission card
+/// use. Clicking the chosen tile again also plays, and a pad's A on a focused tile plays,
+/// because the focus already chose it.
+///
+/// <b>Locked is drawn, not hidden</b>, and the button is not interactable: a tile that lights
+/// up and then does nothing reads as broken. Hovering a locked tile still previews it in the
+/// pane, so what opens it is one glance away.
 ///
 /// Built once by the dashboard builder as a hidden template and cloned per level at
-/// runtime, the same way <see cref="ArenaCard"/> is -- so the number of levels an arena
-/// offers is a property of its <see cref="LevelSet"/> and never of the menu scene.
-///
-/// <b>The stars are conditions, not decoration.</b> Each row says what that star asks for,
-/// in the numbers <see cref="LevelResult.StarsFor"/> actually cuts with
-/// (<see cref="Missions.StarConditions"/>), and is filled amber once it has been earned. A
-/// star the player cannot read the rule for is a star they cannot aim at.
-///
-/// <b>A locked tile is still drawn in full.</b> Seeing that level 6 is a boss with a minute
-/// on the clock is most of the reason to go and beat level 5; the strip is shaded, carries
-/// a lock and says what opens it, and the button is not interactable, for the reason a
-/// locked arena card is not: a card that lights up and then does nothing reads as broken.
-///
-/// <b>The strip is the arena's own screenshot</b>, a band of it panned a little further
-/// across for each rung. There is one real picture per arena and eight levels in it, so
-/// eight identical crops would be honest and dull and eight invented ones would not be
-/// honest; a pan across the real one is both.
+/// runtime, so a ladder's length is a property of its <see cref="LevelSet"/>, never of the scene.
 /// </summary>
 public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, ISelectHandler, IDeselectHandler
 {
     [Header("Parts")]
     public Button button;
     public FlatRect frame;
-    public RawImage strip;
-    public FlatRect stripe;
-    public GameObject lockShade;
-    public TMP_Text lockText;
-    public GameObject nextTag;
-    public GameObject bossTag;
     public TMP_Text numberText;
     public TMP_Text nameText;
-    public TMP_Text enemiesText;
-    public TMP_Text timeText;
-    [Tooltip("Left to right, one per star: the icon is filled amber when earned and an outline when not.")]
+    [Tooltip("Left to right, one per star: filled amber when earned, an outline when not.")]
     public Image[] starIcons = new Image[0];
-    public TMP_Text[] conditionTexts = new TMP_Text[0];
-    public TMP_Text weightText;
-    public TMP_Text bestText;
+    [Tooltip("Shown instead of the stars while the level is locked.")]
+    public Image lockIcon;
+    public GameObject starRow;
+    public GameObject bossTag;
+    public GameObject nextTag;
 
     /// <summary>Zero-based position in the set. What gets handed to the session.</summary>
     public int Index { get; private set; } = -1;
 
     public bool Unlocked { get; private set; }
 
-    /// <summary>Whether this is the level the player should play next. Draws the amber border.</summary>
+    /// <summary>Whether this is the level the player should play next. Carries the NEXT tag.</summary>
     public bool IsNext { get; private set; }
 
-    bool _hover;
-    int _count = 1;
+    /// <summary>The level the detail pane is showing. Draws the amber border.</summary>
+    public bool Chosen
+    {
+        get => _chosen;
+        set { _chosen = value; Paint(); }
+    }
 
-    public void Bind(int index, int count, LevelSet.Level level, string arena, Texture preview, Color arenaColor,
-                     bool unlocked, bool isNext, UnityEngine.Events.UnityAction onChosen)
+    bool _hover, _chosen;
+    System.Action<int, bool> _preview;
+    System.Action<int> _focus;
+
+    /// <param name="onChosen">A click, tap or submit on this tile.</param>
+    /// <param name="onPreview">Pointer over (true) or off (false) the tile.</param>
+    /// <param name="onFocus">A pad or keyboard moved the focus here.</param>
+    public void Bind(int index, LevelSet.Level level, string arena, bool unlocked, bool isNext,
+                     UnityEngine.Events.UnityAction onChosen, System.Action<int, bool> onPreview,
+                     System.Action<int> onFocus)
     {
         var t = UITheme.Active;
         Index = index;
         Unlocked = unlocked;
         IsNext = isNext && unlocked;
-        _count = Mathf.Max(1, count);
+        _preview = onPreview;
+        _focus = onFocus;
         name = $"Level_{index + 1}";
 
         int earned = LevelProgress.StarsIn(arena, index);
-        Color ink = unlocked ? t.textPrimary : t.textSecondary;
-        Color quiet = unlocked ? t.textSecondary : t.textDisabled;
 
         if (numberText != null)
         {
             numberText.text = t.Tabular((index + 1).ToString("00"));
-            numberText.color = unlocked ? t.accent : t.textDisabled;
+            numberText.color = unlocked ? (earned >= 3 ? t.accent : t.textPrimary) : t.textDisabled;
         }
         if (nameText != null)
         {
             nameText.text = level != null ? level.Label(index).ToUpperInvariant() : $"LEVEL {index + 1}";
-            nameText.color = ink;
-        }
-
-        if (enemiesText != null)
-        {
-            enemiesText.text = level == null ? "" :
-                t.Tabular(level.enemyCount.ToString(), heading: false) + (level.hasBoss ? " + BOSS" : " ENEMIES");
-            enemiesText.color = quiet;
-        }
-        if (timeText != null)
-        {
-            // TIME LIMIT, spelled out: it is the clock that ends the level, not a target,
-            // and a bare "32s" was read as a par.
-            timeText.text = level == null ? "" : "TIME LIMIT " + t.Tabular(Clock(level.timeLimit), heading: false);
-            timeText.color = quiet;
+            nameText.color = unlocked ? t.textSecondary : t.textDisabled;
         }
         if (bossTag != null) bossTag.SetActive(level != null && level.hasBoss);
-        if (nextTag != null) nextTag.SetActive(IsNext);
+        // Not on a phone: three across, the tag lay over the number. The next level is the
+        // one chosen when the screen opens, so its amber border already says it.
+        if (nextTag != null) nextTag.SetActive(IsNext && DeviceProfile.CurrentForm != DeviceProfile.Form.Handset);
 
-        var conditions = Missions.StarConditions(level);
-        for (int i = 0; i < 3; i++)
+        if (starRow != null) starRow.SetActive(unlocked);
+        if (lockIcon != null) lockIcon.gameObject.SetActive(!unlocked);
+        for (int i = 0; i < starIcons.Length; i++)
         {
+            if (starIcons[i] == null) continue;
             bool got = i < earned;
-            if (i < starIcons.Length && starIcons[i] != null)
-            {
-                starIcons[i].sprite = t.IconSprite(got ? "star-filled" : "star");
-                starIcons[i].color = got ? t.accent : unlocked ? t.textSecondary : t.textDisabled;
-            }
-            if (i < conditionTexts.Length && conditionTexts[i] != null)
-            {
-                conditionTexts[i].text = conditions[i];
-                conditionTexts[i].color = got ? t.textPrimary : quiet;
-            }
+            starIcons[i].sprite = t.IconSprite(got ? "star-filled" : "star");
+            starIcons[i].color = got ? t.accent : t.textDisabled;
         }
-        if (weightText != null)
-        {
-            weightText.text = Missions.WeightNote(level);
-            weightText.color = t.textDisabled;
-        }
-
-        if (bestText != null)
-        {
-            int score = LevelProgress.BestScoreIn(arena, index);
-            float time = LevelProgress.BestTimeIn(arena, index);
-            // The time is only there once a clear has been timed -- which a save from before
-            // best times were kept will not have, and a pass on the clock never does. Saying
-            // NOT CLEARED beside a header that counts the level as cleared would be two
-            // screens disagreeing, so it simply shows what there is.
-            bestText.text = earned <= 0 && score <= 0
-                ? (unlocked ? "NOT PLAYED YET" : "")
-                : "BEST " + UIText.Row(time > 0f ? t.Tabular(Clock(time), heading: false) : "",
-                                       score > 0 ? t.Tabular(score.ToString("N0"), heading: false) + " PTS" : "");
-            bestText.color = quiet;
-        }
-
-        if (strip != null)
-        {
-            strip.texture = preview;
-            strip.color = preview != null ? (unlocked ? Color.white : new Color(0.38f, 0.38f, 0.38f, 1f)) : t.panelRaised;
-            Crop();
-        }
-        if (stripe != null)
-            stripe.color = unlocked ? arenaColor : new Color(arenaColor.r * 0.45f, arenaColor.g * 0.45f, arenaColor.b * 0.45f, 1f);
-
-        if (lockShade != null) lockShade.SetActive(!unlocked);
-        if (lockText != null) lockText.text = index > 0 ? $"CLEAR LEVEL {index:00} FIRST" : "LOCKED";
 
         if (button != null)
         {
@@ -164,41 +115,41 @@ public class LevelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
         return s < 60 ? UIText.Seconds(s) : $"{s / 60}:{s % 60:00}";
     }
 
-    /// <summary>
-    /// A band of the screenshot, panned further across for each rung. Never stretched: the
-    /// band's shape is the strip's shape, and zoomed in enough that there is room to pan.
-    /// </summary>
-    void Crop()
+    public void OnPointerEnter(PointerEventData e)
     {
-        if (strip == null || strip.texture == null) return;
-        var r = strip.rectTransform.rect;
-        if (r.width <= 1f || r.height <= 1f) return;
-        float texAspect = strip.texture.width / (float)strip.texture.height;
-        float boxAspect = r.width / r.height;
-        const float zoom = 0.62f;
-        float w = zoom;
-        float h = Mathf.Min(1f, w * texAspect / boxAspect);
-        if (h >= 1f) { h = 1f; w = Mathf.Min(1f, boxAspect / texAspect); }
-        float along = _count > 1 ? Index / (float)(_count - 1) : 0.5f;
-        // A little below centre: the middle of a preview is the horizon, and the ground
-        // and what stands on it say more about a place than the sky does.
-        float y = Mathf.Clamp(0.42f - h * 0.5f, 0f, 1f - h);
-        strip.uvRect = new Rect((1f - w) * along, y, w, h);
+        _hover = true;
+        Paint();
+        _preview?.Invoke(Index, true);
     }
 
-    void OnRectTransformDimensionsChange() => Crop();
+    public void OnPointerExit(PointerEventData e)
+    {
+        _hover = false;
+        Paint();
+        _preview?.Invoke(Index, false);
+    }
 
-    public void OnPointerEnter(PointerEventData e) { _hover = Unlocked; Paint(); }
-    public void OnPointerExit(PointerEventData e) { _hover = false; Paint(); }
-    public void OnSelect(BaseEventData e) => Paint();
+    /// <summary>
+    /// The pad's focus arriving is a choice: the pane follows it, and A then plays. A pointer
+    /// press selects the tile too, on the way to its click, and must not count -- or the
+    /// first click would find the tile already chosen and start the level.
+    /// </summary>
+    public void OnSelect(BaseEventData e)
+    {
+        Paint();
+        var pointer = UnityEngine.InputSystem.Pointer.current;
+        if (pointer != null && pointer.press.isPressed) return;
+        _focus?.Invoke(Index);
+    }
+
     public void OnDeselect(BaseEventData e) => Paint();
 
     void Paint()
     {
         if (frame == null) return;
         var t = UITheme.Active;
-        frame.borderColor = IsNext ? t.accent : _hover ? t.borderHover : t.border;
-        frame.borderPixels = IsNext ? 2f : t.borderPixels;
-        frame.color = _hover ? t.panelRaised : t.panel;
+        frame.borderColor = _chosen ? t.accent : _hover && Unlocked ? t.borderHover : t.border;
+        frame.borderPixels = _chosen ? 2f : t.borderPixels;
+        frame.color = _chosen || (_hover && Unlocked) ? t.panelRaised : Unlocked ? t.panel : t.background;
     }
 }

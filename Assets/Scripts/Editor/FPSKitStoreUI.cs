@@ -210,6 +210,10 @@ namespace FPSKit.EditorTools
             price.fontSize = t.sizeHeading;
             var upgrade = UIKit.Button(buy, "Upgrade", "Upgrade", FlatButton.Variant.Secondary, null, t);
             var primary = UIKit.Button(buy, "Primary", "Buy", FlatButton.Variant.Primary, null, t);
+            // The purchase has its own sound once it goes through; a click under it would be
+            // two sounds saying different things.
+            UIButtonSound.On(primary.gameObject, UIButtonSound.Voice.Silent);
+            UIButtonSound.On(upgrade.gameObject, UIButtonSound.Voice.Silent);
 
             var card = frame.gameObject.AddComponent<StoreItemCard>();
             card.frame = frame;

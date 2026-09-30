@@ -502,3 +502,29 @@ random.setstate(_punch_stream)
 # Not synthesised. The enemy voices in Assets/Audio/SFX/Voice are CC0 recordings (see
 # Docs/DESIGN_NOTES.md, "Where a round lands changes what it does"); a formant synth
 # was tried first and sounded like a synthesiser, which is the thing a voice cannot be.
+
+
+# ---- interface, second set ------------------------------------------------------
+# The custom keyboard, panels opening, switches and refusals. Its own saved
+# stream, appended last for the reason the punch has one: nothing above is re-rolled.
+_ui2_stream = random.getstate()
+
+# A key: short and dry, lower than the click so thirty of them in a name do not chirp.
+save(f"{A}/UI/ui_key.wav",
+     mix(gain(blip(0.045, 520, 480, 5.0, attack=0.001), 0.7),
+         gain(env(highpass(n(secs(0.012)), 2600), power=10), 0.10)))
+
+# A switch: two quick taps a fourth apart, so on and off are one gesture.
+save(f"{A}/UI/ui_toggle.wav",
+     cat(gain(blip(0.035, 880, 880, 5.0, attack=0.001), 0.6),
+         gain(blip(0.06, 1175, 1175, 4.0, attack=0.001), 0.7)))
+
+# A panel arriving: a soft rising sweep, felt more than heard.
+save(f"{A}/UI/ui_open.wav", gain(blip(0.16, 380, 620, 2.6, attack=0.02), 0.45))
+
+# Refused: a low double buzz, for a locked tile or a key that cannot be typed.
+save(f"{A}/UI/ui_error.wav",
+     cat(gain(blip(0.07, 220, 200, 3.0), 0.8), blank(0.03),
+         gain(blip(0.09, 196, 180, 3.0), 0.8)))
+
+random.setstate(_ui2_stream)

@@ -33,8 +33,10 @@ namespace FPSKit.EditorTools
     {
         const string ScenePath = "Assets/FPSKit_Generated/Scenes/IndustrialWarehouse.unity";
 
-        /// <summary>Real seconds a run is given before it is measured. The briefing runs four.</summary>
-        const double SettleSeconds = 8.0;
+        /// <summary>Real seconds a run is given before it is measured. The level-start card
+        /// runs 7.5 now (it was four when this was 8), so 8 caught the level on its first frame
+        /// or just before it, and a run that had not started read as a dead one.</summary>
+        const double SettleSeconds = 12.0;
 
         /// <summary>Real seconds after a scene load before the new world is measured.</summary>
         const double OpeningSeconds = 1.0;

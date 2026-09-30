@@ -65,11 +65,10 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         {
             descriptionText.text = entry.description ?? "";
 
-            // One line with an ellipsis is all a desktop card needs; a handset card is
-            // narrower and the sentence was cut to a few words, so it gets two.
-            bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
-            descriptionText.textWrappingMode = handset ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
-            descriptionText.maxVisibleLines = handset ? 2 : 99999;
+            // One line everywhere. On a phone the second line came out of the picture, and
+            // the whole sentence is on the mission card beside it anyway.
+            descriptionText.textWrappingMode = TextWrappingModes.NoWrap;
+            descriptionText.overflowMode = TextOverflowModes.Ellipsis;
             descriptionText.color = unlocked ? t.textSecondary : t.textDisabled;
         }
         if (progressText != null)
@@ -81,6 +80,8 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         var difficulty = Missions.ForArena(entry, campaign);
         if (difficultyText != null)
         {
+            // The bars say it on a phone; the word crowded the star count off the card.
+            difficultyText.gameObject.SetActive(DeviceProfile.CurrentForm != DeviceProfile.Form.Handset);
             difficultyText.text = Missions.Label(difficulty);
             difficultyText.color = unlocked ? Missions.ColorFor(t, difficulty) : t.textDisabled;
         }
@@ -120,14 +121,16 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         Paint();
     }
 
-    /// <summary>"5/8 CLEARED · 12/24 ★", with the star drawn from the icon set.</summary>
+    /// <summary>"5/8 CLEARED · 12/24 ★", with the star drawn from the icon set. A phone's card
+    /// is too narrow for the word beside the difficulty, so there it is "5/8 · 12/24 ★".</summary>
     static string ProgressLine(ArenaCatalog.Entry entry, UITheme t)
     {
         int count = entry.LevelCount;
         if (count <= 0) return "NO LEVELS";
         int cleared = LevelProgress.LevelsCleared(entry.ProgressKey, count);
         int stars = LevelProgress.StarsInArena(entry.ProgressKey, count);
-        return t.Tabular($"{cleared}/{count}", heading: false) + " CLEARED" + UIText.Separator +
+        bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+        return t.Tabular($"{cleared}/{count}", heading: false) + (handset ? "" : " CLEARED") + UIText.Separator +
                t.Tabular($"{stars}/{count * 3}", heading: false) + " " + InputPrompts.Glyph("star-filled");
     }
 
@@ -145,6 +148,23 @@ public class ArenaCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
     }
 
     void OnRectTransformDimensionsChange() => Cover();
+
+    float _zoom = 1f;
+
+    /// <summary>
+    /// The picture leans in a little under the pointer or the focus ring. Scale on the
+    /// picture inside its mask, never the card: the grid owns the card's rect.
+    /// </summary>
+    void Update()
+    {
+        if (thumbnail == null) return;
+        bool focused = EventSystem.current != null && EventSystem.current.currentSelectedGameObject == gameObject;
+        float target = (_hover || (focused && Unlocked)) ? 1.05f : 1f;
+        if (Mathf.Approximately(_zoom, target)) return;
+        float step = Time.unscaledDeltaTime / Mathf.Max(0.01f, UITheme.Active.motionSlow) * 0.05f;
+        _zoom = Mathf.MoveTowards(_zoom, target, step);
+        thumbnail.rectTransform.localScale = new Vector3(_zoom, _zoom, 1f);
+    }
 
     public void OnPointerEnter(PointerEventData e) { _hover = Unlocked; Paint(); }
     public void OnPointerExit(PointerEventData e) { _hover = false; Paint(); }

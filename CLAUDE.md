@@ -150,6 +150,13 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - `UITheme.asset` field initialisers are the spec; flat, matte, one amber accent plus six arena
   signal colours. New icons need `FPSKitBatch.ImportUiKit`.
 - No developer logs on the player's screen (WebGL page only with `?debug`).
+- Text fields on touch use the game's own keyboard (`OnScreenKeyboard.Attach`), never the
+  OS one; desktop types into the field. Keys are not Selectables (they would steal focus).
+- UI sound goes through `UISfx` (clips on `UITheme`, filled by `ImportUiKit`); kit buttons get
+  a `UIButtonSound` automatically, so set a voice with `UIButtonSound.On`, never `AddComponent`.
+- Only the top `OverlayPanel` answers Back. One-line kit texts hold their line height
+  (`UITextFloor`), so size card cells with `UIGrid.ContentHeight`, not an aspect alone.
+- Level select is choose-then-play: tiles choose, the `LevelDetail` pane has PLAY.
 
 ## Platforms
 

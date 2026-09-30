@@ -150,6 +150,9 @@ public class ResultsView : MonoBehaviour
         retryButton = UIKit.Button(buttons, "Retry", "Retry", FlatButton.Variant.Secondary, "refresh", t);
         nextButton = UIKit.Button(buttons, "Next", "Next level", FlatButton.Variant.Primary, "chevron-right", t);
         menuButton = UIKit.Button(buttons, "Menu", "Menu", FlatButton.Variant.Secondary, "arrow-left", t);
+        UIButtonSound.On(nextButton.gameObject, UIButtonSound.Voice.Launch);
+        UIButtonSound.On(retryButton.gameObject, UIButtonSound.Voice.Launch);
+        UIButtonSound.On(menuButton.gameObject, UIButtonSound.Voice.Back);
 
         hint = UIKit.Text(card.transform, "Keys", "", UIKit.TextRole.Caption, t);
         hint.color = t.textDisabled;
@@ -216,9 +219,13 @@ public class ResultsView : MonoBehaviour
         timeNote.text = newBest ? "NEW BEST" : "";
         timeNote.color = newBest ? t.accent : t.textDisabled;
         killsValue.text = t.Tabular($"{r.killed}/{r.total}");
-        scoreValue.text = t.Tabular(r.score.ToString("N0"));
-        coinsValue.text = t.Tabular("+" + Wallet.Format(r.coins));
-        xpValue.text = t.Tabular("+" + xpGained.ToString("N0"));
+        // Score, coins and XP roll up from nothing rather than appear: the card is the
+        // payoff for the level, and a number that counts is a number that gets read.
+        _score = r.score;
+        _coins = r.coins;
+        _xp = xpGained;
+        _count = 0f;
+        ShowCounts(0f);
 
         int after = xpBefore + xpGained;
         int rank = PlayerRank.RankFor(after);
@@ -241,6 +248,24 @@ public class ResultsView : MonoBehaviour
         hint.text = keys ?? "";
     }
 
+    int _score, _coins, _xp;
+    float _count = 1f;
+
+    void ShowCounts(float k)
+    {
+        var t = UITheme.Active;
+        if (scoreValue != null) scoreValue.text = t.Tabular(Mathf.RoundToInt(_score * k).ToString("N0"));
+        if (coinsValue != null) coinsValue.text = t.Tabular("+" + Wallet.Format(Mathf.RoundToInt(_coins * k)));
+        if (xpValue != null) xpValue.text = t.Tabular("+" + Mathf.RoundToInt(_xp * k).ToString("N0"));
+    }
+
+    void Update()
+    {
+        if (_count >= 1f) return;
+        _count = Mathf.Min(1f, _count + Time.unscaledDeltaTime / UITheme.CountSeconds);
+        ShowCounts(UITheme.EaseOut(_count));
+    }
+
     /// <summary>A star lands: filled amber, its condition lit and marked MET.</summary>
     public void Land(int index)
     {
@@ -248,6 +273,7 @@ public class ResultsView : MonoBehaviour
         var t = UITheme.Active;
         starIcons[index].sprite = t.IconSprite("star-filled");
         starIcons[index].color = t.accent;
+        UIPop.Play(starIcons[index]);
         conditions[index].color = t.textPrimary;
         verdicts[index].text = "MET";
         verdicts[index].color = t.success;

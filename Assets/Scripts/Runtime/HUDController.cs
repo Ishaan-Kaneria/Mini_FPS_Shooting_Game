@@ -121,6 +121,9 @@ public class HUDController : MonoBehaviour
     [Header("Crosshair")]
     public CanvasGroup crosshairGroup;
 
+    /// <summary>How much of the crosshair something over the centre is hiding, 0 to 1. Set by the HUD view.</summary>
+    [System.NonSerialized] public float crosshairVeil;
+
     [Tooltip("Order matters: Top, Bottom, Left, Right.")]
     public RectTransform[] crosshairArms;
 
@@ -1326,6 +1329,9 @@ public class HUDController : MonoBehaviour
         if (crosshairGroup != null)
         {
             float target = weapon != null ? 1f - weapon.AimProgress : 1f;
+            // Out of the way of the level-start card, which sits over the middle of the screen
+            // and had the reticle drawn across its words.
+            target *= 1f - Mathf.Clamp01(crosshairVeil);
             crosshairGroup.alpha = Mathf.Lerp(crosshairGroup.alpha, target,
                                               Mathf.Clamp01(16f * Time.unscaledDeltaTime));
         }

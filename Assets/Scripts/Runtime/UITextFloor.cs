@@ -46,8 +46,13 @@ public class UITextFloor : MonoBehaviour
         Apply();
     }
 
+    [SerializeField] float _authoredMin = -1f;
+    float _lastMin = -2f;
+    UnityEngine.UI.LayoutElement _element;
+
     void LateUpdate()
     {
+        KeepLines();
         // A size set from code after this was added is the new authored size -- the kit's
         // own factory does exactly that, sizing a label after making it.
         if (_lastSet >= 0f && !Mathf.Approximately(_text.fontSize, _lastSet)) SetAuthored(_text.fontSize);
@@ -92,5 +97,43 @@ public class UITextFloor : MonoBehaviour
         float floorUnits = floorPixels / scale;
         _text.fontSize = Mathf.Max(_authored, floorUnits);
         _lastSet = _text.fontSize;
+        KeepLines();
+    }
+
+    /// <summary>
+    /// Holds a one-line (or line-capped) text at least as tall as its lines.
+    ///
+    /// A TMP text tells a layout group its minimum height is zero, so when a card runs short
+    /// of room the group squeezes the text first -- and a squeezed text with an ellipsis
+    /// draws nothing at all. That is how the arena and store cards lost their names on a
+    /// phone, where the text floor had made every line taller than the card was built for.
+    /// With this, a card short of room overflows visibly instead of blanking its title, and
+    /// the grids size cells from the result (<see cref="UIGrid.ContentHeight"/>).
+    /// Free-running paragraphs are left alone: their height is the layout's to decide.
+    /// </summary>
+    void KeepLines()
+    {
+        if (_text == null) return;
+        bool single = _text.textWrappingMode == TextWrappingModes.NoWrap;
+        int cap = _text.maxVisibleLines;
+        if (!single && (cap <= 0 || cap > 6)) return;
+        if (_element == null) _element = GetComponent<UnityEngine.UI.LayoutElement>();
+        if (_element == null)
+        {
+            // Only inside a layout group: a text placed by anchors has no use for one.
+            if (transform.parent == null || transform.parent.GetComponent<UnityEngine.UI.LayoutGroup>() == null) return;
+            _element = gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+        }
+        // A minimum set by somebody else since the last pass is theirs, and is kept as a floor.
+        if (!Mathf.Approximately(_element.minHeight, _lastMin)) _authoredMin = _element.minHeight;
+        var face = _text.font != null ? _text.font.faceInfo : default;
+        float ratio = face.pointSize > 0f ? face.lineHeight / face.pointSize : 1.2f;
+        float lines = string.IsNullOrEmpty(_text.text) ? 0f : single ? 1f : cap;
+        // An empty text keeps no line: a combo readout with nothing to say must not hold a
+        // blank row open in its panel.
+        float need = lines <= 0f ? 0f : Mathf.Ceil(_text.fontSize * ratio * lines + _text.margin.y + _text.margin.w);
+        float min = Mathf.Max(_authoredMin, need);
+        if (!Mathf.Approximately(_element.minHeight, min)) _element.minHeight = min;
+        _lastMin = _element.minHeight;
     }
 }

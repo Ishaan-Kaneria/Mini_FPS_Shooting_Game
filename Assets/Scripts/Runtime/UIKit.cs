@@ -236,6 +236,7 @@ public static class UIKit
         b.icon = icon;
         b.targetGraphic = face;
         b.variant = variant;
+        UIButtonSound.On(face.gameObject);
         return b;
     }
 
@@ -259,6 +260,7 @@ public static class UIKit
         b.icon = icon;
         b.targetGraphic = face;
         b.variant = FlatButton.Variant.Icon;
+        UIButtonSound.On(face.gameObject);
 
         var tip = face.gameObject.AddComponent<UITooltip>();
         tip.text = tooltip;
@@ -331,6 +333,7 @@ public static class UIKit
             b.targetGraphic = face;
             b.tabEdge = FlatRect.Side.Left;
             b.variant = FlatButton.Variant.Tab;
+            UIButtonSound.On(face.gameObject);
             tabs[i] = b;
         }
 
@@ -494,11 +497,16 @@ public static class UIKit
         fr.raycastTarget = false; fr.color = t.accent;
 
         var handleArea = Rect(sliderRect, "HandleArea");
-        Fill(handleArea, 8f, 0f, 8f, 0f);
+        Fill(handleArea, 10f, 0f, 10f, 0f);
+        // A square knob, not a post: the tall white bar read as a cursor stuck in the track.
+        // Amber with a dark edge, so it reads as the end of the amber fill and stands off it.
         var handle = Rect(handleArea, "Handle");
-        handle.sizeDelta = new Vector2(16f, 24f);
+        // The Slider stretches its handle to the full height of the handle area on every
+        // update, so the height is an inset: 32 tall less 12 is a 20-unit square.
+        handle.sizeDelta = new Vector2(20f, -12f);
         var hr = handle.gameObject.AddComponent<FlatRect>();
-        hr.raycastTarget = false; hr.color = t.textPrimary;
+        hr.raycastTarget = false; hr.color = t.accent;
+        hr.borderColor = t.background; hr.borderPixels = 2f;
 
         var slider = sliderRect.gameObject.AddComponent<Slider>();
         slider.transition = Selectable.Transition.None;

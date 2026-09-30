@@ -155,6 +155,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: be443c73e3b706b72894e20277206ada, type: 3}
   - id: backpack
     sprite: {fileID: 21300000, guid: fac841c6d2941be8c91d6341e0e8a453, type: 3}
+  - id: backspace
+    sprite: {fileID: 21300000, guid: 4067e143e9ee5334aab2bfd84ed4a81b, type: 3}
   - id: bolt
     sprite: {fileID: 21300000, guid: 43fef608c8dcea8f28bec9aac91f4b73, type: 3}
   - id: bomb
@@ -261,3 +263,14 @@ MonoBehaviour:
   tooltipDelay: 0.4
   toastSeconds: 3.5
   warningPulseSeconds: 1
+  soundClick: {fileID: 8300000, guid: ac68b73ab6cf8c6cc94f3ede2c23f697, type: 3}
+  soundHover: {fileID: 8300000, guid: 3f6ad5607f927f7818a624579cfbbb57, type: 3}
+  soundBack: {fileID: 8300000, guid: efdac6c5678059dceb0e104212bc14a9, type: 3}
+  soundLaunch: {fileID: 8300000, guid: 3b5ea3e921fdcb0a6afbcc6c105112e6, type: 3}
+  soundPurchase: {fileID: 8300000, guid: b37152df46e6065378ba262e9189ea0a, type: 3}
+  soundKey: {fileID: 8300000, guid: 4d217eddd506e32ba843a9057c603449, type: 3}
+  soundToggle: {fileID: 8300000, guid: d6e9942ffb91ee192aa6a69a1fc8fb7d, type: 3}
+  soundOpen: {fileID: 8300000, guid: 927d7d176cd6aa03db53111b66868ed3, type: 3}
+  soundStar: {fileID: 8300000, guid: 3cfe6cb623707b746b1fa3845f8f235f, type: 3}
+  soundError: {fileID: 8300000, guid: f260aaedaef89c32494a667dbfdf2f35, type: 3}
+  soundVolume: 0.55

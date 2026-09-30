@@ -1207,7 +1207,7 @@ namespace FPSKit.EditorTools
 
             // Added here rather than at each call site, for the same reason raycastTarget
             // is: a button that exists should sound like one without anybody remembering.
-            button.gameObject.AddComponent<UIButtonSound>();
+            UIButtonSound.On(button.gameObject);
 
             return button;
         }

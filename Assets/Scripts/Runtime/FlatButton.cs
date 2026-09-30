@@ -164,8 +164,25 @@ public class FlatButton : Button
         _t = 0f;
     }
 
+    float _scale = 1f;
+
+    /// <summary>
+    /// A pressed button sinks a little and comes back on release, over the fast motion
+    /// time. Scale, never position: most buttons live in layout groups, which own position.
+    /// Tabs do not sink -- a tab is a place, not an action.
+    /// </summary>
+    void Press()
+    {
+        float target = _look == Look.Pressed && _variant != Variant.Tab ? 0.96f : 1f;
+        if (Mathf.Approximately(_scale, target)) return;
+        float d = Mathf.Max(0.01f, Theme.motionFast);
+        _scale = Mathf.MoveTowards(_scale, target, Time.unscaledDeltaTime / d * 0.04f * 2f);
+        transform.localScale = new Vector3(_scale, _scale, 1f);
+    }
+
     void Update()
     {
+        if (Application.isPlaying) Press();
         if (_t >= 1f) return;
         var t = Theme;
         _t = Mathf.Min(1f, _t + Time.unscaledDeltaTime / Mathf.Max(0.001f, t.motionFast));

@@ -17,6 +17,11 @@ using UnityEngine.UI;
 /// disagreeing -- and the zone's story opening sits under it at reading size, because this
 /// is where somebody who skipped the card is standing when they wonder what it said.
 ///
+/// <b>Choose, then play.</b> The ladder is a grid of compact tiles and the level chosen is
+/// shown in full in the pane beside it (<see cref="LevelDetail"/>), with PLAY under it; the
+/// next level to play is chosen when the screen opens, so PLAY is one press away. Clicking
+/// the chosen tile again plays it too.
+///
 /// Built into the dashboard scene by the menu builder and driven by
 /// <see cref="MainMenuController"/>, which owns the catalog. The tiles are cloned from
 /// a template per level in the arena's <see cref="LevelSet"/>, so an arena that grows a
@@ -68,18 +73,27 @@ public class LevelSelectPanel : MonoBehaviour
     [Tooltip("Tile height as a fraction of its width.")]
     [Min(0.1f)] public float tileAspect = 0.78f;
 
-    [Tooltip("Scrolls the tiles sideways on a handset, where eight cards of this much text " +
-             "cannot share one screen at a size anybody can read.")]
+    [Tooltip("Scrolls the tiles down when the ladder is longer than the screen is tall.")]
     public ScrollRect scroll;
+
+    [Header("Detail")]
+    [Tooltip("The pane beside the grid: the chosen level in full, and PLAY.")]
+    public LevelDetail detail;
+
+    [Tooltip("Handset only: shows the zone's story in the pane, where the desktop has a panel over the grid.")]
+    public FlatButton storyButton;
+
+    [Tooltip("The smallest a tile may be across, in canvas units, before a column is dropped.")]
+    [Min(60f)] public float minTileWidth = 132f;
 
     // ======================================================================
     readonly List<LevelButton> _tiles = new List<LevelButton>();
 
     GridLayoutGroup _layout;
-    Transform _storyHome;
-    int _storyIndex = 1;
     float _fittedWidth = -1f;
     float _fittedHeight = -1f;
+    float _fittedNeed = -1f;
+    int _chosen;
 
     /// <summary>The arena on screen, or null when the panel is closed.</summary>
     public ArenaCatalog.Entry Entry { get; private set; }
@@ -127,12 +141,29 @@ public class LevelSelectPanel : MonoBehaviour
 
     void Start()
     {
-        if (storyBlock != null) _storyIndex = storyBlock.transform.GetSiblingIndex();
+        if (backButton != null)
+        {
+            backButton.onClick.RemoveAllListeners();
+            backButton.onClick.AddListener(Close);
+        }
+        if (detail != null && detail.playButton != null)
+        {
+            detail.playButton.onClick.RemoveAllListeners();
+            detail.playButton.onClick.AddListener(() => Launch(_chosen));
+        }
+        if (storyButton != null)
+        {
+            storyButton.onClick.RemoveAllListeners();
+            storyButton.onClick.AddListener(ToggleStory);
+        }
+    }
 
-        if (backButton == null) return;
-
-        backButton.onClick.RemoveAllListeners();
-        backButton.onClick.AddListener(Close);
+    void ToggleStory()
+    {
+        if (detail == null) return;
+        detail.ShowStory(!detail.ShowingStory);
+        if (storyButton != null && storyButton.label != null)
+            storyButton.label.text = detail.ShowingStory ? "LEVEL" : "STORY";
     }
 
     void Update()
@@ -141,9 +172,12 @@ public class LevelSelectPanel : MonoBehaviour
 
         FitGrid();
 
-        // Escape and Q back out. A screen with no keyboard way out traps anyone whose
-        // pointer is not where they expected it to be.
-        if (GameInput.BackPressed) Close();
+        // Escape and Q back out -- of the story first, when a phone is showing it in the pane.
+        // A screen with no keyboard way out traps anyone whose pointer is not where they
+        // expected it to be.
+        if (!GameInput.BackPressed) return;
+        if (detail != null && detail.ShowingStory) ToggleStory();
+        else Close();
     }
 
     // ======================================================================
@@ -159,8 +193,13 @@ public class LevelSelectPanel : MonoBehaviour
         // The measured box has only just been shown, so the cells have to be worked out
         // again rather than trusting whatever the last arena left behind.
         _fittedWidth = _fittedHeight = -1f;
+        if (scroll != null) scroll.verticalNormalizedPosition = 1f;
 
-        if (backButton != null) backButton.Select();
+        // The focus starts on the level to play, so a pad's A plays it.
+        var start = _chosen >= 0 && _chosen < _tiles.Count ? _tiles[_chosen] : null;
+        if (start != null && start.button != null && start.button.interactable) start.button.Select();
+        else if (backButton != null) backButton.Select();
+        UISfx.Play(UISfx.Sound.Open);
     }
 
     public void Close()
@@ -215,11 +254,17 @@ public class LevelSelectPanel : MonoBehaviour
             tile.gameObject.SetActive(true);
 
             int index = i;
-            tile.Bind(index, set.Count, set.At(i), key, entry.preview, arenaColor,
-                      LevelProgress.IsUnlocked(key, i), nextIsNew && i == next, () => Choose(index));
+            tile.Bind(index, set.At(i), key, LevelProgress.IsUnlocked(key, i), nextIsNew && i == next,
+                      () => Clicked(index), Preview, Choose);
 
             _tiles.Add(tile);
         }
+        _arenaColor = arenaColor;
+        _nextIndex = nextIsNew ? next : -1;
+        // The level to play next, else the last open one -- never a locked one.
+        int start = Mathf.Clamp(next, 0, set.Count - 1);
+        while (start > 0 && !LevelProgress.IsUnlocked(key, start)) start--;
+        Choose(start);
 
         int earned = LevelProgress.StarsInArena(key, set.Count);
         int cleared = LevelProgress.LevelsCleared(key, set.Count);
@@ -230,39 +275,78 @@ public class LevelSelectPanel : MonoBehaviour
         if (clearedText != null)
             clearedText.text = t.Tabular($"{cleared}/{set.Count}") + " CLEARED";
 
-        // On a handset the story is the first card of the sideways row rather than a panel
-        // over it: a landscape phone has no height to give a paragraph above the cards, and
-        // the cards' star conditions were what got squeezed out. It is read first, then
-        // swiped past.
-        if (storyBlock != null && _storyHome == null) _storyHome = storyBlock.transform.parent;
-        if (storyBlock != null)
-        {
-            bool inRow = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
-            storyBlock.transform.SetParent(inRow ? tileParent : _storyHome, false);
-            if (inRow) storyBlock.transform.SetAsFirstSibling();
-            else storyBlock.transform.SetSiblingIndex(_storyIndex);
-        }
-
         var zone = campaign != null ? campaign.ZoneForArena(key) : null;
         bool story = zone != null && !string.IsNullOrWhiteSpace(zone.opening);
-        if (storyBlock != null) storyBlock.SetActive(story);
-        if (hintText != null) hintText.text = story ? Campaign.Expand(zone.opening) : "";
-        if (storyTitleText != null)
+        string opening = story ? Campaign.Expand(zone.opening) : "";
+        var holder = story ? campaign.HolderOf(zone) : null;
+        string holderName = holder != null && !string.IsNullOrWhiteSpace(holder.displayName)
+            ? holder.displayName.ToUpperInvariant()
+            : "THE STORY";
+
+        // A landscape phone has no height for a paragraph over the grid: there the story is
+        // in the pane, behind the header's STORY button, and is read on the way past.
+        bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+        if (storyBlock != null) storyBlock.SetActive(story && !handset);
+        if (hintText != null) hintText.text = opening;
+        if (storyTitleText != null) storyTitleText.text = holderName;
+        if (storyButton != null)
         {
-            var holder = story ? campaign.HolderOf(zone) : null;
-            storyTitleText.text = holder != null && !string.IsNullOrWhiteSpace(holder.displayName)
-                ? holder.displayName.ToUpperInvariant()
-                : "THE STORY";
+            storyButton.gameObject.SetActive(story && handset);
+            if (storyButton.label != null) storyButton.label.text = "STORY";
+        }
+        if (detail != null)
+        {
+            detail.ShowStory(false);
+            if (detail.storyText != null) detail.storyText.text = opening;
+            if (detail.storyTitleText != null) detail.storyTitleText.text = holderName;
         }
     }
 
+    Color _arenaColor;
+    int _nextIndex = -1;
+
+    /// <summary>Makes a level the chosen one: its tile wears the amber border and the pane shows it.</summary>
     void Choose(int index)
+    {
+        if (index < 0 || index >= _tiles.Count) return;
+        _chosen = index;
+        for (int i = 0; i < _tiles.Count; i++) if (_tiles[i] != null) _tiles[i].Chosen = i == index;
+        ShowDetail(index);
+    }
+
+    /// <summary>The pointer over a tile shows it in the pane; off it, the pane goes back to the chosen one.</summary>
+    void Preview(int index, bool on) => ShowDetail(on ? index : _chosen);
+
+    void ShowDetail(int index)
+    {
+        if (detail == null || Entry == null || Entry.levels == null) return;
+        if (index < 0 || index >= Entry.levels.Count) return;
+        string key = Entry.ProgressKey;
+        if (detail.ShowingStory) detail.ShowStory(false);
+        if (storyButton != null && storyButton.label != null) storyButton.label.text = "STORY";
+        detail.Show(index, Entry.levels.Count, Entry.levels.At(index), key, Entry.preview, _arenaColor,
+                    LevelProgress.IsUnlocked(key, index), index == _nextIndex);
+    }
+
+    /// <summary>A tile clicked: the chosen one plays, any other becomes the chosen one.</summary>
+    void Clicked(int index)
+    {
+        if (index == _chosen) Launch(index);
+        else
+        {
+            Choose(index);
+            UISfx.Play(UISfx.Sound.Toggle, 1f, 0.6f);
+        }
+    }
+
+    void Launch(int index)
     {
         if (Entry == null) return;
 
         if (!LevelProgress.IsUnlocked(Entry.ProgressKey, index))
         {
             Report($"Level {index + 1} is locked. Clear level {index} first.");
+            UISfx.Play(UISfx.Sound.Error);
             return;
         }
 
@@ -270,13 +354,9 @@ public class LevelSelectPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Sizes the level tiles to the space there actually is, in both directions, and
-    /// chooses how many go across. <see cref="UIGrid"/> owns the arithmetic, shared with
-    /// the arena grid and the store.
-    ///
-    /// A tile is a number, a star row and a line of detail, so it survives being small
-    /// better than a store card does -- four across on a handset is still four tiles a
-    /// thumb can hit, and eight levels in two rows is the whole ladder without scrolling.
+    /// As many tiles across as fit at <see cref="minTileWidth"/> (eight at most on a desk,
+    /// four on a phone), each as tall as its aspect or its content, whichever is more, in a
+    /// grid that scrolls down once the ladder outgrows the screen.
     /// </summary>
     void FitGrid()
     {
@@ -287,58 +367,30 @@ public class LevelSelectPanel : MonoBehaviour
         var box = scroll != null && scroll.viewport != null ? scroll.viewport : tileParent;
         float width = box.rect.width;
         float height = box.rect.height;
-
         if (width <= 1f || height <= 1f) return;
-        if (Mathf.Abs(width - _fittedWidth) < 0.5f &&
-            Mathf.Abs(height - _fittedHeight) < 0.5f) return;
-
+        float need = UIGrid.ContentHeight(tileParent);
+        if (Mathf.Abs(width - _fittedWidth) < 0.5f && Mathf.Abs(height - _fittedHeight) < 0.5f &&
+            Mathf.Abs(need - _fittedNeed) < 0.5f) return;
         _fittedWidth = width;
         _fittedHeight = height;
+        _fittedNeed = need;
 
         bool handset = DeviceProfile.CurrentForm == DeviceProfile.Form.Handset;
+        float inner = width - _layout.padding.left - _layout.padding.right;
+        // Three across on a phone, whatever the arithmetic says: the text floor makes a
+        // unit bigger there, and two across was sixteen rows of scrolling for one ladder.
+        int columns = handset ? 3
+            : Mathf.Clamp(Mathf.FloorToInt((inner + _layout.spacing.x) / (minTileWidth + _layout.spacing.x)), 2, Mathf.Max(1, gridColumns));
+        float cell = (inner - _layout.spacing.x * (columns - 1)) / columns;
 
-        // Centred over the view on a screen that holds the whole ladder; pinned to the
-        // left edge when it scrolls, or the first card would start off screen.
-        var anchor = handset ? new Vector2(0f, 1f) : new Vector2(0.5f, 1f);
-        tileParent.anchorMin = tileParent.anchorMax = tileParent.pivot = anchor;
+        tileParent.anchorMin = tileParent.anchorMax = tileParent.pivot = new Vector2(0f, 1f);
         tileParent.anchoredPosition = Vector2.zero;
-
-        if (handset)
-        {
-            // One row the height of the view, scrolling sideways: a landscape phone has
-            // width to spare and no height, the same call the arena row makes.
-            _layout.startAxis = GridLayoutGroup.Axis.Vertical;
-            _layout.constraint = GridLayoutGroup.Constraint.FixedRowCount;
-            _layout.constraintCount = 1;
-            float h = height - _layout.padding.top - _layout.padding.bottom;
-            _layout.cellSize = new Vector2(h / tileAspect, h);
-            if (scroll != null) { scroll.horizontal = true; scroll.vertical = false; }
-            return;
-        }
-
         _layout.startAxis = GridLayoutGroup.Axis.Horizontal;
-
-        // A long ladder (32 levels) cannot be fitted whole: it would shrink every tile to
-        // the floor and run off the bottom. Laid out at the width there is, scrolling
-        // down (six across, so a tile's lines are not cut); a short one is still laid
-        // out whole with nothing to scroll.
-        const int LongLadder = 12;
-        if (_tiles.Count > LongLadder && scroll != null)
-        {
-            int columns = 6;
-            float cell = (width - _layout.padding.left - _layout.padding.right
-                          - _layout.spacing.x * (columns - 1)) / columns;
-            _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            _layout.constraintCount = columns;
-            _layout.cellSize = new Vector2(cell, cell * tileAspect);
-            // The grid's ContentSizeFitter makes it as tall as its rows, which is what scrolls.
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            return;
-        }
-
-        if (scroll != null) { scroll.horizontal = false; scroll.vertical = false; }
-        UIGrid.Fit(_layout, box, _tiles.Count, tileAspect, 200f, Mathf.Max(1, gridColumns));
+        _layout.childAlignment = TextAnchor.UpperLeft;
+        _layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        _layout.constraintCount = columns;
+        _layout.cellSize = new Vector2(cell, Mathf.Max(cell * tileAspect, need));
+        if (scroll != null) { scroll.horizontal = false; scroll.vertical = true; }
     }
 
     void Report(string message)

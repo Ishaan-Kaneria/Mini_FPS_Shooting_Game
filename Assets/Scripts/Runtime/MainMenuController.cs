@@ -69,6 +69,14 @@ public class MainMenuController : MonoBehaviour
     public TMP_Text footerText;
     public UIToastStack toasts;
 
+    [Tooltip("The chosen arena's real screenshot behind the whole menu, held far down so it is " +
+             "a sense of place rather than a picture: no text ever has to be read over it at more " +
+             "than this.")]
+    public RawImage backdropScene;
+    // Small on purpose: the project renders in linear space, where a 6% blend of sand over
+    // the near-black background comes out at about a quarter brightness on screen.
+    [Range(0f, 0.4f)] public float backdropStrength = 0.025f;
+
     [Header("Handset")]
     [Tooltip("Hidden on a handset: the screen is short, and these are also reachable from a tab.")]
     public GameObject[] hideOnHandset;
@@ -239,9 +247,44 @@ public class MainMenuController : MonoBehaviour
         button.onClick.AddListener(action);
     }
 
+    Texture _backdropTo;
+    float _backdropFade = 1f;
+
+    /// <summary>
+    /// Crossfades the backdrop to the chosen arena: down to nothing, swap, back up, over
+    /// twice the panel time. A cut would flash the whole screen on every card click.
+    /// </summary>
+    void FadeBackdrop()
+    {
+        if (backdropScene == null) return;
+        if (_backdropTo != backdropScene.texture && _backdropFade >= 1f) _backdropFade = 0f;
+        if (_backdropFade >= 1f) return;
+        _backdropFade = Mathf.Min(1f, _backdropFade + Time.unscaledDeltaTime / (UITheme.Active.motionSlow * 2f));
+        if (_backdropFade >= 0.5f && backdropScene.texture != _backdropTo)
+        {
+            backdropScene.texture = _backdropTo;
+            CoverBackdrop();
+        }
+        float k = Mathf.Abs(_backdropFade * 2f - 1f);
+        backdropScene.color = new Color(1f, 1f, 1f, backdropScene.texture != null ? backdropStrength * k : 0f);
+    }
+
+    /// <summary>Fills the screen with the screenshot, cropped, never stretched.</summary>
+    void CoverBackdrop()
+    {
+        var tex = backdropScene.texture;
+        var r = backdropScene.rectTransform.rect;
+        if (tex == null || r.width <= 1f || r.height <= 1f) return;
+        float texAspect = tex.width / (float)tex.height, boxAspect = r.width / r.height;
+        backdropScene.uvRect = boxAspect > texAspect
+            ? new Rect(0f, (1f - texAspect / boxAspect) * 0.5f, 1f, texAspect / boxAspect)
+            : new Rect((1f - boxAspect / texAspect) * 0.5f, 0f, boxAspect / texAspect, 1f);
+    }
+
     void Update()
     {
         if (!_dashboardHidden) FitGrid();
+        FadeBackdrop();
 
         if (exitConfirmPanel != null && exitConfirmPanel.activeSelf && GameInput.BackPressed)
             CancelExit();
@@ -375,8 +418,9 @@ public class MainMenuController : MonoBehaviour
             {
                 int n = fit + 1;
                 w = (view.x - gap * (n - 1)) / n;
-                h = w / cardAspect;
             }
+            // The full height of the row either way: the picture takes what the text leaves,
+            // and a card shorter than its row is a strip of empty panel under it.
             _layout.startAxis = GridLayoutGroup.Axis.Vertical;
             _layout.constraint = GridLayoutGroup.Constraint.FixedRowCount;
             _layout.constraintCount = 1;
@@ -416,6 +460,7 @@ public class MainMenuController : MonoBehaviour
             PlayerPrefs.Save();
         }
         if (mission != null) mission.Bind(entry);
+        _backdropTo = entry.preview;
     }
 
     // ======================================================================

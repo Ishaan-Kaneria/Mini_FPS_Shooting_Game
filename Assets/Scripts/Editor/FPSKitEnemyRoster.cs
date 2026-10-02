@@ -52,7 +52,7 @@ namespace FPSKit.EditorTools
             "Kestrel Auger",
             "Aurel Auger",
             "Ilsa Auger",
-            "Dev Auger",
+            "Sorrel Auger",
             "Roan Auger",
 
             // The last fight in the campaign.
@@ -857,7 +857,7 @@ namespace FPSKit.EditorTools
 
                 // The works. The longest reach in the game on the arena with the least
                 // room, which is the joke the fairground is built on.
-                case "Dev Auger":
+                case "Sorrel Auger":
                     a.description = "Boss. Enormous reach in a place with nowhere to stand.";
                     a.role = EnemyArchetype.Role.Boss;
                     a.voice = EnemyVoice.Kind.Human;

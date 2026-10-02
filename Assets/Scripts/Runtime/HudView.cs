@@ -158,8 +158,13 @@ public class HudView : MonoBehaviour
 
         // The boss bar sits under the mission panel and the objective strip rather than
         // where the builder put it, which is now where the strip is.
+        // Smaller and tucked up under them: at full size it hung well down the screen, nearer the
+        // crosshair than the mission bar it belongs with.
         if (_hud.bossPanel != null && _hud.bossPanel.transform is RectTransform boss)
-            boss.anchoredPosition = new Vector2(boss.anchoredPosition.x, -150f);
+        {
+            boss.anchoredPosition = new Vector2(boss.anchoredPosition.x, -(Margin + 96f));
+            boss.localScale = new Vector3(0.62f, 0.62f, 1f);
+        }
 
         foreach (var a in Achievements.Catalogue) _achievementStep[a.Id] = Step(a.Progress, a.Target);
 

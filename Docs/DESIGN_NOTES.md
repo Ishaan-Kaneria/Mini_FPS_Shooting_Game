@@ -2405,3 +2405,131 @@ all; every path was a bare strip with no edge; clutter was random crates in open
 - **Last details** (`FPSKitFairgroundDetail.cs`): paper/confetti drifts and cracks laid above the paving
   (0.082 on paths, 0.115 on plazas, so nothing z-fights), and crows perched on the gate towers, hall
   ridge, clock tower, yard water tower and big-top pole. None is cover or on the bake.
+
+## The fairground, realistic night rebuild (Oct 2026, in progress)
+
+The cheerful low-poly park is being replaced by a dark, flooded, abandoned fairground built to the quality
+and mood of the Flooded Grounds Asset Store pack. The old scene stays until the new one replaces it. Look
+recipe (measured, not guessed): `Docs/FAIRGROUND_LOOK_RECIPE.md`. All the new tooling is `Fairground*.cs` in
+`Assets/Scripts/Editor` (menu: **Tools > MiniFPS > Fairground**); generated output is in `Assets/Fairground`.
+
+- **The pack is not committed** (`.gitignore`), and neither is `_TerrainAutoUpgrade`. Our converted copies
+  (`Assets/Fairground/Materials`, `Prefabs`) still point at the pack's textures and meshes, so a fresh clone needs the
+  pack re-imported first. `PostProcessing/Editor` inside the pack is renamed `Editor~`: its two scripts do not compile
+  on Unity 6 and they take the whole editor assembly (every menu item) down with them.
+- **Shaders are HLSL, not Shader Graph** (`Assets/Fairground/Shaders`): `FG_TopBlend_URP`, `FG_Triplanar_URP`,
+  `FG_Water_URP`, sharing `FG_Common/ForwardPass/DepthPasses.hlsl`. Lightmap variants are dropped on purpose
+  (realtime + adaptive probe volumes). `_FG_LOW` is the Low-tier switch. Water needs the depth texture for
+  depth darkening and the soft shoreline; the Mobile URP asset has it off.
+- **Terrain trees:** Tree Creator billboards render wrong in URP (white leaves, blue trunks). Set
+  `treeBillboardDistance` past the view distance; the baked meshes are converted to URP Lit.
+- **Terrain mesh grass does not render** with the converted prefabs (instanced or not, even a forced full-coverage
+  patch). Unsolved; the fallback is script-scattered instanced grass, not terrain details.
+- **Night balance:** exposure is fixed, so a dim moon needs `FG_Night` postExposure ~+1.4 to be playable. The night HDRI
+  (`qwantani_night_puresky`) has horizon values far above 1: skybox exposure 0.12.
+- **Blockout** (`FairgroundBlockout`): x east, z north, 180 m playable. Cover is placed along lanes and into any empty
+  10 m cell; sightline blockers are placed by raycasts but never in lanes, the spawn, the Big Top or a camera spot
+  (the first version put a 3 m wall in front of three of the eight views). `WadingZone` carries the configurable
+  water speed penalty but is not wired into `PlayerMotor`/`EnemyAI` yet.
+- Fixed camera spots live in `FairgroundSpots` (gate, midway, carousel, ferris, lowlands, bigtop, +coaster, backlot).
+
+### Step 2 (ground, roads, water, props), Oct 2026
+`FairgroundDress` (menu **Build Step 2 Dressed Scene**) runs the blockout generator, then dresses it and saves
+`AbandonedFairground_Step2.unity`; the approved blockout scene is untouched.
+- The blockout's rubble-wall sightline blockers and box cover were the "random big blocks". They are now the pack's
+  fences, wrecked cars, a beached boat, benches, cabinets, sofas, flower boxes and cobble rocks. Blockers still never go
+  in lanes, the spawn, the Big Top or a camera view.
+- Every remaining primitive uses `FG_WorldPBR_URP` (world-space triplanar, whiteout normals) with the CC0 sets, so boxes
+  of any size keep their texel density. Roads are generated mesh slabs with kerbs (not the Splines package): asphalt
+  strips, concrete plazas, an asphalt lot; mud bleeds over their edges in the terrain paint near the flood.
+- Night values that work (exposure is fixed): moon 1.3, trilight ambient 0.26/0.19/0.09, `FG_Night` post exposure +2.0,
+  fog 20 to 220 m, leaf tint (0.24, 0.30, 0.26) so the treeline sits back.
+- **Decals** (`FairgroundDecals`, 230 placed): procedural textures (cracks, potholes, oil, mud, leaves, worn queue arrows,
+  flood lines). They need the `DecalRendererFeature` on the renderer in **Screen Space** mode (added to `PC_Renderer`;
+  our own shaders do not write the DBuffer). `Mobile_Renderer` does not have it yet (Step 5). Flood-line decals are
+  feathered at the ends; unfeathered they show a seam every 6 m.
+- Not done yet: grass, drain grates, boardwalks round the rides outside the lowlands, practical lights.
+
+### Step 3 (dressing and decay), Oct 2026
+`FairgroundDressing` (run by the Step 2 build): fairground signs, caution/quarantine tape, plywood boarding, sandbag
+emplacements, torn alpha-clipped tarps (they sway: `WindFlutter`), toppled bins, four squatter camps, burning-barrel and
+camp-fire anchors (`FX_BarrelFire`, `FX_CampFire`) for the lighting pass, string lights (most bulbs dead, ~7% emissive
+for flicker, some wires snapped to the ground), furniture clusters, litter and spray-painted warnings. Textures are
+generated by a Python/PIL script (not in the repo): signs, tape, graffiti, litter sheet, tarps; no real brands.
+- **Anything that moves at runtime is not static** (`Flutter()` clears `isStatic`), or static batching freezes it.
+- Memory: the full rebuild runs near the machine's limit. It now releases unused assets between stages, all of our
+  scenes use an explicit lighting-settings asset with Auto Generate OFF, and textures are capped (colour/normal 2048,
+  roughness/AO/sky 1024, signs 1024, decals 512). Set Preferences > Asset Pipeline > Import Worker Count to 0 before it.
+- Known weak spots: sandbags still read slightly brick-like, sleeping bags are capsules, signs are flat slabs.
+
+### Step 4 (light and atmosphere), Oct 2026
+`FairgroundLighting` (menu **Add Step 4 Lighting To Open Scene**) works on the OPEN Step 2/3 scene (no rebuild, so it is
+cheap on memory) and saves `AbandonedFairground_Step4.unity`.
+- **The moon is kept low (0.7)**; the scene is lit by practicals so the eye follows pools of light: 6 burning barrels and
+  4 camp fires (anchors `FX_BarrelFire` / `FX_CampFire` from the dressing pass, flicker + flame particles), 5 generator
+  work lights (cold spots with a hum; the gate and the Big Top cast shadows, the only two that do), 3 pulsing red
+  beacons, one lit ticket booth, 29 live bulbs that drop out (every third carries a light). 27 lights in all.
+- `FG_FxAdd_URP` is the one additive shader for flames, rain, shafts and mist. Mist cards must be FAINT: tint 0.06 turned
+  the lowlands to ice; 0.011 is a haze. Shafts are additive cones along the moon direction through the Big Top's four
+  missing roof slabs and a hole cut in the pavilion roof.
+- Runtime: `FlickerLight` (flicker/pulse/dropout, emission via MaterialPropertyBlock), `RainFollow`, `AmbientOneShot`.
+  Audio is generated, not downloaded (`Assets/Fairground/Audio`, Python/PIL/wave script not in the repo).
+- **Not done / not verified:** reflection probes are placed but NOT baked and there is no APV bake (waits for approval).
+  Particles do not simulate in edit-mode renders, so rain and flames were never seen moving. Audio was never listened to.
+
+## Fairground 450 m arena (2026-10-02)
+
+Ishaan asked for more breathing space: the arena is now **450 x 450 m** (`FairgroundBlockout.Half` 225; terrain 550 m,
+heightmap 1025). The hand-planned fair (the old 180 m square, `Core` = 90) is unchanged and stays flat and dense; the
+band outside it is abandoned open ground. Stretching every hard-coded site coordinate was rejected: ~130 coordinates
+across the blockout, plan and dress files, and the verified reach/deck checks depend on them.
+
+- **Height:** `H()` clamps to `Half + 1`; beyond `Core + 25` a gentle swell (about 2 m over 80 m, ~4 degrees) fades in, never
+  over the flood (`LowMask`). The SE corner stays flooded lowland.
+- **Cover:** `FillEmptyCells` covers the whole arena but the meadow gets ~1 piece per 25-30 m. Sightline fixing stays in the core.
+- **Outskirts** (`Outskirts()`): gate road runs on to the wall, service roads, overflow car park, ranger lodge (two doors),
+  campsite, water tower, watch post (raised deck, flush stairs, in `Elevated`), fallen fence lines, road wrecks.
+- **Trees:** up to 1400 terrain trees: noise-clustered groves in the meadow (2.8 m trunk spacing, off the flood, clear of the
+  core) plus the treeline beyond the walls.
+- **Zones:** North Fields, West Meadow, East Meadow, South Meadow added to `ZoneDefs` and `FairgroundFightOrder`; spawn range
+  is `Half - 4`, ring cap 170, zone distance 18-260, despawn 560, camera far clip 420.
+- **Rain removed** (particles and `RainBed` sound); `Rain()` is no longer called.
+- **Checks:** `VerifyReach` passed (Fairground 1.3% stranded, strays on props/track). All 88 spawn points on 11 zones are
+  on the NavMesh and path to the player start. `VerifyWalkways` skips the realistic arena by design.
+- **Checks no longer close the editor:** every Verify* exit goes through `FPSKitBatch.Exit`, which only quits in batch mode.
+  (Calling `VerifyReach` over MCP once closed his editor.)
+- Not yet done: baked lighting/probes, Mobile_Renderer decals, grass, `WadingZone` wiring; a 450 m arena needs a perf pass
+  on WebGL/Android (tree count, draw distance).
+
+### 450 m arena: the fair is stretched (2026-10-02, supersedes the "core stays at the planned spot" note above)
+
+Ishaan: "you have not stretched the current properly". The planned fair is now spread over ~350 m, not left in the middle.
+- **Planned space first.** `FairgroundBlockout.Generate()` builds the eight sites in their planned coordinates (`stretched` = false);
+  Dress, Dressing, Decals and `FairgroundLighting.ApplyWorld` all run in planned space, so none of their ~50 hard-coded
+  coordinates changed. `FairgroundDress.Finish()` then calls `FairgroundBlockout.FinalStretch()`.
+- **`FinalStretch`:** each site group moves rigidly to `Warp(anchor)` (x2 from the centre, per axis; sites keep size and insides).
+  Everything else (dressing, decals, lights, audio) moves with the site it belongs to (`SiteOf`: footprint rectangles, else nearest
+  anchor). Marks on the old perimeter wall (|x| or |z| = 88.9) are re-seated on the new wall. Then `stretched` turns on:
+  `H()` reads the planned ground through `Unwarp` (flood, gate plateau stretch continuously) and the terrain, water, walls,
+  outskirts, zones and cover are built in final coordinates. `SwapProps`, `Retexture`, roads, paint and trees run after.
+- **Roads** are re-laid between the moved sites (`AddRoadShapes`, final coordinates); `PlannedStrips` keeps the old lanes for the dressing.
+- **Performance:** 420 trees (was 1400), tree distance 170, 120 full-LOD trees, heightmap 513, terrain pixel error 8, kerbs in
+  4 m runs and none on the outer dirt roads, sightline blockers capped at 80, camera far clip 320.
+- Checks: `VerifyReach` passed, Fairground 0.9% stranded. 87 of 88 spawns reachable (one Midway point is off the navmesh; spawns are snapped at run time).
+
+### Old-growth wood replaces the flood (2026-10-02)
+
+Ishaan did not like the water ("does not look any clearer"): the flood is gone. `LowMask` returns 0 (ground no longer sinks, no
+pit beyond the walls), `FloodWater`, the water plane, flood decals, `FloodNavVolume`, `MapWater` and the lapping sounds are removed.
+The south-east quarter (`FairgroundBlockout.InOldGrowth`) is an old-growth forest built by `FairgroundDress.BuildOldGrowth`:
+huge, very thick trees on a jittered 20 m grid (prefab trees scaled 3.4-4.8 wide, 2.6-3.4 tall, each with a trunk capsule so the
+NavMesh goes round), 16 fallen giant logs, 28 mossy boulders. The floor is painted moss/leaf, not mud. The zone is renamed
+"Old Growth" (minimap "WOODS"). The lowlands site (pavilion, kiddie rides) now stands inside the wood.
+
+### Dusk lighting (2026-10-02)
+
+Ishaan found the night too dim: "brighter like dusk or dawn (not too much)". `FairgroundLighting.Atmosphere`: a low warm sun
+(colour 1.0/0.74/0.58, intensity 0.95, elevation 22 degrees, yaw 208), ambient sky 0.30/0.34/0.48, fog 0.25/0.25/0.31 from 14 to 210 m,
+reflection intensity 0.7, sky exposure 0.4 with a warm tint. `FairgroundVolume.Night`: post exposure 1.5 (was 2.0 with a dim moon),
+saturation -14, warm colour filter, white balance +3. The Volume profile is now rebuilt on every scene build (it used to load a stale
+asset, so edits to `Night()` did nothing). Old-growth fix: the fallen-log overlap box is long and thin (it was a square), 400 tries.

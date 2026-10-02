@@ -77,7 +77,7 @@ namespace FPSKit.EditorTools
         static readonly string[] DefaultNames =
         {
             "Tove Auger", "Kestrel Auger", "Aurel Auger", "Ilsa Auger",
-            "Dev Auger", "Roan Auger", "Marit Auger", "the eighth name"
+            "Sorrel Auger", "Roan Auger", "Marit Auger", "the eighth name"
         };
 
         public static string PathFor(string name)

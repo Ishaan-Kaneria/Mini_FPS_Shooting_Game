@@ -706,7 +706,7 @@ public class EnemyAI : MonoBehaviour
         if (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound)
             multiplier = Mathf.Min(multiplier, 1f) * _wounds.MoveSpeedMultiplier;
 
-        _agent.speed = _baseSpeed * multiplier;
+        _agent.speed = _baseSpeed * multiplier * WadingZone.SpeedFactorAt(transform.position, false);   // and slows enemies, a little less
     }
 
     // ======================================================================

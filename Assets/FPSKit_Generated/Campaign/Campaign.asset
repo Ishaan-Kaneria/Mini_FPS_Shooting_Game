@@ -41,11 +41,11 @@ MonoBehaviour:
     beat: Ilsa had watched you for twenty years and filed none of it. Someone was paying her not to. She told you the amount before she told you the name, because she thought the amount would mean more.
     archetype: {fileID: 0}
     portrait: {fileID: 2800000, guid: f14e8d3a69ff9b727b729d3aa5e02135, type: 3}
-  - displayName: Dev Auger
+  - displayName: Sorrel Auger
     holding: the works
     beat: Dev stopped running the works the year they stopped being worth running and moved into what was left. He was the first of them to call you by your first name, and he did it without having to be told it.
     archetype: {fileID: 0}
-    portrait: {fileID: 2800000, guid: a3ec8510accc29b5f9708bb4b7a60801, type: 3}
+    portrait: {fileID: 2800000, guid: 15d9259ea7277c9d8b532b77eaa42148, type: 3}
   - displayName: Roan Auger
     holding: the colony
     beat: Roan left before any of it and has spent the years since being the one who was not there. He is the only one who asked you a question. It was whether you had worked out yet who had been funding you.

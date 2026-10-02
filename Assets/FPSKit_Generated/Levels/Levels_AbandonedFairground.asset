@@ -852,8 +852,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: DEV AUGER
-    brief: Dev is waiting by the wheel, and he knows your first name. 167 between you and Dev.
+  - displayName: SORREL AUGER
+    brief: Dev is waiting by the wheel, and he knows your first name. 167 between you and Sorrel.
     enemyCount: 167
     timeLimit: 790
     maxAliveAtOnce: 15
@@ -866,8 +866,8 @@ MonoBehaviour:
     objectiveWeight: 75
     objectiveStages: 1
     hasBoss: 1
-    bossArchetype: {fileID: 11400000, guid: de1d1c45acbd37be58aabf2af5006815, type: 2}
-    bossName: Dev Auger
+    bossArchetype: {fileID: 11400000, guid: d108274a3bd28e5a8851c9713ab1871f, type: 2}
+    bossName: Sorrel Auger
     bossWeight: 20
     bossHealthMultiplier: 3.4
     healthMultiplier: 2.2

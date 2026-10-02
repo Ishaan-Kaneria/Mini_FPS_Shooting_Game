@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -171,11 +172,17 @@ public class Minimap : MonoBehaviour
         public Color tone;
         public int order;
         public bool dot;
+        public bool outline;       // a hollow rectangle: four thin quads
+        public bool icon;          // a ringed pip
+        public string label;
+        public Color labelColor;
     }
 
     List<Piece> _pieces;
     List<Image> _terrainPool;
     List<Image> _blipPool;
+    List<TMP_Text> _labelPool;
+    RectTransform _labelRoot;
     List<EnemyAI> _enemies;
     List<Pickup> _pickups;
 
@@ -253,8 +260,10 @@ public class Minimap : MonoBehaviour
         float halfPx = Mathf.Min(r.width, r.height) * 0.5f;
         float scale = halfPx / Mathf.Max(worldRadius, 0.01f);
 
-        int terrain = DrawStructures(centre, cos, sin, yaw, scale, halfPx);
+        int labels = 0;
+        int terrain = DrawStructures(centre, cos, sin, yaw, scale, halfPx, ref labels);
         Hide(_terrainPool, terrain);
+        HideLabels(labels);
 
         int blips = DrawActors(centre, cos, sin, yaw, scale, halfPx);
         Hide(_blipPool, blips);
@@ -281,7 +290,7 @@ public class Minimap : MonoBehaviour
     // ======================================================================
     // Drawing
     // ======================================================================
-    int DrawStructures(Vector2 centre, float cos, float sin, float yaw, float scale, float halfPx)
+    int DrawStructures(Vector2 centre, float cos, float sin, float yaw, float scale, float halfPx, ref int labelsUsed)
     {
         int used = 0;
 
@@ -304,6 +313,12 @@ public class Minimap : MonoBehaviour
             float radius = piece.half.magnitude;
             if (d.sqrMagnitude > (reach + radius) * (reach + radius)) continue;
 
+            if (piece.outline || piece.icon)
+            {
+                DrawMarked(piece, d, cos, sin, yaw, scale, halfPx, ref used, ref labelsUsed);
+                continue;
+            }
+
             var image = Take(_terrainPool, _terrainRoot, used);
             if (image == null) break;
 
@@ -312,6 +327,7 @@ public class Minimap : MonoBehaviour
             rect.sizeDelta = piece.half * 2f * scale;
             rect.localRotation = Quaternion.Euler(0f, 0f, yaw - piece.yaw);
 
+            image.sprite = null;                               // pooled quads are shared with the round pips of icons
             image.color = piece.tone;
             image.enabled = true;
             used++;
@@ -320,6 +336,110 @@ public class Minimap : MonoBehaviour
         }
 
         return used;
+    }
+
+    /// <summary>A zone outline (four thin quads) or a landmark pip, and the name that goes with it.</summary>
+    void DrawMarked(Piece piece, Vector2 d, float cos, float sin, float yaw, float scale, float halfPx, ref int used, ref int labelsUsed)
+    {
+        Vector2 centrePx = Project(d, cos, sin) * scale;
+        float turn = yaw - piece.yaw;
+        var rotation = Quaternion.Euler(0f, 0f, turn);
+
+        if (piece.outline)
+        {
+            float t = Mathf.Max(1.2f, 0.7f * scale);                     // never thinner than a pixel and a bit
+            Vector2 full = piece.half * 2f * scale;
+            for (int side = 0; side < 4; side++)
+            {
+                var image = Take(_terrainPool, _terrainRoot, used);
+                if (image == null) return;
+                bool horizontal = side < 2;
+                float sign = side % 2 == 0 ? 1f : -1f;
+                Vector2 local = horizontal ? new Vector2(0f, sign * (full.y * 0.5f)) : new Vector2(sign * (full.x * 0.5f), 0f);
+                var rect = image.rectTransform;
+                rect.anchoredPosition = centrePx + (Vector2)(rotation * local);
+                rect.sizeDelta = horizontal ? new Vector2(full.x + t, t) : new Vector2(t, full.y + t);
+                rect.localRotation = rotation;
+                image.sprite = null;
+                image.color = piece.tone;
+                image.enabled = true;
+                used++;
+            }
+        }
+        else
+        {
+            // A ringed pip: a solid dot with a paler ring around it, so a landmark never reads as an enemy.
+            float px = Mathf.Max(minPipPixels, piece.half.x * 2f * scale);
+            var ring = Take(_terrainPool, _terrainRoot, used);
+            if (ring == null) return;
+            ring.rectTransform.anchoredPosition = centrePx;
+            ring.rectTransform.sizeDelta = Vector2.one * (px + 5f);
+            ring.rectTransform.localRotation = Quaternion.identity;
+            ring.sprite = blipSprite;
+            ring.color = new Color(piece.tone.r, piece.tone.g, piece.tone.b, 0.35f);
+            ring.enabled = true;
+            used++;
+            var dot = Take(_terrainPool, _terrainRoot, used);
+            if (dot == null) return;
+            dot.rectTransform.anchoredPosition = centrePx;
+            dot.rectTransform.sizeDelta = Vector2.one * px;
+            dot.rectTransform.localRotation = Quaternion.identity;
+            dot.sprite = blipSprite;
+            dot.color = piece.tone;
+            dot.enabled = true;
+            used++;
+        }
+
+        if (string.IsNullOrEmpty(piece.label)) return;
+        var text = TakeLabel(labelsUsed);
+        if (text == null) return;
+        var tr = text.rectTransform;
+        // Upright whatever the map is doing; an outline's name sits in its middle, an icon's just below it.
+        tr.anchoredPosition = piece.icon ? centrePx + new Vector2(0f, -(Mathf.Max(minPipPixels, piece.half.x * 2f * scale) * 0.5f + 7f)) : centrePx;
+        text.text = piece.label;
+        text.color = piece.labelColor;
+        text.enabled = true;
+        labelsUsed++;
+    }
+
+    TMP_Text TakeLabel(int index)
+    {
+        if (_labelRoot == null) _labelRoot = Layer("Labels", 2);
+        if (_labelPool == null)
+        {
+            // Labels that survived a mid-play reload are adopted, as the image pools are, not duplicated.
+            _labelPool = new List<TMP_Text>();
+            for (int i = 0; i < _labelRoot.childCount; i++)
+            {
+                var existing = _labelRoot.GetChild(i).GetComponent<TMP_Text>();
+                if (existing == null) continue;
+                existing.enabled = false;
+                _labelPool.Add(existing);
+            }
+        }
+        while (_labelPool.Count <= index)
+        {
+            var go = new GameObject("Label", typeof(RectTransform));
+            go.transform.SetParent(_labelRoot, false);
+            var text = go.AddComponent<TextMeshProUGUI>();
+            text.fontSize = 9f;
+            text.alignment = TextAlignmentOptions.Center;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.raycastTarget = false;                       // the map must never swallow a click
+            text.fontStyle = FontStyles.Bold;
+            var rt = text.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(120f, 14f);
+            _labelPool.Add(text);
+        }
+        return _labelPool[index];
+    }
+
+    void HideLabels(int from)
+    {
+        if (_labelPool == null) return;
+        for (int i = from; i < _labelPool.Count; i++)
+            if (_labelPool[i] != null) _labelPool[i].enabled = false;
     }
 
     int DrawActors(Vector2 centre, float cos, float sin, float yaw, float scale, float halfPx)
@@ -575,11 +695,37 @@ public class Minimap : MonoBehaviour
             });
         }
 
+        // Zones and landmarks: markers that need no renderer (an outline and an icon are drawn from the
+        // marker's own position and size, so a zone is a trigger volume and a name, not a mesh).
+        foreach (var marker in FindObjectsByType<MinimapMarker>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (marker.style != MinimapMarker.Style.Outline && marker.style != MinimapMarker.Style.Icon) continue;
+            var mt = marker.transform;
+            bool outline = marker.style == MinimapMarker.Style.Outline;
+            _pieces.Add(new Piece
+            {
+                follow = marker.moves ? mt : null,
+                centre = new Vector2(mt.position.x, mt.position.z),
+                half = outline ? marker.size * 0.5f : Vector2.one * marker.dotRadius,
+                yaw = mt.eulerAngles.y,
+                tone = marker.color,
+                order = marker.order + 10,
+                dot = !outline,
+                outline = outline,
+                icon = !outline,
+                label = marker.label,
+                labelColor = marker.labelColor
+            });
+        }
+
         // Over budget, the biggest survive: the ones worth navigating by are the ones
         // big enough to see, and a hundred crates are one texture of noise either way.
         if (_pieces.Count > maxStructures)
         {
-            _pieces.Sort((a, b) => (b.half.x * b.half.y).CompareTo(a.half.x * a.half.y));
+            // Zones and landmarks are few and are the point of having them: they are never the ones cut.
+            _pieces.Sort((a, b) => (b.outline || b.icon).CompareTo(a.outline || a.icon) != 0
+                ? (b.outline || b.icon).CompareTo(a.outline || a.icon)
+                : (b.half.x * b.half.y).CompareTo(a.half.x * a.half.y));
             _pieces.RemoveRange(maxStructures, _pieces.Count - maxStructures);
         }
 

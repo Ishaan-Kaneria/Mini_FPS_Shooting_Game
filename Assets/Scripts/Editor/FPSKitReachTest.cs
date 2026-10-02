@@ -79,7 +79,7 @@ namespace FPSKit.EditorTools
                     EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
                     var theme = FPSKitThemes.GetOrCreate(name);
                     Check(theme, name, problems, notes);
-                    if (theme.parkZone) CheckFairgroundDecks(name, problems, notes);
+                    if (theme.parkZone && !FPSKitSceneBuilder.RealisticFairgroundEnabled) CheckFairgroundDecks(name, problems, notes);
                 }
 
                 if (problems.Count > 0)
@@ -88,17 +88,17 @@ namespace FPSKit.EditorTools
                     foreach (var problem in problems) report.Append($"\n  - {problem}");
 
                     Debug.LogError($"[FPSKitBatch] FAILED: enemies would be stranded:{report}{notes}");
-                    EditorApplication.Exit(1);
+                    FPSKitBatch.Exit(1);
                     return;
                 }
 
                 Debug.Log($"[FPSKitBatch] verify reach passed.{notes}");
-                EditorApplication.Exit(0);
+                FPSKitBatch.Exit(0);
             }
             catch (Exception e)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: {e}{notes}");
-                EditorApplication.Exit(1);
+                FPSKitBatch.Exit(1);
             }
         }
 

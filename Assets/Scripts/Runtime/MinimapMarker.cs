@@ -29,7 +29,14 @@ public class MinimapMarker : MonoBehaviour
 
         /// <summary>Draw nothing. For scenery big enough to be picked up as a structure
         /// and unimportant enough that showing it is noise.</summary>
-        Hidden
+        Hidden,
+
+        /// <summary>A hollow rectangle of <see cref="size"/> metres centred on this object. Needs no
+        /// renderer. For marking out a zone, with its name in <see cref="label"/>.</summary>
+        Outline,
+
+        /// <summary>A ringed pip with a name under it, for a landmark. Needs no renderer.</summary>
+        Icon
     }
 
     [Header("How it reads")]
@@ -47,6 +54,15 @@ public class MinimapMarker : MonoBehaviour
              "water it crosses or the crossing is invisible, which is the one thing " +
              "about it worth knowing.")]
     public int order;
+
+    [Header("Outline and icon (no renderer needed)")]
+    [Tooltip("Outline only: width and depth of the rectangle, in metres. Turned with the object.")]
+    public Vector2 size = new Vector2(30f, 30f);
+
+    [Tooltip("A short name drawn at the centre of an outline or under an icon. Empty draws none.")]
+    public string label;
+
+    public Color labelColor = new Color(0.82f, 0.86f, 0.92f, 0.9f);
 
     [Tooltip("Follow this object every frame instead of reading its position once at " +
              "the start of the level. Off for scenery, which is the usual case and " +

@@ -71,17 +71,17 @@ namespace FPSKit.EditorTools
                     foreach (var problem in problems) report.Append($"\n  - {problem}");
 
                     Debug.LogError($"[FPSKitBatch] FAILED: the open zone does not hold together:{report}{notes}");
-                    EditorApplication.Exit(1);
+                    FPSKitBatch.Exit(1);
                     return;
                 }
 
                 Debug.Log($"[FPSKitBatch] verify zone passed: {zones} open zone(s) checked.{notes}");
-                EditorApplication.Exit(0);
+                FPSKitBatch.Exit(0);
             }
             catch (Exception e)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: {e}{notes}");
-                EditorApplication.Exit(1);
+                FPSKitBatch.Exit(1);
             }
         }
 

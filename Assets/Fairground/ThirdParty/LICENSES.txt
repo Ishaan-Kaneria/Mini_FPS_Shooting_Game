@@ -1,0 +1,11 @@
+All assets below are CC0 1.0 (public domain); no attribution required, listed for provenance.
+
+rusty_painted_metal  Poly Haven, CC0  https://polyhaven.com/a/rusty_painted_metal  (2K JPG: diff, nor_gl, rough, ao, disp)
+wood_peeling_paint_weathered  Poly Haven, CC0  https://polyhaven.com/a/wood_peeling_paint_weathered  (2K JPG: diff, nor_gl, rough, ao, disp)
+weathered_planks  Poly Haven, CC0  https://polyhaven.com/a/weathered_planks  (2K JPG: diff, nor_gl, rough, ao, disp)
+brown_mud_leaves_01  Poly Haven, CC0  https://polyhaven.com/a/brown_mud_leaves_01  (2K JPG: diff, nor_gl, rough, ao, disp)
+concrete_wall_006  Poly Haven, CC0  https://polyhaven.com/a/concrete_wall_006  (2K JPG: diff, nor_gl, rough, ao, disp)
+qwantani_night_puresky  Poly Haven, CC0  https://polyhaven.com/a/qwantani_night_puresky  (2K HDR)
+Asphalt012  ambientCG, CC0  https://ambientcg.com/view?id=Asphalt012  (cracked dark asphalt, 2K JPG)
+Fence001  ambientCG, CC0  https://ambientcg.com/view?id=Fence001  (wire-mesh / chain-link fence, 2K JPG)
+Fabric061  ambientCG, CC0  https://ambientcg.com/view?id=Fabric061  (rough fabric (closest to canvas), 2K JPG)

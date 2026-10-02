@@ -63,7 +63,7 @@ namespace FPSKit.EditorTools
         public static readonly string[] SiblingNames =
         {
             "Tove Auger", "Kestrel Auger", "Aurel Auger", "Ilsa Auger",
-            "Dev Auger", "Roan Auger", "Marit Auger", "the eighth name"
+            "Sorrel Auger", "Roan Auger", "Marit Auger", "the eighth name"
         };
 
         /// <summary>

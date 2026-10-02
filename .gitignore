@@ -149,3 +149,9 @@ InitTestScene*.unity*
 
 # Burst's WebGL output, dropped at the project root by a player build.
 /Data/Plugins/lib_burst_generated.*
+
+# Flooded Grounds (Asset Store pack, 2.7 GB, re-download from the Asset Store; our converted copies live in Assets/Fairground)
+/Assets/Flooded_Grounds/
+/Assets/Flooded_Grounds.meta
+/Assets/_TerrainAutoUpgrade/
+/Assets/_TerrainAutoUpgrade.meta

@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: FG_Water_Flood
+  m_Shader: {fileID: 4800000, guid: edf1b823410f0dce48d084a80dcab6c8, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _DEPTH_FADE
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 2800000, guid: 74423cbef99ad234e9191594e6c27a06, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap2:
+        m_Texture: {fileID: 2800000, guid: 74423cbef99ad234e9191594e6c27a06, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BumpLerp: 0.25
+    - _BumpScale: 0.55
+    - _DeepAlpha: 0.97
+    - _DepthMax: 1.2
+    - _EdgeSoftness: 0.25
+    - _Emis: 0
+    - _ScrollSpeed: 0.03
+    - _ShallowAlpha: 0.7
+    - _Smoothness: 0.78
+    - _Tiling: 8
+    - _UseDepth: 1
+    - _WaveHeight: 0.03
+    - _WaveLength: 6
+    - _WaveSpeed: 1.2
+    m_Colors:
+    - _DeepColor: {r: 0.005, g: 0.011, b: 0.011, a: 1}
+    - _ShallowColor: {r: 0.045, g: 0.062, b: 0.045, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

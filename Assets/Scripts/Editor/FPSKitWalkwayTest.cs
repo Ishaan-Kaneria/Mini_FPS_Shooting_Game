@@ -24,6 +24,13 @@ namespace FPSKit.EditorTools
 
         public static void VerifyWalkways()
         {
+            if (FPSKitSceneBuilder.RealisticFairgroundEnabled)
+            {
+                // These walkways are the old park plan's. The realistic arena has roads and plazas of its own.
+                Debug.Log("[FPSKitBatch] VerifyWalkways skipped: the fairground is the realistic night arena.");
+                return;
+            }
+
             try
             {
                 var report = new StringBuilder();
@@ -110,24 +117,24 @@ namespace FPSKit.EditorTools
                     var sb = new StringBuilder();
                     foreach (var pr in problems) sb.Append($"\n  - {pr}");
                     Debug.LogError($"[FPSKitBatch] FAILED: the fairground's walkways do not join up:{sb}{report}");
-                    EditorApplication.Exit(1);
+                    FPSKitBatch.Exit(1);
                     return;
                 }
 
                 Debug.Log($"[FPSKitBatch] verify walkways passed.{report}");
-                EditorApplication.Exit(0);
+                FPSKitBatch.Exit(0);
             }
             catch (System.Exception e)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: {e}");
-                EditorApplication.Exit(1);
+                FPSKitBatch.Exit(1);
             }
         }
 
         static void Fail(string why)
         {
             Debug.LogError($"[FPSKitBatch] FAILED: {why}");
-            EditorApplication.Exit(1);
+            FPSKitBatch.Exit(1);
         }
     }
 }

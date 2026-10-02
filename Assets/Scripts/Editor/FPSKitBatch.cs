@@ -328,6 +328,15 @@ namespace FPSKit.EditorTools
         /// a gorge that does not block, banks that are not joined, spawn points off the
         /// navmesh and water that is not lethal. Edit mode, so it costs seconds.
         /// </summary>
+        /// <summary>Set by a caller driving a check inside an open editor (the MCP): the checks then report through the console and leave the editor running.</summary>
+        public static bool KeepEditorOpen;
+
+        /// <summary>Every check ends here. Batch runs exit with the code; an interactive editor must never be closed by a check.</summary>
+        public static void Exit(int code)
+        {
+            if (!KeepEditorOpen && Application.isBatchMode) EditorApplication.Exit(code);
+        }
+
         public static void VerifyZone() => FPSKitZoneTest.VerifyZone();
 
         /// <summary>
@@ -945,7 +954,7 @@ namespace FPSKit.EditorTools
             PlayerSettings.Android.forceSDCardPermission = false;
 
             PlayerSettings.Android.androidIsGame = true;
-            PlayerSettings.Android.useAPKExpansionFiles = false;
+            PlayerSettings.Android.splitApplicationBinary = false;
             EditorUserBuildSettings.buildAppBundle = !apk;
 
             FPSKitGraphics.ApplyOrientation();

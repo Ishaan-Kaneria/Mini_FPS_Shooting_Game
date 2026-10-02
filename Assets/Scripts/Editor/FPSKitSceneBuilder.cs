@@ -555,6 +555,7 @@ namespace FPSKit.EditorTools
             StampStoreContent(FPSKitStore.GetOrCreate(), impacts);
 
             var player = BuildPlayer(weaponData);
+            if (FairgroundRealisticActive) FairgroundAfterPlayer(player);
 
             // Rebuilt every time, unless it is a rigged character from Enemy Setup -- that
             // is somebody's imported model, and rebuilding the capsule soldier over it
@@ -750,6 +751,7 @@ namespace FPSKit.EditorTools
             // The industrial zone is asked about first: a theme that sets both is asking
             // for a factory, and a factory cannot also be a river valley.
             if (_theme.industrialZone) { BuildIndustrialZone(); return; }
+            if (_theme.parkZone && FairgroundRealisticActive) { BuildFairgroundRealistic(); return; }
             if (_theme.parkZone) { BuildParkZone(); return; }
             if (_theme.snowZone) { BuildSnowZone(); return; }
             if (_theme.openZone) { BuildOpenZone(); return; }
@@ -1123,6 +1125,7 @@ namespace FPSKit.EditorTools
 
         private static void BuildAtmosphereExtras()
         {
+            if (FairgroundRealisticActive) return;           // the arena brings its own wind, rain and water
             if (_theme.weatherPrefab != null)
             {
                 var weather = (GameObject)PrefabUtility.InstantiatePrefab(_theme.weatherPrefab);
@@ -2678,6 +2681,7 @@ namespace FPSKit.EditorTools
         // ==================================================================
         private static Transform[] BuildSpawnPoints()
         {
+            if (FairgroundRealisticActive) return BuildFairgroundSpawnPoints();
             if (_theme.industrialZone) return BuildZoneSpawnPoints();
             if (_theme.parkZone) return BuildOpenZoneSpawnPoints();
             if (_theme.snowZone) return BuildOpenZoneSpawnPoints();
@@ -2868,6 +2872,8 @@ namespace FPSKit.EditorTools
             manager.playerViewAngle = 70f;
             manager.spawnSightBlockers = 1 << LayerMask.NameToLayer("Environment");
 
+            if (FairgroundRealisticActive) WireFairgroundLevelManager(manager);
+
             manager.levelClearBonus = 400;
             manager.timeBonusPerSecond = 25;
             manager.starBonus = 500;
@@ -2991,9 +2997,9 @@ namespace FPSKit.EditorTools
         // ==================================================================
         private static void BuildPostProcessing(GameObject player)
         {
-            if (!_theme.enablePostProcessing) return;
+            if (!_theme.enablePostProcessing && !FairgroundRealisticActive) return;
 
-            var profile = CreateVolumeProfile();
+            var profile = FairgroundRealisticActive ? FairgroundVolumeProfile() : CreateVolumeProfile();
             if (profile == null) return;
 
             var go = new GameObject("Global Volume");

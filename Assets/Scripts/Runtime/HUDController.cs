@@ -1612,7 +1612,7 @@ public class HUDController : MonoBehaviour
         if (bossPanel == null) return;
 
         var boss = levelManager != null ? levelManager.ActiveBoss : null;
-        bool show = boss != null && !boss.IsDead;
+        bool show = boss != null && !boss.IsDead && levelManager.BossEngaged;
 
         if (bossPanel.activeSelf != show) bossPanel.SetActive(show);
         if (!show) return;

@@ -742,6 +742,7 @@ public class PlayerMotor : MonoBehaviour
 
         float targetSpeed = IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed);
         targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier);
+        targetSpeed *= WadingZone.SpeedFactorAt(transform.position, true, IsSprinting);   // floodwater slows the player
         Vector3 wish = (transform.right * input.x + transform.forward * input.y) * targetSpeed;
 
         Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);

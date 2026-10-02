@@ -55,6 +55,17 @@ public class LevelManager : MonoBehaviour
         public bool IsBoss => archetype != null && archetype.role == EnemyArchetype.Role.Boss;
     }
 
+    /// <summary>One part of the map enemies can arrive in, with the places inside it they arrive at.</summary>
+    [Serializable]
+    public class SpawnZone
+    {
+        [Tooltip("What the zone is called. For the log and the editor; nothing reads it at runtime.")]
+        public string name;
+
+        [Tooltip("Where enemies appear in this zone. Pulled onto the NavMesh when used.")]
+        public Transform[] points;
+    }
+
     [Header("Content")]
     [Tooltip("Spawned for any roster entry that does not name its own prefab.")]
     public GameObject baseEnemyPrefab;
@@ -97,6 +108,26 @@ public class LevelManager : MonoBehaviour
     public LayerMask spawnSightBlockers;
 
     [Range(10f, 180f)] public float playerViewAngle = 70f;
+
+    [Header("Zone Spawning")]
+    [Tooltip("An arena that is a set of places rather than an open ring. Listed in the order a " +
+             "player meets them: the level starts arrivals in the first and moves down the list " +
+             "as it is cleared, so the fight travels toward the last one (where the boss is). " +
+             "Empty uses the ring around the player, exactly as before.")]
+    public SpawnZone[] spawnZones;
+
+    [Tooltip("How near and how far from the player a zone spawn may be, in metres. Out of the " +
+             "player's view where it can be; never closer than the near edge.")]
+    public Vector2 zoneSpawnDistance = new Vector2(18f, 110f);
+
+    [Tooltip("Where the boss stands for the whole level. Empty puts it where any enemy would go. " +
+             "A boss with a place is a boss you walk up to rather than one that was dropped on you.")]
+    public Transform bossSpawnPoint;
+
+    [Tooltip("The spawn ring is never wider than this, however far the level's reach stretches " +
+             "it. 0 is no cap. The ring is the arena's own size times the level's reach, which on " +
+             "a 180 m arena is a ring wider than the arena.")]
+    [Min(0f)] public float spawnRingCap;
 
     [Tooltip("Optional puff of smoke, portal, teleport flash -- spawned at each arrival.")]
     public GameObject spawnEffectPrefab;
@@ -207,6 +238,24 @@ public class LevelManager : MonoBehaviour
 
     /// <summary>The live boss, or null. The HUD hangs its boss bar off this.</summary>
     public Health ActiveBoss { get; private set; }
+
+    EnemyAI _bossAi;
+
+    /// <summary>
+    /// The boss is in the fight: it has noticed the player or it has been hurt. The boss bar waits for
+    /// this, so a boss standing at the far end of the arena does not put a health bar on the screen
+    /// before it has done anything.
+    /// </summary>
+    public bool BossEngaged
+    {
+        get
+        {
+            if (ActiveBoss == null || ActiveBoss.IsDead) return false;
+            if (ActiveBoss.TotalNormalized < 0.995f) return true;
+            if (_bossAi == null || _bossAi.gameObject != ActiveBoss.gameObject) _bossAi = ActiveBoss.GetComponent<EnemyAI>();
+            return _bossAi != null && _bossAi.HasSpotted;
+        }
+    }
     public string ActiveBossName { get; private set; } = "";
     public bool HasBoss { get; private set; }
     public bool BossKilled { get; private set; }
@@ -962,6 +1011,16 @@ public class LevelManager : MonoBehaviour
             if (boss == null) continue;
 
             ActiveBoss = boss.GetComponent<Health>();
+
+            // A boss with a place of its own holds it. Every other enemy is relentless and heads for the player
+            // from the moment it spawns; a boss that did the same would walk out of its arena and the arena would
+            // be empty. It wakes when it sees the player or is hurt, and that is also when its bar appears.
+            if (bossSpawnPoint != null)
+            {
+                var bossAi = boss.GetComponent<EnemyAI>();
+                if (bossAi != null) bossAi.relentless = false;
+            }
+
             // The level's own name wins: the campaign fights two boss chassis as eight
             // different people, and the archetype only knows which chassis it is.
             ActiveBossName = !string.IsNullOrWhiteSpace(Level.bossName)
@@ -1009,7 +1068,16 @@ public class LevelManager : MonoBehaviour
         var prefab = type.prefab != null ? type.prefab : baseEnemyPrefab;
         if (prefab == null) return null;
 
-        if (!TryGetSpawnPosition(out Vector3 position)) return null;
+        Vector3 position;
+        if (boss && bossSpawnPoint != null)
+        {
+            // The boss has a place. It is not tested for reachability from the player on purpose: it
+            // may well be the farthest thing in the arena, which is the point of it.
+            position = NavMesh.SamplePosition(bossSpawnPoint.position, out NavMeshHit bossHit, Mathf.Max(navMeshSampleRadius, 6f), NavMesh.AllAreas)
+                ? bossHit.position
+                : bossSpawnPoint.position;
+        }
+        else if (!TryGetSpawnPosition(out position)) return null;
 
         var enemy = Instantiate(prefab, position, FacePlayerFrom(position));
         Configure(enemy, type, boss);
@@ -1122,12 +1190,73 @@ public class LevelManager : MonoBehaviour
     // ======================================================================
     bool TryGetSpawnPosition(out Vector3 position)
     {
+        // An arena made of places: arrivals come from the zone the fight has reached.
+        if (spawnZones != null && spawnZones.Length > 0 && player != null && TryZoneSpawn(out position))
+            return true;
+
         // Preferred: a fresh ring around the player, out of their line of sight.
         if (useDynamicSpawnPoints && player != null && TrySampleAroundPlayer(out position))
             return true;
 
         // Fallback: the authored spawn points.
         return TryUseFixedSpawnPoint(out position);
+    }
+
+    /// <summary>
+    /// Picks an arrival in the zone the level has reached, then in its neighbours if that one has
+    /// nothing usable. "Reached" is how much of the roster has already been sent: a level that has
+    /// spawned half its enemies is half way down the list, so the fight moves toward the last zone
+    /// (where the boss waits) without anyone having to script a route.
+    ///
+    /// A point is usable when it is inside the distance band, on the NavMesh, out of the player's
+    /// view (first pass only) and joined to the player by a complete route -- the same three tests
+    /// the ring uses, in the same order of cost. A handful are tried per zone, not all of them: the
+    /// route query is the expensive one.
+    /// </summary>
+    bool TryZoneSpawn(out Vector3 position)
+    {
+        position = Vector3.zero;
+        int zones = spawnZones.Length;
+        float progress = Level != null && Level.enemyCount > 0
+            ? 1f - Mathf.Clamp01(_pendingSpawns / (float)Level.enemyCount)
+            : 0f;
+        int lead = Mathf.Clamp(Mathf.FloorToInt(progress * zones), 0, zones - 1);
+
+        for (int pass = 0; pass < 2; pass++)
+        {
+            bool requireHidden = avoidPlayerView && pass == 0;
+
+            for (int step = 0; step < zones * 2; step++)
+            {
+                // lead, lead-1, lead+1, lead-2, lead+2 ...
+                int offset = (step + 1) / 2 * (step % 2 == 1 ? -1 : 1);
+                int index = lead + offset;
+                if (index < 0 || index >= zones) continue;
+
+                var zone = spawnZones[index];
+                if (zone == null || zone.points == null || zone.points.Length == 0) continue;
+
+                int tries = Mathf.Min(zone.points.Length, 8);
+                int start = UnityEngine.Random.Range(0, zone.points.Length);
+                for (int k = 0; k < tries; k++)
+                {
+                    var point = zone.points[(start + k) % zone.points.Length];
+                    if (point == null) continue;
+
+                    float d = Vector3.ProjectOnPlane(point.position - player.position, Vector3.up).magnitude;
+                    if (d < zoneSpawnDistance.x || d > zoneSpawnDistance.y) continue;
+
+                    if (!NavMesh.SamplePosition(point.position, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas)) continue;
+                    if (requireHidden && IsVisibleToPlayer(hit.position)) continue;
+                    if (!CanReachPlayerFrom(hit.position)) continue;
+
+                    position = hit.position;
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -1198,8 +1327,23 @@ public class LevelManager : MonoBehaviour
     /// The spawn ring for this level. The level's reach stretches the far edge, and the
     /// near edge half as much, so a long level in a big arena is fought from across it.
     /// </summary>
-    float MaxSpawnDistance => maxSpawnDistanceFromPlayer * Mathf.Max(1f, Level != null ? Level.spawnReach : 1f);
-    float MinSpawnDistance => minSpawnDistanceFromPlayer * (1f + (Mathf.Max(1f, Level != null ? Level.spawnReach : 1f) - 1f) * 0.5f);
+    float MaxSpawnDistance
+    {
+        get
+        {
+            float d = maxSpawnDistanceFromPlayer * Mathf.Max(1f, Level != null ? Level.spawnReach : 1f);
+            return spawnRingCap > 0f ? Mathf.Min(d, spawnRingCap) : d;
+        }
+    }
+
+    float MinSpawnDistance
+    {
+        get
+        {
+            float d = minSpawnDistanceFromPlayer * (1f + (Mathf.Max(1f, Level != null ? Level.spawnReach : 1f) - 1f) * 0.5f);
+            return Mathf.Min(d, MaxSpawnDistance * 0.6f);
+        }
+    }
 
     /// <summary>Rotation that faces the player, so nothing arrives with its back turned.</summary>
     Quaternion FacePlayerFrom(Vector3 position)

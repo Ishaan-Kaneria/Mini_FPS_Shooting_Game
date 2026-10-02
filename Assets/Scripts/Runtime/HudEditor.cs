@@ -220,7 +220,7 @@ public class HudEditor : OverlayPanel
     class HandleDrag : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         public HudEditor editor;
-        public Handle handle;
+        [System.NonSerialized] public Handle handle;      // wired when the outline is built; a plain class, so never serialized
         Vector2 _last;
 
         public void OnPointerDown(PointerEventData e)

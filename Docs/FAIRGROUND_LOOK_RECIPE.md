@@ -101,3 +101,26 @@ Step 4 asks for ACES, so the Volume will carry both and we compare.
 | Tree Creator Bark / Leaves | 9 + 5 materials | URP Lit copies, leaves alpha-clipped, two-sided |
 | Legacy particle shaders | 3 | URP Particles Unlit |
 | Post Processing v1 | whole stack | URP Volume |
+
+## Appendix: the pack's post-processing profile, complete (2026-10-02)
+
+`Assets/Flooded_Grounds/PostProcessing` (the Post Processing Stack v1) is archived to `../MiniFPS_AssetArchive/`, because nothing in
+the project references it (no code, prefab or scene; our Volume is URP). These are **every** value of its profile
+`Postprocess_FloodedGrounds`, dumped from the asset before it left, so the look can be rebuilt without the pack's scripts.
+
+| Model | State | Values |
+|---|---|---|
+| Fog | on | `excludeSkybox` true |
+| Antialiasing, screen space reflection, depth of field, motion blur, eye adaptation, bloom, user LUT, chromatic aberration, dithering | **off** | none |
+| Ambient occlusion | on | intensity 1.0, radius 0.3, sample count 3, downsampling on, ambient-only off, high precision off, forward-compatibility off |
+| Colour grading: tonemapper | on | **Neutral**: black in 0.02, black out 0.0, white in 10.0, white out 10.0, white level 5.3, white clip 10.0 |
+| Colour grading: basic | on | post exposure **+1.0**, temperature **-3**, tint 0, hue shift 0, saturation **0.8**, contrast **0.9** |
+| Colour grading: channel mixer | identity | red (1,0,0), green (0,1,0), blue (0,0,1) |
+| Colour grading: colour wheels | identity | log mode, slope (1,1,1), power (1,1,1), offset (1,1,1); linear lift, gamma, gain all 0 |
+| Colour grading: curves | identity | master, red, green, blue are straight (0,0) to (1,1); hue/sat curves empty |
+| Grain | on | coloured, intensity 0.2, size 1.0, luminance contribution 0.8 |
+| Vignette | on | classic mode, colour black, centre (0.5, 0.5), intensity 0.45, smoothness 0.2, roundness 0.888, rounded **off**, opacity 1.0 |
+| Debug views | off | mode none (defaults) |
+
+URP equivalents live in `FairgroundVolume.Day()` (Neutral tonemapping, +1.0 exposure, -3 temperature, saturation -20, contrast -10,
+vignette 0.45 / 0.2, film grain 0.2 / 0.8). URP has no direct "ambient occlusion" Volume override: use the SSAO renderer feature.

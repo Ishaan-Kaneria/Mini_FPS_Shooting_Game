@@ -2533,3 +2533,18 @@ Ishaan found the night too dim: "brighter like dusk or dawn (not too much)". `Fa
 reflection intensity 0.7, sky exposure 0.4 with a warm tint. `FairgroundVolume.Night`: post exposure 1.5 (was 2.0 with a dim moon),
 saturation -14, warm colour filter, white balance +3. The Volume profile is now rebuilt on every scene build (it used to load a stale
 asset, so edits to `Night()` did nothing). Old-growth fix: the fallen-log overlap box is long and thin (it was a square), 400 tries.
+
+## Asset cleanup (2026-10-02)
+
+- **Audit:** `Tools > MiniFPS > Assets > Audit Unused (read-only)` (`FPSKitAssetAudit`) lists what the build scenes, Resources folders,
+  settings and generated content reach, what only the scene builders name (exact file names / paths in scripts), and what nothing uses.
+  Its dependency analysis cannot see shader `#include` files or `Shader.Find` names: never archive `.hlsl`/`.cginc`/`.compute` on its say-so.
+- **Archive:** `Tools/archive_assets.py --apply` moved 430 unused files (262 MB, including the whole Post Processing Stack v1) to
+  `~/MiniFPS_AssetArchive/` (same folder structure, `.meta` files with them, `MOVED.txt`, `restore.sh`). Kept in the project: `Fairground/ThirdParty`
+  (CC0 textures for the dressing step), shader includes, `InputSystem_Actions.inputactions`, and 1.5 GB of pack content that only the builders load.
+  The pack's own profile `Postprocess_FloodedGrounds.asset` was archived too; its values are in `FAIRGROUND_LOOK_RECIPE.md`.
+- **Packages removed:** `com.unity.ai.assistant` (its Accounts module polled `generators.ai.unity.com`), `visualscripting`, `timeline`,
+  `collab-proxy`. Kept `probuilder`.
+- **Old formats:** 97 old Flooded Grounds assets were re-saved in the Unity 6 format (originals in `~/MiniFPS_PackBackup_preResave/`);
+  `FpsController.prefab` lost its dead post-processing component. `HudEditor.HandleDrag.handle` is `[NonSerialized]`.
+- **Checked afterwards:** 382 prefabs and 8 build scenes: no missing scripts, no empty material slots; Console clean.

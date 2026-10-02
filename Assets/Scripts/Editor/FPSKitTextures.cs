@@ -322,19 +322,23 @@ namespace FPSKit.EditorTools
         /// <summary>Wind ripples over soft dune relief, with grains on top.</summary>
         private static float SandHeight(float u, float v)
         {
-            // Ripples run across the wind and are what gives sand its scale. Warped by
-            // noise so they meander rather than running dead straight, which is what
-            // they do and also what stops the tile reading as corduroy.
+            // Ripples meander and change spacing across the tile. A fixed sine wave
+            // still reads as corduroy when it is only warped; broad variation breaks
+            // the crests into the irregular patches wind leaves behind.
             float warp = TileFbm(u, v, 3, 3, 8101) - 0.5f;
-            float ripple = Mathf.Sin((u * 18f + v * 5f + warp * 2.4f) * Mathf.PI * 2f) * 0.5f + 0.5f;
+            float patch = TileFbm(u, v, 2, 3, 8104);
+            float phase = u * 18f + v * 5f + warp * (2.4f + patch * 4f);
+            float ripple = Mathf.Sin(phase * Mathf.PI * 2f) * 0.5f + 0.5f;
 
             // Sharpened: a ripple has a rounded crest and a flatter trough.
-            ripple = Mathf.Pow(ripple, 1.6f);
+            ripple = Mathf.Pow(ripple, 1.35f + patch * 0.65f);
 
             float relief = TileFbm(u, v, 2, 4, 8102);
+            float brokenCrests = TileFbm(u, v, 7, 3, 8105);
             float grain = TileFbm(u, v, 64, 2, 8103);
 
-            return relief * 0.42f + ripple * 0.4f + grain * 0.18f;
+            return relief * 0.34f + ripple * (0.30f + patch * 0.16f)
+                 + brokenCrests * 0.08f + grain * 0.12f;
         }
 
         /// <summary>Horizontal strata, warped, with cracks cut across them.</summary>

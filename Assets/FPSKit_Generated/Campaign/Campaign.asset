@@ -99,7 +99,7 @@ MonoBehaviour:
     extraBeatSibling: -1
     starsToUnlock: 38
     grantsPower: 
-  - displayName: Abandoned Subway
+  - displayName: Abandoned Fairground
     levels: {fileID: 11400000, guid: 2103e99d5365a121ca63d3aa4e9a6695, type: 2}
     siblingIndex: 4
     opening: Dev ran the works into the ground and then moved into what was left. The rides still turn when the wind is behind them. He kept the lights on over the shafts, which is either a courtesy or a trap.

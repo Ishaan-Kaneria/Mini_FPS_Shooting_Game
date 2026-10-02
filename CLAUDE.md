@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 Level-based FPS, **Unity 6000.6.0f1**, **URP 17.6.0**. Seven arenas played as a campaign
-(Warehouse, Snowbound, Desert, Rooftop, Subway, Mars, The Auger House), eight levels each
-except the finale (three). A level = fixed enemy roster + strict clock + objective + 1-3 stars.
+(Warehouse, Snowbound, Desert, Rooftop, Fairground, Mars, The Auger House), with 32 levels in
+each arena. A level = fixed enemy roster + strict clock + objective + 1-3 stars.
 
 The long-form history behind every rule below (the bugs, the measurements, the reports) is in
 `Docs/DESIGN_NOTES.md`, with the same section names. Read the relevant section before
@@ -50,6 +50,8 @@ New arena = `LevelTheme` asset (+ scene, `LevelSet`, `ArenaCatalog` entry, rebui
 New enemy = `EnemyArchetype`. New item = `StoreCatalog` entry with a **new permanent `id`**.
 New level = `LevelSet` entry. Add missing knobs to the ScriptableObject, not the builder.
 Never rename serialized fields (`unlockWave` etc. keep old names on purpose).
+Renaming an arena renames its save key: add the pair to `SaveMigration.CarryRenamedArenas`
+(`VerifySaveRename`), or keep the key and change `displayName` as the Unknown Planet does.
 Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off that, not
 `FPSKitThemes.Names`. Each arena's `enemyRoster` differs; Grunt/Runner/Marksman are in all.
 
@@ -128,6 +130,16 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Kill volumes follow the hazard exactly; nothing standable may sit inside one.
 - Industrial: nothing glossy (`Matte`), every walkway has stairs at both ends, walled yards
   have two gates on two sides. Park: everything walkable is the terrain.
+- Fairground (`parkZone`) is a **fixed plan** (`PlanFairground`, `FPSKitFairgroundPlan.cs`): sites, walkways
+  and plazas have set coordinates; nothing is random-placed. Walkways are paving paint (clockwise-from-above
+  winding; the first version was upside-down and invisible). Ground is gently rolling (`duneHeight` 2.6).
+  Raised walkable decks are real: hall gallery + stage, coaster station, carousel/bandstand floors, haunted
+  balcony, big-top seating, bridge, container lookouts. Each is solid with **flush** stairs (`FgStair`, rise
+  0.22) and must not share a plane with a `NoStanding` mesh or sit behind a lip. `VerifyReach`
+  (`CheckFairgroundDecks`) proves each is baked and connected; add a new deck's collider name to its list.
+  Every attraction/shop door is an `Entrance(...)` in the plan; `CheckWalkwayGraph` and
+  `VerifyWalkways` fail if the paving is not one network or a door has none. Anything placed late (clutter, trees) must clear `Keep()` circles, `_fgRoutes` and `SpotEmpty`. Every
+  building/tent needs 2+ openings of 2.6m+. Trunks 2.8m apart, fixed tree budget (300). Glow is emissive.
 - Art-pack lookups (`Pack`) may return null; always fall back.
 - Generated textures are grayscale; colour stays on the material. `_NORMALMAP` keyword required.
 
@@ -176,7 +188,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 
 Use the `verify` skill. Checks run via `Tools/unity-batch.sh FPSKitBatch.<Verify*>`:
 Controls, Replay, Levels, Store, Combat, Wounds, Bomb, Flow, Terrain, Reach, Zone, Devices, Statics,
-Objectives, Rosters, Touch, HudLayout; UI kit gallery via `FPSKitUIKit.VerifyGallery`.
+Objectives, Rosters, Touch, HudLayout, SaveRename; UI kit gallery via `FPSKitUIKit.VerifyGallery`.
 A play-mode test measuring speed must set `Time.captureDeltaTime = 1f/60f`. Tests that exist
 to prove a rule must fail with the rule deleted (hence public `ControlSettings.CanRead`,
 `DeviceProfile.FormFor`). If `VerifyReach` fails by more than a few percent, read the reported

@@ -5,8 +5,8 @@ using UnityEngine;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// The abandoned park: smooth sunken ground, four rides to navigate by, and holes in
-    /// it that kill you.
+    /// The abandoned fairground: gently rolling ground, a planned park on it (see
+    /// <c>FPSKitFairgroundPlan</c>), and holes in it that kill you.
     ///
     /// <b>Everything walkable here is the terrain, and that is the whole design.</b> The
     /// arena this replaced was a station on three levels joined by stairs, bridges and
@@ -48,16 +48,30 @@ namespace FPSKit.EditorTools
         }
 
         private static readonly List<Sink> _sinks = new List<Sink>();
+        private struct ParkSite
+        {
+            public Vector2 Centre;
+            public float Radius;
+            public float Yaw;
+        }
+
+        private static ParkSite _entrancePlan, _midwayPlan, _maintenancePlan;
+        private static ParkSite _hallPlan, _pondPlan, _bumperPlan;
+        private static bool _hasEntrance, _hasMidway, _hasMaintenance;
+        private static bool _hasHall, _hasPond, _hasBumper;
 
         /// <summary>How far down a shaft the kill trigger starts. Below the lip, so that
         /// standing on the edge is safe and leaning in is not.</summary>
         private const float ShaftMouthDrop = 2.2f;
+
 
         private static void BuildParkZone()
         {
             _claimed.Clear();
             _anchors.Clear();
             _sinks.Clear();
+            _hasEntrance = _hasMidway = _hasMaintenance = false;
+            ResetFairground();
 
             ClearMeshPool();
             ResetTerrain();
@@ -79,13 +93,12 @@ namespace FPSKit.EditorTools
             Claim(0f, 0f, 30f);
             _anchors.Add(Vector3.zero);
             FlattenPad(0f, 0f, 20f, 30f);
+            Keep(0f, 0f, 16f);
 
-            // ---- planning: sites are chosen and pads reserved before the ground exists,
-            // ---- because a ride is a straight-sided thing and there is no version of that
-            // ---- which follows a hill. Same two-half shape the open zone uses, and the
-            // ---- Plan and Build passes must stay in the same order as each other.
-            PlanRides(rng, half);
-            PlanSinkholes(rng, half);
+            // ---- planning: every site is fixed and its ground reserved before the heightfield
+            // ---- exists, because a ride is a straight-sided thing and there is no version of that
+            // ---- which follows a hill. The Plan and Build passes name the same sites.
+            PlanFairground(half);
 
             // ---- ground ----
             BuildDuneField(root, layer, half);
@@ -93,11 +106,26 @@ namespace FPSKit.EditorTools
             BuildBoundary(root, layer, half);
             BuildBackdrop(root, backdrop, rng, half);
 
-            // ---- what stands on it ----
+            // ---- the park, in the order a visitor meets it ----
+            BuildFairgroundPaths(root, backdrop, backdrop);
             BuildSinkholes(root, layer, rng);
+            BuildGate(root, layer, rng);
+            BuildPlazaDressing(root, layer, backdrop, rng);
+            BuildMidwayStreet(root, layer, backdrop, rng);
+            BuildGrandHall(root, layer, backdrop);
             BuildRides(root, layer, rng);
-            BuildMidway(root, layer, rng, half);
-            BuildParkScatter(root, layer, rng, half);
+            BuildBumperPavilion(root, layer, backdrop);
+            BuildPond(root, layer, backdrop);
+            BuildMaintenanceYard(root, layer, rng);
+            BuildRideGraveyard(root, layer, rng);
+            BuildFill(root, layer, backdrop, rng);
+            BuildScenes(root, layer, backdrop, rng);
+            BuildHoarding(root, layer, rng);
+            BuildPromenadeFurniture(root, layer, backdrop);
+            BuildClutter(root, layer, backdrop, half);
+            BuildJungle(root, layer, backdrop, half);
+            BuildGroundDecals(root, backdrop, half);
+            BuildFinalDetails(root, backdrop, half);
             BuildParkLights(root, rng, half);
 
             // The same call the open zone makes, with the same numbers. Guessed at
@@ -111,11 +139,6 @@ namespace FPSKit.EditorTools
             SealNavMeshOutside(root, half - BermToe - 8f, half + _theme.apronSize);
         }
 
-
-        // ==================================================================
-        // Planning. Sites first, ground second, structures third.
-        // ==================================================================
-
         private struct RidePlan
         {
             public Vector2 Centre;
@@ -124,100 +147,6 @@ namespace FPSKit.EditorTools
         }
 
         private static readonly List<RidePlan> _ridePlans = new List<RidePlan>();
-
-        /// <summary>
-        /// Where the four anchors go.
-        ///
-        /// Spread by angle rather than placed at random, because these are what a player
-        /// navigates by -- four landmarks clustered in one half of the map is a park with
-        /// one landmark and three things behind it. Each still gets a jittered distance and
-        /// a random bearing within its quadrant, so the plan is not a cross.
-        /// </summary>
-        private static void PlanRides(System.Random rng, float half)
-        {
-            _ridePlans.Clear();
-
-            // Radius is the flat pad each needs, which is the footprint plus room to walk
-            // round it. The ferris wheel needs least -- it is tall, not wide.
-            float[] radii = { 20f, 30f, 22f, 34f };
-
-            for (int kind = 0; kind < 4; kind++)
-            {
-                float bearing = (kind + 0.5f) * Mathf.PI * 0.5f
-                                + (float)(rng.NextDouble() - 0.5) * 0.7f;
-
-                // Far enough out that the spawn is not inside one, near enough that none is
-                // in the boundary ridge.
-                float distance = Mathf.Lerp(half * 0.34f, half * 0.68f, (float)rng.NextDouble());
-
-                var centre = new Vector2(Mathf.Cos(bearing) * distance,
-                                         Mathf.Sin(bearing) * distance);
-
-                _ridePlans.Add(new RidePlan { Centre = centre, Radius = radii[kind], Kind = kind });
-
-                // <b>Claim the pad's whole influence, not just its flat part.</b> A pad
-                // reaches Radius + Blend, and where two reach the same ground the nearer
-                // one wins outright -- so a hollow planned later whose blend laps over a
-                // ride's pad pulls the ground out from under it. That is what left the
-                // ferris wheel standing at a cliff edge with no ground beside it, and it is
-                // the same bug CLAUDE.md records from the desert, where a vantage sixty
-                // metres from a bridge dragged the sand at the end of the deck down with it.
-                float blend = radii[kind] * 0.9f;
-                Claim(centre.x, centre.y, radii[kind] + blend + 4f);
-                FlattenPad(centre.x, centre.y, radii[kind], blend);
-            }
-        }
-
-        /// <summary>
-        /// Where the ground has given way.
-        ///
-        /// A hollow is a pad pinned below the natural height rather than a hole cut after
-        /// the fact, so it goes through the same arithmetic as every other flattened site
-        /// and the terrain smooths into it instead of ending at a wall. The blend is wide --
-        /// two and a half times the radius -- because that is what makes it a subsidence
-        /// rather than a crater, and because a rim the player can walk down is the whole
-        /// difference between a place and an obstacle.
-        ///
-        /// Only some get a shaft. A park where every hollow kills teaches the player to
-        /// avoid all of them, which removes the ground the fight is supposed to use.
-        /// </summary>
-        private static void PlanSinkholes(System.Random rng, float half)
-        {
-            int wanted = 7 + rng.Next(4);
-
-            for (int i = 0; i < wanted; i++)
-            {
-                float radius = 13f + (float)rng.NextDouble() * 15f;
-
-                // Its blend reaches two and a half radii, so that is what has to be clear.
-                // Claiming only the mouth let a hollow forty metres away still drag a ride's
-                // pad down through the tail of its own falloff.
-                float reach = radius * 2.5f;
-
-                if (!TryClaim(rng, half * 0.88f, reach + 4f, out var point, 26)) continue;
-
-                float depth = 5f + (float)rng.NextDouble() * 6f;
-
-                // Pinned to natural ground minus the depth, so a hollow on high ground is
-                // still a hollow rather than being levelled to the same absolute height as
-                // one in a basin.
-                float floorY = NaturalHeightAt(point.x, point.y) - depth;
-                FlattenPad(point.x, point.y, radius * 0.45f, reach - radius * 0.45f, floorY);
-
-                _sinks.Add(new Sink
-                {
-                    Centre = point,
-                    Radius = radius,
-                    Depth = depth,
-
-                    // Roughly half, and never the first: the player has to be able to learn
-                    // that a hollow is not automatically fatal before one of them is.
-                    HasShaft = i > 0 && rng.NextDouble() < 0.55,
-                });
-
-                _anchors.Add(new Vector3(point.x, 0f, point.y));
-            }
-        }
 
 
         // ==================================================================
@@ -248,6 +177,9 @@ namespace FPSKit.EditorTools
             foreach (var sink in _sinks)
             {
                 float floorY = GroundHeightAt(sink.Centre.x, sink.Centre.y);
+                var marker = new GameObject("Sinkhole").transform;
+                marker.SetParent(group, false);
+                marker.position = new Vector3(sink.Centre.x, floorY, sink.Centre.y);
 
                 // Debris round the rim, which is what makes a hollow read as a collapse
                 // rather than as a dip. Placed on the slope, not the floor.
@@ -354,395 +286,45 @@ namespace FPSKit.EditorTools
         }
 
 
-        /// <summary>The four anchors, each built where its pad was reserved.</summary>
-        private static void BuildRides(Transform root, int layer, System.Random rng)
+        private static void BuildServiceVan(Transform parent, int layer, Vector3 at)
         {
-            var group = new GameObject("Rides").transform;
-            group.SetParent(root, false);
+            var van = new GameObject("ServiceVan").transform;
+            van.SetParent(parent, false);
+            van.localPosition = at;
+            van.localRotation = Quaternion.Euler(0f, 12f, 0f);
 
-            foreach (var plan in _ridePlans)
-            {
-                float y = GroundHeightAt(plan.Centre.x, plan.Centre.y);
-                var at = new Vector3(plan.Centre.x, y, plan.Centre.y);
+            var body = CreateBlock(van, new Vector3(0f, 1.15f, 0f), new Vector3(4.8f, 2.1f, 2.1f),
+                                   0f, layer, "Metal", new Color(0.39f, 0.37f, 0.31f),
+                                   0.18f, 0.24f, "Body", _parkSteel);
+            NoStanding(body);
 
-                switch (plan.Kind)
-                {
-                    case 0: BuildFerrisWheel(group, layer, rng, at); break;
-                    case 1: BuildBigTop(group, layer, rng, at); break;
-                    case 2: BuildCarousel(group, layer, rng, at); break;
-                    default: BuildCoaster(group, layer, rng, at, plan.Radius); break;
-                }
-            }
-        }
-
-        /// <summary>
-        /// The tallest thing on the map, and therefore the compass.
-        ///
-        /// Leaning, because a wheel standing true reads as a working ride. The lean is what
-        /// says the place has been left. Held off the bake entirely -- every spoke and car
-        /// is a surface an agent would otherwise be spawned onto forty metres up.
-        /// </summary>
-        private static void BuildFerrisWheel(Transform parent, int layer, System.Random rng, Vector3 at)
-        {
-            var wheel = new GameObject("FerrisWheel").transform;
-            wheel.SetParent(parent, false);
-            wheel.position = at;
-            wheel.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 180f, 6.5f);
-
-            const float R = 21f;
-            float hubY = R + 4f;
-
-            // A-frame legs.
-            for (int side = -1; side <= 1; side += 2)
-                for (int lean = -1; lean <= 1; lean += 2)
-                {
-                    var leg = CreateBlock(wheel,
-                        new Vector3(lean * 7f, hubY * 0.5f, side * 5f),
-                        new Vector3(1.3f, hubY * 1.06f, 1.3f), 0f, layer,
-                        "Metal", new Color(0.3f, 0.31f, 0.33f), 0.3f, 0.6f,
-                        $"Leg{side}{lean}", _parkSteel);
-                    leg.transform.localRotation = Quaternion.Euler(0f, 0f, -lean * 9f);
-                    NoStanding(leg);
-                }
-
-            var hub = CreateBlock(wheel, new Vector3(0f, hubY, 0f), new Vector3(3f, 3f, 7f),
-                                  0f, layer, "Metal", new Color(0.26f, 0.27f, 0.29f), 0.4f, 0.7f,
-                                  "Hub", _parkSteel);
-            NoStanding(hub);
-
-            const int Spokes = 16;
-            for (int i = 0; i < Spokes; i++)
-            {
-                float a = i * Mathf.PI * 2f / Spokes;
-
-                var spoke = CreateBlock(wheel, new Vector3(Mathf.Cos(a) * R * 0.5f, hubY + Mathf.Sin(a) * R * 0.5f, 0f),
-                                        new Vector3(R, 0.32f, 0.32f), 0f, layer,
-                                        "Metal", new Color(0.28f, 0.29f, 0.31f), 0.35f, 0.65f,
-                                        $"Spoke{i}", _parkSteel);
-                spoke.transform.localRotation = Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg);
-                NoStanding(spoke);
-
-                // Most cars are gone. The ones left are what makes the silhouette read.
-                if (rng.NextDouble() > 0.55) continue;
-
-                var car = CreateBlock(wheel,
-                    new Vector3(Mathf.Cos(a) * R, hubY + Mathf.Sin(a) * R, 0f),
-                    new Vector3(2.6f, 2.4f, 3.2f), 0f, layer,
-                    "Metal", _theme.RandomCoverColor(rng), 0.2f, 0.3f,
-                    $"Car{i}", _parkPaint);
-                NoStanding(car);
-            }
-        }
-
-        /// <summary>
-        /// The one place the fight goes indoors.
-        ///
-        /// Four openings, because anything a player can walk into needs more than one way
-        /// out -- the same rule the industrial hall follows. The floor inside is the park's
-        /// own ground, so nothing is sealed: this is a roof on poles, not a room.
-        /// </summary>
-        private static void BuildBigTop(Transform parent, int layer, System.Random rng, Vector3 at)
-        {
-            var tent = new GameObject("BigTop").transform;
-            tent.SetParent(parent, false);
-            tent.position = at;
-
-            const float R = 24f;
-            const float WallH = 5.5f;
-
-            // The wall, in segments, with four gaps left in it.
-            const int Segments = 20;
-            for (int i = 0; i < Segments; i++)
-            {
-                if (i % 5 == 0) continue;   // four doorways
-
-                float a0 = i * Mathf.PI * 2f / Segments;
-                float a1 = (i + 1) * Mathf.PI * 2f / Segments;
-                float mid = (a0 + a1) * 0.5f;
-
-                float chord = Vector2.Distance(new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * R,
-                                               new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * R);
-
-                var panel = CreateBlock(tent,
-                    new Vector3(Mathf.Cos(mid) * R, WallH * 0.5f, Mathf.Sin(mid) * R),
-                    new Vector3(chord + 0.4f, WallH, 0.5f),
-                    -mid * Mathf.Rad2Deg, layer,
-                    "Wood", Shade(_theme.wallColor, 0.9f), 0.05f, 0f,
-                    $"Panel{i}", _parkCanvas);
-                Hide(panel);
-            }
-
-            // The roof, as a cone of sloped panels, and the king pole through it.
-            const int Slices = 20;
-            for (int i = 0; i < Slices; i++)
-            {
-                float a = (i + 0.5f) * Mathf.PI * 2f / Slices;
-
-                var flap = CreateBlock(tent,
-                    new Vector3(Mathf.Cos(a) * R * 0.55f, WallH + 4.2f, Mathf.Sin(a) * R * 0.55f),
-                    new Vector3(R * 1.16f, 0.35f, R * 0.36f),
-                    -a * Mathf.Rad2Deg, layer,
-                    "Wood", Shade(_theme.wallColor, 0.78f), 0.04f, 0f,
-                    $"Roof{i}", _parkCanvas);
-                flap.transform.localRotation = Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 21f);
-                NoStanding(flap);
-                Hide(flap);
-            }
-
-            var pole = CreateBlock(tent, new Vector3(0f, (WallH + 12f) * 0.5f, 0f),
-                                   new Vector3(1.1f, WallH + 12f, 1.1f), 0f, layer,
-                                   "Wood", Shade(_theme.bankColor, 0.7f), 0.06f, 0f,
-                                   "KingPole", _parkTimber);
-            NoStanding(pole);
-
-            // Tiered seating inside: cover, and a reason to be in here.
-            for (int ring = 0; ring < 3; ring++)
-            {
-                float rr = R - 4f - ring * 3.2f;
-                int seats = 14 - ring * 2;
-
-                for (int i = 0; i < seats; i++)
-                {
-                    float a = i * Mathf.PI * 2f / seats + ring * 0.2f;
-
-                    var bench = CreateBlock(tent,
-                        new Vector3(Mathf.Cos(a) * rr, 0.45f + ring * 0.4f, Mathf.Sin(a) * rr),
-                        new Vector3(4.2f, 0.9f + ring * 0.8f, 1.5f),
-                        -a * Mathf.Rad2Deg, layer,
-                        "Wood", Shade(_theme.bankColor, 0.75f), 0.05f, 0f,
-                        $"Bench{ring}_{i}", _parkTimber);
-                    NoStanding(bench);
-                }
-            }
-        }
-
-        /// <summary>The carousel: a canopy on a drum, with horses left on it.</summary>
-        private static void BuildCarousel(Transform parent, int layer, System.Random rng, Vector3 at)
-        {
-            var ride = new GameObject("Carousel").transform;
-            ride.SetParent(parent, false);
-            ride.position = at;
-
-            const float R = 13f;
-
-            var deck = CreateBlock(ride, new Vector3(0f, 0.55f, 0f),
-                                   new Vector3(R * 2f, 1.1f, R * 2f), 0f, layer,
-                                   "Wood", Shade(_theme.bankColor, 0.88f), 0.08f, 0f,
-                                   "Deck", _parkTimber);
-            Mark(deck, new Color(0.46f, 0.3f, 0.28f), 1);
-
-            var column = CreateBlock(ride, new Vector3(0f, 4.4f, 0f),
-                                     new Vector3(2.2f, 8.8f, 2.2f), 0f, layer,
-                                     "Metal", new Color(0.32f, 0.28f, 0.26f), 0.3f, 0.5f,
-                                     "Column", _parkPaint);
-            NoStanding(column);
-
-            const int Posts = 12;
-            for (int i = 0; i < Posts; i++)
-            {
-                float a = i * Mathf.PI * 2f / Posts;
-
-                var post = CreateBlock(ride,
-                    new Vector3(Mathf.Cos(a) * (R - 1.5f), 3.2f, Mathf.Sin(a) * (R - 1.5f)),
-                    new Vector3(0.35f, 5f, 0.35f), 0f, layer,
-                    "Metal", new Color(0.55f, 0.48f, 0.3f), 0.4f, 0.6f,
-                    $"Post{i}", _parkSteel);
-                NoStanding(post);
-
-                if (rng.NextDouble() > 0.5) continue;
-
-                var horse = CreateBlock(ride,
-                    new Vector3(Mathf.Cos(a) * (R - 3.4f), 2.1f, Mathf.Sin(a) * (R - 3.4f)),
-                    new Vector3(2.2f, 1.9f, 0.9f), -a * Mathf.Rad2Deg, layer,
-                    "Wood", _theme.RandomCoverColor(rng), 0.12f, 0f,
-                    $"Horse{i}", _parkPaint);
-                NoStanding(horse);
-            }
-
-            var canopy = CreateBlock(ride, new Vector3(0f, 6.6f, 0f),
-                                     new Vector3(R * 2.2f, 0.5f, R * 2.2f), 0f, layer,
-                                     "Wood", Shade(_theme.wallColor, 0.86f), 0.05f, 0f,
-                                     "Canopy", _parkCanvas);
-            NoStanding(canopy);
-            Hide(canopy);
-        }
-
-        /// <summary>
-        /// Collapsed coaster track: long diagonals across the sky, and things to fight
-        /// under. The supports are what a player actually interacts with.
-        /// </summary>
-        private static void BuildCoaster(Transform parent, int layer, System.Random rng,
-                                         Vector3 at, float radius)
-        {
-            var ride = new GameObject("Coaster").transform;
-            ride.SetParent(parent, false);
-            ride.position = at;
-            ride.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
-
-            int bents = 7;
-            float span = radius * 1.8f;
-
-            for (int i = 0; i < bents; i++)
-            {
-                float t = i / (float)(bents - 1);
-                float x = Mathf.Lerp(-span * 0.5f, span * 0.5f, t);
-
-                // A profile that climbs and then falls, which is what a coaster is.
-                float h = 6f + Mathf.Sin(t * Mathf.PI) * 17f;
-
-                for (int leg = -1; leg <= 1; leg += 2)
-                {
-                    var post = CreateBlock(ride, new Vector3(x, h * 0.5f, leg * 2.6f),
-                                           new Vector3(0.8f, h, 0.8f), 0f, layer,
-                                           "Wood", Shade(_theme.bankColor, 0.72f), 0.06f, 0f,
-                                           $"Bent{i}_{leg}", _parkTimber);
-                    NoStanding(post);
-                }
-
-                // Cross bracing, which is most of what makes timber structure read.
-                var brace = CreateBlock(ride, new Vector3(x, h * 0.55f, 0f),
-                                        new Vector3(0.35f, 0.35f, 6f), 0f, layer,
-                                        "Wood", Shade(_theme.bankColor, 0.68f), 0.06f, 0f,
-                                        $"Brace{i}", _parkTimber);
-                NoStanding(brace);
-
-                if (i == 0) continue;
-
-                // The track between this bent and the last, which is the diagonal.
-                float prevT = (i - 1) / (float)(bents - 1);
-                float prevX = Mathf.Lerp(-span * 0.5f, span * 0.5f, prevT);
-                float prevH = 6f + Mathf.Sin(prevT * Mathf.PI) * 17f;
-
-                // One span in three has fallen. A complete run reads as a working ride.
-                if (rng.NextDouble() < 0.34) continue;
-
-                var a = new Vector3(prevX, prevH, 0f);
-                var b = new Vector3(x, h, 0f);
-                var mid = (a + b) * 0.5f;
-                float length = Vector3.Distance(a, b);
-                float pitch = Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg;
-
-                var track = CreateBlock(ride, mid, new Vector3(length, 0.4f, 4.4f),
-                                        0f, layer, "Wood", Shade(_theme.bankColor, 0.8f),
-                                        0.08f, 0f, $"Track{i}", _parkTimber);
-                track.transform.localRotation = Quaternion.Euler(0f, 0f, pitch);
-                NoStanding(track);
-            }
-        }
-
-
-        /// <summary>
-        /// The midway: two rows of stalls facing each other across a lane.
-        ///
-        /// This is the close-quarters part of the park, and it works because it is a
-        /// *street* -- two solid rows with gaps, so every sightline is either down the lane
-        /// or through one gap. Scattering the same stalls over the same area would give the
-        /// same object count and none of the shape.
-        /// </summary>
-        private static void BuildMidway(Transform root, int layer, System.Random rng, float half)
-        {
-            if (!TryClaim(rng, half * 0.72f, 26f, out var centre, 30)) return;
-
-            var group = new GameObject("Midway").transform;
-            group.SetParent(root, false);
-
-            float bearing = (float)rng.NextDouble() * Mathf.PI;
-            var along = new Vector2(Mathf.Cos(bearing), Mathf.Sin(bearing));
-            var across = new Vector2(-along.y, along.x);
-
-            const float LaneHalf = 6.5f;
-            int perSide = 7;
+            var cab = CreateBlock(van, new Vector3(-0.75f, 2.15f, 0f), new Vector3(2.4f, 1.0f, 1.95f),
+                                  0f, layer, "Metal", new Color(0.32f, 0.34f, 0.31f),
+                                  0.18f, 0.2f, "Cab", _parkSteel);
+            NoStanding(cab);
 
             for (int side = -1; side <= 1; side += 2)
-            {
-                for (int i = 0; i < perSide; i++)
+                for (int axle = -1; axle <= 1; axle += 2)
                 {
-                    // A gap every few stalls, so the lane is not a corridor with two walls.
-                    if (rng.NextDouble() < 0.22) continue;
-
-                    float t = (i - (perSide - 1) * 0.5f) * 8.5f;
-
-                    var p = centre + along * t + across * (side * (LaneHalf + 2.6f));
-                    float y = GroundHeightAt(p.x, p.y);
-
-                    BuildStall(group, layer, rng, p, y, bearing, side, $"{side}_{i}");
-
-                    _anchors.Add(new Vector3(p.x, 0f, p.y));
+                    var wheel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    wheel.name = $"Wheel{side}_{axle}";
+                    wheel.transform.SetParent(van, false);
+                    wheel.transform.localPosition = new Vector3(axle * 1.55f, 0.58f, side * 1.05f);
+                    wheel.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                    wheel.transform.localScale = new Vector3(0.62f, 0.2f, 0.62f);
+                    wheel.layer = layer;
+                    wheel.tag = "Concrete";
+                    wheel.GetComponent<Renderer>().sharedMaterial =
+                        MakeDetailMaterial("Tyre", new Color(0.075f, 0.075f, 0.075f), "Rock",
+                                           0.8f, 0.08f, 0f, 0.4f);
+                    NoStanding(wheel);
                 }
-            }
         }
 
-
-        /// <summary>
-        /// One midway stall, built from the parts a stall has.
-        ///
-        /// <b>A single box is not a stall.</b> It is the right size and the right colour
-        /// and it reads as a crate, because what makes a stall legible is the counter you
-        /// buy across, the open front above it, the awning over that and the boards at the
-        /// back -- four pieces with a gap between them. The same object count spent on
-        /// parts rather than on scattering whole boxes is most of the difference between
-        /// a fairground and a field of cubes.
-        /// </summary>
-        private static void BuildStall(Transform parent, int layer, System.Random rng,
-                                       Vector2 p, float y, float bearing, int side, string id)
+        private static Vector2 ParkPoint(ParkSite site, float localX, float localZ)
         {
-            float yaw = -bearing * Mathf.Rad2Deg;
-            float w = 5f + (float)rng.NextDouble() * 2.2f;
-            float d = 3.6f + (float)rng.NextDouble() * 1.2f;
-
-            var stall = new GameObject($"Stall{id}").transform;
-            stall.SetParent(parent, false);
-            stall.position = new Vector3(p.x, y, p.y);
-            stall.localRotation = Quaternion.Euler(0f, yaw, 0f);
-
-            var paint = _theme.RandomCoverColor(rng);
-
-            // Back and two sides. The front is left open -- that opening is the whole
-            // silhouette of a stall.
-            CreateBlock(stall, new Vector3(0f, 1.6f, -d * 0.5f), new Vector3(w, 3.2f, 0.25f),
-                        0f, layer, "Wood", Shade(_theme.bankColor, 0.72f), 0.06f, 0f,
-                        "Back", _parkTimber);
-
-            for (int e = -1; e <= 1; e += 2)
-                CreateBlock(stall, new Vector3(e * w * 0.5f, 1.6f, 0f),
-                            new Vector3(0.25f, 3.2f, d), 0f, layer,
-                            "Wood", Shade(_theme.bankColor, 0.78f), 0.06f, 0f,
-                            $"Side{e}", _parkTimber);
-
-            // The counter: chest high, and the thing that makes the front read as a front.
-            CreateBlock(stall, new Vector3(0f, 0.55f, d * 0.5f - 0.15f),
-                        new Vector3(w, 1.1f, 0.5f), 0f, layer,
-                        "Wood", paint, 0.1f, 0f, "Counter", _parkPaint);
-
-            // Awning, sloped out over the counter, on two posts.
-            var awning = CreateBlock(stall, new Vector3(0f, 3.05f, d * 0.5f + 0.7f),
-                                     new Vector3(w + 0.5f, 0.18f, d * 0.9f), 0f, layer,
-                                     "Wood", paint, 0.08f, 0f, "Awning", _parkPaint);
-            awning.transform.localRotation = Quaternion.Euler(-16f, 0f, 0f);
-            NoStanding(awning);
-
-            for (int e = -1; e <= 1; e += 2)
-            {
-                var post = CreateBlock(stall,
-                    new Vector3(e * (w * 0.5f - 0.2f), 1.4f, d * 0.5f + 1.1f),
-                    new Vector3(0.16f, 2.8f, 0.16f), 0f, layer,
-                    "Wood", Shade(_theme.bankColor, 0.66f), 0.06f, 0f,
-                    $"Post{e}", _parkTimber);
-                NoStanding(post);
-            }
-
-            // The sign board across the top, which is where a fairground puts its colour.
-            var sign = CreateBlock(stall, new Vector3(0f, 3.6f, d * 0.5f - 0.1f),
-                                   new Vector3(w * 0.86f, 0.9f, 0.16f), 0f, layer,
-                                   "Wood", paint, 0.14f, 0f, "Sign", _parkPaint);
-            NoStanding(sign);
-
-            // Roof over the box itself.
-            var roof = CreateBlock(stall, new Vector3(0f, 3.25f, 0f),
-                                   new Vector3(w + 0.3f, 0.2f, d + 0.2f), 0f, layer,
-                                   "Wood", Shade(_theme.wallColor, 0.8f), 0.05f, 0f,
-                                   "Roof", _parkCanvas);
-            NoStanding(roof);
+            var offset = Quaternion.Euler(0f, site.Yaw, 0f) * new Vector3(localX, 0f, localZ);
+            return site.Centre + new Vector2(offset.x, offset.z);
         }
 
         /// <summary>A run of fence: posts and two rails, not a slab.</summary>
@@ -884,113 +466,15 @@ namespace FPSKit.EditorTools
             NoStanding(window);
         }
 
-        /// <summary>Litter of the park: fencing, bins, broken ride parts, ticket booths.</summary>
-        private static void BuildParkScatter(Transform root, int layer, System.Random rng, float half)
-        {
-            var group = new GameObject("Scatter").transform;
-            group.SetParent(root, false);
-
-            int count = _theme.ScaledCount(46);
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!TryClaim(rng, half * 0.92f, 3.2f, out var p, 12)) continue;
-
-                double roll = rng.NextDouble();
-
-                if (roll < 0.26)
-                    BuildFenceRun(group, layer, rng, p, (float)rng.NextDouble() * 360f,
-                                  5f + (float)rng.NextDouble() * 9f, $"{i}");
-                else if (roll < 0.46)
-                    BuildLampPost(group, layer, rng, p, $"{i}");
-                else if (roll < 0.66)
-                    BuildBin(group, layer, rng, p, $"{i}");
-                else if (roll < 0.82)
-                    BuildBooth(group, layer, rng, p, $"{i}");
-                else
-                {
-                    // Ride wreckage: a piece of something big, lying where it fell. The one
-                    // thing here that is genuinely a broken lump, because that is what it is.
-                    float y = GroundHeightAt(p.x, p.y);
-
-                    var wreck = CreateBlock(group, new Vector3(p.x, y + 0.7f, p.y),
-                                            new Vector3(1.4f + (float)rng.NextDouble() * 3f, 1.4f,
-                                                        1.2f + (float)rng.NextDouble() * 2.4f),
-                                            (float)rng.NextDouble() * 360f, layer,
-                                            "Metal", new Color(0.3f, 0.29f, 0.3f), 0.25f, 0.45f,
-                                            $"Wreck{i}", _parkSteel);
-                    NoStanding(wreck);
-                }
-            }
-        }
-
-        /// <summary>
-        /// What is still lit.
-        ///
-        /// <b>This gets more care than an outdoor arena, not less, and the subway is why.</b>
-        /// That level was given nine short-range lamps across 450m and rendered as a large
-        /// dark room with no readable structure in it -- the geometry was all there and none
-        /// of it could be seen. A dark arena is a *lighting design*; darkness on its own is
-        /// just an absence.
-        ///
-        /// Three things carry it. The moon is the base, dim but everywhere, so nothing is
-        /// ever truly black. Each ride gets a light of its own, because a landmark you
-        /// cannot see is not a landmark. And the sinkholes are lit from *inside*, which is
-        /// the one trick that matters here: a hollow with a glow in it reads as a hole from
-        /// across the park, and that is the telegraphing the hazard needs.
-        /// </summary>
-        private static void BuildParkLights(Transform root, System.Random rng, float half)
-        {
-            var group = new GameObject("ParkLights").transform;
-            group.SetParent(root, false);
-
-            foreach (var plan in _ridePlans)
-            {
-                float y = GroundHeightAt(plan.Centre.x, plan.Centre.y);
-
-                var go = new GameObject($"RideLight{plan.Kind}");
-                go.transform.SetParent(group, false);
-                go.transform.position = new Vector3(plan.Centre.x, y + 9f, plan.Centre.y);
-
-                var light = go.AddComponent<Light>();
-                light.type = LightType.Point;
-
-                // Sodium, and failing. Warm against the blue of the moon, which is what
-                // separates "still has power" from "does not" at a distance.
-                light.color = new Color(1f, 0.72f, 0.38f);
-                light.intensity = 5.5f + (float)rng.NextDouble() * 2f;
-                light.range = plan.Radius * 2.6f;
-                light.shadows = LightShadows.Soft;
-            }
-
-            foreach (var sink in _sinks)
-            {
-                if (!sink.HasShaft) continue;
-
-                float floorY = GroundHeightAt(sink.Centre.x, sink.Centre.y);
-
-                var go = new GameObject("ShaftGlow");
-                go.transform.SetParent(group, false);
-                go.transform.position = new Vector3(sink.Centre.x, floorY + 1.4f, sink.Centre.y);
-
-                var light = go.AddComponent<Light>();
-                light.type = LightType.Point;
-
-                // Cold and weak. Enough to pick the rim out of the dark and to say
-                // something is down there; not enough to light the hollow.
-                light.color = new Color(0.42f, 0.66f, 0.8f);
-                light.intensity = 2.6f;
-                light.range = sink.Radius * 1.5f;
-                light.shadows = LightShadows.None;
-            }
-        }
-
         // ==================================================================
         private static Material _parkTimber;
         private static Material _parkPaint;
         private static Material _parkSteel;
         private static Material _parkCanvas;
         private static Material _parkDark;
+        private static Material _parkConcrete;
+        private static Material _parkRubble;
+        private static Material _parkPath;
 
         private static void ResolveParkMaterials()
         {
@@ -1009,10 +493,19 @@ namespace FPSKit.EditorTools
             _parkCanvas = MakeDetailMaterial("ParkCanvas", new Color(0.50f, 0.47f, 0.43f),
                                              "Adobe", Metres(5f), 0.04f, 0f, 0.9f);
 
+            _parkConcrete = MakeDetailMaterial("ParkConcrete", Shade(_theme.floorColor, 1.08f),
+                                               "Concrete", Metres(2.6f), 0.08f, 0f, 0.9f);
+            _parkRubble = MakeDetailMaterial("ParkRubble", Shade(_theme.floorColor, 0.74f),
+                                             "Rock", Metres(1.8f), 0.05f, 0f, 1.4f);
+            _parkPath = MakeDetailMaterial("ParkPath", new Color(0.34f, 0.32f, 0.29f),
+                                           "Concrete", Metres(3.2f), 0.08f, 0f, 0.8f);
+
             // What the inside of a shaft is. Not black -- a hole that is pure black reads
             // as a rendering fault, and this has to read as depth.
             _parkDark = MakeMaterialAt($"{MaterialFolder}/{SafeName(_theme.themeName)}_Void.mat",
                                        new Color(0.045f, 0.04f, 0.05f), 0f, 0f);
+
+            ResolveFairgroundMaterials();
         }
     }
 }

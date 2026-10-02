@@ -859,14 +859,14 @@ namespace FPSKit.EditorTools
             dust.transform.SetParent(parent, false);
             var fall = dust.AddComponent<Snowfall>();
             fall.flakeMaterial = FlakeMaterial();
-            fall.flakes = 420;
-            fall.ceiling = 3f;
-            fall.spread = 34f;
-            fall.fallSpeed = 0.25f;
-            fall.wind = new Vector3(6.5f, 0f, 2.2f);
-            fall.tint = new Color(0.86f, 0.76f, 0.58f, 0.55f);
-            fall.tintAlt = new Color(0.72f, 0.62f, 0.46f, 0.4f);
-            fall.size = new Vector2(0.04f, 0.1f);
+            fall.flakes = 560;
+            fall.ceiling = 1.6f;
+            fall.spread = 32f;
+            fall.fallSpeed = 0.4f;
+            fall.wind = new Vector3(5.6f, 0f, 3.3f);
+            fall.tint = new Color(0.86f, 0.76f, 0.58f, 0.38f);
+            fall.tintAlt = new Color(0.72f, 0.62f, 0.46f, 0.24f);
+            fall.size = new Vector2(0.025f, 0.075f);
 
             for (int i = 0, made = 0; i < 120 && made < 5; i++)
             {
@@ -895,9 +895,9 @@ namespace FPSKit.EditorTools
             main.playOnAwake = true;
             main.prewarm = true;
             main.duration = 6f;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(3.5f, 5.5f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(3f, 5.5f);
-            main.startSize = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(4f, 6f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.8f, 3.2f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.45f, 1.3f);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = 140;
@@ -905,27 +905,27 @@ namespace FPSKit.EditorTools
             system.randomSeed = (uint)rng.Next();
 
             var emission = system.emission;
-            emission.rateOverTime = 28f;
+            emission.rateOverTime = 20f;
 
             var shape = system.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = 6f;
-            shape.radius = 1.2f;
+            shape.angle = 8f;
+            shape.radius = 0.9f;
 
             // The twist: particles orbit the column's axis as they climb.
             var velocity = system.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.Local;
-            velocity.orbitalZ = new ParticleSystem.MinMaxCurve(2.4f, 3.6f);
-            velocity.radial = new ParticleSystem.MinMaxCurve(0.15f, 0.35f);
+            velocity.orbitalZ = new ParticleSystem.MinMaxCurve(1.2f, 1.9f);
+            velocity.radial = new ParticleSystem.MinMaxCurve(0.1f, 0.3f);
             velocity.x = new ParticleSystem.MinMaxCurve(0f, 0f);
             velocity.y = new ParticleSystem.MinMaxCurve(0f, 0f);
             velocity.z = new ParticleSystem.MinMaxCurve(0f, 0f);
 
             var size = system.sizeOverLifetime;
             size.enabled = true;
-            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.2f));
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.65f, 1f, 1.8f));
 
             var colour = system.colorOverLifetime;
             colour.enabled = true;

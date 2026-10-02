@@ -88,8 +88,8 @@ namespace FPSKit.EditorTools
         [MenuItem("FPSKit/Build Scene/Night Rooftop", false, 3)]
         private static void BuildRooftop() => BuildScene("Night Rooftop");
 
-        [MenuItem("FPSKit/Build Scene/Abandoned Subway", false, 4)]
-        private static void BuildSubway() => BuildScene("Abandoned Subway");
+        [MenuItem("FPSKit/Build Scene/Abandoned Fairground", false, 4)]
+        private static void BuildFairground() => BuildScene("Abandoned Fairground");
 
         // Filed as Mars Colony, shown as the Unknown Planet -- see LevelTheme.displayName.
         [MenuItem("FPSKit/Build Scene/Unknown Planet", false, 5)]

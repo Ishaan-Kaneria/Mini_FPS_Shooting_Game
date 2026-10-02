@@ -26,25 +26,16 @@ namespace FPSKit.EditorTools
         public const string LevelFolder = "Assets/FPSKit_Generated/Levels";
 
         /// <summary>
-        /// Levels per arena. Eight is a ladder you can see the top of from the bottom:
-        /// long enough that unlocking means something, short enough that a player who
-        /// likes one arena can finish it.
+        /// Levels in each arena. Thirty-two gives a player room to learn each arena,
+        /// meet its whole roster and still climb through a meaningful difficulty curve.
         /// </summary>
         public const int LevelsPerArena = 32;
 
         /// <summary>
         /// How many levels an arena's ladder holds.
         ///
-        /// Eight everywhere except the last zone, which is three. <b>A finale is not a
-        /// ladder.</b> The Auger House is a house: the player arrives having cleared six
-        /// arenas, and asking them for another eight rungs of the same curve before the
-        /// last fight would turn the ending into a chore with a cutscene at the end of
-        /// it. Three is a way in, a room to get through, and Marit.
-        /// </summary>
-        /// <summary>
-        /// Thirty-two in every arena, the finale included: the arenas are big, and eight
-        /// two-minute levels never took a player far enough from where they started to see
-        /// more than a corner of one.
+        /// Thirty-two in every arena, including the finale. The large arenas need enough
+        /// rungs for a player to move beyond the spawn district and learn the site.
         /// </summary>
         public static int LevelsFor(string themeName) => LevelsPerArena;
 
@@ -216,8 +207,8 @@ namespace FPSKit.EditorTools
 
             // How many levels so far have asked for an objective. The rotation below is
             // keyed on this rather than on the level index, and the difference is not
-            // cosmetic: the boss slots are not evenly spaced, so at eight levels an
-            // index-keyed rotation of six comes back round and hands two levels of the
+            // cosmetic: the boss slots are not evenly spaced, so on this ladder an
+            // index-keyed rotation comes back round and hands two levels of the
             // same ladder the same objective while leaving another one unused.
             int fought = 0;
 
@@ -272,7 +263,7 @@ namespace FPSKit.EditorTools
                     // Worth about a fifth of a mid-ladder roster, so an objective ignored
                     // costs a star and an objective done is most of the difference
                     // between two and three. Scaled with the level so it keeps that share
-                    // as the crowd grows rather than becoming a rounding error by level 8.
+                    // as the crowd grows rather than becoming a rounding error late in the ladder.
                     objectiveWeight = Mathf.Round(Mathf.Max(4f, enemies * 0.45f)),
                     objectiveStages = StagesFor(objective, clock),
 
@@ -282,7 +273,7 @@ namespace FPSKit.EditorTools
                     // The crowd on screen grows more slowly than the crowd in total, so
                     // a later level is a longer fight rather than an unwinnable one.
                     // And they arrive thicker. Twelve at once against the fourteen an
-                    // eighth-rung level tops out at is what "waves" means here: the
+                    // last-rung level tops out at is what "waves" means here: the
                     // arena is never not full for the whole of the last fight.
                     maxAliveAtOnce = Mathf.RoundToInt(finale ? Mathf.Lerp(9f, 18f, t) : Mathf.Lerp(5f, 14f, t) + arenaIndex * 0.3f),
                     spawnInterval = Mathf.Lerp(0.8f, 0.3f, t),
@@ -409,7 +400,7 @@ namespace FPSKit.EditorTools
         /// on, and it cannot do that while also introducing a rule.
         ///
         /// <b>The rotation is offset by the arena.</b> Without that, the fourth level of
-        /// all six zones is the same objective, and a player who has finished one arena
+        /// all seven zones is the same objective, and a player who has finished one arena
         /// has seen the whole ladder of the next one before starting it.
         /// </summary>
         static LevelSet.Objective ObjectiveFor(int fought, bool boss, int arenaIndex)
@@ -465,8 +456,8 @@ namespace FPSKit.EditorTools
         static string Brief(string themeName, int index, int count, int enemies, bool boss,
                             LevelSet.Objective objective, int stages, bool last, string holder)
         {
-            // Where the player is, then what the level wants. Four rungs of story for
-            // eight levels, so the arena is saying something different at the bottom of
+            // Where the player is, then what the level wants. Four story beats across
+            // thirty-two levels, so the arena is saying something different at the bottom of
             // the ladder and at the top without anybody writing forty-eight lines that
             // could each be wrong about the level they sit on.
             int rung = last ? 3 : index < count * 3 / 8 ? 0 : index < count * 6 / 8 ? 1 : 2;

@@ -21,7 +21,7 @@ EditorBuildSettings:
     path: Assets/FPSKit_Generated/Scenes/NightRooftop.unity
     guid: de32a20969372e584b2505d32a8cf586
   - enabled: 1
-    path: Assets/FPSKit_Generated/Scenes/AbandonedSubway.unity
+    path: Assets/FPSKit_Generated/Scenes/AbandonedFairground.unity
     guid: 8101906db81f2459aacb24af41edbe5c
   - enabled: 1
     path: Assets/FPSKit_Generated/Scenes/MarsColony.unity

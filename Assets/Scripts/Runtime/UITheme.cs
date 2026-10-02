@@ -164,7 +164,7 @@ public class UITheme : ScriptableObject
         new ArenaStripe { scene = "SnowboundStation",    color = Hex(0x8CBCD9) },
         new ArenaStripe { scene = "DesertOutpost",       color = Hex(0xCDB07A) },
         new ArenaStripe { scene = "NightRooftop",        color = Hex(0x8E7CC3) },
-        new ArenaStripe { scene = "AbandonedSubway",     color = Hex(0x4FA39A) },
+        new ArenaStripe { scene = "AbandonedFairground",     color = Hex(0x4FA39A) },
         new ArenaStripe { scene = "MarsColony",          color = Hex(0xC4553B) },
         new ArenaStripe { scene = "TheAugerHouse",       color = Hex(0xC9C3B6) },
     };

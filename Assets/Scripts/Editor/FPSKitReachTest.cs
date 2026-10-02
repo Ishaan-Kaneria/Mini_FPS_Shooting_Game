@@ -77,7 +77,9 @@ namespace FPSKit.EditorTools
                     }
 
                     EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
-                    Check(FPSKitThemes.GetOrCreate(name), name, problems, notes);
+                    var theme = FPSKitThemes.GetOrCreate(name);
+                    Check(theme, name, problems, notes);
+                    if (theme.parkZone) CheckFairgroundDecks(name, problems, notes);
                 }
 
                 if (problems.Count > 0)
@@ -98,6 +100,81 @@ namespace FPSKit.EditorTools
                 Debug.LogError($"[FPSKitBatch] FAILED: {e}{notes}");
                 EditorApplication.Exit(1);
             }
+        }
+
+        // ==================================================================
+        /// <summary>
+        /// The fairground's raised, walkable surfaces: the hall gallery and stage, the coaster
+        /// station, the carousel and bandstand floors, the balcony of the haunted house, the
+        /// big top's seating, the footbridge and the container roofs.
+        ///
+        /// <b>The ground-level probe above cannot see any of them.</b> It samples the navmesh
+        /// from 1.5m up with a three-metre reach, so a gallery six metres up is not in its set
+        /// and a gallery with no stair to it passes. This asks the question directly: for each
+        /// deck, is there navmesh on its top, and can it path to the player? A stair that stops
+        /// short, a landing a centimetre low or a deck wrongly held off the bake each fail here.
+        /// </summary>
+        static void CheckFairgroundDecks(string name, List<string> problems, StringBuilder notes)
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player == null || !NavMesh.SamplePosition(player.transform.position, out var home, 20f, NavMesh.AllAreas)) return;
+
+            var path = new NavMeshPath();
+            var decks = new[]
+            {
+                "GalleryS_West", "GalleryS_Mid", "GalleryS_Raw", "GalleryN", "GalleryN_Raw", "GalleryW", "Stage",
+                "StationDeck", "CarouselDeck", "BandstandFloor", "Balcony", "BridgeDeck", "ContainerRoof"
+            };
+
+            int checkedCount = 0;
+            var seen = new HashSet<string>();
+
+            foreach (var collider in UnityEngine.Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+            {
+                if (System.Array.IndexOf(decks, collider.name) < 0) continue;
+
+                var b = collider.bounds;
+
+                // Down onto the collider itself from above its middle, so the height is the deck's and
+                // not that of a rail or a canopy standing on it; and off-centre where the middle is a
+                // drum or a pole.
+                var at = new Vector3(b.center.x, b.max.y + 2f, b.center.z);
+                if (collider.name == "CarouselDeck") at.x += 7.45f;
+                if (!collider.Raycast(new Ray(at, Vector3.down), out var ray, 8f)) continue;
+
+                var top = ray.point + Vector3.up * 0.05f;
+                seen.Add(collider.name);
+                checkedCount++;
+
+                if (!NavMesh.SamplePosition(top, out var hit, 0.9f, NavMesh.AllAreas) || Mathf.Abs(hit.position.y - ray.point.y) > 0.4f)
+                {
+                    problems.Add($"{name}: \"{collider.name}\" at {b.center} has no navmesh on its top surface (y {ray.point.y:0.00}), " +
+                                 "so nothing can stand on it -- it was held off the bake or is too steep");
+                    continue;
+                }
+
+                if (!NavMesh.CalculatePath(hit.position, home.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+                    problems.Add($"{name}: \"{collider.name}\" at {b.center} is an island -- its navmesh cannot path to the player. " +
+                                 "Its stair stops short of the deck, lands off its height, or is not joined to the ground");
+            }
+
+            // The tent's raked seating is one mesh whose bounds centre is the ring on the floor, so
+            // it is sampled at the middle of its fourth tier in all four blocks instead.
+            var tent = GameObject.Find("Arena/Rides/BigTop");
+            if (tent != null)
+                for (int block = 0; block < 4; block++)
+                {
+                    float a = (45f + 90f * block) * Mathf.Deg2Rad;
+                    var p = tent.transform.position + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 16.6f + Vector3.up * 1.25f;
+                    checkedCount++;
+
+                    if (!NavMesh.SamplePosition(p, out var hit, 0.8f, NavMesh.AllAreas))
+                        problems.Add($"{name}: block {block} of the big top's seating has no navmesh on its fourth tier at {p}");
+                    else if (!NavMesh.CalculatePath(hit.position, home.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+                        problems.Add($"{name}: block {block} of the big top's seating is an island at {p}");
+                }
+
+            notes.Append($"\n  {name}: {checkedCount} raised deck(s) checked ({seen.Count} kinds), all must be baked and reachable");
         }
 
         // ==================================================================
@@ -143,6 +220,7 @@ namespace FPSKit.EditorTools
             int on = 0, stranded = 0;
             var worst = Vector3.zero;
             var blamed = new Dictionary<string, int>();
+            var where = new List<Vector3>();
 
             // <b>Where the stranded ground is, not just one sample of it.</b> One coordinate
             // says almost nothing: a thin ring round the boundary and a whole quadrant cut
@@ -177,6 +255,7 @@ namespace FPSKit.EditorTools
 
                 stranded++;
                 worst = hit.position;
+                where.Add(hit.position);
 
                 var flat = new Vector2(hit.position.x, hit.position.z);
                 badMin = Vector2.Min(badMin, flat);
@@ -224,8 +303,16 @@ namespace FPSKit.EditorTools
             }
             else
             {
+                var blame = new StringBuilder();
+                foreach (var pair in blamed) blame.Append($" {pair.Key} x{pair.Value};");
+
                 notes.Append($"\n  {name}: {on} navmesh samples, {stranded} stranded ({share:P1}), " +
-                             $"player standing on \"{floor.collider.name}\"");
+                             $"player standing on \"{floor.collider.name}\"" +
+                             (stranded > 0 ? $"; stranded on:{blame}" : ""));
+
+                // A handful of strays are listed with their coordinates, so each can be found and read.
+                if (stranded > 0 && stranded <= 40)
+                    foreach (var p in where) notes.Append($"\n      stray at ({p.x:0}, {p.y:0.0}, {p.z:0})");
             }
         }
     }

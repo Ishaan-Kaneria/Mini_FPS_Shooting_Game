@@ -76,7 +76,8 @@ namespace FPSKit.EditorTools
                 // The terrain itself, when there is some: near the canyon the lowest thing
                 // under a point is the canyon's rock running on under the sand, and a camera
                 // put there looks up at the world from inside it.
-                bool terrain = hit.collider.CompareTag("Sand") || hit.collider.CompareTag("Snow");
+                bool terrain = hit.collider.CompareTag("Sand") || hit.collider.CompareTag("Snow")
+                    || hit.collider.gameObject.name == "Dune";
                 if (terrain && (float.IsNaN(ground) || hit.point.y > ground)) ground = hit.point.y;
             }
 
@@ -126,6 +127,7 @@ namespace FPSKit.EditorTools
         /// </summary>
         static IEnumerable<Shot> Frame(LevelTheme theme)
         {
+            if (theme != null && theme.parkZone) return FramePark();
             if (theme != null && theme.snowZone) return System.Linq.Enumerable.Concat(FrameSnow(), FrameSnowLife());
             if (theme != null && theme.industrialZone) return FrameIndustrial();
             if (theme != null && theme.openZone && !theme.volcanicZone)
@@ -133,6 +135,105 @@ namespace FPSKit.EditorTools
 
             return FrameDesert(theme);
         }
+
+        /// <summary>
+        /// Abandoned fairground viewpoints. The park is a fixed plan, so most are plain
+        /// coordinates; the hall and the haunted house are framed in their own local space,
+        /// because they are turned.
+        /// </summary>
+        static IEnumerable<Shot> FramePark()
+        {
+            yield return ParkShot("01_gate", new Vector3(0f, 2f, -164f), new Vector3(0f, 7f, -128f), 74f);
+            yield return ParkShot("02_avenue_south", new Vector3(0f, 1.7f, -118f), new Vector3(0f, 3f, -30f), 78f);
+            yield return ParkShot("03_midway_stalls", new Vector3(2f, 1.7f, -90f), new Vector3(-14f, 2.6f, -78f), 78f);
+            yield return ParkShot("04_midway_east", new Vector3(-2f, 1.7f, -96f), new Vector3(14f, 2.6f, -84f), 78f);
+            yield return ParkShot("05_plaza_spawn", new Vector3(0f, 1.7f, 0f), new Vector3(0f, 6f, 60f), 80f);
+            yield return ParkShot("06_plaza_map", new Vector3(-8f, 1.7f, -2f), new Vector3(-11f, 3.5f, -11f), 70f);
+            yield return ParkShot("07_plaza_signpost", new Vector3(2f, 1.7f, 2f), new Vector3(8f, 3.5f, 8f), 70f);
+            yield return ParkShot("08_clock_tower", new Vector3(5f, 1.7f, 4f), new Vector3(24f, 12f, 22f), 70f);
+            yield return ParkShot("09_gate_house", new Vector3(8f, 1.7f, -150f), new Vector3(14f, 2.5f, -125f), 78f);
+
+            var hall = GameObject.Find("Arena/GrandHall");
+            if (hall != null)
+            {
+                var t = hall.transform;
+                Vector3 W(float x, float y, float z) => t.TransformPoint(new Vector3(x, y, z));
+
+                yield return WorldShot("10_hall_front", W(-8f, 2f, 62f), W(0f, 8f, 20f), 72f);
+                yield return WorldShot("11_hall_corner", W(70f, 5f, 60f), W(8f, 6f, 6f), 66f);
+                yield return WorldShot("12_hall_nave_to_stage", W(6f, 1.7f, 0f), W(-36f, 4f, 0f), 80f);
+                yield return WorldShot("13_hall_nave_to_site", W(-14f, 1.7f, 2f), W(32f, 3f, 0f), 80f);
+                yield return WorldShot("14_hall_grand_stair", W(-8f, 1.7f, 0f), W(-30f, 5f, 0f), 76f);
+                yield return WorldShot("15_hall_gallery_walk", W(-36f, 7.9f, 21f), W(6f, 7f, 21f), 76f);
+                yield return WorldShot("18_hall_east_wing", W(12f, 1.7f, -10f), W(34f, 4f, 6f), 80f);
+                yield return WorldShot("21_hall_aerial", W(0f, 95f, 80f), W(0f, 0f, 0f), 58f);
+            }
+
+            yield return ParkShot("22_hall_barricade", new Vector3(0f, 1.7f, 52f), new Vector3(0f, 2f, 72f), 80f);
+            yield return ParkShot("23_camp", new Vector3(-44f, 1.7f, 54f), new Vector3(-56f, 1.2f, 62f), 78f);
+
+            yield return ParkShot("30_ferris_wheel", new Vector3(50f, 12f, -8f), new Vector3(80f, 26f, 26f), 68f);
+            yield return ParkShot("31_ferris_gate", new Vector3(80f, 1.7f, -3f), new Vector3(80f, 4f, 9f), 78f);
+            yield return ParkShot("32_coaster_far", new Vector3(55f, 14f, 30f), new Vector3(100f, 16f, 92f), 70f);
+            yield return ParkShot("33_coaster_station", new Vector3(84f, 1.7f, 42f), new Vector3(98f, 5f, 58f), 78f);
+            yield return ParkShot("35_carousel_gate", new Vector3(-52f, 1.7f, 3f), new Vector3(-52f, 4f, -12f), 78f);
+            yield return ParkShot("36_big_top", new Vector3(-45f, 2f, -60f), new Vector3(-98f, 8f, -64f), 76f);
+            yield return ParkShot("37_big_top_inside", new Vector3(-80f, 1.9f, -64f), new Vector3(-110f, 4f, -60f), 82f);
+            yield return ParkShot("38_drop_tower", new Vector3(-100f, 3f, 40f), new Vector3(-128f, 24f, 62f), 66f);
+            yield return ParkShot("39_swing_gate", new Vector3(-124f, 1.7f, -4f), new Vector3(-124f, 6f, 18f), 76f);
+
+            var haunted = GameObject.Find("Arena/Rides/HauntedHouse");
+            if (haunted != null)
+            {
+                var t = haunted.transform;
+                Vector3 W(float x, float y, float z) => t.TransformPoint(new Vector3(x, y, z));
+                yield return WorldShot("40_haunted_front", W(-4f, 2f, 34f), W(0f, 8f, 9f), 74f);
+            }
+
+            yield return ParkShot("43_maze_entrance", new Vector3(-50f, 1.7f, 74f), new Vector3(-60f, 2f, 88f), 76f);
+            yield return ParkShot("44_maze_top", new Vector3(-70f, 38f, 82f), new Vector3(-70f, 0f, 106f), 60f);
+            yield return ParkShot("45_pond_dock", new Vector3(-58f, 2f, 52f), new Vector3(-74f, 1f, 46f), 72f);
+            yield return ParkShot("46_rose_garden", new Vector3(-32f, 1.7f, 24f), new Vector3(-32f, 2f, 48f), 78f);
+            yield return ParkShot("47_rose_garden_top", new Vector3(-32f, 40f, 34f), new Vector3(-32f, 0f, 48f), 58f);
+            yield return ParkShot("48_yard", new Vector3(-100f, 2f, 100f), new Vector3(-120f, 4f, 122f), 78f);
+            yield return ParkShot("49_graveyard", new Vector3(108f, 2f, -34f), new Vector3(126f, 3f, -50f), 78f);
+            yield return ParkShot("50_karts", new Vector3(-132f, 3f, -92f), new Vector3(-122f, 1f, -112f), 76f);
+            yield return ParkShot("51_service_road", new Vector3(140f, 1.7f, -90f), new Vector3(150f, 3f, -20f), 76f);
+            yield return ParkShot("52_shops_avenue", new Vector3(0f, 1.7f, 28f), new Vector3(8f, 2.5f, 52f), 80f);
+            yield return ParkShot("53_hollow", new Vector3(-40f, 2.5f, -90f), new Vector3(-58f, 1f, -106f), 74f);
+
+            var rink = GameObject.Find("Arena/BumperPavilion");
+            if (rink != null)
+            {
+                var t = rink.transform;
+                yield return WorldShot("54_bumper_pavilion", t.TransformPoint(new Vector3(-26f, 2f, -17f)),
+                                      t.TransformPoint(new Vector3(0f, 2.5f, 0f)), 74f);
+            }
+
+            yield return new Shot { Name = "61_top_plaza", From = new Vector3(0f, 110f, -2f), Look = Vector3.zero, Fov = 60f };
+            yield return new Shot { Name = "62_top_midway", From = new Vector3(0f, 120f, -86f), Look = new Vector3(0f, 0f, -84f), Fov = 60f };
+            yield return new Shot { Name = "63_top_west", From = new Vector3(-90f, 130f, 20f), Look = new Vector3(-90f, 0f, 22f), Fov = 62f };
+
+            yield return new Shot
+            {
+                Name = "60_map_top", From = new Vector3(0f, 430f, -1f),
+                Look = Vector3.zero, Fov = 52f
+            };
+        }
+
+        /// <summary>A shot whose points are already in world space, heights included.
+        /// <see cref="ParkShot"/> adds the ground under each point, which for a point taken
+        /// from a transform that stands on the ground counts the ground twice.</summary>
+        static Shot WorldShot(string name, Vector3 from, Vector3 look, float fov)
+            => new Shot { Name = name, From = from, Look = look, Fov = fov };
+
+        static Shot ParkShot(string name, Vector3 from, Vector3 look, float fov)
+        {
+            from.y += GroundUnder(from);
+            look.y += GroundUnder(look);
+            return new Shot { Name = name, From = from, Look = look, Fov = fov };
+        }
+
 
         /// <summary>
         /// The frozen field's viewpoints, and they are <b>found rather than written
@@ -291,6 +392,20 @@ namespace FPSKit.EditorTools
             // lines and the clear box between them, as the player first meets them.
             yield return new Shot { Name = "08b_junction", From = new Vector3(-3f, 3.2f, -17f),
                                     Look = new Vector3(0f, 0f, 2f), Fov = 72f };
+
+            var factoryHall = FindFirst("FactoryHall");
+            var factoryShell = factoryHall != null
+                ? factoryHall.GetComponentInChildren<MeshFilter>()
+                : null;
+            if (factoryHall != null && factoryShell != null && factoryShell.sharedMesh != null)
+            {
+                var size = factoryShell.sharedMesh.bounds.size;
+                var from = factoryHall.transform.TransformPoint(
+                    new Vector3(size.x * 0.5f + 14f, 10f, -size.z * 0.5f - 18f));
+                var look = factoryHall.transform.TransformPoint(new Vector3(0f, 7f, 0f));
+                yield return new Shot { Name = "08c_factory_hall", From = from,
+                                        Look = look, Fov = 72f };
+            }
 
             // A walkway and its stair, found rather than written down: the catwalks go
             // wherever the tank farms and the power house put their pipe runs.

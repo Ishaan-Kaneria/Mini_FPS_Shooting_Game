@@ -43,7 +43,7 @@ namespace FPSKit.EditorTools
             "Snowbound Station",
             "Desert Outpost",
             "Night Rooftop",
-            "Abandoned Subway",
+            "Abandoned Fairground",
             "Mars Colony",
             FPSKitThemes.FinaleName
         };
@@ -68,9 +68,9 @@ namespace FPSKit.EditorTools
 
         /// <summary>
         /// Stars needed across the campaign to open each zone, in <see cref="ZoneOrder"/>
-        /// order, on top of the story gate. A ladder is 24 stars; these ask for a little over
-        /// half of everything before each zone -- a player who passes every level at one
-        /// star has to go back for some of the second and third, and one who plays well
+        /// order, on top of the story gate. A 32-level ladder offers 96 stars; these ask
+        /// for a little over half of everything before each zone. A player who passes every
+        /// level at one star has to go back for some of the second and third, and one who plays well
         /// never notices the gate. Chosen by Ishaan, 2026-09-25.
         /// </summary>
         public static readonly int[] StarsToUnlock = { 0, 10, 24, 38, 52, 66, 84 };
@@ -139,7 +139,7 @@ namespace FPSKit.EditorTools
                 _ => "Ilsa is on the last roof, and she has turned the recording on."
             },
 
-            "Abandoned Subway" => rung switch
+            "Abandoned Fairground" => rung switch
             {
                 0 => "Dev turned the lights on for you. Only some of them.",
                 1 => "The rides are moving. Nobody is operating them.",
@@ -348,7 +348,7 @@ namespace FPSKit.EditorTools
                     "the city and the decision about which recordings exist. She has " +
                     "watched you for twenty years and filed none of it."),
 
-                Zone("Abandoned Subway", 4, "",
+                Zone("Abandoned Fairground", 4, "",
                     "Dev ran the works into the ground and then moved into what was left. " +
                     "The rides still turn when the wind is behind them. He kept the " +
                     "lights on over the shafts, which is either a courtesy or a trap."),
@@ -451,7 +451,7 @@ namespace FPSKit.EditorTools
                 "with whoever is on it still on it, and the only way down from here is " +
                 "the fast one.",
 
-            "Abandoned Subway" =>
+            "Abandoned Fairground" =>
                 "The ground here is older than the fence around it. When the floodlights " +
                 "go, the holes you have been walking round stop being visible — and they " +
                 "are still exactly where they were.",

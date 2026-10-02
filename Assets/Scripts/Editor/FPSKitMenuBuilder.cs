@@ -313,7 +313,7 @@ namespace FPSKit.EditorTools
                 // A flat four-metre lift fixes those two and ruins the other four. The
                 // walled arenas are five metres to the top of the wall, so a camera four
                 // metres over the player's head is looking out over it -- Abandoned
-                // Subway came back as a black rectangle under a strip of night sky, which
+                // The fairground came back as a black rectangle under a strip of night sky, which
                 // is what is outside a walled box at night. So the lift and the pitch are
                 // both taken from <c>arenaSize</c>: the boxes keep the shot they had, and
                 // only the arenas that outgrew it get the new one.

@@ -360,6 +360,12 @@ namespace FPSKit.EditorTools
         public static void VerifyReach() => FPSKitReachTest.VerifyReach();
 
         /// <summary>
+        /// Opens the fairground and checks its saved walkways: one connected piece of paving, with
+        /// paving at every entrance marker. Read from the scene, not from the builder's plan.
+        /// </summary>
+        public static void VerifyWalkways() => FPSKitWalkwayTest.VerifyWalkways();
+
+        /// <summary>
         /// Plays the economy end to end: coins earned by killing, spent in the store, and
         /// carried into a level as a better gun and a bomb that goes off where it was
         /// aimed.
@@ -420,6 +426,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void VerifyDevices() => Run(FPSKitDeviceTest.VerifyDevices);
 
+        /// <summary>Renaming an arena carries stars, scores and best times to the new name, once.</summary>
+        public static void VerifySaveRename() => Run(FPSKitSaveTest.VerifySaveRename);
+
         /// <summary>
         /// FPSKit > UI Kit > Import Fonts And Icons, headless. Run after rasterising new icons
         /// (Tools/rasterize-icons.py): the theme finds an icon by id in its own list, and a PNG
@@ -461,6 +470,7 @@ namespace FPSKit.EditorTools
                 CheckLevels(problems);
                 CheckHud(problems);
                 CheckEquipment(problems);
+                CheckIndustrialPerimeter(problems);
 
                 if (UnityEngine.Object.FindAnyObjectByType<GameDirector>() == null)
                     problems.Add("no GameDirector: score, combo and pause would not work");
@@ -474,6 +484,27 @@ namespace FPSKit.EditorTools
 
                 Debug.Log($"[FPSKitBatch] verify passed: \"{theme}\" is wired and playable");
             });
+        }
+
+        private static void CheckIndustrialPerimeter(List<string> problems)
+        {
+            var boundary = GameObject.Find("Arena/Perimeter/Boundary");
+            if (boundary == null)
+            {
+                problems.Add("no industrial perimeter boundary");
+                return;
+            }
+
+            if (boundary.GetComponent<MeshCollider>() != null ||
+                boundary.GetComponents<BoxCollider>().Length < 4)
+                problems.Add("industrial perimeter must use four stable box colliders, not one oversized mesh collider");
+
+            int beacons = 0;
+            foreach (var spin in UnityEngine.Object.FindObjectsByType<MachineSpin>(FindObjectsSortMode.None))
+                if (spin.gameObject.name.StartsWith("GateWarningRotor_")) beacons++;
+
+            if (beacons != 4)
+                problems.Add($"industrial perimeter has {beacons} of 4 rotating gate beacons");
         }
 
         private static void CheckPlayer(List<string> problems)

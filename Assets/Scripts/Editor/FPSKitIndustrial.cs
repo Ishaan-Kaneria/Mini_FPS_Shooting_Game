@@ -180,7 +180,7 @@ namespace FPSKit.EditorTools
         /// size of the surface is actually known.
         /// </summary>
         private static Material _zoneCladding, _zonePlate, _zoneBrick,
-                                _zoneLine, _zoneStain, _zoneDirt;
+                                _zoneWindow, _zoneLine, _zoneStain, _zoneDirt;
 
         // ==================================================================
         /// <summary>
@@ -375,6 +375,8 @@ namespace FPSKit.EditorTools
 
             _zonePlate = TiledCopy(steel, "ZonePlate", Vector2.one)
                          ?? MakeMaterial("ZonePlate", new Color(0.50f, 0.51f, 0.53f), 0.30f, 0.45f);
+
+            _zoneWindow = MakeMaterial("ZoneWindow", new Color(0.10f, 0.15f, 0.17f), 0.12f, 0.05f);
 
             // Brick, for the stacks. Tinted off the rusted steel map, which has the right
             // mottling in it and none of the banding concrete has -- a chimney with a

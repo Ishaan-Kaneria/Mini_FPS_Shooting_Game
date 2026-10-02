@@ -401,8 +401,10 @@ namespace FPSKit.EditorTools
             var gateAt = new HashSet<int>();
             foreach (var tile in _roadTiles)
             {
-                if (Mathf.Abs(tile.x * Tile) > edge - Tile) gateAt.Add(Mathf.RoundToInt(tile.y * Tile));
-                if (Mathf.Abs(tile.y * Tile) > edge - Tile) gateAt.Add(Mathf.RoundToInt(tile.x * Tile));
+                if (Mathf.Abs(tile.x * Tile) >= edge - Tile * 1.5f)
+                    gateAt.Add(Mathf.RoundToInt(tile.y * Tile));
+                if (Mathf.Abs(tile.y * Tile) >= edge - Tile * 1.5f)
+                    gateAt.Add(Mathf.RoundToInt(tile.x * Tile));
             }
 
             for (int side = 0; side < 4; side++)
@@ -430,6 +432,9 @@ namespace FPSKit.EditorTools
                     }
 
                     Place(fence, gate ? FenceGate : FenceRun, at, yaw);
+
+                    if (gate && Mathf.Abs(along) < module * 0.5f)
+                        BuildGateBeacon(fence, at, side);
                 }
             }
 
@@ -454,8 +459,69 @@ namespace FPSKit.EditorTools
             wall.Box(new Vector3(-half, wh * 0.5f, 0f), new Vector3(1f, wh, half * 2f), Quaternion.identity);
 
             var bound = MeshObject(fence, "Boundary", ToMesh(wall, "zonebound"), _zoneConcrete,
-                                   Vector3.zero, Quaternion.identity, Vector3.one, layer, "Concrete");
-            if (bound != null) { Hide(bound); NoStanding(bound); }
+                                   Vector3.zero, Quaternion.identity, Vector3.one, layer, "Concrete",
+                                   collider: false);
+            if (bound != null)
+            {
+                Hide(bound);
+                NoStanding(bound);
+
+                AddBoundaryCollider(bound, new Vector3(0f, wh * 0.5f, half),
+                                    new Vector3(half * 2f, wh, 1f));
+                AddBoundaryCollider(bound, new Vector3(0f, wh * 0.5f, -half),
+                                    new Vector3(half * 2f, wh, 1f));
+                AddBoundaryCollider(bound, new Vector3(half, wh * 0.5f, 0f),
+                                    new Vector3(1f, wh, half * 2f));
+                AddBoundaryCollider(bound, new Vector3(-half, wh * 0.5f, 0f),
+                                    new Vector3(1f, wh, half * 2f));
+            }
+        }
+
+        private static void AddBoundaryCollider(GameObject boundary, Vector3 centre, Vector3 size)
+        {
+            var collider = boundary.AddComponent<BoxCollider>();
+            collider.center = centre;
+            collider.size = size;
+        }
+
+        private static void BuildGateBeacon(Transform parent, Vector3 at, int side)
+        {
+            int backdrop = LayerMask.NameToLayer("Backdrop");
+            if (backdrop < 0) backdrop = LayerMask.NameToLayer("Environment");
+
+            var mast = new MeshBuild { UVScale = 0.5f };
+            mast.Tube(Vector3.zero, Vector3.up * 2.2f, 0.12f, 0.1f, 8);
+            MeshObject(parent, $"GateBeaconMast_{side}",
+                       ToMesh(mast, $"gatebeaconmast{side}"), _zoneSteel,
+                       at + Vector3.up * 9f, Quaternion.identity, Vector3.one,
+                       backdrop, null, collider: false);
+
+            var rotor = new MeshBuild { UVScale = 0.5f };
+            rotor.Tube(Vector3.down * 0.16f, Vector3.up * 0.16f, 0.22f, 0.18f, 10);
+            rotor.Box(new Vector3(0.34f, 0f, 0f), new Vector3(0.78f, 0.14f, 0.18f),
+                      Quaternion.identity);
+            rotor.Box(new Vector3(-0.2f, 0f, 0f), new Vector3(0.36f, 0.14f, 0.18f),
+                      Quaternion.identity);
+
+            var head = MeshObject(parent, $"GateWarningRotor_{side}",
+                                  ToMesh(rotor, $"gatebeaconrotor{side}"), _zoneHazard,
+                                  at + Vector3.up * 11.35f, Quaternion.identity, Vector3.one,
+                                  backdrop, null, collider: false);
+            if (head == null) return;
+
+            var spin = head.AddComponent<MachineSpin>();
+            spin.degreesPerSecond = 72f;
+            spin.phase = side * 90f;
+
+            var light = new GameObject($"GateWarningLight_{side}");
+            light.transform.SetParent(head.transform, false);
+            var spot = light.AddComponent<Light>();
+            spot.type = LightType.Spot;
+            spot.color = new Color(1f, 0.48f, 0.12f);
+            spot.intensity = 1.5f;
+            spot.range = 70f;
+            spot.spotAngle = 24f;
+            spot.shadows = LightShadows.None;
         }
 
         // ==================================================================

@@ -68,7 +68,10 @@ namespace FPSKit.EditorTools
                     float z = c.y + Mathf.Sign(k) * (mainHalf + lot * 0.5f + (Mathf.Abs(k) - 1) * pitch);
 
                     var p = new Vector2(x, z);
-                    if ((p - c).magnitude + lot * 0.7f > R - 3f) continue;
+                    // Keep the complete house footprint on the flat village pad. The
+                    // old 0.7 lot-radius admitted corner plots whose walls crossed onto
+                    // the dune blend, while every house stayed at the village-centre height.
+                    if ((p - c).magnitude + lot * 0.9f > R - 3f) continue;
                     if (Mathf.Abs(x - c.x) < plazaX && Mathf.Abs(z - c.y) < plazaZ) continue;
                     lots.Add(p);
                 }
@@ -394,6 +397,7 @@ namespace FPSKit.EditorTools
                     frames.Box(On(door.at, 2.42f, 0.06f), new Vector3(2.1f, 0.22f, 0.24f), rot);
                     foreach (float s in new[] { -0.88f, 0.88f })
                         frames.Box(On(door.at + s, 1.15f, 0.04f), new Vector3(0.14f, 2.3f, 0.16f), rot);
+                    Sunshade(frames, On, rot, door.at, 2.42f, 2.1f);
 
                     if (solidDoors) paint.Box(On(door.at, 1.15f, 0.03f), new Vector3(1.55f, 2.28f, 0.08f), rot);
                     else
@@ -457,6 +461,7 @@ namespace FPSKit.EditorTools
             dark.Box(on(s, cy, 0.02f), new Vector3(ww, wh, 0.06f), rot);
             frames.Box(on(s, sill - 0.05f, 0.06f), new Vector3(ww + 0.3f, 0.1f, 0.18f), rot);
             frames.Box(on(s, sill + wh + 0.06f, 0.06f), new Vector3(ww + 0.3f, 0.12f, 0.18f), rot);
+            Sunshade(frames, on, rot, s, sill + wh + 0.06f, ww + 0.3f);
 
             if (rng.NextDouble() < 0.55)
             {
@@ -476,9 +481,23 @@ namespace FPSKit.EditorTools
         {
             frames.Box(on(s, 1.05f, 0.08f), new Vector3(1.3f, 0.1f, 0.22f), rot);
             frames.Box(on(s, 2.16f, 0.08f), new Vector3(1.3f, 0.12f, 0.22f), rot);
+            Sunshade(frames, on, rot, s, 2.16f, 1.3f);
             if (rng.NextDouble() < 0.6)
                 foreach (float side in new[] { -1f, 1f })
                     paint.Box(on(s + side * 0.78f, 1.6f, 0.05f), new Vector3(0.5f, 1.0f, 0.05f), rot);
+        }
+
+        private static void Sunshade(MeshBuild build, OnFace on, Quaternion rotation,
+                                     float centre, float top, float width)
+        {
+            build.Box(on(centre, top + 0.16f, 0.34f),
+                      new Vector3(width + 0.45f, 0.12f, 0.62f), rotation);
+
+            float bracket = width * 0.5f - 0.04f;
+            var braceRotation = rotation * Quaternion.Euler(-35f, 0f, 0f);
+            foreach (float side in new[] { -1f, 1f })
+                build.Box(on(centre + side * bracket, top - 0.07f, 0.27f),
+                          new Vector3(0.07f, 0.48f, 0.07f), braceRotation);
         }
 
         /// <summary>Windows on a second storey: small ones, high on each face.</summary>

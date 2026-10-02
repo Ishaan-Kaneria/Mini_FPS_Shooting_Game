@@ -41,7 +41,7 @@ namespace FPSKit.EditorTools
             {
                 float lo = _hamletPlans.Count == 0 ? 50f : 60f, hi = _hamletPlans.Count == 0 ? 95f : half;
                 var p = new Vector2(Rand(rng, -half + 45f, half - 45f), Rand(rng, -half + 45f, half - 45f));
-                if (p.magnitude < lo || p.magnitude > hi || !ClearOfRiver(p, 26f) || !Free(p, 26f)) continue;
+                if (p.magnitude < lo || p.magnitude > hi || !ClearOfRiver(p, 29f) || !Free(p, 29f)) continue;
                 if ((p - _townCentre).magnitude < _townRadius + 40f) continue;
                 if (_hasFob && _fob.Contains(p, 30f)) continue;
                 bool crowded = false;
@@ -49,8 +49,8 @@ namespace FPSKit.EditorTools
                 if (crowded) continue;
 
                 _hamletPlans.Add(new SitePlan { Centre = p, Width = 26f, Depth = 41f, Yaw = rng.Next(4) * 90f });
-                Claim(p.x, p.y, 25f);
-                FlattenPad(p.x, p.y, 25f, 30f, SiteHeight(p, 25f));
+                Claim(p.x, p.y, 29f);
+                FlattenPad(p.x, p.y, 29f, 30f, SiteHeight(p, 29f));
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
             }
 

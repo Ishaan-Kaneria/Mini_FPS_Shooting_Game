@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Level-based FPS built on **Unity 6000.6.0f1** with the **Universal Render Pipeline** (com.unity.render-pipelines.universal 17.6.0). **Seven arenas played as a campaign**, each with a ladder of eight levels -- except the finale, which has three. A level is a fixed crowd of NavMesh-driven enemies, a strict clock, an objective, and one to three stars. Clearing a level unlocks the next; clearing a zone's last level puts down the child who holds it and opens the next zone.
+Level-based FPS built on **Unity 6000.6.0f1** with the **Universal Render Pipeline** (com.unity.render-pipelines.universal 17.6.0). **Seven arenas played as a campaign**, each with a ladder of 32 levels. A level is a fixed crowd of NavMesh-driven enemies, a strict clock, an objective, and one to three stars. Clearing a level unlocks the next; clearing a zone's last level puts down the child who holds it and opens the next zone.
 
 ## Layout
 
@@ -98,7 +98,7 @@ Bindings are not hard-coded: they live in the `ControlSettings` ScriptableObject
 
 `FPSKitSceneBuilder.cs` (~3200 lines) drives the **FPSKit** menu:
 
-- **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Subway | Mars Colony | The Auger House]** — each calls `BuildScene(themeName)`.
+- **FPSKit > Build Scene > [Industrial Warehouse | Desert Outpost | Snowbound Station | Night Rooftop | Abandoned Fairground | Mars Colony | The Auger House]** — each calls `BuildScene(themeName)`.
 - **FPSKit > Build Scene > From Selected Theme Asset** — builds from whatever `LevelTheme` is selected in the Project window, built-in or not. This is how a new arena gets made without touching code.
 - **FPSKit > Build Scene > Build ALL Themes** — builds and saves one scene per theme, registering them in Build Settings so the in-game restart works.
 - **FPSKit > Add Gameplay To Current Scene** — the non-destructive path: injects player, enemies, level manager, HUD, post-FX and a baked NavMesh into an existing level, leaving geometry and baked lighting alone. Refuses to run twice (bails if a `Player`-tagged object exists).
@@ -480,6 +480,11 @@ Five things about it are worth not re-deriving:
   already flat in it, and only then is anything built. `PlanX` and `BuildX` have to stay
   in the same order as each other, because the second reads the list the first wrote.
 
+The village plot bound includes the full house footprint, so no outer wall crosses from
+the level pad onto the sloping dune blend. Each hamlet's pad covers its complete rectangular
+ground footprint. House doors and windows carry timber sunshades to break up the plain
+facades and keep the architecture suited to the desert heat.
+
 **Two pads that must agree have to be pinned to one height, and the nearest pad wins.**
 Both of those are bugs that were written first and found by `VerifyTerrain`:
 
@@ -535,6 +540,8 @@ player walking over the second cannot tell they are moving.
 - **Each surface needs its own map.** Adobe borrowed sand's, and sand's detail is wind
   ripples -- parallel, evenly spaced, all the same size -- which on a vertical wall is
   not mud brick, it is corrugated iron.
+- Sand's broad warp varies ripple spacing and breaks up crests, while remaining periodic
+  at tile edges so the generated detail does not seam.
 
 `Sand` is a surface tag, provisioned in `EnsureProjectTagsAndLayers` with the rest and
 carrying its own `ImpactLibrary` entry. It is the tag a player sees and hears most: every
@@ -705,7 +712,8 @@ whole arena is one flat horizon with small sheds dotted over it, and from the ai
 car park with a grid painted on it. No amount of barrels and pallets fixes that, because
 the problem is the silhouette. So `FPSKitFactory.cs` builds a sixty-metre production hall
 with a walkable roof, forty-metre brick stacks, banks of silos, a cooling tower, gantry
-cranes and pipe bridges, and the pack's sheds are demoted to the outbuildings they are
+cranes and pipe bridges. Truck-door corners get concrete-footed safety bollards, and
+stormwater grates sit in the road gutters. The pack's sheds are demoted to the outbuildings they are
 the right size for. Three rules hold that file together:
 
 - **a hall's roof is reached by its own stairs and is meant to be fought over**, which is
@@ -723,7 +731,8 @@ an outdoor level and the hardest to name: a quarter of a million square metres o
 tint of one texture has no near detail at all, so the eye cannot judge distance and the
 site reads as a car park however many sheds are on it. `BuildYardDetail` lays kerbs
 (which draw the street plan at eye level rather than only from the air), worn patches,
-spills and markings. All of it is faded and close in value to what it sits on -- the
+spills, markings and grated storm drains along straight road gutters. All of it is faded
+and close in value to what it sits on -- the
 first cut was saturated yellow hatching at full opacity across every junction, which was
 the loudest thing in the arena from every angle, and the job of ground detail is to be
 noticed without being looked at.
@@ -779,6 +788,11 @@ carry non-convex mesh colliders, so they are hollow and the player can walk insi
 and the road set is modelled on a **20m tile grid**, so a street network is a matter of
 laying tiles. `Hangar_v4` is a solid box -- a silo, not a shed.
 
+The large production halls now have dark clerestory glazing between their wall ribs and
+steel loading canopies over both vehicle doors. These break up blank wall planes and
+make the open bays read as working docks; both details are visual-only on the backdrop
+layer, so they do not alter the proven navigation.
+
 Four things about it each cost a rebuild, and all four are the same failure: the change
 compiled, the build reported success, and nothing happened.
 
@@ -826,7 +840,7 @@ every caller falls back to a built shape or skips that dressing, because the pac
 third-party and a project without it must still build a playable arena.
 
 The level ladder is deliberately not retuned for the larger site: it is shared by all
-six arenas, and `maxSpawnDistanceFromPlayer` already clamps to 80m on a wide arena, so
+seven arenas, and `maxSpawnDistanceFromPlayer` already clamps to 80m on a wide arena, so
 the fight stays local to the player however big the map is.
 
 ## Baked is not the same question as reachable
@@ -1996,8 +2010,8 @@ thing appears to float rather than to be lit.
 
 ## The park is one surface, and that is the whole design
 
-`LevelTheme.parkZone` is the fourth layout mode, and Abandoned Subway is built with it
-at 450x450 -- an abandoned fairground at night, with hollows in the ground and shafts in
+`LevelTheme.parkZone` is the fourth layout mode, and Abandoned Fairground is built with it
+at 450x450 -- an abandoned fairground (at night until the overgrown rework, now dusk), with hollows in the ground and shafts in
 some of them that kill on contact. `FPSKitPark.cs` builds it.
 
 **Everything walkable is the terrain.** That is not a simplification, it is the lesson
@@ -2038,6 +2052,65 @@ Four things about the park are worth not re-deriving:
   sized, correctly coloured single cube reads as a crate. The built stalls also stopped
   appearing in `VerifyReach`'s stranded list, which solid cubes had been pinching pockets
   behind: proper geometry turns out to be better for navigation as well as for looks.
+- **The fairground has a public front and a working back.** The entrance plaza, ticket
+  booths, queue rails and midway are planned before the terrain so their pads remain level.
+  An open repair yard and service van make the attractions feel operated rather than
+  randomly scattered. Worn paths link the gate, midway and rides, follow the actual ground,
+  detour around sinkholes, and have no collider so they cannot alter the proven NavMesh.
+  Focused sodium pools at the gate, midway and service yard keep those places legible
+  without lifting the darkness across the whole park.
+- `CaptureViews` has Fairground-specific entrance, midway, maintenance, hazard and overview
+  shots; heightfield-grounded shots identify the `Dune` terrain chunks even though the
+  park's ground uses the Concrete surface tag.
+
+## The fairground is overgrown: a hall, a jungle and walkways
+
+Ishaan's brief for the rework (Oct 2026): "realistic, filled, not blocks" -- trees (a jungle
+park), walkways, a big hall with a real interior, and the arena renamed from Abandoned Subway
+(a name left over from the station it replaced) to **Abandoned Fairground**. His picks: full
+rename, overgrown dusk, medium fill, a grand exhibition hall, and every landmark offered
+(ferris wheel + carousel, stalls/tents/bumper cars, clown signage and gate, pond/fountain/bridge).
+The files are `FPSKitFairgroundHall.cs`, `FPSKitFairgroundGrounds.cs`, `FPSKitFairgroundJungle.cs`.
+
+- **The rename moves saves.** Progress is filed under `LevelSet.arenaScene`, so changing it would
+  have zeroed every player who had played the arena. `SaveMigration.CarryRenamedArenas` runs on
+  every start (idempotent, a few `HasKey` calls) and moves stars, scores and best times;
+  `VerifySaveRename` proves it. The cheaper pattern is the one the Unknown Planet uses: keep the
+  key and change `displayName`. A rename like this one is for when the key itself is wrong.
+  Dead station code (`FPSKitSubway.cs`, nothing called it) went with it.
+- **Everything walkable is still the terrain.** The hall is a pad flattened before the heightfield
+  exists and a shell stood on it; its tiles are paint on the backdrop layer. The gallery, its
+  collapsed staircase, the stage top, the bridge deck and the roof are all `NoStanding`. A first
+  floor is two joins the bake can fail at, and the station that was here died of exactly that. If a
+  playable gallery is ever wanted it needs a navigation link and a `VerifyReach` case first.
+- **Eight doors, none under 4.5m clear.** A hall with one door is a trap, and anything with an
+  inside needs more than one way out. The bumper pavilion's rail is the same: runs with openings.
+- **Where a thing may stand is answered by three things, not one.** `Keep()` circles (rides, sites,
+  the spawn, scatter), `_fgRoutes` (every walkway, with its width) and `SpotEmpty`, which asks the
+  physics scene. The `_claimed` circles are no use here: by the end of the build they cover
+  the whole map. The jungle runs **last** so it fills what is left instead of pushing aside what the
+  player navigates by. Trunks are 2.8m apart minimum so that every gap in the thickest grove is
+  passable; without it dense bands were pockets walled in on all sides.
+- **Counts come out of a budget, not a hope.** `_theme.ScaledCount` scales with arena area, so a
+  budget of 560 trees came out as 2,145 the first time. The jungle sums its own candidate weights and
+  scales to 560. (`ScaledCount` is for things that should grow with the arena; a fixed budget is not
+  one.)
+- **Glow is a material, light is a budget.** Lamps, festoons and ride rims are emissive; only one lamp
+  in four carries a real light. The hall has nine lights (three chandeliers, two cold skylight shafts
+  and a stage spot among them).
+- **Dusk is not a coloured sun.** The first dusk had a sun of (1, 0.58, 0.34) at 9 degrees: the green
+  floor multiplied by 0.58 went brown and the whole arena was dark. A low sun is mostly light that
+  has left the surface; the fix was 17 degrees, a softer (1, 0.8, 0.6) and letting the violet sky
+  and ambient carry the mood. Likewise the foliage uses the soft `Adobe` map, not the streaky
+  `Timber` one, which read as orange stripes.
+- **Walkways go round, not through.** The old detour measured the bend from the line and for a line that
+  only grazed a hollow put the bend on the hollow. The new one stands off by a margin from the
+  *centre*, and treats a circle with one of the route's ends inside it as the destination.
+- **`CaptureViews` helper:** points taken from a transform that stands on the ground already include
+  its height; `ParkShot` adds the ground again. Use `WorldShot` for those (hall, pond, pavilion).
+  Interior shots from the first run were in the roof for this reason.
+- The scene went from 8.5MB to 41MB (trees are welded per 60m grove, flat-shaded). In line with
+  Snowbound (26MB) and Mars (46MB), but a WebGL concern: fewer or lower-poly crowns are the lever.
 
 ## The volcanic plain is accidents, not a pattern
 
@@ -2090,7 +2163,7 @@ them had been shipping silently because the existing arenas happened to avoid it
   blocks produced Not Walkable volumes that blanketed the arena and the bake came back
   with **no navmesh anywhere**. Nothing logged, and a level with nowhere to spawn.
 - **`BuildPlayer` assumed the walkable surface starts at ground level.** True of a flat
-  floor and of a heightfield, so true of all six arenas -- and false for any layout whose
+  floor and of a heightfield, so true of all seven arenas -- and false for any layout whose
   ground plane is raised, which puts the player *inside* it, on no navmesh, unreachable
   by everything. `_playerStart` lets a layout say otherwise and is cleared beside
   `ResetTerrain` so one arena in a six-arena batch cannot inherit the last one's.
@@ -2162,7 +2235,7 @@ seven zones in play order, who holds each one, the story beats, and what falling
 player hands over. **Reordering the campaign is dragging an entry in a list**; moving
 which zone gives the bomb is retyping one string. Neither is a code change.
 
-The order is Warehouse, Snowbound, Desert, Rooftop, Subway, Mars, The Auger House, and
+The order is Warehouse, Snowbound, Desert, Rooftop, Fairground, Mars, The Auger House, and
 `FPSKitCampaign.ZoneOrder` is the one place it is written down -- `FPSKitLevels` shifts
 its difficulty curve by position in *that* list rather than by position in
 `FPSKitThemes.Names`, which is the order the arenas were built in and means nothing to a
@@ -2265,3 +2338,70 @@ enemy, has no holder, or fields the same list as another arena.
   skills are still worth reading -- `optimize-web`, `initialize-ai-navigation`,
   `physics-3d-collision` and `urp-postprocessing` all apply -- but read them for the technique and
   keep the conventions above. Where the two disagree, this file wins.
+
+
+## The fairground, replanned (Oct 2026)
+
+Ishaan's verdict on the overgrown rework: no real walkways, a small hall, a staircase that was not real,
+and blocks. The brief: an *abandoned* fairground, dense, many broken rides, a half-built/broken hall, many
+walkways, no filler blocks. Everything was replaced (`FPSKitFairground{Plan,Parts,Hall,Rides,Attractions,
+Street,Fill,Clutter}.cs`; `FPSKitPark.cs` keeps sinkholes and the small helpers).
+
+- **The old paving was invisible.** Its quads were wound counter-clockwise from above, so Unity culled
+  them. A strip must be clockwise from above: `PathQuad` uses (0,3,2),(0,2,1). Check winding first when a
+  mesh "does not show".
+- **A plan, not dice.** One table of sites (gate S, plaza at the spawn, hall N, ferris NE-ish, coaster E,
+  carousel/big top W, haunted SE, maze/pond/drop tower/swings NW, yards at the corners, golf, karts, flume,
+  shops on the avenues) and 20 walkways from door to door, plus a perimeter service road. Spurs leave an
+  avenue at its edge so paving never overlaps; a plaza is the surface under its tiles.
+- **Real elevation, proven.** The 80x50m hall's gallery is a U of solid decks 6.16m up (28 risers),
+  reached by a grand 5m stair and two plain ones; the west two thirds are the finished ruin, the east third
+  a never-finished site (steel frame, ragged brick, scaffold, excavator, crane). The previous hall's stair
+  went nowhere on purpose (a first floor killed an older arena's navmesh); the industrial walkway recipe
+  (solid treads, landing flush with the deck) is what made it safe. The reach probe samples at 1.5m so it
+  could never see a deck: `CheckFairgroundDecks` raycasts each deck's top and paths it to the player. It
+  caught four real faults on first run: a stage lip walling off its own stairs, a container-roof deck
+  sharing a plane with the container's non-walkable mesh (the NoStanding area wins), a probe landing on a
+  carousel drum, and a bridge probe reading the rail's height.
+- **Closed shapes seal infields.** Two tyre rings with complementary gaps filled each other's, sealing the
+  kart infield; a flume channel under 2m headroom walled off pockets. The stray list the reach test now
+  prints (coordinates) is how both were found.
+- **Rides are tubes and lattice,** not boxes (`Lattice`, `FlatTruss`, `Arc`, `Cable`, `Cloth`, `Horse`).
+  The coaster is a Catmull-Rom spline with banked rails, a fallen stretch laid crumpled on the ground, and a
+  climbable station. Stock counts: ~25 booths/tents, 13 shops, ~730 clutter pieces, 300 trees; scene 61MB.
+- Capture list lives in `FramePark` (`FPSKitViews.cs`); the tool is in see-a-built-arena.
+
+
+## The fairground, third pass: routes to things, not things on a lawn (Oct 2026)
+
+His verdict on the replan: "I don't feel it real, the walkways are not good and not connecting
+properly, I want meaningful things to fill the land." What was wrong, from my own renders: rides
+stood on a 450m lawn with paths drawn *near* them; attractions added later (golf, flume) had no path at
+all; every path was a bare strip with no edge; clutter was random crates in open ground.
+
+- **Smaller, and brighter.** 340m (was 450), so the next scene is under ~40m away; sun 1.75, brighter
+  ambient and a lighter lawn, because the detail did not read in the murk.
+- **Walkways are a graph that is checked.** Every place a visitor goes in is an `Entrance(...)` in the
+  plan (17 ride/site doors + one per shop). `CheckWalkwayGraph` unions paths and plazas where their
+  paving meets and fails the build if the park is more than one network or an entrance is >2.5m from
+  paving; it writes an `Entrances` marker group into the scene. `FPSKitBatch.VerifyWalkways`
+  (`FPSKitWalkwayTest`) re-derives the same answer from the *saved* paving meshes, flood-filled across
+  one missing stone. A plan that is right and a scene that is right are different claims.
+- **Paths have edges.** A gravel verge a metre either side, a kerb, and on narrow ones a bollard every
+  5m with chain between. Signposts at junctions point at real destinations (bearing from the plan);
+  map boards are drawn from the plan itself at 1:103.
+- **Every ride has a gate where its walkway arrives** (`RideGate`): posts, a sign with the ride's own
+  pictogram, a hanging chain and sign across half the way in, a height gauge, a booth, a rope queue. +z is
+  towards the visitor; the first version faced the ride and every sign was seen from behind.
+- **Meaning is placed.** Gate house with notice board and wreath, plaza carts, a four-parterre rose
+  garden, pedal swans at the pond dock, a camp with a live fire, a sandbag line across the hall's
+  forecourt, coin horses at the carousel, a yard break room and service carts. Clutter is no longer
+  random in the open: it is placed beside a walkway, against a building/ride, or in a sitting spot
+  a few metres back from a path.
+- **Ground wears things for reasons** (`FPSKitFairgroundGround`): mud and puddles at path edges and
+  building feet, leaf litter under trees, moss in the damp, gravel spill, and lawn patches. All flat
+  decals on the backdrop layer, wound clockwise from above.
+- Dropped as weak fits without entrances: mini-golf and the log flume. Karts stayed (gate + path).
+- **Last details** (`FPSKitFairgroundDetail.cs`): paper/confetti drifts and cracks laid above the paving
+  (0.082 on paths, 0.115 on plazas, so nothing z-fights), and crows perched on the gate towers, hall
+  ridge, clock tower, yard water tower and big-top pole. None is cover or on the bake.

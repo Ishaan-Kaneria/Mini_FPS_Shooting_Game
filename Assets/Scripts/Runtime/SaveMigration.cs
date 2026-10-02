@@ -54,7 +54,11 @@ public static class SaveMigration
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public static void Apply()
     {
-        if (UpToDate) return;
+        if (UpToDate)
+        {
+            CarryRenamedArenas();
+            return;
+        }
 
         int was = StoredVersion;
 
@@ -64,5 +68,43 @@ public static class SaveMigration
 
         Debug.Log($"[FPSKit] Save format {was} -> {Version}: the profile was cleared so the " +
                   "campaign starts at its first zone.");
+    }
+
+    /// <summary>
+    /// Moves a renamed arena's stars, scores and best times to its new key, so a rename
+    /// is not a reset. Unlike the wipe above this runs on every start: it is a handful of
+    /// <c>HasKey</c> calls, copies only when the old key exists and the new one does not,
+    /// and deletes the old key, so it is idempotent and a second run finds nothing.
+    /// Level count is bounded generously; a set only ever has 32.
+    /// </summary>
+    static void CarryRenamedArenas()
+    {
+        bool moved = false;
+
+        // Arenas that changed the name their level progress is filed under. A local, not a
+        // static: it holds no state, and a static would need a reset hook it has no use for.
+        var renamed = new[] { ("AbandonedSubway", "AbandonedFairground") };
+
+        foreach (var (was, now) in renamed)
+            for (int i = 0; i < 64; i++)
+                foreach (var field in new[] { "Stars", "Score", "BestTime" })
+                {
+                    string oldKey = $"FPSKit.Level.{was}.{i}.{field}";
+                    if (!PlayerPrefs.HasKey(oldKey)) continue;
+
+                    string newKey = $"FPSKit.Level.{now}.{i}.{field}";
+                    if (!PlayerPrefs.HasKey(newKey))
+                    {
+                        if (field == "BestTime")
+                            PlayerPrefs.SetFloat(newKey, PlayerPrefs.GetFloat(oldKey));
+                        else
+                            PlayerPrefs.SetInt(newKey, PlayerPrefs.GetInt(oldKey));
+                    }
+
+                    PlayerPrefs.DeleteKey(oldKey);
+                    moved = true;
+                }
+
+        if (moved) PlayerPrefs.Save();
     }
 }

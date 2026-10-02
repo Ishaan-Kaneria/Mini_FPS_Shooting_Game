@@ -39,7 +39,7 @@ MonoBehaviour:
     color: {r: 0.8039216, g: 0.6901961, b: 0.47843137, a: 1}
   - scene: NightRooftop
     color: {r: 0.5568628, g: 0.4862745, b: 0.7647059, a: 1}
-  - scene: AbandonedSubway
+  - scene: AbandonedFairground
     color: {r: 0.30980393, g: 0.6392157, b: 0.6039216, a: 1}
   - scene: MarsColony
     color: {r: 0.76862746, g: 0.33333334, b: 0.23137255, a: 1}

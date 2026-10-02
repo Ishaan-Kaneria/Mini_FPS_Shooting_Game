@@ -21,7 +21,7 @@ namespace FPSKit.EditorTools
             "Desert Outpost",
             "Snowbound Station",
             "Night Rooftop",
-            "Abandoned Subway",
+            "Abandoned Fairground",
             "Mars Colony",
             "The Auger House"
         };
@@ -140,7 +140,7 @@ namespace FPSKit.EditorTools
                 "Snowbound Station" => new[] { "Sentinel" },
                 "Desert Outpost" => new[] { "Screamer" },
                 "Night Rooftop" => new[] { "Sentinel" },
-                "Abandoned Subway" => new[] { "Screamer" },
+                "Abandoned Fairground" => new[] { "Screamer" },
                 "Mars Colony" => new[] { "Brute", "Sentinel" },
                 _ => new[] { "Brute", "Sentinel", "Screamer" }
             };
@@ -605,8 +605,8 @@ namespace FPSKit.EditorTools
                     break;
 
                 // ----------------------------------------------------------
-                case "Abandoned Subway":
-                    t.description = "Moonlight, sodium lamps and holes in the ground.";
+                case "Abandoned Fairground":
+                    t.description = "Overgrown dusk. A planned fairground gone to jungle: broken rides, a half-built hall and holes in the ground.";
 
                     t.parkZone = true;
 
@@ -614,74 +614,63 @@ namespace FPSKit.EditorTools
                     // relaxation, same smoothing, so it rolls the way ground does rather
                     // than the way noise does. Lower and longer than the dunes, because
                     // this is subsidence under a car park and not a wind form.
-                    t.duneHeight = 7.5f;
-                    t.duneWavelength = 120f;
+                    // Rolling, not rippled: a fairground is laid on level ground, so the heightfield is
+                    // only a few metres of swell. Each site then flattens a pad of its own.
+                    t.duneHeight = 2.6f;
+                    t.duneWavelength = 110f;
                     t.apronSize = 700f;
 
-                    // Tiled throughout, which is the one surface here with a man-made
-                    // rhythm -- and that rhythm is what tells a player how far down a
-                    // platform they are looking.
-                    // Old asphalt and packed dirt, not tile -- and emphatically not the dune
-                    // field's wind ripples, which would make this a desert with rides in it.
-                    t.floorDetail = "Concrete";
+                    // Packed earth under moss, not the dune field's wind ripples, which
+                    // would make this a desert with rides in it. The low-relief concrete
+                    // map is what keeps it reading as ground rather than as a green sheet.
+                    t.floorDetail = "Adobe";
                     t.wallDetail = "Timber";
                     t.floorDetailSize = 2.4f;
                     t.wallDetailSize = 2f;
-                    // A night sky, not an absence of one. Pure black overhead gives every
-                    // silhouette a hard edge against nothing, which reads as a cut-out
-                    // rather than as a skyline.
-                    t.skyTint = new Color(0.07f, 0.09f, 0.15f);
-                    t.skyGroundColor = new Color(0.03f, 0.03f, 0.03f);
-                    t.atmosphereThickness = 0.3f;
-                    t.skyExposure = 0.25f;
-                    t.sunColor = new Color(0.62f, 0.70f, 0.93f);
-                    // <b>Dark between the lamps, not dim everywhere.</b> The first pass here
-                    // ran the moon at 0.62 with ambient to match, which was legible and not
-                    // remotely abandoned -- an evenly lit park at night is a park that still
-                    // has its power on. Halving the moon and cutting ambient to a third puts
-                    // the darkness back, and the lamp posts scattered through the place are
-                    // what make it navigable: black between them, warm and close under them.
-                    // That is both more frightening and more honest about the state of the
-                    // electrics than a uniform grey.
-                    //
-                    // <b>A real moon.</b> The arena this replaced ran at 0.15 with almost no
-                    // ambient and rendered as a dark rectangle -- every bit of its geometry
-                    // present and none of it visible. Dark is a lighting design, not the
-                    // absence of one: the moon has to be strong enough to model the ground
-                    // and throw a shadow, and the dread comes from the colour and the long
-                    // shadows rather than from there being nothing to see.
-                    t.sunIntensity = 0.30f;
+
+                    // <b>Dusk, not night.</b> Ishaan's pick for the overgrown rework: the sun
+                    // has just gone, so the sky is a warm band over a violet zenith and the
+                    // light is low and orange. A night park hid the trees, the hall and the
+                    // fill he asked for in the dark; a low sun lets them throw long shadows
+                    // and still leaves the string lights and the lamps worth switching on.
+                    t.skyTint = new Color(0.34f, 0.27f, 0.42f);
+                    t.skyGroundColor = new Color(0.12f, 0.09f, 0.08f);
+                    t.atmosphereThickness = 1.25f;
+                    t.skyExposure = 1.0f;
+                    t.sunColor = new Color(1f, 0.80f, 0.60f);
+                    t.sunIntensity = 1.75f;
                     // Low, so everything on this ground casts a long shadow across it.
-                    t.sunAngles = new Vector2(26f, 214f);
-                    t.shadowStrength = 0.4f;
-                    t.fogColor = new Color(0.055f, 0.065f, 0.10f);
-                    // Thinner than it was. Underground there is little to fog, and what has to
-                    // carry is the daylight down the collapses -- heavy fog swallows exactly
-                    // that and leaves the player nothing to navigate by.
-                    // 0.016 is an interior number. Outdoors at 450m it is opaque well before the
-                    // far side, and a fog that hides the far half of the map does not read
-                    // as atmosphere, it reads as an empty arena.
-                    t.fogDensity = 0.0052f;
-                    t.ambientSky = new Color(0.075f, 0.09f, 0.135f);
-                    t.ambientEquator = new Color(0.045f, 0.05f, 0.075f);
-                    t.ambientGround = new Color(0.02f, 0.02f, 0.028f);
-                    // Light enough to catch the moon. At 0.12 the ground returned almost nothing
-                    // and the relief in it -- which is the point of this arena -- was
-                    // invisible.
-                    t.floorColor = new Color(0.21f, 0.20f, 0.19f);
-                    t.wallColor = new Color(0.32f, 0.30f, 0.27f);
+                    t.sunAngles = new Vector2(17f, 214f);
+                    t.shadowStrength = 0.7f;
+                    // Mist, warm at the horizon. 450m of it is what makes the far tree line
+                    // read as a jungle rather than a wall; any thicker and it swallows the
+                    // wheel, which is the compass.
+                    t.fogColor = new Color(0.38f, 0.31f, 0.38f);
+                    t.fogDensity = 0.0048f;
+                    t.ambientSky = new Color(0.54f, 0.52f, 0.66f);
+                    t.ambientEquator = new Color(0.42f, 0.36f, 0.36f);
+                    t.ambientGround = new Color(0.12f, 0.12f, 0.08f);
+                    // Moss over earth. Lifted from the old grey so the ground carries colour
+                    // under a low sun instead of going black.
+                    t.floorColor = new Color(0.31f, 0.38f, 0.18f);
+                    t.wallColor = new Color(0.46f, 0.40f, 0.33f);
+                    // Forested hills on the horizon, hazed towards the fog colour: the desert's
+                    // buttes in a jungle's green.
+                    t.backdropColor = new Color(0.17f, 0.21f, 0.15f);
                     t.coverColors = new[]
                     {
-                        new Color(0.14f, 0.14f, 0.13f),
-                        new Color(0.20f, 0.17f, 0.13f),
-                        new Color(0.11f, 0.13f, 0.13f)
+                        new Color(0.40f, 0.17f, 0.15f),
+                        new Color(0.17f, 0.30f, 0.30f),
+                        new Color(0.58f, 0.44f, 0.20f)
                     };
                     t.coverTag = "Concrete";
                     // 450 to match the desert, against the 70 this was. That size is why the
                     // arena read as a prototype: a seventy-metre box is not a small station,
                     // it is a room. The claustrophobia now comes from the plan -- halls and
                     // passages -- rather than from the walls being close together.
-                    t.arenaSize = 450f;
+                    t.arenaSize = 340f;
+                    // Dense, not vast: 340m, so the next scene is never more than about forty metres away.
+                    // The first replan was 450m and read as rides stood on a lawn.
                     // Tall enough to carry a concourse over the platform halls.
                     t.wallHeight = 13f;
                     // Dense and column-heavy. Nothing should be visible for long.
@@ -697,11 +686,11 @@ namespace FPSKit.EditorTools
                     t.accentLightIntensity = 9f;
                     t.accentLightRange = 11f;
                     t.accentLightHeight = 4.2f;
-                    t.bloomIntensity = 0.8f;
-                    t.saturation = -25f;
-                    t.contrast = 18f;
-                    t.vignetteIntensity = 0.45f;
-                    t.filmGrain = 0.45f;
+                    t.bloomIntensity = 0.9f;
+                    t.saturation = -6f;
+                    t.contrast = 12f;
+                    t.vignetteIntensity = 0.38f;
+                    t.filmGrain = 0.3f;
                     t.randomSeed = 13;
                     break;
 

@@ -13,8 +13,8 @@ using UnityEngine;
 /// FPSKit &gt; Reset Level Sets.
 ///
 /// The levels are entries in a list rather than one asset each, which is how
-/// <see cref="ArenaCatalog"/> holds arenas: eight levels across six arenas is
-/// forty-eight assets to keep in sync, and the only thing that would buy is the
+/// <see cref="ArenaCatalog"/> holds arenas: one level-set asset per arena keeps
+/// all 224 levels in sync, and the only thing separate assets would buy is the
 /// ability to share a level between two arenas, which no level does.
 /// </summary>
 [CreateAssetMenu(menuName = "FPSKit/Level Set", fileName = "Levels")]

@@ -108,6 +108,70 @@ namespace FPSKit.EditorTools
                                    layer, "Metal");
             if (walls != null) Mark(walls, new Color(0.46f, 0.47f, 0.50f), 2);
 
+            var glazing = new MeshBuild { UVScale = 1f };
+            var windowFrames = new MeshBuild { UVScale = 0.5f };
+            for (float x = -hw + 6f; x <= hw - 3f; x += 12f)
+            {
+                foreach (int side in new[] { -1, 1 })
+                {
+                    float z = side * (hd + wall * 0.5f + 0.06f);
+                    var centre = new Vector3(x, 8.6f, z);
+                    glazing.Box(centre, new Vector3(4.2f, 1.25f, 0.08f), Quaternion.identity);
+                    windowFrames.Box(centre + Vector3.up * 0.72f, new Vector3(4.55f, 0.12f, 0.18f), Quaternion.identity);
+                    windowFrames.Box(centre - Vector3.up * 0.72f, new Vector3(4.55f, 0.12f, 0.18f), Quaternion.identity);
+                    windowFrames.Box(centre + Vector3.left * 2.2f, new Vector3(0.12f, 1.55f, 0.18f), Quaternion.identity);
+                    windowFrames.Box(centre + Vector3.right * 2.2f, new Vector3(0.12f, 1.55f, 0.18f), Quaternion.identity);
+                    windowFrames.Box(centre, new Vector3(0.10f, 1.25f, 0.18f), Quaternion.identity);
+                }
+            }
+
+            int detailLayer = LayerMask.NameToLayer("Backdrop");
+            if (detailLayer < 0) detailLayer = layer;
+            MeshObject(hall, "ClerestoryGlass",
+                       ToMesh(glazing, $"hallglass{width:0}x{depth:0}"), _zoneWindow,
+                       Vector3.zero, Quaternion.identity, Vector3.one, detailLayer, null, collider: false);
+            MeshObject(hall, "ClerestoryFrames",
+                       ToMesh(windowFrames, $"hallwindowframes{width:0}x{depth:0}"), _zoneSteel,
+                       Vector3.zero, Quaternion.identity, Vector3.one, detailLayer, null, collider: false);
+
+            // Concrete footings and safety-yellow bollards protect the corners of both
+            // truck doors from reversing vehicles. They are scenery, not navmesh
+            // obstacles: the door opening remains wide and clear for the arena routes.
+            var dockFootings = new MeshBuild { UVScale = 0.5f };
+            var dockBollards = new MeshBuild { UVScale = 0.5f };
+            var canopies = new MeshBuild { UVScale = 0.5f };
+            for (int end = -1; end <= 1; end += 2)
+            {
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    var post = new Vector3(end * (hw + 0.85f), 0f,
+                                           side * (bigDoor * 0.5f + 0.65f));
+                    dockFootings.Box(post + Vector3.up * 0.12f,
+                                     new Vector3(0.55f, 0.24f, 0.55f), Quaternion.identity);
+                    dockBollards.Tube(post + Vector3.up * 0.24f, post + Vector3.up * 1.3f,
+                                      0.14f, 0.12f, 10);
+                    float z = side * (bigDoor * 0.5f + 0.45f);
+                    canopies.Tube(new Vector3(end * (hw + 0.25f), 7.6f, z),
+                                  new Vector3(end * (hw + 2.9f), 6.4f, z),
+                                  0.13f, 0.10f, 8);
+                }
+                canopies.Box(new Vector3(end * (hw + 1.55f), 7.65f, 0f),
+                             new Vector3(3.2f, 0.18f, bigDoor + 2.2f), Quaternion.identity);
+            }
+
+            MeshObject(hall, "DockFootings",
+                       ToMesh(dockFootings, $"dockfootings{width:0}x{depth:0}"), _zoneConcrete,
+                       Vector3.zero, Quaternion.identity, Vector3.one, detailLayer, "Concrete",
+                       collider: false);
+            MeshObject(hall, "DockBollards",
+                       ToMesh(dockBollards, $"dockbollards{width:0}x{depth:0}"), _zoneSafety,
+                       Vector3.zero, Quaternion.identity, Vector3.one, detailLayer, "Metal",
+                       collider: false);
+            MeshObject(hall, "LoadingCanopies",
+                       ToMesh(canopies, $"loadingcanopies{width:0}x{depth:0}"), _zoneSteel,
+                       Vector3.zero, Quaternion.identity, Vector3.one, detailLayer, null,
+                       collider: false);
+
             // ---- roof deck and parapet ----
             //
             // Two stairs, on opposite flanks at opposite ends, and the parapet leaves a
@@ -682,6 +746,8 @@ namespace FPSKit.EditorTools
             var paint = new MeshBuild { UVScale = 0.5f };
             var spills = new MeshBuild { UVScale = 0.12f };
             var worn = new MeshBuild { UVScale = 0.06f };
+            var drains = new MeshBuild { UVScale = 0.3f };
+            var drainBars = new MeshBuild { UVScale = 0.3f };
 
             float edge = Tile * 0.5f;
 
@@ -702,6 +768,35 @@ namespace FPSKit.EditorTools
                 RoadKerbs(kerbs, centre, n, s, e, w);
 
                 int neighbours = (n ? 1 : 0) + (s ? 1 : 0) + (e ? 1 : 0) + (w ? 1 : 0);
+
+                // Stormwater grates sit in the gutter, not in a traffic lane. Repeating
+                // them on alternating straight segments makes the road edges read as
+                // maintained infrastructure without filling the arena with objects.
+                bool straightRunsX = e && w && !n && !s;
+                bool straightRunsZ = n && s && !e && !w;
+                if ((straightRunsX || straightRunsZ) && (tile.x + tile.y) % 2 == 0 &&
+                    centre.magnitude >= Tile * 1.2f)
+                {
+                    for (int side = -1; side <= 1; side += 2)
+                    {
+                        Vector3 at = centre + (straightRunsX
+                            ? new Vector3(0f, 0.09f, side * (CarriageHalf - 0.4f))
+                            : new Vector3(side * (CarriageHalf - 0.4f), 0.09f, 0f));
+                        Vector3 bedSize = straightRunsX ? new Vector3(1.5f, 0.04f, 0.58f)
+                                                : new Vector3(0.58f, 0.04f, 1.5f);
+                        drains.Box(at, bedSize, Quaternion.identity);
+
+                        for (int bar = -2; bar <= 2; bar++)
+                        {
+                            Vector3 barAt = at + (straightRunsX
+                                ? new Vector3(bar * 0.25f, 0.04f, 0f)
+                                : new Vector3(0f, 0.04f, bar * 0.25f));
+                            Vector3 barSize = straightRunsX ? new Vector3(0.05f, 0.035f, 0.50f)
+                                                    : new Vector3(0.50f, 0.035f, 0.05f);
+                            drainBars.Box(barAt, barSize, Quaternion.identity);
+                        }
+                    }
+                }
 
                 if (neighbours >= 3)
                 {
@@ -797,6 +892,8 @@ namespace FPSKit.EditorTools
             Flat(group, paintLayer, "Markings", paint, "zonepaint", _zoneLine);
             Flat(group, paintLayer, "Spills", spills, "zonespills", _zoneStain);
             Flat(group, paintLayer, "WornGround", worn, "zoneworn", _zoneDirt);
+            Flat(group, paintLayer, "StormDrains", drains, "zonestormdrains", _zoneStain);
+            Flat(group, paintLayer, "StormDrainBars", drainBars, "zonestormdrainbars", _zonePlate);
         }
 
         /// <summary>One painted stripe, lying on the ground.</summary>

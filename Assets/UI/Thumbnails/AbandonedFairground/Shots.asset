@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Shots
   m_EditorClassIdentifier: Assembly-CSharp-Editor:FPSKit.EditorTools:ThumbnailShots
   arena:
-    position: {x: 30, y: 9, z: -60}
-    lookAt: {x: 70, y: 18, z: 10}
-    fov: 66
-    exposure: 1.3
+    position: {x: 35, y: 1.8, z: -72}
+    lookAt: {x: 99, y: 24, z: -26}
+    fov: 55
+    exposure: 1.25
   levels: []

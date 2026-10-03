@@ -134,6 +134,25 @@ namespace FPSKit.EditorTools
                 }
             }
 
+            // ---- trees on the rim, outside the fence: tamarisk and ghaf where the water keeps
+            // the ground damp, a dead one now and then. Skipped near a crossing and near a place. ----
+            int planted = 0;
+            float treeOff = _theme.hazardWidth * 0.5f + FenceStandOff + 7f;
+            for (int side = -1; side <= 1; side += 2)
+                for (float z = -half + 14f; z < half - 14f; z += 17f)
+                {
+                    if (rng.NextDouble() > 0.5) continue;
+                    if (NearCrossing(z, _theme.bridgeWidth * 0.5f + 14f)) continue;
+
+                    float zz = z + Rand(rng, -6f, 6f);
+                    var p = new Vector2(GorgeCentreAt(zz) + side * (treeOff + Rand(rng, 0f, 20f)), zz);
+                    if (!Drapeable(p.x, p.y, 3f) || InSite(p, 6f) || NearTrack(p, 4f)) continue;
+
+                    double roll = rng.NextDouble();
+                    PlantTree(group, layer, rng, p, roll < 0.55 ? 1 : roll < 0.85 ? 0 : 2);
+                    planted++;
+                }
+
             void Flush(MeshBuild b, string name, Material m)
             {
                 if (b.Triangles.Count == 0) return;
@@ -148,7 +167,7 @@ namespace FPSKit.EditorTools
             Flush(foam, "Foam", foamMat);
             Flush(drift, "Driftwood", driftMat);
 
-            Debug.Log($"[FPSKit] river life: {rocks} shore rock(s), {reeds.Triangles.Count / 3} reed tri(s), {foam.Triangles.Count / 3} foam tri(s).");
+            Debug.Log($"[FPSKit] river life: {planted} bank tree(s), {rocks} shore rock(s), {reeds.Triangles.Count / 3} reed tri(s), {foam.Triangles.Count / 3} foam tri(s).");
         }
     }
 }

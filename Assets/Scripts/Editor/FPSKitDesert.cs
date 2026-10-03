@@ -1084,7 +1084,8 @@ namespace FPSKit.EditorTools
 
             void Slab(Vector3 at, float span, float h)
             {
-                build.Box(at, Size(span, h), Quaternion.identity);
+                // Rounded, like the houses: a mud wall has soft edges and a hand-made face.
+                build.SoftBox(at, Size(span, h), Quaternion.identity, rng.Next(1, 9999), 0.1f, 4, 0.02f);
                 solid.Box(at, Size(span, h), Quaternion.identity);
             }
 
@@ -1122,9 +1123,9 @@ namespace FPSKit.EditorTools
                 var at = centre + (alongX ? Vector3.right : Vector3.forward) * along;
                 float lift = Rand(rng, 0.14f, 0.42f);
 
-                build.Box(at + Vector3.up * (height + lift * 0.5f),
-                          Size(span * 0.97f, lift) + new Vector3(alongX ? 0f : 0.12f, 0f, alongX ? 0.12f : 0f),
-                          Quaternion.identity);
+                build.SoftBox(at + Vector3.up * (height + lift * 0.5f),
+                              Size(span * 0.97f, lift) + new Vector3(alongX ? 0f : 0.12f, 0f, alongX ? 0.12f : 0f),
+                              Quaternion.identity, rng.Next(1, 9999), 0.09f, 3, 0.015f);
             }
         }
 

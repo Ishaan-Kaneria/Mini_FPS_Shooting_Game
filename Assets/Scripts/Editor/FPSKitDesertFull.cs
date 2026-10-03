@@ -121,7 +121,9 @@ namespace FPSKit.EditorTools
             {
                 if (s1 - s0 < 0.04f || y1 - y0 < 0.04f) return;
                 var mid = a + dir * ((s0 + s1) * 0.5f);
-                build.Box(f.P(mid.x, baseY + (y0 + y1) * 0.5f, mid.y), new Vector3(s1 - s0, y1 - y0, thick), rot);
+                // Soft-edged panels (see SoftBox); a wall of dead-square boxes read as plasterboard.
+                build.SoftBox(f.P(mid.x, baseY + (y0 + y1) * 0.5f, mid.y), new Vector3(s1 - s0, y1 - y0, thick), rot,
+                              Mathf.RoundToInt(mid.x * 7f + mid.y * 13f + y0 * 5f), 0.06f, 3, 0.012f);
             }
 
             float s = 0f;
@@ -583,7 +585,10 @@ namespace FPSKit.EditorTools
             float height = 20 * StairRise;   // 4.4 m, a whole number of risers
 
             var block = new MeshBuild { UVScale = 0.45f };
-            block.Box(f.P(u, height * 0.5f, v), new Vector3(size, height, size), f.Rot);
+            // A rounded block with a splayed footing, and a radio mast, searchlight and flag
+            // on the roof corner -- the tower was a bare box under a plywood lid.
+            block.SoftBox(f.P(u, height * 0.5f, v), new Vector3(size, height, size), f.Rot, 41, 0.14f, 5, 0.02f);
+            block.SoftBox(f.P(u, 0.15f, v), new Vector3(size + 0.6f, 0.5f, size + 0.6f), f.Rot, 43, 0.1f, 3, 0.01f);
             MeshObject(parent, "TowerBase", ToMesh(block, DenseKey("towerbase")), _hescoMat, Vector3.zero, Quaternion.identity,
                        Vector3.one, layer, "Concrete");
 
@@ -622,6 +627,15 @@ namespace FPSKit.EditorTools
                                     Quaternion.identity, Vector3.one, layer, "Wood");
             NoStanding(roofGo);
             Hide(roofGo);
+
+            // Radio mast on the roof, a searchlight on a post at the sandbag corner, a whip aerial.
+            var gear = new MeshBuild { UVScale = 0.5f };
+            RoofMast(gear, f.P(u + 0.5f * su, height + 2.64f, v + 0.5f * sv), 3.6f, f.Rot);
+            var lamp = f.P(u + 1.4f * su, height + 0.9f, v + 1.4f * sv);
+            gear.Tube(lamp - Vector3.up * 0.7f, lamp, 0.04f, 0.035f, 5);
+            gear.Tube(lamp, lamp + f.Rot * new Vector3(0.35f * sv, 0.08f, 0.35f * su), 0.15f, 0.19f, 10);
+            gear.Tube(f.P(u - 1.3f * su, height + 0.05f, v - 0.2f), f.P(u - 1.3f * su, height + 3.0f, v - 0.2f), 0.012f, 0.005f, 4);
+            Visual(parent, "TowerGear", gear, _steelMat, layer);
 
             // The stair: along u towards the corner's own side, landing against the inner face.
             float landU = u - su * 0.9f;

@@ -567,10 +567,7 @@ namespace FPSKit.EditorTools
             if (rng.NextDouble() < 0.75)
             {
                 var at = f.P(cu + Rand(rng, -hw, hw), roofY, cv + Rand(rng, -hd, hd));
-                foreach (var o in new[] { new Vector3(-0.4f, 0f, -0.4f), new Vector3(0.4f, 0f, -0.4f), new Vector3(-0.4f, 0f, 0.4f), new Vector3(0.4f, 0f, 0.4f) })
-                    metal.Box(at + o + Vector3.up * 0.3f, new Vector3(0.06f, 0.6f, 0.06f), f.Rot);
-                tanks.Tube(at + Vector3.up * 0.6f, at + Vector3.up * 1.7f, 0.6f, 0.6f, 12);
-                tanks.Tube(at + Vector3.up * 1.7f, at + Vector3.up * 1.85f, 0.6f, 0.2f, 12);
+                RoofTank(tanks, metal, at, f.Rot);
             }
 
             if (rng.NextDouble() < 0.45)
@@ -578,15 +575,14 @@ namespace FPSKit.EditorTools
                 var at = f.P(cu + Rand(rng, -hw, hw), roofY, cv + Rand(rng, -hd, hd));
                 metal.Tube(at, at + Vector3.up * 1.1f, 0.04f, 0.04f, 5);
                 var face = Quaternion.Euler(0f, Rand(rng, 100f, 170f), 0f) * new Vector3(0f, 0.5f, 1f).normalized;
-                dish.Tube(at + Vector3.up * 1.1f, at + Vector3.up * 1.1f + face * 0.18f, 0.45f, 0.5f, 12);
+                ParabolicDish(dish, metal, at + Vector3.up * 1.1f, face, Rand(rng, 0.38f, 0.55f));
             }
 
             if (rng.NextDouble() < 0.3)
             {
+                // (The plain pole-and-bars antenna that stood here is RoofExtras' mast now.)
                 var at = f.P(cu + Rand(rng, -hw, hw), roofY, cv + Rand(rng, -hd, hd));
-                metal.Tube(at, at + Vector3.up * 3.2f, 0.03f, 0.02f, 4);
-                for (int i = 0; i < 4; i++)
-                    metal.Box(at + Vector3.up * (2.2f + i * 0.28f), new Vector3(1.2f - i * 0.2f, 0.025f, 0.025f), f.Rot);
+                RoofMast(metal, at, Rand(rng, 3.2f, 5.2f), f.Rot * Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f));
             }
 
             if (rng.NextDouble() < 0.3 && w > 4f)
@@ -608,6 +604,9 @@ namespace FPSKit.EditorTools
                     AddDown(cloth, p0, p1, p1 + Vector3.down * drop, p0 + Vector3.down * drop);
                 }
             }
+
+            // The extras a flat roof collects: air-conditioners, solar panels, vents, masts.
+            RoofExtras(parent, layer, rng, f, cu, cv, hw, hd, roofY);
 
             if (tanks.Triangles.Count > 0)
             {

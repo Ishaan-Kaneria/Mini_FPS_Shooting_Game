@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using UnityEditor;
 using UnityEngine;
 
 namespace FPSKit.EditorTools
@@ -250,6 +251,611 @@ namespace FPSKit.EditorTools
 
             // The cockpit glass, across the nose.
             glass.Box(new Vector3(0f, 0.42f, 10.6f), new Vector3(1.5f, 0.45f, 0.4f), Quaternion.Euler(-24f, 0f, 0f));
+        }
+
+        // ==================================================================
+        // The rooftop kit
+        // ==================================================================
+        /// <summary>
+        /// A real dish: a shallow paraboloid of four rings and twenty sides, concave towards
+        /// <paramref name="face"/>, double-sided, with a feed arm and a receiver at its focus.
+        /// The roofs had a flat disc on a stick; from the street that reads as a plate.
+        /// </summary>
+        private static void ParabolicDish(MeshBuild dish, MeshBuild arm, Vector3 centre, Vector3 face, float radius)
+        {
+            face = face.normalized;
+            var rot = Quaternion.LookRotation(face, Mathf.Abs(face.y) > 0.95f ? Vector3.forward : Vector3.up);
+            const int rings = 4, sides = 20;
+            float depth = radius * 0.28f;
+
+            Vector3 P(int ring, int sd, float zOff)
+            {
+                float t = ring / (float)rings;
+                float a = sd * Mathf.PI * 2f / sides;
+                return centre + rot * new Vector3(Mathf.Cos(a) * radius * t, Mathf.Sin(a) * radius * t,
+                                                  -depth * (1f - t * t) + zOff);
+            }
+
+            for (int r = 0; r < rings; r++)
+                for (int sd = 0; sd < sides; sd++)
+                {
+                    int n = (sd + 1) % sides;
+                    dish.Quad(P(r, sd, 0f), P(r + 1, sd, 0f), P(r + 1, n, 0f), P(r, n, 0f));
+                    dish.Quad(P(r, n, -0.03f), P(r + 1, n, -0.03f), P(r + 1, sd, -0.03f), P(r, sd, -0.03f));
+                }
+
+            // The feed: an arm out to the focus, and the receiver on its end.
+            var back = centre + rot * new Vector3(0f, 0f, -depth);
+            var focus = centre + rot * new Vector3(0f, 0f, radius * 0.5f);
+            arm.Tube(back, focus, 0.018f, 0.014f, 4);
+            arm.Box(focus, new Vector3(0.07f, 0.07f, 0.1f), rot);
+        }
+
+        /// <summary>
+        /// A rooftop radio mast: a triangular lattice on three legs that taper towards the top,
+        /// rungs and diagonals every half metre, a Yagi antenna on the head and three guy wires
+        /// to the roof. <paramref name="at"/> is its foot, <paramref name="rot"/> the house's frame.
+        /// </summary>
+        private static void RoofMast(MeshBuild m, Vector3 at, float height, Quaternion rot)
+        {
+            Vector3 Leg(int i, float y)
+            {
+                float t = y / height;
+                float r = Mathf.Lerp(0.3f, 0.11f, t);
+                float a = (90f + i * 120f) * Mathf.Deg2Rad;
+                return at + rot * new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+            }
+
+            for (int i = 0; i < 3; i++)
+                m.Tube(Leg(i, 0f), Leg(i, height), 0.026f, 0.018f, 4);
+
+            const float step = 0.55f;
+            for (float y = 0f; y + step <= height + 0.01f; y += step)
+                for (int i = 0; i < 3; i++)
+                {
+                    int j = (i + 1) % 3;
+                    m.Tube(Leg(i, y), Leg(j, y), 0.012f, 0.012f, 3);
+                    m.Tube(Leg(i, y), Leg(j, y + step), 0.01f, 0.01f, 3);
+                }
+
+            // The head: a boom and five elements, longest at the back.
+            var top = at + rot * new Vector3(0f, height, 0f);
+            m.Tube(top - rot * new Vector3(0f, 0f, 0.1f), top + rot * new Vector3(0f, 0f, 0.95f), 0.014f, 0.012f, 4);
+            for (int e = 0; e < 5; e++)
+            {
+                float z = 0.05f + e * 0.2f;
+                float len = 0.78f - e * 0.1f;
+                m.Box(top + rot * new Vector3(0f, 0f, z), new Vector3(len, 0.012f, 0.012f), rot);
+            }
+
+            // Guy wires from two-thirds up to the roof, three ways round.
+            var tie = at + rot * new Vector3(0f, height * 0.66f, 0f);
+            for (int i = 0; i < 3; i++)
+            {
+                float a = (30f + i * 120f) * Mathf.Deg2Rad;
+                var anchor = at + rot * new Vector3(Mathf.Cos(a) * 2.1f, 0.02f, Mathf.Sin(a) * 2.1f);
+                m.Tube(tie, anchor, 0.006f, 0.006f, 3);
+                m.Tube(anchor, anchor + Vector3.up * 0.18f, 0.02f, 0.02f, 4);
+            }
+        }
+
+        /// <summary>
+        /// A water tank on a braced stand: ribbed drum, domed lid and hatch, a standpipe down to
+        /// the roof and a short ladder. It was a plain cylinder on four sticks.
+        /// </summary>
+        private static void RoofTank(MeshBuild tank, MeshBuild metal, Vector3 at, Quaternion rot)
+        {
+            const float r = 0.62f, h = 1.15f, y0 = 0.72f;
+
+            // Stand: four legs splayed out at the foot, a ring of ties and cross braces.
+            var feet = new Vector3[4];
+            var tops = new Vector3[4];
+            for (int i = 0; i < 4; i++)
+            {
+                float a = (45f + i * 90f) * Mathf.Deg2Rad;
+                feet[i] = at + rot * new Vector3(Mathf.Cos(a) * 0.62f, 0f, Mathf.Sin(a) * 0.62f);
+                tops[i] = at + rot * new Vector3(Mathf.Cos(a) * 0.46f, y0, Mathf.Sin(a) * 0.46f);
+                metal.Tube(feet[i], tops[i], 0.032f, 0.03f, 5);
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                int j = (i + 1) % 4;
+                var a = Vector3.Lerp(feet[i], tops[i], 0.45f);
+                var b = Vector3.Lerp(feet[j], tops[j], 0.45f);
+                metal.Tube(a, b, 0.014f, 0.014f, 4);
+                metal.Tube(Vector3.Lerp(feet[i], tops[i], 0.15f), Vector3.Lerp(feet[j], tops[j], 0.75f), 0.01f, 0.01f, 3);
+                metal.Tube(Vector3.Lerp(feet[j], tops[j], 0.15f), Vector3.Lerp(feet[i], tops[i], 0.75f), 0.01f, 0.01f, 3);
+            }
+
+            // Drum, three hoops round it, a domed lid and a hatch.
+            var bottom = at + Vector3.up * y0;
+            var topC = at + Vector3.up * (y0 + h);
+            tank.Tube(bottom, topC, r, r, 18);
+            foreach (float t in new[] { 0.2f, 0.5f, 0.8f })
+                tank.Tube(bottom + Vector3.up * (h * t - 0.025f), bottom + Vector3.up * (h * t + 0.025f), r + 0.014f, r + 0.014f, 18);
+            tank.Tube(topC, topC + Vector3.up * 0.1f, r, r * 0.62f, 18);
+            tank.Tube(topC + Vector3.up * 0.1f, topC + Vector3.up * 0.18f, r * 0.62f, r * 0.2f, 14);
+            tank.Tube(topC + rot * new Vector3(0.25f, 0.08f, 0.1f), topC + rot * new Vector3(0.25f, 0.2f, 0.1f), 0.12f, 0.12f, 10);
+
+            // Standpipe down the side, with an elbow into the drum.
+            var pipeTop = bottom + rot * new Vector3(r + 0.05f, 0.1f, 0f);
+            metal.Tube(at + rot * new Vector3(r + 0.05f, 0f, 0f), pipeTop, 0.022f, 0.022f, 6);
+            metal.Tube(pipeTop, bottom + rot * new Vector3(r - 0.02f, 0.1f, 0f), 0.022f, 0.022f, 6);
+
+            // A little ladder on the far side.
+            var l0 = rot * new Vector3(-r - 0.04f, 0f, -0.13f);
+            var l1 = rot * new Vector3(-r - 0.04f, 0f, 0.13f);
+            metal.Tube(at + l0, at + l0 + Vector3.up * (y0 + h * 0.9f), 0.014f, 0.014f, 4);
+            metal.Tube(at + l1, at + l1 + Vector3.up * (y0 + h * 0.9f), 0.014f, 0.014f, 4);
+            for (float y = 0.2f; y < y0 + h * 0.85f; y += 0.28f)
+                metal.Tube(at + l0 + Vector3.up * y, at + l1 + Vector3.up * y, 0.01f, 0.01f, 3);
+        }
+
+        /// <summary>
+        /// The things a flat roof collects: air-conditioners hung off the parapet, a pair of
+        /// solar panels on a tilted frame, vent stacks, a television antenna and the odd mast.
+        /// All drawn only -- no collider, off the minimap and off the navigation bake.
+        /// </summary>
+        private static void RoofExtras(Transform parent, int layer, System.Random rng, Frame f,
+                                       float cu, float cv, float hw, float hd, float roofY)
+        {
+            var units = new MeshBuild { UVScale = 0.5f };
+            var dark = new MeshBuild { UVScale = 0.5f };
+            var metal = new MeshBuild { UVScale = 0.5f };
+
+            Vector3 Spot() => f.P(cu + Rand(rng, -hw, hw), roofY, cv + Rand(rng, -hd, hd));
+
+            if (rng.NextDouble() < 0.28)
+                RoofMast(metal, Spot(), Rand(rng, 3.4f, 5.6f), f.Rot * Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f));
+
+            int acs = rng.NextDouble() < 0.4 ? 1 + rng.Next(2) : 0;
+            for (int i = 0; i < acs; i++)
+            {
+                var at = Spot() + Vector3.up * 0.3f;
+                var turn = f.Rot * Quaternion.Euler(0f, rng.Next(4) * 90f, 0f);
+                units.SoftBox(at, new Vector3(0.85f, 0.56f, 0.34f), turn, rng.Next(1, 999), 0.05f, 4, 0.005f);
+                var grille = at + turn * new Vector3(0f, 0f, 0.18f);
+                dark.Tube(grille, grille + turn * new Vector3(0f, 0f, 0.015f), 0.22f, 0.22f, 14);
+                for (float x = -0.2f; x <= 0.2f; x += 0.1f)
+                    metal.Box(grille + turn * new Vector3(x, 0f, 0.03f), new Vector3(0.012f, 0.42f, 0.012f), turn);
+                metal.Box(at + Vector3.down * 0.34f, new Vector3(0.7f, 0.08f, 0.26f), turn);
+            }
+
+            if (rng.NextDouble() < 0.25)
+            {
+                var at = Spot();
+                var turn = f.Rot * Quaternion.Euler(0f, Rand(rng, -25f, 25f) + (rng.Next(2) * 180f), 0f);
+                for (int k = 0; k < 2; k++)
+                {
+                    var c = at + turn * new Vector3((k - 0.5f) * 1.7f, 0f, 0f);
+                    var tilt = turn * Quaternion.Euler(-28f, 0f, 0f);
+                    metal.Box(c + Vector3.up * 0.55f, new Vector3(1.64f, 0.05f, 1.04f), tilt);
+                    dark.Box(c + Vector3.up * 0.58f + tilt * new Vector3(0f, 0.03f, 0f), new Vector3(1.5f, 0.02f, 0.92f), tilt);
+                    for (int g = -1; g <= 1; g += 2)
+                        metal.Box(c + turn * new Vector3(g * 0.62f, 0.2f, 0.35f), new Vector3(0.04f, 0.4f, 0.04f), turn);
+                }
+            }
+
+            int vents = rng.NextDouble() < 0.5 ? 1 + rng.Next(2) : 0;
+            for (int i = 0; i < vents; i++)
+            {
+                var at = Spot();
+                metal.Tube(at, at + Vector3.up * 0.7f, 0.05f, 0.05f, 8);
+                metal.Tube(at + Vector3.up * 0.7f, at + Vector3.up * 0.9f + f.Rot * new Vector3(0.16f, 0f, 0f), 0.05f, 0.05f, 8);
+                metal.Tube(at + Vector3.up * 0.9f + f.Rot * new Vector3(0.16f, 0f, 0f), at + Vector3.up * 0.84f + f.Rot * new Vector3(0.28f, 0f, 0f), 0.075f, 0.075f, 8);
+            }
+
+            if (rng.NextDouble() < 0.3)
+            {
+                var at = Spot();
+                var turn = f.Rot * Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f);
+                metal.Tube(at, at + Vector3.up * 2.2f, 0.022f, 0.016f, 5);
+                for (int i = 0; i < 4; i++)
+                {
+                    float y = 1.3f + i * 0.22f, len = 0.9f - i * 0.15f;
+                    metal.Box(at + Vector3.up * y, new Vector3(len, 0.012f, 0.012f), turn);
+                }
+                metal.Box(at + Vector3.up * 1.8f, new Vector3(0.012f, 0.012f, 0.5f), turn);
+            }
+
+            Visual(parent, "RoofKit", metal, _steelMat, layer);
+            Visual(parent, "RoofUnits", units, _acMat, layer);
+            Visual(parent, "RoofDark", dark, _tankBlackMat, layer);
+        }
+
+        // ==================================================================
+        // Watchtowers
+        // ==================================================================
+        private static readonly System.Collections.Generic.List<Vector2> _watchPlans = new System.Collections.Generic.List<Vector2>();
+
+        /// <summary>
+        /// A mud-brick watchtower: a battered three-stage shaft of rounded blocks on a plinth, a
+        /// cornice, a parapet and a lookout hut under a corrugated roof, with a radio mast, a
+        /// searchlight and a dish up top. Solid and not climbable (it is a landmark and a
+        /// sightline), so the whole thing is kept off the navigation bake.
+        /// </summary>
+        private static void BuildWatchtower(Transform parent, int layer, System.Random rng, Vector2 at, float yaw)
+        {
+            var root = new GameObject("Watchtower").transform;
+            root.SetParent(parent, false);
+
+            float ground = GroundHeightAt(at.x, at.y);
+            var f = new Frame(new Vector3(at.x, ground, at.y), yaw);
+            var mat = _adobeTints[rng.Next(_adobeTints.Length)];
+            int seed = rng.Next(1, 9999);
+
+            var shaft = new MeshBuild { UVScale = 0.28f };
+            // Plinth, then three stages, each narrower: 4.6 -> 4.0 -> 3.5 m across.
+            shaft.SoftBox(f.P(0f, -0.8f, 0f), new Vector3(5.0f, 2.2f, 5.0f), f.Rot, seed, 0.12f, 4, 0.01f);
+            shaft.SoftBox(f.P(0f, 2.2f, 0f), new Vector3(4.6f, 4.8f, 4.6f), f.Rot, seed + 1, 0.22f, 6, 0.025f);
+            shaft.SoftBox(f.P(0f, 6.4f, 0f), new Vector3(4.0f, 3.8f, 4.0f), f.Rot, seed + 2, 0.2f, 6, 0.025f);
+            shaft.SoftBox(f.P(0f, 9.6f, 0f), new Vector3(3.5f, 3.0f, 3.5f), f.Rot, seed + 3, 0.18f, 6, 0.02f);
+            // Cornice and a parapet with a crenel on each face.
+            shaft.SoftBox(f.P(0f, 11.25f, 0f), new Vector3(4.3f, 0.4f, 4.3f), f.Rot, seed + 4, 0.1f, 4, 0.005f);
+            for (int i = 0; i < 4; i++)
+            {
+                var dir = Quaternion.Euler(0f, i * 90f, 0f);
+                for (int k = -1; k <= 1; k += 2)
+                    shaft.SoftBox(f.P(0f, 11.95f, 0f) + f.Rot * dir * new Vector3(k * 1.3f, 0f, 2.05f),
+                                  new Vector3(1.1f, 1.0f, 0.4f), f.Rot * dir, seed + 5 + i, 0.06f, 3, 0.005f);
+            }
+
+            var shaftGo = MeshObject(root, "TowerShaft", ToMesh(shaft, DenseKey("watchshaft")), mat, Vector3.zero,
+                                     Quaternion.identity, Vector3.one, layer, "Concrete");
+            NoStanding(shaftGo);
+            SealLocal(root, f, 0f, 6f, 0f, new Vector3(5.2f, 13f, 5.2f));
+
+            // Window slits and a door-shaped shadow at the foot.
+            var dark = new MeshBuild { UVScale = 0.5f };
+            for (int i = 0; i < 4; i++)
+            {
+                var dir = Quaternion.Euler(0f, i * 90f, 0f);
+                foreach (float y in new[] { 4.0f, 7.4f })
+                    dark.Box(f.P(0f, y, 0f) + f.Rot * dir * new Vector3(0f, 0f, (y < 5f ? 2.31f : 2.01f)),
+                             new Vector3(0.35f, 0.9f, 0.16f), f.Rot * dir);
+            }
+            dark.Box(f.P(0f, 1.0f, 0f) + f.Rot * new Vector3(0f, 0f, -2.33f), new Vector3(1.1f, 2.0f, 0.14f), f.Rot);
+            Visual(root, "TowerOpenings", dark, _shadowMat, layer);
+
+            // The lookout: four posts, a bench rail and a corrugated roof, canted a little.
+            var timber = new MeshBuild { UVScale = 0.5f };
+            var roofM = new MeshBuild { UVScale = 0.5f };
+            foreach (float a in new[] { -1f, 1f })
+                foreach (float b in new[] { -1f, 1f })
+                    timber.Tube(f.P(a * 1.45f, 12.4f, b * 1.45f), f.P(a * 1.45f, 14.6f, b * 1.45f), 0.09f, 0.07f, 6);
+            roofM.Box(f.P(0f, 14.75f, 0f), new Vector3(4.2f, 0.1f, 4.2f), f.Rot * Quaternion.Euler(5f, 0f, 0f));
+            for (float x = -2f; x <= 2f; x += 0.35f)
+                roofM.Box(f.P(x, 14.82f, 0f), new Vector3(0.09f, 0.06f, 4.2f), f.Rot * Quaternion.Euler(5f, 0f, 0f));
+            timber.Tube(f.P(-1.45f, 13.2f, -1.45f), f.P(1.45f, 13.2f, -1.45f), 0.05f, 0.05f, 5);
+            timber.Tube(f.P(-1.45f, 13.2f, 1.45f), f.P(1.45f, 13.2f, 1.45f), 0.05f, 0.05f, 5);
+            Visual(root, "TowerLookout", timber, _timberMat, layer);
+            Visual(root, "TowerRoof", roofM, _steelMat, layer);
+
+            // Radio mast, a searchlight on a bracket and a dish on the parapet.
+            var kit = new MeshBuild { UVScale = 0.5f };
+            RoofMast(kit, f.P(1.1f, 11.4f, 1.1f), 3.4f, f.Rot);
+            var lamp = f.P(-1.9f, 13.4f, 0f);
+            kit.Tube(lamp, lamp + f.Rot * new Vector3(0f, 0.25f, 0f), 0.03f, 0.03f, 5);
+            kit.Tube(lamp + f.Rot * new Vector3(0f, 0.25f, 0f), lamp + f.Rot * new Vector3(-0.4f, 0.3f, 0f), 0.16f, 0.2f, 10);
+            var dishMesh = new MeshBuild { UVScale = 0.5f };
+            ParabolicDish(dishMesh, kit, f.P(0f, 12.9f, 2.3f), f.Axis(new Vector3(0f, 0.3f, 1f)), 0.55f);
+            Visual(root, "TowerKit", kit, _steelMat, layer);
+            Visual(root, "TowerDish", dishMesh, _dishMat, layer);
+        }
+
+        // ==================================================================
+        // Trees
+        // ==================================================================
+        /// <summary>
+        /// Real branching: a trunk that forks, each fork forking again, each limb thinner and
+        /// shorter than the one it came from, with foliage as a mass of small leaf triangles
+        /// on the tips. Three kinds -- <c>0</c> an acacia (low fork, flat umbrella crown),
+        /// <c>1</c> a ghaf / tamarisk (taller, rounder, denser) and <c>2</c> a dead tree (gnarled,
+        /// bare). The old acacia was a squashed boulder on three sticks.
+        /// </summary>
+        private static void GrowTree(MeshBuild trunk, MeshBuild leaves, System.Random rng, Vector3 p, Vector3 dir,
+                                     float length, float radius, int depth, int kind)
+        {
+            var end = p + dir * length;
+            trunk.Tube(p, end, radius, Mathf.Max(0.02f, radius * 0.7f), depth >= 2 ? 8 : 5);
+
+            if (depth == 0 || radius < 0.035f)
+            {
+                if (kind != 2) LeafMass(leaves, rng, end, kind);
+                return;
+            }
+
+            int kids = kind == 2 ? 2 : 2 + rng.Next(2);
+            for (int k = 0; k < kids; k++)
+            {
+                float spread = kind == 0 ? 0.75f : kind == 1 ? 0.6f : 0.55f;
+                var d = (dir + new Vector3(Rand(rng, -spread, spread), Rand(rng, -0.1f, kind == 0 ? 0.25f : 0.5f), Rand(rng, -spread, spread))).normalized;
+                // An acacia's limbs run out sideways, so lean the dir away from straight up.
+                if (kind == 0 && d.y > 0.7f) d = new Vector3(d.x, 0.7f, d.z).normalized;
+                if (kind == 2) d = (d + new Vector3(Rand(rng, -0.4f, 0.4f), 0f, Rand(rng, -0.4f, 0.4f))).normalized;
+                GrowTree(trunk, leaves, rng, end, d, length * Rand(rng, 0.68f, 0.9f), radius * Rand(rng, 0.55f, 0.68f), depth - 1, kind);
+            }
+        }
+
+        /// <summary>A puff of foliage: thirty-odd small double-sided leaf triangles in an ellipsoid.</summary>
+        private static void LeafMass(MeshBuild leaves, System.Random rng, Vector3 c, int kind)
+        {
+            float rx = kind == 0 ? 1.7f : 1.15f;
+            float ry = kind == 0 ? 0.42f : 0.95f;
+
+            for (int i = 0; i < 34; i++)
+            {
+                var o = new Vector3(Rand(rng, -1f, 1f) * rx, Rand(rng, -0.6f, 1f) * ry, Rand(rng, -1f, 1f) * rx);
+                if (o.x * o.x / (rx * rx) + o.z * o.z / (rx * rx) > 1f) o *= 0.7f;
+                var q = c + o;
+
+                var a = new Vector3(Rand(rng, -1f, 1f), Rand(rng, -0.4f, 0.4f), Rand(rng, -1f, 1f)).normalized;
+                var b = Vector3.Cross(a, new Vector3(Rand(rng, -1f, 1f), Rand(rng, -1f, 1f), Rand(rng, -1f, 1f))).normalized;
+                float sz = Rand(rng, 0.28f, 0.52f);
+
+                var v0 = q + a * sz;
+                var v1 = q + b * sz * 0.8f;
+                var v2 = q - (a + b) * 0.5f * sz;
+                leaves.Tri(v0, v1, v2);
+                leaves.Tri(v0, v2, v1);
+            }
+        }
+
+        private static void BuildTreeGeometry(int seed, int kind, MeshBuild trunk, MeshBuild leaves)
+        {
+            var rng = new System.Random(seed * 31 + kind * 977 + 5);
+            float height = kind == 0 ? Rand(rng, 2.4f, 3.4f) : kind == 1 ? Rand(rng, 3.6f, 5f) : Rand(rng, 2.6f, 4f);
+            float radius = kind == 1 ? 0.3f : 0.26f;
+
+            var lean = new Vector3(Rand(rng, -0.22f, 0.22f), 1f, Rand(rng, -0.22f, 0.22f)).normalized;
+            GrowTree(trunk, leaves, rng, Vector3.down * 0.25f, lean, height, radius, kind == 2 ? 4 : 3, kind);
+
+            // A flare of roots at the foot.
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI * 0.5f + Rand(rng, -0.3f, 0.3f);
+                trunk.Tube(new Vector3(Mathf.Cos(a) * 0.5f, -0.1f, Mathf.Sin(a) * 0.5f), new Vector3(0f, 0.5f, 0f), 0.05f, radius * 0.8f, 5);
+            }
+        }
+
+        private static Mesh TreeTrunkMesh(int seed, int kind)
+            => Pooled($"tree_trunk_{kind}_{seed}", () =>
+            {
+                var t = new MeshBuild { UVScale = 0.6f };
+                BuildTreeGeometry(seed, kind, t, new MeshBuild());
+                return t.ToMesh($"TreeTrunk_{kind}_{seed}");
+            });
+
+        private static Mesh TreeLeafMesh(int seed, int kind)
+            => Pooled($"tree_leaf_{kind}_{seed}", () =>
+            {
+                var l = new MeshBuild { UVScale = 0.6f };
+                BuildTreeGeometry(seed, kind, new MeshBuild(), l);
+                return l.ToMesh($"TreeLeaves_{kind}_{seed}");
+            });
+
+        /// <summary>Plants one of the new trees at a ground point: trunk with a collider, leaves without.</summary>
+        private static void PlantTree(Transform parent, int layer, System.Random rng, Vector2 p, int kind)
+        {
+            var leafMat = kind == 1
+                ? MakeMaterial("GhafLeaf", new Color(0.27f, 0.37f, 0.18f), 0.08f, 0f)
+                : MakeMaterial("Acacia", new Color(0.30f, 0.34f, 0.15f), 0.08f, 0f);
+
+            int seed = 1 + rng.Next(28);
+            var foot = new Vector3(p.x, GroundHeightAt(p.x, p.y), p.y);
+            var turn = Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f);
+            var scale = Vector3.one * Rand(rng, 0.85f, 1.25f);
+
+            MeshObject(parent, kind == 2 ? "DeadTree" : "Tree", TreeTrunkMesh(seed, kind), _timberMat, foot, turn, scale, layer, "Wood");
+
+            if (kind == 2) return;
+
+            // The crown is off the bake -- a flat umbrella of leaves bakes as an island in the sky.
+            var crown = MeshObject(parent, "TreeLeaves", TreeLeafMesh(seed, kind), leafMat, foot, turn, scale, layer, null, collider: false);
+            NoStanding(crown);
+            Hide(crown);
+        }
+
+        // ==================================================================
+        // The ground
+        // ==================================================================
+        /// <summary>
+        /// A colour map for the whole dune field, laid under the sand's fine detail.
+        ///
+        /// Ishaan, 2026-10-03: "sand, ground texture, also the ground texture shifting from one
+        /// theme to another". The ground was one grey map tinted one colour, so a kilometre of
+        /// dune was one flat tan. The land is not like that: crests are paler (wind-blown fine
+        /// sand), basins hold pale cracked clay, steep faces are scree, the ground round a
+        /// village and along the track is packed dark earth, and the banks of the river are
+        /// damp silt that greens towards the water. Each of those fades into the next across
+        /// a noise-warped edge, so there is no line where one "texture" stops.
+        ///
+        /// A colour map is what the Lit shader's base map is for; the sand's own grain and
+        /// ripples ride on top of it as the detail map (see <see cref="MakeMacroGroundMaterial"/>).
+        /// Computed from the same heights the mesh is built from, so it lines up with it.
+        /// </summary>
+        private static Color MacroColour(float wx, float wz)
+        {
+            int seed = _theme.randomSeed;
+            Color sand = _theme.floorColor;
+
+            float big = Fbm2(wx * 0.0035f, wz * 0.0035f, seed + 1, 3);
+            float mid = Fbm2(wx * 0.018f, wz * 0.018f, seed + 2, 3);
+            float fine = Fbm2(wx * 0.11f, wz * 0.11f, seed + 3, 2);
+
+            float h = GroundHeightAt(wx, wz);
+            float sx = GroundHeightAt(wx + 1.6f, wz) - GroundHeightAt(wx - 1.6f, wz);
+            float sz = GroundHeightAt(wx, wz + 1.6f) - GroundHeightAt(wx, wz - 1.6f);
+            float slope = Mathf.Sqrt(sx * sx + sz * sz) / 3.2f;     // rise over run
+
+            var c = sand;
+
+            // Regional drift: ochre-red one way, bleached the other.
+            c = Color.Lerp(c, new Color(0.69f, 0.49f, 0.32f), Mathf.Clamp01(big * 1.6f) * 0.55f);
+            c = Color.Lerp(c, new Color(0.77f, 0.69f, 0.51f), Mathf.Clamp01(-big * 1.6f) * 0.5f);
+
+            // Crests, windblown and pale.
+            float crest = Mathf.SmoothStep(0f, 1f, (h - 3f + mid * 3f) / 9f);
+            c = Color.Lerp(c, new Color(0.80f, 0.72f, 0.54f), crest * 0.38f * (1f - Mathf.Clamp01(slope * 2f)));
+
+            // Basins: pale clay, cracked.
+            float basin = Mathf.SmoothStep(0f, 1f, (-4f - h + mid * 3f) / 7f);
+            float cracks = Mathf.Pow(1f - Mathf.Abs(Fbm2(wx * 0.16f, wz * 0.16f, seed + 9, 3)) * 1.9f, 5f);
+            var clay = new Color(0.75f, 0.70f, 0.59f);
+            clay = Color.Lerp(clay, clay * 0.7f, Mathf.Clamp01(cracks) * 0.6f);
+            c = Color.Lerp(c, clay, basin * 0.85f);
+
+            // Scree on the steep faces.
+            float steep = Mathf.SmoothStep(0.34f, 0.62f, slope + mid * 0.06f);
+            var scree = new Color(0.55f, 0.47f, 0.38f) * (0.92f + fine * 0.2f);
+            c = Color.Lerp(c, scree, steep * 0.75f);
+
+            // Packed earth round a place and along the track.
+            var p2 = new Vector2(wx, wz);
+            float earth = 0f;
+            if (NearTrack(p2, 3.2f)) earth = 0.85f;
+            else if (InSite(p2, 3f)) earth = 0.7f;
+            else if (InSite(p2, 20f)) earth = 0.35f * (0.6f + mid * 0.8f);
+            c = Color.Lerp(c, new Color(0.50f, 0.40f, 0.28f), Mathf.Clamp01(earth));
+
+            // The river's banks: damp silt, greener towards the water.
+            float bank = Mathf.Abs(wx - GorgeCentreAt(wz)) - _theme.hazardWidth * 0.5f;
+            float silt = 1f - Mathf.SmoothStep(0f, 34f + mid * 10f, bank);
+            c = Color.Lerp(c, new Color(0.38f, 0.32f, 0.22f), Mathf.Clamp01(silt) * 0.7f);
+            float green = 1f - Mathf.SmoothStep(14f, 34f, bank + mid * 6f);
+            c = Color.Lerp(c, new Color(0.37f, 0.40f, 0.23f), Mathf.Clamp01(green * (0.4f + fine * 0.9f)) * 0.45f);
+
+            // Stains and mottling so no stretch is clean.
+            float shade = 1f + mid * 0.1f + fine * 0.05f;
+            c = new Color(Mathf.Clamp01(c.r * shade), Mathf.Clamp01(c.g * shade), Mathf.Clamp01(c.b * shade), 1f);
+            return c;
+        }
+
+        /// <summary>
+        /// The desert's ground material: the colour map as base, the sand's grain and ripples as
+        /// the Lit shader's detail albedo and detail normal (multiplied x2 around mid-grey, so
+        /// they add contrast and leave the colour alone).
+        /// </summary>
+        private static Material MakeMacroGroundMaterial()
+        {
+            const int n = 768;
+            float span = (_groundN - 1) * _groundStep;
+            float min = _groundMin;
+
+            // <b>Brightness bookkeeping.</b> The sand's grain map sits at mid-grey, so the old ground
+            // rendered at about half its material colour. URP's detail multiply is x2 around
+            // mid-grey in gamma and about x2.3 in linear, which on a full-brightness colour map would
+            // come out four times too bright. So the map is stored pre-darkened by exactly that
+            // ratio (in linear), and the finished ground matches what it replaced.
+            const float compensate = 0.5f / 2.2974f;
+
+            var plain = _theme.floorColor;
+            var pixels = new Color32[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float wx = min + (x + 0.5f) / n * span;
+                    float wz = min + (y + 0.5f) / n * span;
+                    var c = MacroColour(wx, wz);
+
+                    // Fade to the plain sand colour over the last sixty metres to the map's edge,
+                    // where the apron (still the plain material) takes over without a seam.
+                    float fromEdge = Mathf.Min(Mathf.Min(x, n - 1 - x), Mathf.Min(y, n - 1 - y)) / (float)n * span;
+                    c = Color.Lerp(plain, c, Mathf.SmoothStep(0f, 1f, fromEdge / 60f));
+
+                    var lin = c.linear;
+                    pixels[y * n + x] = new Color(lin.r * compensate, lin.g * compensate, lin.b * compensate, 1f).gamma;
+                }
+
+            string texPath = $"{TextureFolder}/DesertMacro.png";
+            WritePng(texPath, pixels, n, importer =>
+            {
+                importer.textureType = TextureImporterType.Default;
+                importer.sRGBTexture = true;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.filterMode = FilterMode.Bilinear;
+                importer.mipmapEnabled = true;
+            });
+            var macro = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+
+            string path = $"{MaterialFolder}/{SafeName(_theme.themeName)}_GroundMacro.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (mat == null) { mat = new Material(shader); AssetDatabase.CreateAsset(mat, path); }
+            else if (mat.shader != shader) mat.shader = shader;
+
+            // A 1.5x gain, found by comparing renders against the ground this replaced: the colour
+            // map comes out of the detail multiply about a third darker than the arithmetic says.
+            var gain = new Color(1.5f, 1.5f, 1.5f, 1f);
+            mat.color = gain;
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", gain);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", _theme.floorSmoothness * 0.4f);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0f);
+
+            mat.SetTexture("_BaseMap", macro);
+            mat.SetTextureScale("_BaseMap", new Vector2(1f / span, 1f / span));
+            mat.SetTextureOffset("_BaseMap", new Vector2(-min / span, -min / span));
+            mat.mainTexture = macro;
+            mat.mainTextureScale = new Vector2(1f / span, 1f / span);
+            mat.mainTextureOffset = new Vector2(-min / span, -min / span);
+
+            var da = LoadDetail("Sand_Albedo");
+            var dn = LoadDetail("Sand_Normal");
+            // URP multiplies the detail tiling by the base map's, and this base map covers the whole
+            // field, so the sand's 0.09 repeats per metre has to be scaled up by the span or the grain
+            // is sampled at one point and the ground goes flat.
+            var tile = new Vector2(0.09f * span, 0.09f * span);
+            if (da != null && mat.HasProperty("_DetailAlbedoMap"))
+            {
+                mat.SetTexture("_DetailAlbedoMap", da);
+                mat.SetTextureScale("_DetailAlbedoMap", tile);
+                if (mat.HasProperty("_DetailAlbedoMapScale")) mat.SetFloat("_DetailAlbedoMapScale", 1f);
+            }
+            if (dn != null && mat.HasProperty("_DetailNormalMap"))
+            {
+                mat.SetTexture("_DetailNormalMap", dn);
+                mat.SetTextureScale("_DetailNormalMap", tile);
+                if (mat.HasProperty("_DetailNormalMapScale")) mat.SetFloat("_DetailNormalMapScale", 1.15f);
+            }
+            mat.EnableKeyword("_DETAIL_MULX2");
+
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>
+        /// A post on the east bank: a watchtower, two houses with plinths and rooftop kit, a
+        /// sandbag position and a parked pickup, turned to face the river. Built on the pad
+        /// <see cref="PlanDesertWild"/> flattened for it.
+        /// </summary>
+        private static Vector3 OnGround(Vector3 v) => new Vector3(v.x, GroundHeightAt(v.x, v.z), v.z);
+
+        private static void BuildEastPost(Transform parent, int layer, int backdrop, System.Random rng, Vector2 at)
+        {
+            var post = new GameObject("EastPost").transform;
+            post.SetParent(parent, false);
+
+            float floor = GroundHeightAt(at.x, at.y);
+            var f = new Frame(new Vector3(at.x, floor, at.y), 0f);
+
+            // The tower stands nearest the river (the -x side), looking over it.
+            var towerAt = f.P2(-3f, 0f);
+            BuildWatchtower(post, layer, rng, towerAt, 90f + rng.Next(2) * 180f);
+
+            const float lot = 9.6f;
+            foreach (var (u, v) in new[] { (7.8f, 6.2f), (7.4f, -6.4f) })
+            {
+                var lf = new Frame(f.P(u, 0f, v), rng.Next(4) * 90f);
+                BuildSolidHouse(post, layer, rng, lf, lot, false);
+            }
+
+            BuildSandbagWall(post, layer, rng, OnGround(f.P(-8.5f, 0f, -6f)), 90f + Rand(rng, -10f, 10f));
+            BuildSandbagWall(post, layer, rng, OnGround(f.P(-8.5f, 0f, 6.5f)), 90f + Rand(rng, -10f, 10f));
+            var car = f.P2(2f, -11.5f);
+            BuildVehicle(post, layer, rng, car, 90f + Rand(rng, -8f, 8f), VehicleKind.Pickup, _carPaints[rng.Next(_carPaints.Length)]);
+
+            var palm = f.P(-1f, 0f, 11f);
+            BuildPalm(post, layer, rng, new Vector3(palm.x, GroundHeightAt(palm.x, palm.z) - 0.2f, palm.z));
         }
     }
 }

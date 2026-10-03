@@ -32,6 +32,7 @@ namespace FPSKit.EditorTools
         {
             _wadis.Clear();
             _hamletPlans.Clear();
+            _watchPlans.Clear();
 
             bool ClearOfRiver(Vector2 p, float r) => Mathf.Abs(p.x - GorgeCentreAt(p.y)) > rim + r + 12f;
 
@@ -52,6 +53,44 @@ namespace FPSKit.EditorTools
                 Claim(p.x, p.y, 29f);
                 FlattenPad(p.x, p.y, 29f, 30f, SiteHeight(p, 29f));
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
+            }
+
+            // ---- the east bank (2026-10-03, "add towers or houses on the other side of the river"):
+            // a watchtower post at each bridge landing and two between, so the far side is somewhere
+            // and not a strip of dunes. Planned before the farms, which take whatever is left. ----
+            var postZ = new List<float>();
+            foreach (var c in _crossings) postZ.Add(c.z + Rand(rng, 18f, 30f) * (rng.Next(2) == 0 ? -1f : 1f));
+            postZ.Add(-155f + Rand(rng, -14f, 14f));
+            postZ.Add(165f + Rand(rng, -14f, 14f));
+            if (_crossings.Count < 2) postZ.Add(5f);
+
+            foreach (float z0 in postZ)
+            {
+                const float r = 14f;
+                bool placed = false;
+
+                // The east strip is narrow and the farms and base have first claim on it, so each
+                // post tries a handful of nearby spots, nearest first, before giving up.
+                foreach (float dz in new[] { 0f, 16f, -16f, 32f, -32f, 48f, -48f, 64f, -64f })
+                {
+                    foreach (float dx in new[] { 0f, 8f, 16f })
+                    {
+                        float z = z0 + dz;
+                        var p = new Vector2(GorgeCentreAt(z) + rim + 12f + r + 4f + dx, z);
+                        if (p.x > half - 16f || Mathf.Abs(z) > half - 30f || !Free(p, r + 2f)) continue;
+                        bool near = false;
+                        foreach (var w in _watchPlans) if ((w - p).magnitude < 60f) near = true;
+                        if (near) continue;
+
+                        _watchPlans.Add(p);
+                        Claim(p.x, p.y, r + 1f);
+                        FlattenPad(p.x, p.y, r, 20f, SiteHeight(p, r));
+                        _anchors.Add(new Vector3(p.x, 0f, p.y));
+                        placed = true;
+                        break;
+                    }
+                    if (placed) break;
+                }
             }
 
             // ---- farm compounds, each with a field beside it ----
@@ -138,6 +177,7 @@ namespace FPSKit.EditorTools
 
             foreach (var hamlet in _hamletPlans) BuildHamlet(wild, layer, backdrop, rng, hamlet);
             foreach (var farm in _farmPlans) BuildFarm(wild, layer, backdrop, rng, farm);
+            foreach (var post in _watchPlans) BuildEastPost(wild, layer, backdrop, rng, post);
             foreach (var camp in _campSites) BuildCamp(wild, layer, backdrop, rng, camp);
             foreach (var cp in _checkpoints) BuildCheckpoint(wild, layer, rng, cp);
             BuildDesertMore(wild, layer, backdrop, rng);

@@ -425,6 +425,32 @@ namespace FPSKit.EditorTools
                 var dir = f.Axis(Quaternion.Euler(0f, ang, 0f) * Vector3.forward);
                 tower.Box(f.P(0f, h - 2f, 0f) + dir * 0.9f, new Vector3(0.35f, 1.6f, 0.12f), Quaternion.LookRotation(dir));
             }
+            // A service platform two-thirds up with a rail, two microwave dishes on it, a ladder
+            // down one leg and a beacon on top -- the mast was legs and three panels.
+            float deck = h * 0.7f;
+            float reach = Mathf.Lerp(1.6f, 0.32f, deck / h) + 0.5f;
+            tower.Box(f.P(0f, deck, 0f), new Vector3(reach * 2f, 0.08f, reach * 2f), f.Rot);
+            foreach (var (p0, p1) in new[] { (new Vector2(-reach, -reach), new Vector2(reach, -reach)), (new Vector2(reach, -reach), new Vector2(reach, reach)),
+                                             (new Vector2(reach, reach), new Vector2(-reach, reach)), (new Vector2(-reach, reach), new Vector2(-reach, -reach)) })
+            {
+                tower.Tube(f.P(p0.x, deck + 1.05f, p0.y), f.P(p1.x, deck + 1.05f, p1.y), 0.016f, 0.016f, 4);
+                tower.Tube(f.P(p0.x, deck + 0.5f, p0.y), f.P(p1.x, deck + 0.5f, p1.y), 0.012f, 0.012f, 4);
+                tower.Tube(f.P(p0.x, deck, p0.y), f.P(p0.x, deck + 1.05f, p0.y), 0.02f, 0.02f, 4);
+            }
+            var microwave = new MeshBuild { UVScale = 0.5f };
+            ParabolicDish(microwave, tower, f.P(reach * 0.9f, deck + 1.0f, -reach * 0.3f), f.Axis(new Vector3(1f, 0.05f, -0.4f)), 0.75f);
+            ParabolicDish(microwave, tower, f.P(-reach * 0.9f, deck + 1.0f, reach * 0.3f), f.Axis(new Vector3(-1f, 0.05f, 0.4f)), 0.6f);
+            Visual(root, "MastDishes", microwave, _dishMat, layer);
+
+            var ladderA = f.P(-1.6f, 0f, -1.6f);
+            for (float y = 0.4f; y < deck; y += 0.38f)
+                tower.Tube(ladderA + f.Axis(new Vector3(0.12f, y, 0f)), ladderA + f.Axis(new Vector3(0.12f, y, 0.4f)), 0.012f, 0.012f, 3);
+
+            var beacon = new MeshBuild { UVScale = 0.5f };
+            beacon.Tube(f.P(0f, h, 0f), f.P(0f, h + 0.5f, 0f), 0.05f, 0.05f, 5);
+            beacon.Tube(f.P(0f, h + 0.5f, 0f), f.P(0f, h + 0.75f, 0f), 0.15f, 0.1f, 10);
+            Visual(root, "MastBeacon", beacon, _clothRed, layer);
+
             var towerGo = MeshObject(root, "MastTower", ToMesh(tower, DenseKey("masttower")), _dishMat, Vector3.zero, Quaternion.identity,
                                      Vector3.one, layer, "Metal");
             NoStanding(towerGo);

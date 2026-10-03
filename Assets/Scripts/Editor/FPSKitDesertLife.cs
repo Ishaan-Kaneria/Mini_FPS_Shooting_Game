@@ -721,40 +721,15 @@ namespace FPSKit.EditorTools
             _acaciaMat ??= MakeMaterial("Acacia", new Color(0.30f, 0.34f, 0.15f), 0.08f, 0f);
 
             int trees = 4 + rng.Next(6);
-            var trunks = new MeshBuild { UVScale = 0.5f };
-
             for (int i = 0; i < trees; i++)
             {
                 float a = Rand(rng, 0f, Mathf.PI * 2f), r = Mathf.Sqrt((float)rng.NextDouble()) * 13f;
                 var p = centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
                 var foot = new Vector3(p.x, GroundHeightAt(p.x, p.y) - 0.3f, p.y);
 
-                float h = Rand(rng, 2.6f, 4f);
-                var lean = new Vector3(Rand(rng, -0.25f, 0.25f), 1f, Rand(rng, -0.25f, 0.25f)).normalized;
-                var fork = foot + lean * h;
-                trunks.Tube(foot, fork, 0.24f, 0.17f, 7);
-
-                float crown = h + Rand(rng, 1.2f, 2f);
-                float spread = Rand(rng, 3.2f, 5f);
-                int limbs = 2 + rng.Next(2);
-                for (int k = 0; k < limbs; k++)
-                {
-                    float la = Rand(rng, 0f, Mathf.PI * 2f);
-                    var tip = new Vector3(foot.x + Mathf.Cos(la) * spread * 0.45f, foot.y + crown, foot.z + Mathf.Sin(la) * spread * 0.45f);
-                    trunks.Tube(fork, tip, 0.14f, 0.07f, 6);
-                }
-
-                var canopy = MeshObject(parent, "AcaciaCanopy", BoulderMesh(1 + rng.Next(20), 0.3f, 0.6f), _acaciaMat,
-                                        new Vector3(foot.x, foot.y + crown + 0.35f, foot.z),
-                                        Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f),
-                                        new Vector3(spread * 0.5f, 0.32f, spread * 0.5f * Rand(rng, 0.8f, 1.2f)),
-                                        layer, null, collider: false);
-                NoStanding(canopy);
-                Hide(canopy);
+                // Real branching trees now (GrowTree): mostly acacias, some taller ghaf.
+                PlantTree(parent, layer, rng, p, rng.NextDouble() < 0.7 ? 0 : 1);
             }
-
-            MeshObject(parent, "AcaciaTrunks", ToMesh(trunks, DenseKey("acacia")), _timberMat, Vector3.zero,
-                       Quaternion.identity, Vector3.one, layer, "Wood");
 
             // Dry grass under them, where the shade is.
             Drape(parent, "AcaciaShade", BlobMesh("AcaciaShade", centre, 15f, 7501 + rng.Next(100), 0.06f, 1f,

@@ -386,9 +386,13 @@ namespace FPSKit.EditorTools
             string detail = string.IsNullOrEmpty(_theme.floorDetail) ? "Sand" : _theme.floorDetail;
 
             // The volcanic ground tiles far wider than sand -- see BasaltRepeat.
-            var sand = MakeDetailMaterial("Ground", _theme.floorColor, detail,
-                                          _theme.volcanicZone ? BasaltTiling : 0.09f,
-                                          _theme.floorSmoothness * 0.4f, 0f, 1.15f);
+            // The desert's ground carries a colour map (crests, basins, scree, packed earth, river
+            // silt) under the sand's own grain; every other arena keeps the single tinted map.
+            var sand = IsDesertArena()
+                ? MakeMacroGroundMaterial()
+                : MakeDetailMaterial("Ground", _theme.floorColor, detail,
+                                     _theme.volcanicZone ? BasaltTiling : 0.09f,
+                                     _theme.floorSmoothness * 0.4f, 0f, 1.15f);
 
             const int chunkCells = 30;
             int chunks = Mathf.CeilToInt(cells / (float)chunkCells);

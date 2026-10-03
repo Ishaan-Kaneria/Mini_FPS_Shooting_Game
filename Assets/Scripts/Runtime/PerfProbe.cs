@@ -40,6 +40,12 @@ public class PerfProbe : MonoBehaviour
 
     IEnumerator Start()
     {
+        // The build starts at the main menu; the probe goes straight to the arena like the one-scene build used to start there.
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "AbandonedFairground")
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("AbandonedFairground");
+            yield return new WaitForSecondsRealtime(1f);
+        }
         QualitySettings.vSyncCount = 0;                       // uncapped, so the numbers are the cost and not the refresh rate
         Application.targetFrameRate = -1;
         var sb = new StringBuilder();
@@ -121,56 +127,99 @@ public class PerfProbe : MonoBehaviour
         if (cc != null) cc.enabled = true;
     }
 
-    /// <summary>One change at a time, each measured in two places and put back: the delta against the baseline is that change's cost.</summary>
+    /// <summary>
+    /// One change at a time, measured in three places and put back. Every row reports frame time, the main thread's CPU
+    /// time, the GPU time (Vulkan reports it; OpenGL says 0) and the graphics-thread waits. A frame time well above both
+    /// the CPU and the waits is the GPU. The first rows switch quality tier (Medium, High) and the rest are single changes
+    /// to High, with a screenshot of each upscaler so their sharpness can be compared by eye. Baseline is measured first
+    /// and last: the gap between the two is the noise, and a laptop warming up shows as a gap that grows through the run.
+    /// </summary>
     IEnumerator RunExperiments(StringBuilder sb, ProfilerRecorder tris, ProfilerRecorder casters, ProfilerRecorder setpass)
     {
-        var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
-        var lights = FindObjectsByType<Light>(FindObjectsInactive.Exclude);
-        var shadowed = lights.Where(l => l.shadows != LightShadows.None).ToDictionary(l => l, l => l.shadows);
-        var others = lights.Where(l => l.type != LightType.Directional && l.enabled).ToArray();
-        var terrains = FindObjectsByType<Terrain>(FindObjectsInactive.Exclude);
-        var volumes = FindObjectsByType<Volume>(FindObjectsInactive.Exclude);
+        UniversalRenderPipelineAsset Urp() => GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        var wait1 = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Gfx.WaitForPresentOnGfxThread");
+        var wait2 = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Gfx.WaitForGfxCommandsFromMainThread");
         var cam = Camera.main;
-        float sd = urp.shadowDistance, far = cam != null ? cam.farClipPlane : 1000f, lod = QualitySettings.lodBias;
-        int cc = urp.shadowCascadeCount, msaa = urp.msaaSampleCount;
-        sb.AppendLine($"URP asset '{urp.name}': shadow distance {sd}, cascades {cc}, MSAA {msaa}, main shadow res {urp.mainLightShadowmapResolution}");
+        int startLevel = QualitySettings.GetQualityLevel();
+        int medium = Array.FindIndex(QualitySettings.names, n => n == "Medium"), high = Array.FindIndex(QualitySettings.names, n => n == "High");
+        string dir = Path.GetDirectoryName(Path.GetFullPath(outFile));
 
-        var exps = new List<(string name, Action apply, Action revert)>
+        var u0 = Urp();
+        sb.AppendLine($"URP asset '{u0.name}' at start: shadow distance {u0.shadowDistance}, cascades {u0.shadowCascadeCount}, MSAA {u0.msaaSampleCount}, render scale {u0.renderScale}, upscaling {u0.upscalingFilter}");
+
+        // Saved per asset the first time a row touches it, restored when the row ends.
+        var saved = new Dictionary<UniversalRenderPipelineAsset, (float scale, UpscalingFilterSelection filter, int msaa, float dist)>();
+        void Save(UniversalRenderPipelineAsset u) { if (!saved.ContainsKey(u)) saved[u] = (u.renderScale, u.upscalingFilter, u.msaaSampleCount, u.shadowDistance); }
+        void Restore() { foreach (var kv in saved) { kv.Key.renderScale = kv.Value.scale; kv.Key.upscalingFilter = kv.Value.filter; kv.Key.msaaSampleCount = kv.Value.msaa; kv.Key.shadowDistance = kv.Value.dist; } }
+
+        IEnumerable<ScriptableRendererFeature> Ssao()
         {
-            ("baseline", () => { }, () => { }),
-            ("no realtime shadows", () => { foreach (var l in shadowed.Keys) l.shadows = LightShadows.None; }, () => { foreach (var kv in shadowed) kv.Key.shadows = kv.Value; }),
-            ("spot shadows off (sun only)", () => { foreach (var l in shadowed.Keys) if (l.type != LightType.Directional) l.shadows = LightShadows.None; }, () => { foreach (var kv in shadowed) kv.Key.shadows = kv.Value; }),
-            ("shadow distance 95 -> 70", () => urp.shadowDistance = 70f, () => urp.shadowDistance = sd),
-            ("shadow distance 95 -> 50", () => urp.shadowDistance = 50f, () => urp.shadowDistance = sd),
-            ("cascades 4 -> 2", () => urp.shadowCascadeCount = 2, () => urp.shadowCascadeCount = cc),
-            ("distance 70 + 2 cascades", () => { urp.shadowDistance = 70f; urp.shadowCascadeCount = 2; }, () => { urp.shadowDistance = sd; urp.shadowCascadeCount = cc; }),
-            ("MSAA 4x -> 2x", () => urp.msaaSampleCount = 2, () => urp.msaaSampleCount = msaa),
-            ("MSAA 4x -> off", () => urp.msaaSampleCount = 1, () => urp.msaaSampleCount = msaa),
-            ("all point/spot lights off", () => { foreach (var l in others) l.enabled = false; }, () => { foreach (var l in others) l.enabled = true; }),
-            ("terrain trees + detail off", () => { foreach (var t in terrains) t.drawTreesAndFoliage = false; }, () => { foreach (var t in terrains) t.drawTreesAndFoliage = true; }),
-            ("post-processing off", () => { foreach (var v in volumes) v.enabled = false; }, () => { foreach (var v in volumes) v.enabled = true; }),
-            ("far clip 1000 -> 220", () => { if (cam != null) cam.farClipPlane = 220f; }, () => { if (cam != null) cam.farClipPlane = far; }),
-            ("LOD bias 2 -> 1", () => QualitySettings.lodBias = 1f, () => QualitySettings.lodBias = lod),
+            var f = typeof(UniversalRenderPipelineAsset).GetField("m_RendererDataList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (f != null && f.GetValue(Urp()) is ScriptableRendererData[] datas)
+                foreach (var d in datas) if (d != null) foreach (var rf in d.rendererFeatures) if (rf != null && rf.name.IndexOf("Occlusion", StringComparison.OrdinalIgnoreCase) >= 0) yield return rf;
+        }
+
+        // name, apply, revert, screenshot
+        var exps = new List<(string name, Action apply, Action revert, bool shot)>
+        {
+            ("baseline (start)", () => { }, () => { }, true),
+            ("tier Medium", () => QualitySettings.SetQualityLevel(medium, true), () => QualitySettings.SetQualityLevel(startLevel, true), false),
+            ("tier High", () => QualitySettings.SetQualityLevel(high, true), () => QualitySettings.SetQualityLevel(startLevel, true), false),
+            ("High: render scale 1.0", () => { var u = Urp(); Save(u); u.renderScale = 1f; }, Restore, true),
+            ("High: 0.85 bilinear", () => { var u = Urp(); Save(u); u.renderScale = 0.85f; u.upscalingFilter = UpscalingFilterSelection.Linear; }, Restore, true),
+            ("High: 0.85 FSR 1", () => { var u = Urp(); Save(u); u.renderScale = 0.85f; u.upscalingFilter = UpscalingFilterSelection.FSR; }, Restore, true),
+            ("High: 0.85 STP (MSAA off)", () => { var u = Urp(); Save(u); u.renderScale = 0.85f; u.upscalingFilter = UpscalingFilterSelection.STP; u.msaaSampleCount = 1; }, Restore, true),
+            ("High: 0.7 FSR 1", () => { var u = Urp(); Save(u); u.renderScale = 0.7f; u.upscalingFilter = UpscalingFilterSelection.FSR; }, Restore, false),
+            ("High: MSAA off", () => { var u = Urp(); Save(u); u.msaaSampleCount = 1; }, Restore, false),
+            ("High: SSAO off", () => { foreach (var f in Ssao()) f.SetActive(false); }, () => { foreach (var f in Ssao()) f.SetActive(true); }, false),
+            ("High: shadow distance 70", () => { var u = Urp(); Save(u); u.shadowDistance = 70f; }, Restore, false),
+            ("High: shadow distance 30", () => { var u = Urp(); Save(u); u.shadowDistance = 30f; }, Restore, false),
+            ("baseline (end)", () => { }, () => { }, false),
         };
-        foreach (var view in new[] { Views[0], Views[3] })
+        // The player starts on whichever tier the machine picked; measure the rows that start with "High" on High.
+        sb.AppendLine($"start quality level {QualitySettings.names[startLevel]}");
+
+        foreach (var view in new[] { Views[0], Views[2], Views[3] })
         {
+            sb.AppendLine($"== view '{view.name}'");
             Teleport(view);
             yield return new WaitForSecondsRealtime(2f);
             float baseMs = 0f;
-            sb.AppendLine($"== view '{view.name}'");
             foreach (var e in exps)
             {
+                if (e.name.StartsWith("High:")) QualitySettings.SetQualityLevel(high, true);
+                else if (e.name == "baseline (start)" || e.name == "baseline (end)") QualitySettings.SetQualityLevel(high, true);
                 e.apply();
-                yield return new WaitForSecondsRealtime(1.5f);
-                var dt = new List<float>();
-                float end = Time.realtimeSinceStartup + 4f;
-                while (Time.realtimeSinceStartup < end) { yield return null; dt.Add(Time.unscaledDeltaTime * 1000f); }
+                yield return new WaitForSecondsRealtime(3f);
+                var dt = new List<float>(); var cpu = new List<float>(); var gpu = new List<float>(); var waits = new List<double>();
+                var timings = new FrameTiming[1];
+                float end = Time.realtimeSinceStartup + 8f; bool shot = false, shotOk = e.shot && view.name == "oldgrowth";
+                while (Time.realtimeSinceStartup < end)
+                {
+                    yield return null;
+                    dt.Add(Time.unscaledDeltaTime * 1000f);
+                    FrameTimingManager.CaptureFrameTimings();
+                    if (FrameTimingManager.GetLatestTimings(1, timings) > 0)
+                    {
+                        if (timings[0].cpuMainThreadFrameTime > 0) cpu.Add((float)timings[0].cpuMainThreadFrameTime);
+                        if (timings[0].gpuFrameTime > 0) gpu.Add((float)timings[0].gpuFrameTime);
+                    }
+                    waits.Add((wait1.Valid ? wait1.LastValue : 0) / 1e6 + (wait2.Valid ? wait2.LastValue : 0) / 1e6);
+                    if (shotOk && !shot && end - Time.realtimeSinceStartup < 3f)
+                    {
+                        shot = true;
+                        ScreenCapture.CaptureScreenshot(Path.Combine(dir, $"shot_{Array.IndexOf(exps.ToArray(), e):00}_{e.name.Replace(' ', '_').Replace(':', '_').Replace('(', '_').Replace(')', '_')}.png"));
+                    }
+                }
                 float avg = dt.Average();
-                if (e.name == "baseline") baseMs = avg;
+                if (e.name == "baseline (start)") baseMs = avg;
                 var sorted = dt.OrderBy(x => x).ToArray();
-                sb.AppendLine($"   {e.name,-30} avg {avg,5:0.0} ms ({1000f / avg,3:0} fps)  p95 {sorted[(int)(0.95f * (sorted.Length - 1))],5:0.0}  delta {avg - baseMs,+6:0.0} ms | tris {tris.LastValue / 1000}k, shadow casters {casters.LastValue}, setpass {setpass.LastValue}");
+                sb.AppendLine($"   {e.name,-28} avg {avg,5:0.0} ms ({1000f / avg,3:0} fps)  p95 {sorted[(int)(0.95f * (sorted.Length - 1))],5:0.0}  delta {avg - baseMs,+6:0.0} | main cpu {(cpu.Count > 0 ? cpu.Average() : 0):0.0}, gpu {(gpu.Count > 0 ? gpu.Average() : 0):0.0}, gfx waits {(waits.Count > 0 ? waits.Average() : 0):0.0} | tris {tris.LastValue / 1000}k, casters {casters.LastValue}, setpass {setpass.LastValue}");
                 e.revert();
+                yield return null;
             }
         }
+        QualitySettings.SetQualityLevel(startLevel, true);
+        wait1.Dispose(); wait2.Dispose();
     }
 }

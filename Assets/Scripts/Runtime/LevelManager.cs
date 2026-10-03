@@ -167,6 +167,15 @@ public class LevelManager : MonoBehaviour
              "held in between, the same way the enemy's line of sight is.")]
     public float reachCheckInterval = 1.5f;
 
+    [Tooltip("How close, in metres, the end of a partial route has to get to the player for the " +
+             "leash to leave an enemy alone. With the player on a roof the nearest bit of navmesh " +
+             "to them is often the roof's own island, joined to nothing, so every enemy on the " +
+             "ground had 'no route' and was discarded after the grace time -- they vanished. An " +
+             "enemy that can walk to within this distance (the foot of the house, say) is not " +
+             "stuck, it is just on the wrong floor. Spawning still needs a complete route; this " +
+             "applies only to the leash. 0 restores the old all-or-nothing rule.")]
+    [Min(0f)] public float partialReachRadius = 18f;
+
     [Tooltip("Put a fresh enemy in the queue for every one the leash discards. This is " +
              "what keeps three stars honest: the level asks for a fixed number of kills, " +
              "and a body that fell through a gap in the floor is not the player's mistake " +
@@ -413,15 +422,40 @@ public class LevelManager : MonoBehaviour
         // which reads as "nothing ever spawns" and is miserable to diagnose from the
         // symptom. Push it clear of the ring and say so rather than let it happen.
         float minimumLeash = MaxSpawnDistance * 1.4f;
+
+        // <b>And clear of the fixed spawn points too.</b> An open arena spawns from a ring of fixed points,
+        // and the player can be standing anywhere between or beside them, so the farthest an enemy can
+        // appear is the widest gap between two points, not the radius of the random ring. The leash was
+        // shorter than that, so on a roof with a long view the enemies that spawned beyond it were deleted
+        // four seconds later, in plain sight (Ishaan: "enemies disappear when I stand on the roof").
+        minimumLeash = Mathf.Max(minimumLeash, SpawnPointSpan() + 20f);
+
         if (despawnDistance > 0f && despawnDistance < minimumLeash)
         {
             Debug.LogWarning($"[LevelManager] Despawn Distance ({despawnDistance:0}m) is too close to " +
-                             $"the spawn ring ({MaxSpawnDistance:0}m); enemies would be " +
+                             $"the spawn ring or spawn points ({minimumLeash - 20f:0}m); enemies would be " +
                              $"culled on arrival. Raised to {minimumLeash:0}m.", this);
             despawnDistance = minimumLeash;
         }
 
         _levelRoutine = StartCoroutine(RunLevel());
+    }
+
+    /// <summary>The widest gap between any two fixed spawn points: the farthest an enemy can start from the player.</summary>
+    float SpawnPointSpan()
+    {
+        if (spawnPoints == null) return 0f;
+
+        float widest = 0f;
+        for (int i = 0; i < spawnPoints.Length; i++)
+        {
+            if (spawnPoints[i] == null) continue;
+            for (int j = i + 1; j < spawnPoints.Length; j++)
+                if (spawnPoints[j] != null)
+                    widest = Mathf.Max(widest, Vector3.Distance(spawnPoints[i].position, spawnPoints[j].position));
+        }
+
+        return widest;
     }
 
     void OnDestroy()
@@ -934,7 +968,7 @@ public class LevelManager : MonoBehaviour
         if (Time.time < tracked.nextReachCheck) return tracked.routeBlocked;
 
         tracked.nextReachCheck = Time.time + Mathf.Max(0.25f, reachCheckInterval);
-        tracked.routeBlocked = !CanReachPlayerFrom(tracked.go.transform.position);
+        tracked.routeBlocked = !CanReachPlayerFrom(tracked.go.transform.position, allowPartial: true);
 
         return tracked.routeBlocked;
     }
@@ -1395,7 +1429,7 @@ public class LevelManager : MonoBehaviour
     /// refusing on an unanswerable question spawns nothing at all.
     /// </para>
     /// </summary>
-    bool CanReachPlayerFrom(Vector3 from)
+    bool CanReachPlayerFrom(Vector3 from, bool allowPartial = false)
     {
         if (!requireReachableSpawns || player == null) return true;
 
@@ -1405,8 +1439,20 @@ public class LevelManager : MonoBehaviour
 
         var route = Route;
 
-        return NavMesh.CalculatePath(from, target.position, NavMesh.AllAreas, route)
-            && route.status == NavMeshPathStatus.PathComplete;
+        if (!NavMesh.CalculatePath(from, target.position, NavMesh.AllAreas, route)) return false;
+        if (route.status == NavMeshPathStatus.PathComplete) return true;
+
+        // A partial route runs to the nearest reachable point to the target. For the leash that is good
+        // enough when it ends near the player: the player is on a roof or a ledge off the walkable ground,
+        // and the enemy can still come and stand under them. A sealed shed's partial route ends far away.
+        if (allowPartial && partialReachRadius > 0f && route.status == NavMeshPathStatus.PathPartial
+            && route.corners.Length > 0)
+        {
+            Vector3 end = route.corners[route.corners.Length - 1];
+            return (end - player.position).sqrMagnitude <= partialReachRadius * partialReachRadius;
+        }
+
+        return false;
     }
 
     bool TryUseFixedSpawnPoint(out Vector3 position)

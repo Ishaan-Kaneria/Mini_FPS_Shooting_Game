@@ -200,9 +200,9 @@ namespace FPSKit.EditorTools
                 }
             td.SetHeights(0, 0, h);
 
-            var moss = MakeLayer("FG_Moss", FindTex("Assets/Flooded_Grounds/Content/Textures", "GR_Moss1_AS"), FindTex("Assets/Flooded_Grounds/Content/Textures", "GR_Moss1_N"), 10f);
-            var dirt = MakeLayer("FG_Dirt", FindTex("Assets/Flooded_Grounds/Content/Textures", "GR_Dirt1_AS"), FindTex("Assets/Flooded_Grounds/Content/Textures", "GR_Dirt1_N"), 10f);
-            var asph = MakeLayer("FG_Asphalt", FindTex("Assets/Flooded_Grounds/Content/Textures", "GR_Asphalt1_AS"), FindTex("Assets/Flooded_Grounds/Content/Textures", "GR_Asphalt1_N"), 20f);
+            var moss = MakeLayer("FG_Moss", FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "GR_Moss1_AS"), FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "GR_Moss1_N"), 10f);
+            var dirt = MakeLayer("FG_Dirt", FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "GR_Dirt1_AS"), FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "GR_Dirt1_N"), 10f);
+            var asph = MakeLayer("FG_Asphalt", FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "GR_Asphalt1_AS"), FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "GR_Asphalt1_N"), 20f);
             var mud = MakeLayer("FG_WetMud", FindTex(ThirdParty, "brown_mud_leaves_01_diff_2k"), FindTex(ThirdParty, "brown_mud_leaves_01_nor_gl_2k"), 6f);
             td.terrainLayers = new[] { moss, dirt, asph, mud };
 
@@ -345,7 +345,7 @@ namespace FPSKit.EditorTools
             if (mat == null)
             {
                 mat = new Material(Shader.Find("Fairground/FG_Water_URP"));
-                var normal = FindTex("Assets/Flooded_Grounds/Content/Textures", "BGR_Ocean_N");
+                var normal = FindTex("Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures", "BGR_Ocean_N");
                 mat.SetTexture("_BumpMap", normal);
                 mat.SetTexture("_BumpMap2", normal);
                 // Tuned in the night test: dark and murky, soft reflections (bright silver at smoothness 0.95).
@@ -367,7 +367,7 @@ namespace FPSKit.EditorTools
 
         static GameObject FindPackPrefab(string name)
         {
-            foreach (var g in AssetDatabase.FindAssets(name + " t:Prefab", new[] { "Assets/Flooded_Grounds/Prefabs" }))
+            foreach (var g in AssetDatabase.FindAssets(name + " t:Prefab", new[] { "Assets/Fairground/ThirdParty/FloodedGrounds/Prefabs" }))
             {
                 string p = AssetDatabase.GUIDToAssetPath(g);
                 if (Path.GetFileNameWithoutExtension(p) == name) return AssetDatabase.LoadAssetAtPath<GameObject>(p);

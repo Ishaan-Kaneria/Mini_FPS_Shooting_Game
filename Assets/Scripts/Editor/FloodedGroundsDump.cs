@@ -17,8 +17,8 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static class FloodedGroundsDump
     {
-        const string ScenePath = "Assets/Flooded_Grounds/Scenes/Scene_A.unity";
-        const string PackRoot = "Assets/Flooded_Grounds";
+        const string ScenePath = "Assets/Fairground/ThirdParty/FloodedGrounds/Scenes/Scene_A.unity";
+        const string PackRoot = "Assets/Fairground/ThirdParty/FloodedGrounds";
 
         [MenuItem("Tools/MiniFPS/Fairground/Dump Flooded Grounds Look")]
         public static void Run()

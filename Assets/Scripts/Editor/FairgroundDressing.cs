@@ -100,7 +100,7 @@ namespace FPSKit.EditorTools
         static GameObject Pack(string name)
         {
             if (PackCache.TryGetValue(name, out var gobj)) return gobj;
-            foreach (var guid in AssetDatabase.FindAssets(name + " t:Prefab", new[] { "Assets/Flooded_Grounds/Prefabs" }))
+            foreach (var guid in AssetDatabase.FindAssets(name + " t:Prefab", new[] { "Assets/Fairground/ThirdParty/FloodedGrounds/Prefabs" }))
             {
                 string p = AssetDatabase.GUIDToAssetPath(guid);
                 if (Path.GetFileNameWithoutExtension(p) == name) { gobj = AssetDatabase.LoadAssetAtPath<GameObject>(p); break; }

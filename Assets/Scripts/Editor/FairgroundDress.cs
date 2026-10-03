@@ -155,7 +155,7 @@ namespace FPSKit.EditorTools
         static GameObject Pack(string name)
         {
             if (PackCache.TryGetValue(name, out var g)) return g;
-            foreach (var guid in AssetDatabase.FindAssets(name + " t:Prefab", new[] { "Assets/Flooded_Grounds/Prefabs" }))
+            foreach (var guid in AssetDatabase.FindAssets(name + " t:Prefab", new[] { "Assets/Fairground/ThirdParty/FloodedGrounds/Prefabs" }))
             {
                 string p = AssetDatabase.GUIDToAssetPath(guid);
                 if (Path.GetFileNameWithoutExtension(p) == name) { g = AssetDatabase.LoadAssetAtPath<GameObject>(p); break; }
@@ -608,7 +608,7 @@ namespace FPSKit.EditorTools
             terr.terrainData = td;
             terr.GetComponent<TerrainCollider>().terrainData = td;
 
-            const string pack = "Assets/Flooded_Grounds/Content/Textures";
+            const string pack = "Assets/Fairground/ThirdParty/FloodedGrounds/Content/Textures";
             td.terrainLayers = new[]
             {
                 Layer("D_DeadGround", FindTex(pack, "GR_Dirt1_AS"), FindTex(pack, "GR_Dirt1_N"), 9f),

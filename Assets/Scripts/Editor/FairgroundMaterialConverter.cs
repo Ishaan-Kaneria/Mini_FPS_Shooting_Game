@@ -22,9 +22,9 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static class FairgroundMaterialConverter
     {
-        public const string PackMaterials = "Assets/Flooded_Grounds/Content/Materials";
-        public const string PackTrees = "Assets/Flooded_Grounds/Prefabs/Nature/Trees";
-        public const string PackGrass = "Assets/Flooded_Grounds/Prefabs/Nature/Grass";
+        public const string PackMaterials = "Assets/Fairground/ThirdParty/FloodedGrounds/Content/Materials";
+        public const string PackTrees = "Assets/Fairground/ThirdParty/FloodedGrounds/Prefabs/Nature/Trees";
+        public const string PackGrass = "Assets/Fairground/ThirdParty/FloodedGrounds/Prefabs/Nature/Grass";
         public const string OutMaterials = "Assets/Fairground/Materials";
         public const string OutPrefabs = "Assets/Fairground/Prefabs";
 

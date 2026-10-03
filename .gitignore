@@ -159,3 +159,7 @@ InitTestScene*.unity*
 # Editor swap files (machine-specific)
 *.swp
 *.swo
+
+# The part of the Flooded Grounds pack the Fairground still uses (moved out of Assets/Flooded_Grounds; same licence rule: not redistributed).
+/Assets/Fairground/ThirdParty/FloodedGrounds/
+/Assets/Fairground/ThirdParty/FloodedGrounds.meta

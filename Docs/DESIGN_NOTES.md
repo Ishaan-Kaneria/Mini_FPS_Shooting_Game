@@ -2632,3 +2632,13 @@ Ishaan fell off the fire escapes whenever he missed the turn at a landing, found
 **RooftopQuality (2026-10-03):** `Runtime/RooftopQuality.cs`, wired by `BuildCityZone` onto `Arena/RooftopQuality` (80 lamp lights, 32 roof lights). Low: no lamp lights,
 every third roof light, shadows 45 m / 2 cascades; Medium: every other lamp light, every roof light, 60 m / 2; High: all, 55 m / 3. The pipeline asset's
 shadow range is saved and restored on disable, like `FairgroundQuality`: never call `Apply` on it in edit mode (nothing restores it). Reach check unchanged.
+
+## Flooded Grounds pack trimmed to what the Fairground uses (2026-10-03)
+
+The Asset Store pack was 2.6 GB in `Assets/Flooded_Grounds` (gitignored). The Fairground scene and every asset under `Assets/Fairground` depend on 187 of its files (1.29 GB of
+source textures, trees, meshes, props); the other 1.3 GB (demo scenes, unused textures) was deleted. The 187 were moved with `AssetDatabase.MoveAsset` (GUIDs kept, so no
+reference broke) to `Assets/Fairground/ThirdParty/FloodedGrounds/` with the same internal layout, and the builders' path constants point there. That folder is **gitignored** (the pack's
+licence is why the old one was): a fresh clone must re-import the pack (`Flooded Grounds.unitypackage`, ~/.local/share/unity3d/Asset Store-5.x) and move those files; the list of 187 is
+whatever `AssetDatabase.GetDependencies` returns for `AbandonedFairground.unity` plus `Assets/Fairground`.
+Two traps: `AssetDatabase.CreateFolder` inside `StartAssetEditing` is deferred, so every move failed ("parent directory is not in the database") and left empty junk folders; create folders first.
+And deleting folders on disk leaves the database remembering them until `refresh_unity`. The MCP `execute_code` tool blocks `AssetDatabase.DeleteAsset`.

@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: NightRooftop
   m_EditorClassIdentifier: Assembly-CSharp::LevelTheme
   themeName: Night Rooftop
-  displayName: 
-  description: City night. Dark sky, warm practicals, heavy bloom.
+  displayName: Night Citylife
+  description: 'City night. A lit street grid under a moon: crossings, signals, lamps and roofs to fight across.'
   enemyRoster:
   - {fileID: 11400000, guid: 4f0e13af1889e1ced9c6cb75b0b60c3a, type: 2}
   - {fileID: 11400000, guid: 3087232d41aa4c2ce83eda1109bb6f66, type: 2}

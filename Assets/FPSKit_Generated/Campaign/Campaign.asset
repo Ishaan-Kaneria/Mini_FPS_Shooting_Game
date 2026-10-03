@@ -92,7 +92,7 @@ MonoBehaviour:
     extraBeatSibling: -1
     starsToUnlock: 24
     grantsPower: 
-  - displayName: Night Rooftop
+  - displayName: Night Citylife
     levels: {fileID: 11400000, guid: eafd0b974f354d6e09074c7a1181b549, type: 2}
     siblingIndex: 3
     opening: Ilsa runs what the company calls security, which is every camera in the city and the decision about which recordings exist. She has watched you for twenty years and filed none of it.

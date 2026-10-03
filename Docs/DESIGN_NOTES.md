@@ -2642,3 +2642,12 @@ licence is why the old one was): a fresh clone must re-import the pack (`Flooded
 whatever `AssetDatabase.GetDependencies` returns for `AbandonedFairground.unity` plus `Assets/Fairground`.
 Two traps: `AssetDatabase.CreateFolder` inside `StartAssetEditing` is deferred, so every move failed ("parent directory is not in the database") and left empty junk folders; create folders first.
 And deleting folders on disk leaves the database remembering them until `refresh_unity`. The MCP `execute_code` tool blocks `AssetDatabase.DeleteAsset`.
+
+## Lite working copies for a laptop that overheats (2026-10-03)
+
+This laptop's cooling fails under the editor (fans read 0 RPM, package 90-110 C, forced shutdowns). `FPSKit > Lite > Make Lite Copy of Open Scene` (`FPSKitLite.cs`) saves the open arena
+as `Scenes/Lite/<Name>_Lite.unity` and reduces the copy only (the original is saved as a copy first, never edited; a dirty scene is refused). It switches off every shadow caster and the camera's
+shadow pass, keeps the twelve strongest lights with no shadows, switches particles off, removes half the trees, tiny props and LOD-grouped clutter, makes LODs drop 1.8x sooner, shortens the far plane,
+clones the post-processing profile and switches off DoF/motion blur/grain/aberration/lens in the clone, drops the tier rigs, and adds `LiteSceneSettings` (30 fps cap, texture mip limit 2 while playing, restored on stop).
+Fairground: 4,857 -> 3,567 mesh renderers, 4,807 -> 0 shadow casters. A Lite scene is not in the build settings, so the in-game restart cannot reload it; it is for editing and play-testing in the editor.
+Shared assets are never written (the terrain asset is shared, so only the Terrain component's own distances are changed). Not measured: frame time or temperature in play.

@@ -10,48 +10,48 @@ using UnityEngine.Rendering.Universal;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// Makes a lightweight working copy of whichever arena scene is open, for a laptop whose cooling cannot keep up
+    /// Makes a reduced copy of whichever arena scene is open, for a laptop whose cooling cannot keep up
     /// with the real thing (the Fairground is 4,857 renderers and 3.9 M triangles across its LODs; the editor on this
     /// machine has hit 110 C and been shut down by it).
     ///
-    /// The copy is saved beside the original in <c>Scenes/Lite</c> and the original is never modified: the scene is saved
+    /// The copy is saved beside the original in <c>Scenes/Reduced</c> and the original is never modified: the scene is saved
     /// as a copy first and the copy is the one opened and reduced. Everything reduced is visual; colliders, the navigation
     /// bake, spawn points and the level logic are untouched, so the copy still plays. Shared assets are never written:
     /// the post-processing profile is cloned before it is edited.
     ///
     /// What it does: no shadow casters and no camera shadow pass, the strongest dozen lights only and none with shadows,
     /// particles off, vegetation and tiny props thinned, LODs that drop sooner, a shorter far plane, the expensive post
-    /// effects off, and a <see cref="LiteSceneSettings"/> that caps the frame rate and quarters texture size while playing.
+    /// effects off, and a <see cref="ArenaPerformance"/> that caps the frame rate and quarters texture size while playing.
     /// </summary>
-    public static class FPSKitLite
+    public static class FPSKitReducedCopy
     {
-        const string Folder = "Assets/FPSKit_Generated/Scenes/Lite";
-        const string ProfileFolder = Folder + "/Profiles";
+        const string Folder = "Assets/FPSKit_Generated/Scenes/Reduced";
+        const string ProfileFolder = "Assets/FPSKit_Generated/Profiles";
 
-        [MenuItem("FPSKit/Lite/Make Lite Copy of Open Scene")]
-        static void Menu() => Debug.Log("[FPSKit] " + MakeLiteCopy());
+        [MenuItem("FPSKit/Performance/Make Reduced Copy of Open Scene")]
+        static void Menu() => Debug.Log("[FPSKit] " + MakeReducedCopy());
 
-        public static string MakeLiteCopy()
+        public static string MakeReducedCopy()
         {
             var scene = EditorSceneManager.GetActiveScene();
             if (!scene.IsValid() || string.IsNullOrEmpty(scene.path)) return "Open a saved arena scene first.";
-            if (scene.name.EndsWith("_Lite")) return "This is already a Lite scene.";
+            if (scene.name.EndsWith("_Reduced")) return "This is already a Reduced scene.";
             if (scene.isDirty) return "The open scene has unsaved changes: save or revert it first (the copy is made from what is open).";
 
-            Ensure("Assets/FPSKit_Generated/Scenes", "Lite");
-            Ensure(Folder, "Profiles");
+            Ensure("Assets/FPSKit_Generated/Scenes", "Reduced");
+            Ensure("Assets/FPSKit_Generated", "Profiles");
 
             string original = scene.name;
-            string path = $"{Folder}/{original}_Lite.unity";
+            string path = $"{Folder}/{original}_Reduced.unity";
             if (!EditorSceneManager.SaveScene(scene, path, true)) return "Could not write " + path;
-            var lite = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            var reduced = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Lite copy of {original}: {path}");
-            Reduce(lite, sb);
+            sb.AppendLine($"Reduced copy of {original}: {path}");
+            Reduce(reduced, sb);
 
-            EditorSceneManager.MarkSceneDirty(lite);
-            EditorSceneManager.SaveScene(lite);
+            EditorSceneManager.MarkSceneDirty(reduced);
+            EditorSceneManager.SaveScene(reduced);
             AssetDatabase.SaveAssets();
             return sb.ToString();
         }
@@ -161,7 +161,7 @@ namespace FPSKit.EditorTools
                 if (v.sharedProfile == null) continue;
                 // A real copy: Instantiate would share the component objects with the original profile.
                 var clone = ScriptableObject.CreateInstance<VolumeProfile>();
-                clone.name = $"{scene.name}_{v.name}_{vols}";
+                clone.name = $"{scene.name}_{v.name}";
                 AssetDatabase.CreateAsset(clone, $"{ProfileFolder}/{clone.name}.asset");
                 foreach (var c in v.sharedProfile.components)
                 {
@@ -181,8 +181,8 @@ namespace FPSKit.EditorTools
             sb.AppendLine($"  volume profiles cloned and trimmed: {vols}");
 
             // ---- the runtime cap ----
-            new GameObject("LiteSceneSettings").AddComponent<LiteSceneSettings>();
-            sb.AppendLine("  LiteSceneSettings added (30 fps cap, textures at quarter size while playing)");
+            new GameObject("ArenaPerformance").AddComponent<ArenaPerformance>();
+            sb.AppendLine("  ArenaPerformance added (30 fps cap, textures at quarter size while playing)");
         }
     }
 }

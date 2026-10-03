@@ -555,7 +555,10 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Night Rooftop":
-                    t.description = "City night. Dark sky, warm practicals, heavy bloom.";
+                    // Filed as Night Rooftop, shown as Night Citylife. The key names the save, the campaign
+                    // order and the scene; only what a player reads changes (see LevelTheme.displayName).
+                    t.displayName = "Night Citylife";
+                    t.description = "City night. A lit street grid under a moon: crossings, signals, lamps and roofs to fight across.";
 
                     // Poured roof deck and rendered parapets. Tiled tighter than the others
                     // because a rooftop is looked at from standing height and nothing is

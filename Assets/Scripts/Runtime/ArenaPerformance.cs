@@ -1,13 +1,13 @@
 using UnityEngine;
 
 /// <summary>
-/// Lives in a "_Lite" working copy of an arena (see FPSKitLite in the editor tools) and makes it cheap to run on a
+/// Lives in a reduced arena scene (see FPSKitReducedCopy in the editor tools) and makes it cheap to run on a
 /// laptop that overheats: it caps the frame rate and drops the texture resolution while the scene is playing, and
-/// gives both back when it stops. The copy itself has no shadow casters, few lights and thinned scenery.
+/// gives both back when it stops. The scene itself has no shadow casters, few lights and thinned scenery.
 ///
-/// Not part of any shipped arena: nothing builds it into the real scenes, and a Lite scene is not in the build settings.
+/// It is part of the shipped Night Citylife and Abandoned Fairground scenes; rebuilding either arena with the scene builder produces the full-quality scene without it.
 /// </summary>
-public class LiteSceneSettings : MonoBehaviour
+public class ArenaPerformance : MonoBehaviour
 {
     [Tooltip("Frame cap while this scene plays. Heat is roughly proportional to frames drawn, so 30 is about half the load of 60.")]
     [Range(15, 60)] public int targetFrameRate = 30;

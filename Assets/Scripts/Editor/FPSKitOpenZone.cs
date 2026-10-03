@@ -650,6 +650,9 @@ namespace FPSKit.EditorTools
             var vertices = new Vector3[(across + 1) * (along + 1)];
             var uvs = new Vector2[vertices.Length];
             var triangles = new List<int>(across * along * 6);
+            var riverDist = new float[vertices.Length];
+            bool cutRiver = IsDesertArena();
+            float cut = cutRiver ? BermRiverCut() : 0f;
 
             for (int a = 0; a <= across; a++)
             {
@@ -666,6 +669,7 @@ namespace FPSKit.EditorTools
 
                     vertices[a * (along + 1) + b] = new Vector3(x, BermHeightAt(x, z, u), z);
                     uvs[a * (along + 1) + b] = new Vector2(x, z);
+                    riverDist[a * (along + 1) + b] = cutRiver ? Mathf.Abs(x - GorgeCentreAt(z)) : float.MaxValue;
                 }
             }
 
@@ -676,6 +680,9 @@ namespace FPSKit.EditorTools
                     int v01 = v00 + 1;
                     int v10 = (a + 1) * (along + 1) + b;
                     int v11 = v10 + 1;
+
+                    // No ridge over the canyon: the river's corridor is left open.
+                    if (cutRiver && (riverDist[v00] < cut || riverDist[v01] < cut || riverDist[v10] < cut || riverDist[v11] < cut)) continue;
 
                     // Wound so the face is up whichever side of the arena this is.
                     //
@@ -762,8 +769,25 @@ namespace FPSKit.EditorTools
             float swell = 1f + Fbm2(x * 0.0045f, z * 0.0045f, _theme.randomSeed * 53 + 11, 2) * 0.42f
                              + Fbm2(x * 0.014f, z * 0.014f, _theme.randomSeed * 71 + 3, 3) * 0.2f;
 
-            return GroundHeightAt(x, z) - 0.5f + BermHeight * Mathf.Max(0.5f, swell) * profile;
+            float full = GroundHeightAt(x, z) - 0.5f + BermHeight * Mathf.Max(0.5f, swell) * profile;
+
+            // <b>The ridge gives way to the river.</b> It is a 23 m hill all the way round the arena, and
+            // the river runs out through it at both ends -- so the hill stood across the water with a
+            // thin notch in it, and from the bank it read as a mountain passing over the river (Ishaan,
+            // 2026-10-03). Along the river's corridor it is brought down to the ground and the mesh is
+            // cut open (see BuildBoundaryRun), so the canyon visibly runs out to the horizon.
+            if (IsDesertArena())
+            {
+                float dist = Mathf.Abs(x - GorgeCentreAt(z));
+                float keep = Mathf.SmoothStep(0f, 1f, (dist - BermRiverCut()) / 90f);
+                return Mathf.Lerp(GroundHeightAt(x, z) - 0.5f, full, keep);
+            }
+
+            return full;
         }
+
+        /// <summary>Half-width, from the river's centre line, of the opening in the boundary ridge: the water, the canyon and its lip.</summary>
+        private static float BermRiverCut() => _theme.hazardWidth * 0.5f + 34f;
 
         /// <summary>
         /// Rock standing out of the ridge: weathered sandstone the wind has not buried.
@@ -790,6 +814,9 @@ namespace FPSKit.EditorTools
 
                     float x = alongZ ? sign * outward : t;
                     float z = alongZ ? t : sign * outward;
+
+                    // None where the ridge has opened for the river.
+                    if (IsDesertArena() && Mathf.Abs(x - GorgeCentreAt(z)) < BermRiverCut() + 70f) continue;
 
                     // Buried against the lowest the ridge gets under the rock's own
                     // footprint. The ridge is a slope, so a flat base pinned to the

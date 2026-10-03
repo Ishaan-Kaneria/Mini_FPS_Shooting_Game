@@ -117,6 +117,12 @@ public class PlayerMotor : MonoBehaviour
     public float coyoteTime = 0.12f;
     public float jumpBuffer = 0.12f;
 
+    [Tooltip("Metres the player is pulled back down to the ground when they were standing on it a " +
+             "frame ago and have just lifted off without jumping. Going downhill, the ground falls " +
+             "away faster than gravity's small bias can follow, so each frame left the floor and " +
+             "landed again -- a jerk, a flickering head bob and phantom landings. 0 turns it off.")]
+    [Min(0f)] public float groundSnapDistance = 0.6f;
+
     [Header("Crouch")]
     public float standHeight = 1.8f;
     public float crouchHeight = 1.15f;
@@ -774,8 +780,10 @@ public class PlayerMotor : MonoBehaviour
         bool canGroundJump = _jumpsUsed == 0 && withinCoyote;
         bool canAirJump = _jumpsUsed > 0 && _jumpsUsed < maxJumps;
 
+        bool jumped = false;
         if (jumpQueued && !IsCrouching && (canGroundJump || canAirJump))
         {
+            jumped = true;
             // v = sqrt(2 * g * h) -- the launch speed that peaks at exactly jumpHeight.
             _velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
@@ -794,6 +802,27 @@ public class PlayerMotor : MonoBehaviour
         if ((flags & CollisionFlags.Above) != 0 && _velocity.y > 0f) _velocity.y = 0f;
 
         IsGrounded = _cc.isGrounded;
+
+        // Stay on the ground going downhill. Only when we were grounded a frame ago, are not rising and
+        // did not just jump, so jumps, ledges and falls behave exactly as before.
+        if (!IsGrounded && _wasGrounded && !jumped && _velocity.y <= 0f && groundSnapDistance > 0f)
+        {
+            float planarStep = new Vector2(_velocity.x, _velocity.z).magnitude * Time.deltaTime;
+            float reach = groundSnapDistance + planarStep * 0.6f;
+            Vector3 origin = transform.position + Vector3.up * (_cc.radius + 0.05f);
+
+            if (Physics.SphereCast(origin, _cc.radius * 0.9f, Vector3.down, out RaycastHit under,
+                                   reach + _cc.radius, ~0, QueryTriggerInteraction.Ignore)
+                && Vector3.Angle(under.normal, Vector3.up) <= _cc.slopeLimit + 1f)
+            {
+                float drop = Mathf.Max(0f, under.distance - 0.05f);
+                if (drop > 0.001f) _cc.Move(Vector3.down * drop);
+
+                IsGrounded = _cc.isGrounded || drop <= reach;
+                _velocity.y = -2f;
+            }
+        }
+
         if (IsGrounded && !_wasGrounded) OnLanded(impactSpeed);
         _wasGrounded = IsGrounded;
 

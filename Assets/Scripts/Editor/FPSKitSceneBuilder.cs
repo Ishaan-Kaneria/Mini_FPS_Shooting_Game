@@ -602,6 +602,22 @@ namespace FPSKit.EditorTools
             sun.shadows = LightShadows.Soft;
 
             _theme.ApplyEnvironment(sun, CreateSkybox());
+
+            // <b>A bounce light from the far side of the sun (desert).</b> A face turned away from the sun
+            // gets ambient light and nothing else, so beside sunlit sand it came out chocolate brown --
+            // the "black shade" on walls, stairs and props (Ishaan, 2026-10-03). Sand throws a lot of
+            // light back up and sideways; a second, weak, shadowless directional light from the opposite
+            // side stands in for it. It lifts every shaded face by the same amount and leaves the sunlit
+            // ones, and the shadows, as they were.
+            if (IsDesertArena())
+            {
+                var bounce = new GameObject("Bounce Light").AddComponent<Light>();
+                bounce.type = LightType.Directional;
+                bounce.shadows = LightShadows.None;
+                bounce.color = new Color(1f, 0.86f, 0.68f);
+                bounce.intensity = 0.55f;
+                bounce.transform.rotation = Quaternion.Euler(_theme.sunAngles.x * 0.6f, _theme.sunAngles.y + 180f, 0f);
+            }
         }
 
         private static Material CreateSkybox()

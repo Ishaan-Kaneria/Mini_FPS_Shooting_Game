@@ -266,7 +266,7 @@ namespace FPSKit.EditorTools
                     t.atmosphereThickness = 1.15f;
                     t.skyExposure = 1.45f;
                     t.sunColor = new Color(1f, 0.90f, 0.72f);
-                    t.sunIntensity = 1.6f;
+                    t.sunIntensity = 1.4f;
                     // Mid-afternoon rather than noon, and this is a terrain decision more
                     // than a lighting one. A dune is read entirely through the shading
                     // across its own slope, and a sun sixty-eight degrees up puts almost

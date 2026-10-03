@@ -138,6 +138,13 @@ namespace FPSKit.EditorTools
                     c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.45f);
                     c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.1f);
                     c |= SetFloat(m.FindPropertyRelative("Radius"), 0.18f);
+
+                    // And off, in the end (2026-10-03). Even softened, four-sample SSAO leaves a dithered dark
+                    // fringe on every wall edge and a mottled darkening on any wall close to the camera,
+                    // which on the desert's rounded mud brick read as black grime. The scene lighting
+                    // (ambient, bounce light, shadow strength) carries the shading instead, and it saves
+                    // the pass's cost on the laptop.
+                    c |= SetBool(so.FindProperty("m_Active"), false);
                     if (c) { so.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(f); EditorUtility.SetDirty(data); changed = true; }
                 }
             }

@@ -370,12 +370,17 @@ namespace FPSKit.EditorTools
             // Drum, three hoops round it, a domed lid and a hatch.
             var bottom = at + Vector3.up * y0;
             var topC = at + Vector3.up * (y0 + h);
-            tank.Tube(bottom, topC, r, r, 18);
+            tank.Tube(bottom, topC, r, r, 40);
             foreach (float t in new[] { 0.2f, 0.5f, 0.8f })
-                tank.Tube(bottom + Vector3.up * (h * t - 0.025f), bottom + Vector3.up * (h * t + 0.025f), r + 0.014f, r + 0.014f, 18);
-            tank.Tube(topC, topC + Vector3.up * 0.1f, r, r * 0.62f, 18);
-            tank.Tube(topC + Vector3.up * 0.1f, topC + Vector3.up * 0.18f, r * 0.62f, r * 0.2f, 14);
-            tank.Tube(topC + rot * new Vector3(0.25f, 0.08f, 0.1f), topC + rot * new Vector3(0.25f, 0.2f, 0.1f), 0.12f, 0.12f, 10);
+                tank.Tube(bottom + Vector3.up * (h * t - 0.025f), bottom + Vector3.up * (h * t + 0.025f), r + 0.014f, r + 0.014f, 40);
+            // A rounded lid: four stacked rings following a circular arc, not a two-step cone.
+            for (int k = 0; k < 4; k++)
+            {
+                float a0 = k / 4f * 0.5f * Mathf.PI, a1 = (k + 1) / 4f * 0.5f * Mathf.PI;
+                tank.Tube(topC + Vector3.up * (0.2f * Mathf.Sin(a0)), topC + Vector3.up * (0.2f * Mathf.Sin(a1)),
+                          r * Mathf.Cos(a0), r * Mathf.Cos(a1) + 0.01f, 40);
+            }
+            tank.Tube(topC + rot * new Vector3(0.25f, 0.08f, 0.1f), topC + rot * new Vector3(0.25f, 0.2f, 0.1f), 0.12f, 0.12f, 20);
 
             // Standpipe down the side, with an elbow into the drum.
             var pipeTop = bottom + rot * new Vector3(r + 0.05f, 0.1f, 0f);

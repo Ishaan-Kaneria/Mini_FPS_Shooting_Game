@@ -2674,3 +2674,7 @@ first switched everything on **in memory only** (all 131 lights, directional sha
 **Night Citylife in the menu (2026-10-03):** `MainMenuController` builds the cards at run time from `Arenas.asset`, so no menu rebuild is needed for a rename: the Rooftop entry's `displayName`, `description` and `preview` were set directly
 (`Build Dashboard` would also do it, but it captures a preview of all seven arenas first). `ProgressKey` stays `NightRooftop`, which is the save key. The card folder follows the display name
 (`Assets/UI/Thumbnails/NightCitylife/`, as `FPSKitThumbnails.CardImage(displayName)` expects); the PNG imports at 512x256 (NPOT-to-nearest), which the 16:9 card frame stretches back. A later `Build Dashboard` finds the card by that folder.
+
+**Fixed (2026-10-03): `Shots.asset` loads now.** `ThumbnailShots` moved into its own file (`ThumbnailShots.cs`, a ScriptableObject class must live in a file of the same name), and both `Shots.asset` files had their `m_Script` patched to its GUID
+(text edit, so the assets keep their identity). The earlier note about the broken reference no longer applies. Night Citylife's card camera is stored there now (`(-72, 1.25, -1.2)` -> `(30, 19, 8)`, FOV 56, exposure 1.1).
+Caveat: `CaptureArena` renders the shipped scene as saved (lights, moon shadows and shadow casters off), so it will not reproduce the card exactly; the card was rendered after switching those on in memory (see above).

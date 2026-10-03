@@ -117,7 +117,9 @@ namespace FPSKit.EditorTools
 
             var buildings = new GameObject("Buildings").transform;
             buildings.SetParent(root, false);
+            BeginRoofLights(root);
             foreach (var lot in _lots) BuildCityBuilding(buildings, layer, rng, lot);
+            EndRoofLights(root, backdrop);
 
             var bridges = new GameObject("Skybridges").transform;
             bridges.SetParent(root, false);
@@ -478,6 +480,9 @@ namespace FPSKit.EditorTools
             }
 
             _cityRoof = MakeMaterial("CityRoof", new Color(0.13f, 0.13f, 0.14f), 0.12f, 0f);
+            // Lifted off near black so a roof reads under the moon; MakeMaterial leaves an existing asset alone, so set it.
+            _cityRoof.SetColor("_BaseColor", new Color(0.30f, 0.31f, 0.34f));
+            EditorUtility.SetDirty(_cityRoof);
             _cityTrim = MakeMaterial("CityTrim", new Color(0.30f, 0.30f, 0.31f), 0.08f, 0f);
             _cityPlant = MakeMaterial("CityPlant", new Color(0.36f, 0.38f, 0.40f), 0.30f, 0.55f);
             _cityDark = MakeMaterial("CityDark", new Color(0.04f, 0.04f, 0.05f), 0.20f, 0.3f);

@@ -14,7 +14,7 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static partial class FPSKitSceneBuilder
     {
-        private static Material _cityPaving, _cityKerb, _cityPool, _tlRed, _tlAmber, _tlGreen, _tlOff, _tlWalk, _tlStop;
+        private static Material _cityPaving, _cityKerb, _cityPool, _roofPool, _tlRed, _tlAmber, _tlGreen, _tlOff, _tlWalk, _tlStop;
 
         /// <summary>Rectangles (x0, z0, x1, z1) of every crossing laid, so a parked car is never put across one.</summary>
         private static readonly List<Vector4> _cityCrossings = new List<Vector4>();
@@ -86,7 +86,7 @@ namespace FPSKit.EditorTools
 
         private static void EnsureRoadMaterials()
         {
-            if (_cityPaving != null && _tlRed != null && _cityPool != null) return;
+            if (_cityPaving != null && _tlRed != null && _cityPool != null && _roofPool != null) return;
 
             var paving = MakeMaterial("CityPaving", new Color(1.05f, 1.05f, 1.08f), 0.10f, 0f);
             var tex = LoadDetail("City_Paving");
@@ -100,6 +100,7 @@ namespace FPSKit.EditorTools
             Matte(_cityKerb, 0.08f);
 
             _cityPool = ParticleMaterial("LampPool", "City_LampPool", additive: true, new Color(1.0f, 0.70f, 0.42f) * 0.60f);
+            _roofPool = ParticleMaterial("RoofPool", "City_LampPool", additive: true, new Color(1.0f, 0.82f, 0.58f) * 1.35f);
 
             _tlRed = Glow("CitySignalRed", new Color(1.0f, 0.07f, 0.04f), 6f);
             _tlAmber = Glow("CitySignalAmber", new Color(1.0f, 0.55f, 0.04f), 5f);
@@ -362,6 +363,148 @@ namespace FPSKit.EditorTools
             var go = MeshObject(group, name, ToMesh(build, "city" + name.ToLowerInvariant()), mat, Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false);
             Hide(go);
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        // ==================================================================
+        // Roof lighting
+        // ==================================================================
+        private static readonly List<(Vector3 c, float hx, float hz)> _roofPools = new List<(Vector3, float, float)>();
+        private static MeshBuild _roofHeads;
+        private static Transform _roofLights;
+
+        private static void BeginRoofLights(Transform root)
+        {
+            EnsureStreetMaterials();
+            EnsureRoadMaterials();
+            _roofPools.Clear();
+            _roofHeads = new MeshBuild { UVScale = 1f };
+            _roofLights = new GameObject("RoofLights").transform;
+            _roofLights.SetParent(root, false);
+        }
+
+        /// <summary>
+        /// Two floodlight posts on a walkable roof, on the corners that are clear of every stair and bridge
+        /// landing and of the plant, each throwing a pool of warm light across the deck, and one real light over
+        /// the roof. A roof used to be a black plate under the moon: the lit windows below it did not reach it.
+        /// </summary>
+        private static void AddRoofLights(MeshBuild plant, CityLot lot, List<Vector2> placed, List<Vector3> clear, System.Random rng)
+        {
+            if (_roofHeads == null) return;
+            float y = lot.Height;
+            var centre = new Vector3(lot.Centre.x, y, lot.Centre.z);
+            const float inset = 2.6f;
+            var corners = new[]
+            {
+                new Vector2(lot.x0 + inset, lot.z0 + inset), new Vector2(lot.x1 - inset, lot.z1 - inset),
+                new Vector2(lot.x0 + inset, lot.z1 - inset), new Vector2(lot.x1 - inset, lot.z0 + inset),
+            };
+
+            bool Valid(Vector2 c)
+            {
+                foreach (var k in clear) if (Vector2.Distance(new Vector2(k.x, k.z), c) < 7f) return false;
+                foreach (var q in placed) if (Vector2.Distance(q, c) < 3.4f) return false;
+                return true;
+            }
+
+            var chosen = new List<Vector2>();
+            int start = rng.Next(0, 4);
+            for (int i = 0; i < 4 && chosen.Count < 2; i++)
+            {
+                var c = corners[(start + i) % 4];
+                if (!Valid(c)) continue;
+                if (chosen.Count == 1 && Vector2.Distance(chosen[0], c) < 8f) continue;
+                chosen.Add(c);
+            }
+
+            // Corner markers on the parapet: a small amber lamp at each corner of the roof, so its outline reads from the street.
+            foreach (var cx in new[] { lot.x0 + 0.45f, lot.x1 - 0.45f })
+                foreach (var cz in new[] { lot.z0 + 0.45f, lot.z1 - 0.45f })
+                    _roofHeads.Box(new Vector3(cx, y + ParapetHigh + 0.12f, cz), new Vector3(0.28f, 0.22f, 0.28f), Quaternion.identity);
+
+            var tips = new List<Vector3>();
+            bool first = true;
+            foreach (var c in chosen)
+            {
+                var basePos = new Vector3(c.x, y, c.y);
+                var toward = centre - basePos; toward.y = 0f; toward.Normalize();
+                var top = basePos + Vector3.up * 4.4f;
+                var tip = top + toward * 1.2f;
+                plant.Tube(basePos, basePos + Vector3.up * 0.3f, 0.2f, 0.12f, 8);
+                plant.Tube(basePos + Vector3.up * 0.25f, top, 0.09f, 0.07f, 8);
+                plant.Tube(top - Vector3.up * 0.1f, tip, 0.05f, 0.05f, 6);
+                _roofHeads.Box(tip + Vector3.down * 0.1f + toward * 0.15f, new Vector3(0.8f, 0.18f, 0.45f), Quaternion.LookRotation(toward));
+                _roofPools.Add((basePos + toward * 3.4f + Vector3.up * 0.05f, 8.5f, 8.5f));
+                tips.Add(tip + Vector3.down * 0.15f);
+
+                if (first)
+                {
+                    var go = new GameObject("RoofLight");
+                    go.transform.SetParent(_roofLights, false);
+                    go.transform.position = tip + Vector3.down * 0.3f;
+                    var l = go.AddComponent<Light>();
+                    l.type = LightType.Point;
+                    l.color = new Color(1.0f, 0.82f, 0.60f);
+                    l.intensity = 10f;
+                    l.range = 26f;
+                    l.shadows = LightShadows.None;
+                    first = false;
+                }
+            }
+
+            // String lights between the two posts: a sagging line of warm bulbs on a thin wire, high enough to walk under.
+            if (tips.Count == 2)
+            {
+                float span = Vector3.Distance(tips[0], tips[1]);
+                if (span > 6f && span < 48f)
+                {
+                    int bulbs = Mathf.RoundToInt(span / 1.1f);
+                    Vector3 Pt(float t) => Vector3.Lerp(tips[0], tips[1], t) - Vector3.up * (1.0f * 4f * t * (1f - t));
+                    for (int i = 0; i <= bulbs; i++)
+                    {
+                        float t = i / (float)bulbs;
+                        _roofHeads.Box(Pt(t) - Vector3.up * 0.10f, new Vector3(0.16f, 0.16f, 0.16f), Quaternion.identity);
+                        if (i < bulbs)
+                        {
+                            var a = Pt(t); var b2 = Pt((i + 1) / (float)bulbs);
+                            plant.Box((a + b2) * 0.5f, new Vector3(0.03f, 0.03f, Vector3.Distance(a, b2)), Quaternion.LookRotation(b2 - a));
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void EndRoofLights(Transform root, int layer)
+        {
+            if (_roofHeads == null) return;
+            var group = new GameObject("RoofLighting").transform;
+            group.SetParent(root, false);
+
+            var heads = MeshObject(group, "RoofLampHeads", ToMesh(_roofHeads, "cityroofheads"), _cityLamp, Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false);
+            NoStanding(heads);
+            heads.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            if (_roofPools.Count > 0)
+            {
+                var v = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+                foreach (var p in _roofPools)
+                {
+                    int i0 = v.Count;
+                    v.Add(p.c + new Vector3(-p.hx, 0f, -p.hz)); uv.Add(new Vector2(0f, 0f));
+                    v.Add(p.c + new Vector3(-p.hx, 0f, p.hz)); uv.Add(new Vector2(0f, 1f));
+                    v.Add(p.c + new Vector3(p.hx, 0f, p.hz)); uv.Add(new Vector2(1f, 1f));
+                    v.Add(p.c + new Vector3(p.hx, 0f, -p.hz)); uv.Add(new Vector2(1f, 0f));
+                    t.AddRange(new[] { i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3 });
+                }
+                var mesh = new Mesh { name = "cityroofpools" };
+                mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetTriangles(t, 0);
+                mesh.RecalculateNormals(); mesh.RecalculateBounds();
+                var go = MeshObject(group, "RoofPools", mesh, _roofPool, Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false);
+                Hide(go);
+                var r = go.GetComponent<MeshRenderer>();
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+            _roofHeads = null;
         }
     }
 }

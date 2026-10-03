@@ -2606,3 +2606,25 @@ reach check is unchanged (32/32 roofs, 16/16 spawns, 800/800 samples, 11.2 k tri
   every second lamp has a real unshadowed spot (80 lights; scene total 99). URP allows only 4 additional lights per object (`PC_RPAsset`), so
   real lamp lights are decoration for walls and cars; the pools carry the look. The 80 sit under `StreetFurniture/LampLights`: a `RooftopQuality`
   rig should thin them per tier (the next step).
+
+## Night Rooftop: stairs, cars, night, roofs (2026-10-03, second pass)
+
+Ishaan fell off the fire escapes whenever he missed the turn at a landing, found the night too dark, the cars cartoony and the roofs black.
+
+- **Fire escapes:** every flight now has a handrail on both sides, a toe plate and a baluster every second tread; every landing a full perimeter rail
+  with balusters and an amber lamp cage at the corner (a marker for the turn). Under the rails are **invisible `BoxCollider` guards**
+  (children of the `FireEscape`, 1.2-1.3 m tall, tilted along each flight) so overshooting a landing is a bump, not a fall. Colliders without a
+  renderer are ignored by the bake (`CollectObjects.All` collects render meshes), so the layout and the reach check are unchanged.
+- **Cars:** `FPSKitCityCars.cs`. The pack's only cars are rusted wrecks of 8-21 k triangles each and no download source is configured
+  (Sketchfab has no token), so cars are built in code: a ten-point ring lofted along the length (hood, deck, greenhouse, tail), glass,
+  arches, tyres, rims, head and tail lamps, bumpers, mirrors, plates; three shapes (sedan, hatch, SUV), ~1 k triangles, six submeshes so
+  one renderer per car, two `BoxCollider`s instead of a mesh collider. `Mathf.SmoothStep(a, b, t)` is an interpolation, not the shader
+  smoothstep: use `Sm`. Parked nose to the flow of the lane (traffic keeps right).
+- **Night:** moon 0.35 -> 1.05, ambient up ~2x, post exposure 0.35 -> 0.85, lighter fog. `FPSKitCitySky.cs` paints the sky panorama (gradient with a city
+  glow at the horizon, ~6500 stars thinned toward the horizon and hidden by cloud, cloud banks lit from the streets, a moon placed opposite the
+  directional light) and `ReflectSky` makes it the reflection. `CreateSkybox` returns it for `rooftopZone`.
+  Theme numbers changed in `Configure`, so only that theme was reset (`Configure` called for "Night Rooftop" alone, not `ResetAll`).
+- **Roofs:** the roof material was near black (0.13); now 0.30 (set explicitly, `MakeMaterial` leaves an existing asset alone). Each walkable roof
+  gets two floodlight posts on corners clear of stairs and plant, an additive warm pool under each, a real point light, string lights between
+  the posts and amber corner lamps on the parapet. Lights: 131 in the scene (99 -> 131), 539 k triangles. **A quality rig must thin the lamp
+  and roof lights per tier before this ships on Medium/Low.**

@@ -568,11 +568,11 @@ namespace FPSKit.EditorTools
                     t.skyGroundColor = new Color(0.06f, 0.07f, 0.10f);
                     t.atmosphereThickness = 0.4f;
                     t.skyExposure = 0.45f;
-                    t.sunColor = new Color(0.55f, 0.65f, 0.95f);   // moonlight
-                    t.sunIntensity = 0.35f;
+                    t.sunColor = new Color(0.62f, 0.72f, 1.00f);   // moonlight
+                    t.sunIntensity = 1.05f;
                     t.sunAngles = new Vector2(32f, 250f);
-                    t.shadowStrength = 0.6f;
-                    t.fogColor = new Color(0.09f, 0.11f, 0.17f);
+                    t.shadowStrength = 0.55f;
+                    t.fogColor = new Color(0.12f, 0.15f, 0.26f);
                     t.fogDensity = 0.016f;
                     t.ambientSky = new Color(0.12f, 0.15f, 0.24f);
                     t.ambientEquator = new Color(0.09f, 0.10f, 0.14f);
@@ -591,11 +591,11 @@ namespace FPSKit.EditorTools
                     t.apronSize = 500f;
                     // 450 m: a night city district. The old 95 m box is gone; the lit windows, bridges and the
                     // fog are what carry the size, so the fog is light (it is exponential-squared).
-                    t.fogDensity = 0.0022f;
+                    t.fogDensity = 0.0016f;
                     t.skyExposure = 0.55f;
-                    t.ambientSky = new Color(0.16f, 0.19f, 0.30f);
-                    t.ambientEquator = new Color(0.13f, 0.14f, 0.20f);
-                    t.ambientGround = new Color(0.06f, 0.06f, 0.08f);
+                    t.ambientSky = new Color(0.30f, 0.36f, 0.54f);
+                    t.ambientEquator = new Color(0.22f, 0.25f, 0.36f);
+                    t.ambientGround = new Color(0.10f, 0.10f, 0.14f);
                     t.backdropCount = 60;
                     // Rooftops live or die on verticality.
                     t.roomCount = 3;
@@ -608,8 +608,8 @@ namespace FPSKit.EditorTools
                     t.accentLightIntensity = 14f;
                     t.accentLightRange = 16f;
                     t.bloomIntensity = 1.1f;
-                    t.postExposure = 0.35f;
-                    t.vignetteIntensity = 0.38f;
+                    t.postExposure = 0.85f;
+                    t.vignetteIntensity = 0.30f;
                     t.filmGrain = 0.35f;
                     t.randomSeed = 88;
                     break;

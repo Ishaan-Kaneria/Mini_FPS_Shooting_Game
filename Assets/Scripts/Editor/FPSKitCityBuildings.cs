@@ -263,6 +263,8 @@ namespace FPSKit.EditorTools
                 }
             }
 
+            AddRoofLights(b, lot, placed, clear, rng);
+
             var go = MeshObject(root, "RoofPlant", ToMesh(b, $"cityplant_{key}"), _cityPlant, Vector3.zero, Quaternion.identity,
                                 Vector3.one, layer, "Metal");
             NoStanding(go);
@@ -315,8 +317,12 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void BuildEscape(Transform parent, int layer, CityLot lot, int side, float anchor)
         {
+            EnsureStreetMaterials();
             int n = lot.floors;
             var b = new MeshBuild { UVScale = 0.5f };
+            var lamps = new MeshBuild { UVScale = 1f };
+            var guardList = new List<(Vector3 c, Vector3 size, float tilt)>();
+            void Guard(Vector3 c, Vector3 size, float tilt) => guardList.Add((c, size, tilt));
 
             const float laneA0 = 0.4f, laneA1 = 2.6f, laneB0 = 2.8f, laneB1 = 5.0f, mid = 2.7f, wide = 2.2f, land = EscapeLanding;
             const float tread = 0.30f, rise = 0.22f, run = 15 * tread;
@@ -341,14 +347,23 @@ namespace FPSKit.EditorTools
                 float rot = lane ? theta : -theta;
                 foreach (float off in new[] { -0.95f, 0.95f })
                     b.Box(new Vector3(run * 0.5f, y0 + FloorH * 0.5f - 0.18f, zc + off), new Vector3(stringerLen, 0.2f, 0.05f), Quaternion.Euler(0f, 0f, rot));
-                b.Box(new Vector3(run * 0.5f, y0 + FloorH * 0.5f + 0.95f, mid), new Vector3(stringerLen, 0.06f, 0.06f), Quaternion.Euler(0f, 0f, rot));
-                for (int k = 0; k <= 15; k += 5)
+                // Handrails on both sides of the flight (waist height), a toe plate under each, and a baluster every
+                // second tread. The invisible guards below make the same sides solid, so a missed turn is a bump, not a fall.
+                float railA = lane ? laneA0 + 0.03f : laneB0 + 0.03f, railB = lane ? laneA1 + 0.03f : laneB1 - 0.03f;
+                foreach (float rz in new[] { railA, railB })
                 {
-                    float u = lane ? k * tread : run - k * tread;
-                    b.Box(new Vector3(u, y0 + k * rise + 0.5f, mid), new Vector3(0.05f, 1.0f, 0.05f), Quaternion.identity);
+                    b.Box(new Vector3(run * 0.5f, y0 + FloorH * 0.5f + 1.00f, rz), new Vector3(stringerLen, 0.07f, 0.07f), Quaternion.Euler(0f, 0f, rot));
+                    b.Box(new Vector3(run * 0.5f, y0 + FloorH * 0.5f + 0.12f, rz), new Vector3(stringerLen, 0.12f, 0.03f), Quaternion.Euler(0f, 0f, rot));
+                    for (int k = 0; k <= 15; k += 2)
+                    {
+                        float u = lane ? k * tread : run - k * tread;
+                        b.Box(new Vector3(u, y0 + k * rise + 0.55f, rz), new Vector3(0.035f, 1.0f, 0.035f), Quaternion.identity);
+                    }
                 }
-                if (!lane)
-                    b.Box(new Vector3(run * 0.5f, y0 + FloorH * 0.5f + 0.95f, laneB1 - 0.03f), new Vector3(stringerLen, 0.06f, 0.06f), Quaternion.Euler(0f, 0f, rot));
+
+                // Invisible guards: solid, 1.2 m above the treads, on both sides of the flight.
+                foreach (float gz in new[] { railA - 0.03f, railB + 0.03f - (lane ? 0.06f : 0f) })
+                    Guard(new Vector3(run * 0.5f, y0 + FloorH * 0.5f + 0.55f, gz), new Vector3(stringerLen, 1.3f, 0.14f), rot);
 
                 // The landing at the end of this flight.
                 float ly = (f + 1) * FloorH;
@@ -357,17 +372,46 @@ namespace FPSKit.EditorTools
                 float z0 = last ? -1.8f : laneA0, z1 = laneB1;
                 b.Box(new Vector3((lu0 + lu1) * 0.5f, ly - 0.05f + (last ? 0.01f : 0f), (z0 + z1) * 0.5f), new Vector3(land, 0.12f, z1 - z0), Quaternion.identity);
 
-                // Landing rails: the outer edge and the far end. The top landing is open to the roof.
+                // Landing rails: the outer edge and the far end, with balusters; the top landing is open to the roof.
                 float uEnd = lane ? lu1 : lu0;
-                b.Box(new Vector3((lu0 + lu1) * 0.5f, ly + 0.5f, z1 - 0.03f), new Vector3(land, 0.06f, 0.06f), Quaternion.identity);
-                b.Box(new Vector3(uEnd - (lane ? 0.03f : -0.03f), ly + 0.5f, (laneA0 + z1) * 0.5f), new Vector3(0.06f, 0.06f, z1 - laneA0), Quaternion.identity);
-                b.Box(new Vector3((lu0 + lu1) * 0.5f, ly + 0.5f, z1 - 0.03f), new Vector3(0.05f, 1.0f, 0.05f), Quaternion.identity);
+                float lcx = (lu0 + lu1) * 0.5f, lcz = (laneA0 + z1) * 0.5f;
+                b.Box(new Vector3(lcx, ly + 1.0f, z1 - 0.03f), new Vector3(land, 0.07f, 0.07f), Quaternion.identity);
+                b.Box(new Vector3(uEnd - (lane ? 0.03f : -0.03f), ly + 1.0f, lcz), new Vector3(0.07f, 0.07f, z1 - laneA0), Quaternion.identity);
+                for (float bu = lu0 + 0.15f; bu <= lu1; bu += 0.3f)
+                    b.Box(new Vector3(bu, ly + 0.52f, z1 - 0.03f), new Vector3(0.035f, 1.0f, 0.035f), Quaternion.identity);
+                for (float bz = laneA0 + 0.15f; bz <= z1; bz += 0.3f)
+                    b.Box(new Vector3(uEnd - (lane ? 0.03f : -0.03f), ly + 0.52f, bz), new Vector3(0.035f, 1.0f, 0.035f), Quaternion.identity);
+                b.Box(new Vector3(lcx, ly + 0.10f, z1 - 0.03f), new Vector3(land, 0.12f, 0.03f), Quaternion.identity);
+                Guard(new Vector3(lcx, ly + 0.6f, z1 + 0.05f), new Vector3(land + 0.2f, 1.2f, 0.14f), 0f);
+                Guard(new Vector3(uEnd + (lane ? 0.05f : -0.05f), ly + 0.6f, lcz), new Vector3(0.14f, 1.2f, z1 - laneA0 + 0.2f), 0f);
+
+                // A warm lamp cage at the outer corner of every landing: a visible marker for where the stairs turn.
+                lamps.Box(new Vector3(uEnd - (lane ? 0.2f : -0.2f), ly + 2.3f, z1 - 0.2f), new Vector3(0.26f, 0.2f, 0.26f), Quaternion.identity);
+                b.Tube(new Vector3(uEnd - (lane ? 0.2f : -0.2f), ly, z1 - 0.2f), new Vector3(uEnd - (lane ? 0.2f : -0.2f), ly + 2.2f, z1 - 0.2f), 0.04f, 0.04f, 6);
             }
 
             Vector3 at = FacePoint(lot, side, anchor);
             var go = MeshObject(parent, "FireEscape", ToMesh(b, $"cityescape_{n}"), _zoneSteel, at, Quaternion.Euler(0f, FaceYaw(side), 0f),
                                 Vector3.one, layer, "Metal");
             StaticFlags(go);
+
+            // Guards: collider-only children (no renderer, so the bake ignores them), turned with the escape.
+            var guards = new GameObject("Guards").transform;
+            guards.SetParent(go.transform, false);
+            foreach (var g in guardList)
+            {
+                var gg = new GameObject("Guard");
+                gg.layer = layer;
+                gg.transform.SetParent(guards, false);
+                gg.transform.localPosition = g.c;
+                gg.transform.localRotation = Quaternion.Euler(0f, 0f, g.tilt);
+                gg.AddComponent<BoxCollider>().size = g.size;
+            }
+
+            var lampGo = MeshObject(go.transform, "Lamps", ToMesh(lamps, $"cityescapelamp_{n}"), _cityLamp, Vector3.zero, Quaternion.identity, Vector3.one,
+                                    layer, null, collider: false);
+            NoStanding(lampGo);
+            lampGo.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         // ==================================================================

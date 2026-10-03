@@ -249,7 +249,7 @@ namespace FPSKit.EditorTools
 
         /// <summary>A wheel on its side axis: a tyre and a hub.</summary>
         private static void Wheel(MeshBuild tyres, Vector3 centre, Vector3 axis, float radius, float width)
-            => tyres.Tube(centre - axis * width * 0.5f, centre + axis * width * 0.5f, radius, radius, 12);
+            => TyreWheel(tyres, centre, axis, radius, width);
 
         /// <summary>
         /// A vehicle, built round its own origin and dropped in place: a pickup, a military

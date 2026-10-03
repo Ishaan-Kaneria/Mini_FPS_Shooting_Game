@@ -345,9 +345,10 @@ namespace FPSKit.EditorTools
             // A water tank on a stand, a haystack, a palm.
             var tank = new MeshBuild { UVScale = 0.5f };
             var ta = f.P(gateSide * (hw - t - 1.6f), 0f, -2f);
-            foreach (var o in new[] { new Vector3(-0.6f, 0f, -0.6f), new Vector3(0.6f, 0f, -0.6f), new Vector3(-0.6f, 0f, 0.6f), new Vector3(0.6f, 0f, 0.6f) })
-                tank.Box(ta + f.Axis(o) + Vector3.up * 1f, new Vector3(0.12f, 2f, 0.12f), f.Rot);
-            tank.Tube(ta + Vector3.up * 2f, ta + Vector3.up * 3.4f, 0.95f, 0.95f, 12);
+            // The same braced-stand tank as the roofs (see RoofTank), scaled up to a farm's.
+            var tankPart = new MeshBuild { UVScale = 0.5f };
+            RoofTank(tankPart, tankPart, Vector3.zero, Quaternion.identity);
+            AppendScaled(tank, tankPart, ta, 1.9f, f.Rot);
             NoStanding(MeshObject(farm, "FarmTank", ToMesh(tank, DenseKey("farmtank")), _tankBlackMat, Vector3.zero,
                                   Quaternion.identity, Vector3.one, layer, "Metal"));
 
@@ -364,12 +365,8 @@ namespace FPSKit.EditorTools
             // Outside: a stack of firewood and a cart by the front gate.
             var outside = new MeshBuild { UVScale = 0.5f };
             var cart = f.P(frontGate + 3.2f, 0f, -hd - 2f);
-            outside.Box(cart + Vector3.up * 0.75f, new Vector3(1.4f, 0.12f, 2.2f), f.Rot);
-            outside.Box(cart + Vector3.up * 0.95f + f.Axis(new Vector3(-0.68f, 0f, 0f)), new Vector3(0.06f, 0.4f, 2.2f), f.Rot);
-            outside.Box(cart + Vector3.up * 0.95f + f.Axis(new Vector3(0.68f, 0f, 0f)), new Vector3(0.06f, 0.4f, 2.2f), f.Rot);
-            outside.Box(cart + Vector3.up * 0.55f + f.Axis(new Vector3(0f, 0f, 1.9f)), new Vector3(0.08f, 0.08f, 1.8f), f.Rot * Quaternion.Euler(-12f, 0f, 0f));
-            foreach (float s in new[] { -0.82f, 0.82f })
-                Wheel(outside, cart + Vector3.up * 0.5f + f.Axis(new Vector3(s, 0f, -0.2f)), f.Axis(Vector3.right), 0.5f, 0.1f);
+            // A proper handcart (see HandCart): planked bed, stakes, spoked wheels, shafts, a load.
+            HandCart(outside, outside, new Vector3(cart.x, GroundHeightAt(cart.x, cart.z), cart.z), f.Rot, rng);
             NoStanding(MeshObject(farm, "Cart", ToMesh(outside, DenseKey("cart")), _deadwoodMat, Vector3.zero,
                                   Quaternion.identity, Vector3.one, layer, "Wood"));
         }
@@ -787,6 +784,17 @@ namespace FPSKit.EditorTools
                 return b;
             }
 
+            // Solid cores for the bigger shrubs: the olive lumps looked like rocks and could be walked straight
+            // through (Ishaan, 2026-10-03). One object per block holding a sphere collider per bush, so a
+            // few thousand bushes cost a few dozen objects.
+            var solids = new Dictionary<Vector2Int, List<Vector4>>();
+            void Solid(Vector2 p, Vector3 at, float br)
+            {
+                var key = new Vector2Int(Mathf.FloorToInt(p.x / block), Mathf.FloorToInt(p.y / block));
+                if (!solids.TryGetValue(key, out var list)) solids[key] = list = new List<Vector4>();
+                list.Add(new Vector4(at.x, at.y + br * 0.42f, at.z, br * 0.6f));
+            }
+
             Physics.SyncTransforms();
             int planted = 0;
             const float step = 4.2f;
@@ -815,8 +823,8 @@ namespace FPSKit.EditorTools
                     var at = new Vector3(p.x, g - 0.08f, p.y);
                     int seed = rng.Next(1, 100000);
                     double kind = rng.NextDouble();
-                    if (kind < 0.32) Bush(In(bushes, p), at, Rand(rng, 0.4f, 1.0f), seed);
-                    else if (kind < 0.58) Bush(In(saltbush, p), at, Rand(rng, 0.35f, 0.85f), seed);
+                    if (kind < 0.32) { float br = Rand(rng, 0.4f, 1.0f); Bush(In(bushes, p), at, br, seed); Solid(p, at, br); }
+                    else if (kind < 0.58) { float br = Rand(rng, 0.35f, 0.85f); Bush(In(saltbush, p), at, br, seed); Solid(p, at, br); }
                     else if (kind < 0.93) Tuft(In(grass, p), at, Rand(rng, 0.35f, 0.7f), seed);
                     else DeadBush(In(dry, p), at, Rand(rng, 0.6f, 1.1f), seed);
                     planted++;
@@ -833,6 +841,20 @@ namespace FPSKit.EditorTools
                     if (!shadows) go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
             }
+            foreach (var kv in solids)
+            {
+                var holder = new GameObject("BushSolids");
+                holder.transform.SetParent(group, false);
+                holder.layer = layer;
+                foreach (var s in kv.Value)
+                {
+                    var sc = holder.AddComponent<SphereCollider>();
+                    sc.center = new Vector3(s.x, s.y, s.z);
+                    sc.radius = s.w;
+                }
+                NoStanding(holder);
+            }
+
             Emit(bushes, "Bushes", _scrubMat, true);
             Emit(saltbush, "Saltbush", _saltbushMat, true);
             Emit(grass, "Grass", _grassDryMat, false);
@@ -906,31 +928,51 @@ namespace FPSKit.EditorTools
 
         private static void Lump(MeshBuild build, Vector3 at, float radius, int seed)
         {
-            const int spokes = 8;
+            // Five rings of fourteen (was three of eight): a dome profile, ragged at the rim, and then a
+            // fuzz of small leaf triangles over the surface so the silhouette is a shrub's and not the
+            // faceted lump that read as a rock (Ishaan, 2026-10-03).
+            const int spokes = 14, ringsN = 5;
             float height = radius * (0.65f + Hash01(seed, 1) * 0.45f);
-            float[] ringY = { 0f, 0.45f, 0.85f };
-            float[] ringR = { 0.8f, 1f, 0.6f };
-            var rings = new Vector3[3, spokes];
+            var rings = new Vector3[ringsN, spokes];
             float twist = Hash01(seed, 2) * Mathf.PI * 2f;
-            for (int k = 0; k < 3; k++)
+
+            for (int k = 0; k < ringsN; k++)
+            {
+                float t = k / (float)ringsN;                       // 0 .. just under 1
+                float profileR = Mathf.Cos(t * Mathf.PI * 0.5f) * (k == 0 ? 0.85f : 1f);
+                float profileY = Mathf.Sin(t * Mathf.PI * 0.5f);
+
                 for (int i = 0; i < spokes; i++)
                 {
                     float a = twist + i * Mathf.PI * 2f / spokes;
-                    // Ragged: alternate spokes pushed out, so the edge is twiggy rather than round.
-                    float r = radius * ringR[k] * (0.7f + 0.55f * Hash01(seed, 10 + k * spokes + i)) * (i % 2 == 0 ? 1.12f : 0.86f);
-                    float y = height * ringY[k] * (0.85f + 0.3f * Hash01(seed, 40 + k * spokes + i));
+                    float r = radius * profileR * (0.72f + 0.5f * Hash01(seed, 10 + k * spokes + i)) * (i % 2 == 0 ? 1.1f : 0.9f);
+                    float y = height * profileY * (0.88f + 0.24f * Hash01(seed, 90 + k * spokes + i));
                     rings[k, i] = at + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
                 }
+            }
             var top = at + Vector3.up * height;
 
-            for (int k = 0; k < 2; k++)
+            for (int k = 0; k < ringsN - 1; k++)
                 for (int i = 0; i < spokes; i++)
                 {
                     int j = (i + 1) % spokes;
                     build.Quad(rings[k, i], rings[k + 1, i], rings[k + 1, j], rings[k, j]);
                 }
             for (int i = 0; i < spokes; i++)
-                build.Tri(rings[2, i], top, rings[2, (i + 1) % spokes]);
+                build.Tri(rings[ringsN - 1, i], top, rings[ringsN - 1, (i + 1) % spokes]);
+
+            // Leaves: small double-sided triangles standing proud of the surface.
+            int leaves = 26 + (int)(radius * 14f);
+            for (int n = 0; n < leaves; n++)
+            {
+                int k = 1 + (int)(Hash01(seed, 200 + n) * (ringsN - 1.01f));
+                int i = (int)(Hash01(seed, 300 + n) * (spokes - 0.01f));
+                var c = rings[k, i] + new Vector3((Hash01(seed, 400 + n) - 0.5f) * 0.1f, 0.03f, (Hash01(seed, 500 + n) - 0.5f) * 0.1f);
+                var d1 = new Vector3(Hash01(seed, 600 + n) - 0.5f, Hash01(seed, 700 + n) * 0.5f, Hash01(seed, 800 + n) - 0.5f).normalized * (0.11f + 0.07f * Hash01(seed, 900 + n));
+                var d2 = Vector3.Cross(d1, Vector3.up).normalized * 0.07f;
+                build.Tri(c, c + d1 + d2, c + d1 - d2);
+                build.Tri(c, c + d1 - d2, c + d1 + d2);
+            }
         }
 
         /// <summary>A tuft of dry grass: thin blades fanned out from a point, drawn both sides.</summary>

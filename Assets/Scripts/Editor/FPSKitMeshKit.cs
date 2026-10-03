@@ -577,9 +577,17 @@ namespace FPSKit.EditorTools
         /// plane. Cut flat at its base it sits on whatever it is put on, every time.
         /// </summary>
         private static Mesh BoulderMesh(int seed, float lumpiness = 0.34f, float squash = 0.72f)
-            => Pooled($"boulder_{seed}_{lumpiness:0.00}_{squash:0.00}", () =>
+            => BoulderMeshAt(seed, lumpiness, squash, IsDesertArena() ? 3 : 2);
+
+        /// <summary>
+        /// The desert's rocks are a subdivision-3 icosphere (1,280 facets, not 320) with two more octaves of
+        /// noise and a faint bedding: a boulder you walk up to has to survive being looked at from a metre.
+        /// The pool key carries the subdivision so the two never share a mesh.
+        /// </summary>
+        private static Mesh BoulderMeshAt(int seed, float lumpiness, float squash, int subdivisions)
+            => Pooled($"boulder_{seed}_{lumpiness:0.00}_{squash:0.00}_{subdivisions}", () =>
             {
-                var (points, faces) = IcoSphere(2);
+                var (points, faces) = IcoSphere(subdivisions);
                 var build = new MeshBuild { UVScale = 0.35f };
 
                 var moved = new Vector3[points.Count];
@@ -594,6 +602,14 @@ namespace FPSKit.EditorTools
                     float r = 1f
                             + Fbm3(dir * 1.6f, seed, 2) * lumpiness
                             + Fbm3(dir * 5.2f, seed + 51, 2) * lumpiness * 0.35f;
+
+                    if (subdivisions >= 3)
+                    {
+                        // Finer breakage and a faint horizontal bedding, only worth having when there are the
+                        // vertices to show it.
+                        r += Fbm3(dir * 11f, seed + 97, 2) * lumpiness * 0.16f;
+                        r += Mathf.Sin((dir.y * 7f + Fbm3(dir * 2.2f, seed + 7, 2) * 2f) * Mathf.PI) * 0.018f;
+                    }
 
                     var p = dir * r;
                     p.y *= squash;

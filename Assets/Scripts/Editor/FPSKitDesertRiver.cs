@@ -112,10 +112,12 @@ namespace FPSKit.EditorTools
                         float size = rng.NextDouble() < 0.2 ? Rand(rng, 1.4f, 3.2f) : Rand(rng, 0.35f, 1.1f);
                         var at = shore + new Vector3(inward * Rand(rng, -0.3f, 1.4f), -size * 0.18f, Rand(rng, -1.2f, 1.2f));
 
-                        MeshObject(group, "ShoreRock", ButteMesh(rng.Next(1, 40), sides: 7, levels: 3), _rockWetMat,
+                        var shoreRock = MeshObject(group, "ShoreRock", BoulderMesh(rng.Next(1, 40), 0.36f, 0.7f), _rockWetMat,
                                    at, Quaternion.Euler(Rand(rng, -8f, 8f), Rand(rng, 0f, 360f), Rand(rng, -8f, 8f)),
                                    new Vector3(size, size * Rand(rng, 0.45f, 0.8f), size * Rand(rng, 0.7f, 1.2f)),
                                    layer, "Untagged", collider: false);
+                        NoStanding(shoreRock);   // rounded tops would bake as ground inside the kill volume
+                        Hide(shoreRock);
                         rocks++;
                     }
 

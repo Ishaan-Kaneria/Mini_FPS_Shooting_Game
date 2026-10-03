@@ -534,18 +534,8 @@ namespace FPSKit.EditorTools
             var wp = G(Rand(rng, -4f, 4f), -5f);
             float wy = LowestGroundIn(wp.x, wp.z, 3.5f) - 0.2f;
             var wrot = Quaternion.Euler(Rand(rng, -3f, 3f), yaw + Rand(rng, -40f, 40f), Rand(rng, -6f, 6f));
-            hull.Box(new Vector3(0f, 1.2f, 0f), new Vector3(3.4f, 1.1f, 7f), Quaternion.identity);
-            hull.Box(new Vector3(0f, 1.0f, 3.6f), new Vector3(3.2f, 0.7f, 0.8f), Quaternion.Euler(30f, 0f, 0f));
-            foreach (float s in new[] { -1.85f, 1.85f })
-                tracks.Box(new Vector3(s, 0.55f, 0f), new Vector3(0.6f, 1.1f, 7.2f), Quaternion.identity);
-            if (tank)
-            {
-                // Turret knocked round, gun drooping.
-                var tr = Quaternion.Euler(0f, Rand(rng, 40f, 140f), 0f);
-                hull.Box(new Vector3(0.3f, 2.15f, -0.4f), new Vector3(2.4f, 0.8f, 3f), tr);
-                hull.Tube(new Vector3(0.3f, 2.2f, -0.4f) + tr * new Vector3(0f, 0f, 1.4f), new Vector3(0.3f, 2.2f, -0.4f) + tr * new Vector3(0f, -0.5f, 5.4f), 0.13f, 0.1f, 8);
-            }
-            else hull.Box(new Vector3(0f, 2.05f, -1f), new Vector3(3f, 0.7f, 4.4f), Quaternion.identity);
+            // Hull, running gear, track links, turret: see WreckTank.
+            WreckTank(hull, tracks, rng, tank);
             var hullGo = MeshObject(site, "WreckHull", ToMesh(hull, DenseKey("wreckhull")), _burntMat, new Vector3(wp.x, wy, wp.z), wrot,
                                     Vector3.one, layer, "Metal");
             NoStanding(hullGo);

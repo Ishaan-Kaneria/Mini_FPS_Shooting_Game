@@ -1104,6 +1104,246 @@ namespace FPSKit.EditorTools
             metal.Box(left + Vector3.down * 0.02f, new Vector3(0.025f, 0.06f, 0.03f), Quaternion.identity);
             metal.Box(right + Vector3.down * 0.02f, new Vector3(0.025f, 0.06f, 0.03f), Quaternion.identity);
         }
+
+        // ==================================================================
+        // Wrecks, carts, wheels
+        // ==================================================================
+        /// <summary>Copies one builder into another at an offset and scale (for reusing a prop built at one size).</summary>
+        private static void AppendScaled(MeshBuild dst, MeshBuild src, Vector3 offset, float scale, Quaternion rot)
+        {
+            int start = dst.Vertices.Count;
+            for (int i = 0; i < src.Vertices.Count; i++)
+            {
+                dst.Vertices.Add(offset + rot * (src.Vertices[i] * scale));
+                dst.Normals.Add(rot * src.Normals[i]);
+                dst.UVs.Add(src.UVs[i]);
+            }
+            foreach (int t in src.Triangles) dst.Triangles.Add(start + t);
+        }
+
+        /// <summary>
+        /// A tyre with a rounded shoulder, a rim and hub caps, not a bare cylinder: a wheel on a vehicle is
+        /// the one part everybody looks at, and twelve flat sides read as a nut.
+        /// </summary>
+        private static void TyreWheel(MeshBuild m, Vector3 centre, Vector3 axis, float radius, float width)
+        {
+            axis = axis.normalized;
+            const int sides = 28;
+            var a = centre - axis * width * 0.5f;
+            var b = centre + axis * width * 0.5f;
+
+            m.Tube(a, a + axis * width * 0.18f, radius * 0.9f, radius * 0.99f, sides);
+            m.Tube(a + axis * width * 0.18f, b - axis * width * 0.18f, radius, radius, sides);
+            m.Tube(b - axis * width * 0.18f, b, radius * 0.99f, radius * 0.9f, sides);
+
+            // Rim, and a hub cap each side.
+            m.Tube(a - axis * 0.01f, b + axis * 0.01f, radius * 0.62f, radius * 0.62f, 20);
+            foreach (float sd in new[] { -1f, 1f })
+            {
+                var c0 = centre + axis * sd * (width * 0.5f + 0.012f);
+                m.Tube(c0, c0 + axis * sd * 0.035f, radius * 0.34f, radius * 0.3f, 14);
+            }
+        }
+
+        /// <summary>
+        /// A burnt-out tank or armoured carrier, built round its own origin (ground at y = 0, front at +z):
+        /// a sloped glacis and lower plate, rounded hull and fenders, an engine deck of louvre bars, road
+        /// wheels, a sprocket and an idler, and a track made of individual links; on the tank a rounded
+        /// turret knocked round, a mantlet, a drooping barrel with a muzzle brake, an open hatch and smoke
+        /// dischargers; on the carrier a deck, an open hatch and a ring-mount gun. Replaces a stack of boxes.
+        /// </summary>
+        private static void WreckTank(MeshBuild hull, MeshBuild tracks, System.Random rng, bool tank)
+        {
+            int seed = rng.Next(1, 9999);
+
+            // ---- hull ----
+            hull.SoftBox(new Vector3(0f, 0.95f, 0f), new Vector3(3.0f, 0.95f, 6.8f), Quaternion.identity, seed, 0.12f, 5, 0f);
+            hull.SoftBox(new Vector3(0f, 1.5f, -0.9f), new Vector3(3.15f, 0.5f, 4.5f), Quaternion.identity, seed + 1, 0.1f, 5, 0f);
+            hull.SoftBox(new Vector3(0f, 1.28f, 3.15f), new Vector3(3.0f, 0.2f, 1.9f), Quaternion.Euler(32f, 0f, 0f), seed + 2, 0.06f, 4, 0f);
+            hull.SoftBox(new Vector3(0f, 0.72f, 3.65f), new Vector3(3.0f, 0.2f, 1.0f), Quaternion.Euler(-38f, 0f, 0f), seed + 3, 0.06f, 4, 0f);
+
+            foreach (float sd in new[] { -1f, 1f })
+            {
+                hull.SoftBox(new Vector3(sd * 1.78f, 1.22f, 0f), new Vector3(0.65f, 0.09f, 7.3f), Quaternion.identity, seed + 4, 0.04f, 3, 0f);
+                hull.SoftBox(new Vector3(sd * 1.78f, 1.14f, 3.7f), new Vector3(0.65f, 0.09f, 0.8f), Quaternion.Euler(-24f, 0f, 0f), seed + 5, 0.04f, 3, 0f);
+                // Stowage boxes on the fenders and a spare track length on the glacis.
+                hull.SoftBox(new Vector3(sd * 1.72f, 1.42f, -1.6f), new Vector3(0.45f, 0.3f, 1.2f), Quaternion.identity, seed + 6, 0.05f, 3, 0f);
+            }
+
+            // Engine deck louvres and two exhaust stacks at the back.
+            for (int i = 0; i < 9; i++)
+                hull.Box(new Vector3(0f, 1.79f, -2.9f + i * 0.34f), new Vector3(1.9f, 0.035f, 0.17f), Quaternion.identity);
+            foreach (float sd in new[] { -1f, 1f })
+                hull.Tube(new Vector3(sd * 1.1f, 1.7f, -3.35f), new Vector3(sd * 1.1f, 2.05f, -3.35f), 0.11f, 0.09f, 10);
+
+            // Tow cables looped over the front, and a headlight each side.
+            hull.Tube(new Vector3(-1.2f, 1.45f, 3.0f), new Vector3(-1.2f, 0.75f, 3.9f), 0.035f, 0.035f, 5);
+            hull.Tube(new Vector3(1.2f, 1.45f, 3.0f), new Vector3(1.2f, 0.75f, 3.9f), 0.035f, 0.035f, 5);
+            foreach (float sd in new[] { -1f, 1f })
+                hull.Tube(new Vector3(sd * 1.3f, 1.3f, 4.05f), new Vector3(sd * 1.3f, 1.3f, 4.2f), 0.1f, 0.08f, 10);
+
+            // ---- running gear and track ----
+            foreach (float sd in new[] { -1f, 1f })
+            {
+                float x = sd * 1.75f;
+                var axis = Vector3.right * sd;
+
+                // Six road wheels, a sprocket at the back and an idler at the front.
+                for (int w = 0; w < 6; w++)
+                    TyreWheel(tracks, new Vector3(x, 0.48f, -2.55f + w * 1.0f), Vector3.right, 0.4f, 0.5f);
+                TyreWheel(tracks, new Vector3(x, 0.62f, -3.25f), Vector3.right, 0.46f, 0.48f);
+                TyreWheel(tracks, new Vector3(x, 0.62f, 3.25f), Vector3.right, 0.42f, 0.48f);
+
+                // The track: links round a stadium loop (top run, front arc, bottom run, rear arc).
+                const float topY = 1.08f, botY = 0.06f, frontZ = 3.25f, backZ = -3.25f;
+                float cy = (topY + botY) * 0.5f, rr = (topY - botY) * 0.5f;
+                float run = frontZ - backZ;
+                float arc = Mathf.PI * rr;
+                float perimeter = 2f * run + 2f * arc;
+                int links = 96;
+
+                for (int i = 0; i < links; i++)
+                {
+                    float d = (i + 0.5f) / links * perimeter;
+                    Vector3 pos; float angle;       // angle of the link in the y-z plane, 0 = along +z
+
+                    if (d < run) { pos = new Vector3(x, botY, backZ + d); angle = 0f; }
+                    else if (d < run + arc)
+                    {
+                        float t = (d - run) / arc * Mathf.PI;
+                        pos = new Vector3(x, cy - Mathf.Cos(t) * rr, frontZ + Mathf.Sin(t) * rr);
+                        angle = -t * Mathf.Rad2Deg;
+                    }
+                    else if (d < 2f * run + arc) { pos = new Vector3(x, topY, frontZ - (d - run - arc)); angle = 180f; }
+                    else
+                    {
+                        float t = (d - 2f * run - arc) / arc * Mathf.PI;
+                        pos = new Vector3(x, cy + Mathf.Cos(t) * rr, backZ - Mathf.Sin(t) * rr);
+                        angle = -(180f + t * Mathf.Rad2Deg);
+                    }
+
+                    var q = Quaternion.Euler(angle, 0f, 0f);
+                    tracks.Box(pos, new Vector3(0.62f, 0.07f, perimeter / links * 0.9f), q);
+                    // A cleat on every second link.
+                    if (i % 2 == 0) tracks.Box(pos + q * new Vector3(0f, 0.05f, 0f), new Vector3(0.62f, 0.04f, 0.05f), q);
+                }
+
+                // Return rollers on top of the run, and the guard over it.
+                for (int r = 0; r < 3; r++)
+                    TyreWheel(tracks, new Vector3(x, 1.2f, -1.6f + r * 1.7f), Vector3.right, 0.1f, 0.4f);
+            }
+
+            // ---- superstructure ----
+            if (tank)
+            {
+                var tr = Quaternion.Euler(0f, Rand(rng, 40f, 140f), 0f);
+                var tc = new Vector3(0.2f, 2.05f, 0.3f);
+
+                hull.SoftBox(tc, new Vector3(2.3f, 0.75f, 2.7f), tr, seed + 7, 0.24f, 6, 0f);
+                hull.SoftBox(tc + tr * new Vector3(0f, 0.12f, 1.35f), new Vector3(1.5f, 0.6f, 0.7f), tr, seed + 8, 0.2f, 5, 0f);
+                hull.SoftBox(tc + tr * new Vector3(0f, 0.04f, -1.45f), new Vector3(2.0f, 0.55f, 0.6f), tr, seed + 9, 0.18f, 5, 0f);   // turret bustle
+
+                // Mantlet, barrel, bore brake: the barrel droops where the turret was knocked.
+                var mount = tc + tr * new Vector3(0f, 0.12f, 1.75f);
+                var dirB = tr * Quaternion.Euler(Rand(rng, 4f, 12f), 0f, 0f) * Vector3.forward;
+                hull.Tube(mount - tr * Vector3.right * 0.4f, mount + tr * Vector3.right * 0.4f, 0.34f, 0.34f, 18);
+                hull.Tube(mount, mount + dirB * 1.2f, 0.17f, 0.14f, 18);
+                hull.Tube(mount + dirB * 1.2f, mount + dirB * 4.7f, 0.14f, 0.1f, 18);
+                hull.Tube(mount + dirB * 4.7f, mount + dirB * 5.05f, 0.17f, 0.17f, 16);
+                hull.Tube(mount + dirB * 4.85f, mount + dirB * 4.98f, 0.19f, 0.19f, 16);
+
+                // Cupola with its hatch thrown open, and a machine gun on a pintle.
+                var cup = tc + tr * new Vector3(0.55f, 0.37f, -0.35f);
+                hull.Tube(cup, cup + Vector3.up * 0.22f, 0.4f, 0.4f, 20);
+                hull.Box(cup + tr * new Vector3(0.3f, 0.5f, -0.1f), new Vector3(0.65f, 0.05f, 0.7f), tr * Quaternion.Euler(0f, 0f, -75f));
+                hull.Tube(tc + tr * new Vector3(-0.6f, 0.4f, 0.2f), tc + tr * new Vector3(-0.6f, 0.6f, 0.2f), 0.04f, 0.04f, 6);
+                hull.Tube(tc + tr * new Vector3(-0.6f, 0.6f, 0.2f), tc + tr * new Vector3(-0.6f, 0.62f, 1.0f), 0.04f, 0.035f, 8);
+
+                // Smoke dischargers, three each side of the turret front.
+                foreach (float sd in new[] { -1f, 1f })
+                    for (int k = 0; k < 3; k++)
+                    {
+                        var at = tc + tr * new Vector3(sd * 1.05f, 0.1f + k * 0.0f, 0.55f - k * 0.2f);
+                        hull.Tube(at, at + tr * new Vector3(sd * 0.1f, 0.22f, 0.05f), 0.055f, 0.05f, 8);
+                    }
+            }
+            else
+            {
+                hull.SoftBox(new Vector3(0f, 2.15f, -0.9f), new Vector3(3.0f, 0.95f, 4.3f), Quaternion.identity, seed + 7, 0.18f, 6, 0f);
+                hull.SoftBox(new Vector3(0f, 2.35f, 1.5f), new Vector3(2.4f, 0.5f, 1.0f), Quaternion.Euler(-14f, 0f, 0f), seed + 8, 0.12f, 4, 0f);
+                // An open roof hatch and a ring mount with its gun.
+                hull.Box(new Vector3(-0.7f, 2.82f, -1.2f), new Vector3(0.8f, 0.05f, 0.8f), Quaternion.Euler(0f, 0f, 70f));
+                hull.Tube(new Vector3(0.7f, 2.62f, -1.4f), new Vector3(0.7f, 2.78f, -1.4f), 0.5f, 0.5f, 20);
+                hull.Tube(new Vector3(0.7f, 2.78f, -1.4f), new Vector3(0.7f, 3.0f, -1.2f), 0.04f, 0.04f, 6);
+                hull.Tube(new Vector3(0.7f, 3.0f, -1.2f), new Vector3(0.7f, 3.0f, -0.2f), 0.045f, 0.04f, 10);
+                foreach (float sd in new[] { -1f, 1f })
+                    hull.SoftBox(new Vector3(sd * 1.55f, 2.2f, -0.9f), new Vector3(0.1f, 0.6f, 3.2f), Quaternion.identity, seed + 9, 0.03f, 2, 0f);
+            }
+        }
+
+        /// <summary>
+        /// A farm handcart: planked bed with side rails and stakes, a back board, two big spoked wheels on an
+        /// axle, a pair of shafts running forward to a prop leg, and a load of sacks. Built round its origin,
+        /// ground at y = 0, front towards +z. It was a plank, two rails and two discs.
+        /// </summary>
+        private static void HandCart(MeshBuild wood, MeshBuild metal, Vector3 at, Quaternion rot, System.Random rng)
+        {
+            Vector3 P(float x, float y, float z) => at + rot * new Vector3(x, y, z);
+
+            // Bed: seven planks with gaps, two cross-bearers under them.
+            for (int i = 0; i < 7; i++)
+                wood.Box(P(-0.6f + i * 0.2f, 0.78f, -0.1f), new Vector3(0.18f, 0.045f, 2.2f), rot);
+            foreach (float z in new[] { -0.8f, 0.7f })
+                wood.Box(P(0f, 0.72f, z), new Vector3(1.5f, 0.07f, 0.09f), rot);
+
+            // Side rails, stakes and a back board.
+            foreach (float sd in new[] { -1f, 1f })
+            {
+                wood.Box(P(sd * 0.68f, 1.15f, -0.1f), new Vector3(0.05f, 0.07f, 2.2f), rot);
+                wood.Box(P(sd * 0.68f, 0.98f, -0.1f), new Vector3(0.05f, 0.07f, 2.2f), rot);
+                for (int k = 0; k < 5; k++)
+                    wood.Tube(P(sd * 0.68f, 0.76f, -1.08f + k * 0.5f), P(sd * 0.68f, 1.2f, -1.08f + k * 0.5f), 0.032f, 0.026f, 6);
+            }
+            wood.Box(P(0f, 0.98f, -1.18f), new Vector3(1.4f, 0.3f, 0.05f), rot);
+
+            // Axle and two spoked wheels: a rim of curved segments, twelve spokes, a hub.
+            var axle0 = P(-0.82f, 0.5f, -0.2f); var axle1 = P(0.82f, 0.5f, -0.2f);
+            metal.Tube(axle0, axle1, 0.04f, 0.04f, 8);
+            foreach (float sd in new[] { -1f, 1f })
+            {
+                var c = P(sd * 0.82f, 0.5f, -0.2f);
+                var ax = rot * Vector3.right;
+                var up = rot * Vector3.up; var fw = rot * Vector3.forward;
+                const int seg = 24;
+                for (int k = 0; k < seg; k++)
+                {
+                    float a0 = k * Mathf.PI * 2f / seg, a1 = (k + 1) * Mathf.PI * 2f / seg;
+                    var p0 = c + (up * Mathf.Cos(a0) + fw * Mathf.Sin(a0)) * 0.5f;
+                    var p1 = c + (up * Mathf.Cos(a1) + fw * Mathf.Sin(a1)) * 0.5f;
+                    wood.Tube(p0 - ax * 0.04f, p1 - ax * 0.04f, 0.032f, 0.032f, 5);
+                    wood.Tube(p0 + ax * 0.04f, p1 + ax * 0.04f, 0.032f, 0.032f, 5);
+                }
+                for (int k = 0; k < 12; k++)
+                {
+                    float a = k * Mathf.PI * 2f / 12f;
+                    wood.Tube(c, c + (up * Mathf.Cos(a) + fw * Mathf.Sin(a)) * 0.48f, 0.026f, 0.02f, 5);
+                }
+                wood.Tube(c - ax * 0.09f, c + ax * 0.09f, 0.07f, 0.07f, 12);
+                metal.Tube(c - ax * 0.11f, c - ax * 0.07f, 0.05f, 0.05f, 8);
+            }
+
+            // Shafts: two long poles forward, rising to the (absent) animal, joined by a cross-pole, with a prop leg.
+            foreach (float sd in new[] { -1f, 1f })
+                wood.Tube(P(sd * 0.55f, 0.82f, -0.2f), P(sd * 0.42f, 0.62f, 2.6f), 0.04f, 0.03f, 7);
+            wood.Tube(P(-0.48f, 0.7f, 1.8f), P(0.48f, 0.7f, 1.8f), 0.025f, 0.025f, 6);
+            wood.Tube(P(0f, 0.7f, 1.8f), P(0f, 0f, 1.95f), 0.03f, 0.025f, 6);
+
+            // A load: three sacks and a bundle of fodder.
+            for (int i = 0; i < 3; i++)
+                wood.SoftBox(P(-0.35f + i * 0.35f, 1.0f, -0.5f + (i % 2) * 0.25f), new Vector3(0.45f, 0.3f, 0.7f),
+                             rot * Quaternion.Euler(0f, Rand(rng, -25f, 25f), 0f), rng.Next(1, 999), 0.12f, 4, 0f);
+            wood.Tube(P(0.1f, 0.95f, 0.5f), P(0.1f, 0.95f, 1.3f), 0.18f, 0.18f, 10);
+        }
     }
 }
 #endif

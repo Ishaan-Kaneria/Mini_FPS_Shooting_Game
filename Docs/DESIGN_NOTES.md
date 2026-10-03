@@ -2651,3 +2651,12 @@ shadow pass, keeps the twelve strongest lights with no shadows, switches particl
 clones the post-processing profile and switches off DoF/motion blur/grain/aberration/lens in the clone, drops the tier rigs, and adds `LiteSceneSettings` (30 fps cap, texture mip limit 2 while playing, restored on stop).
 Fairground: 4,857 -> 3,567 mesh renderers, 4,807 -> 0 shadow casters. A Lite scene is not in the build settings, so the in-game restart cannot reload it; it is for editing and play-testing in the editor.
 Shared assets are never written (the terrain asset is shared, so only the Terrain component's own distances are changed). Not measured: frame time or temperature in play.
+
+## The shipped Night Rooftop and Fairground are the Lite versions (2026-10-03)
+
+At Ishaan's request (after I advised against it) the Lite copies replaced the game's own `NightRooftop.unity` and `AbandonedFairground.unity`: the Lite files were copied over the originals' paths, so the
+`.meta` GUIDs, the build settings and the arena catalog are unchanged. What the player gets in those two arenas: no shadow casters or camera shadow pass, the twelve strongest lights, no particles (Fairground), thinned
+clutter, LODs that drop 1.8x sooner, a 160 m far plane, a cloned post profile without DoF/motion blur/grain/aberration/lens (`Scenes/Lite/Profiles`, keep it: both scenes reference it), no `RooftopQuality`/`FairgroundQuality` rig,
+and `LiteSceneSettings` forcing a 30 fps cap and quarter-size textures while the scene plays (it restores the player's settings on exit). **To get the full-quality arenas back:** `git checkout facee30 -- Assets/FPSKit_Generated/Scenes/AbandonedFairground.unity`
+(and `617830b^` for `NightRooftop.unity`), or rebuild with the scene builder (`BuildScene`), which regenerates the full scene and overwrites the Lite one. The `FPSKit > Lite` tool refuses a scene named `*_Lite`, but the shipped scenes are not named that, so running it again would reduce them twice.
+Also deleted this session (regenerable, untracked): `Build/Android` IL2CPP symbols (554 MB, stale 18 Sept build), `Build/Views`, `Build/Perf`.

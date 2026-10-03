@@ -124,6 +124,8 @@ namespace FPSKit.EditorTools
             foreach (var b in _bridges) BuildSkybridge(bridges, layer, b);
 
             BuildCityStreet(root, layer, rng, half);
+            BuildCityPavement(root, layer);
+            BuildCitySignals(root, layer, rng);
             BuildCityFurniture(root, layer, rng);
             BuildCityCars(root, layer, rng);
             BuildCitySigns(root, layer, rng);
@@ -440,6 +442,7 @@ namespace FPSKit.EditorTools
         {
             EnsureTextureFolder();
             WriteCityTextures();
+            WriteRoadTextures();
 
             var masonryAlbedo = LoadDetail("City_Masonry_Albedo");
             var masonryGlow = LoadDetail("City_Masonry_Glow");

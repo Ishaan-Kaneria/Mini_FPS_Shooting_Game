@@ -2586,3 +2586,23 @@ the fence, `BuildZoneSpawnPoints`): 16 blocks of 80 m on a 20 m tile, cut into 4
 pipeline asset to 95 m shadows, four cascades, 4x MSAA and put full SSAO back, which silently undid the tier settings (and is why Medium
 had 95 m). It now skips `FPSKitQualityTiers.IsTierAsset`; only `Ensure()` writes Low/Medium/High. High is 50 m, 3 cascades, 2x MSAA, 85 %
 render scale with FSR 1, half-resolution 4-sample SSAO.
+
+## Night Rooftop streets: footways, crossings, signals, lamps (2026-10-03)
+
+Ishaan asked for proper street lighting, good roads, traffic lights and a good pedestrian walkway. `FPSKitCityRoad.cs` (new) and
+`FPSKitCityStreet.cs`; all of it is paint or hand-sized detail with **no collider and on the Backdrop layer** (the bake ignores it), so the
+reach check is unchanged (32/32 roofs, 16/16 spawns, 800/800 samples, 11.2 k triangles).
+
+- **Footways:** each road tile is 20 m with a 10 m carriageway, so the other 5 m each side is footway. Paving = the four corner squares plus
+  the strip on any side that is not more road; grayscale 0.6 m slab texture (`City_Paving`, 2.4 m per tile) a few cm above the ground, and a
+  `RoadKerbs` kerb on the carriageway edge. Kerbs and paving on `layer` (not Backdrop) bake as ledges: keep them on Backdrop.
+- **Crossings:** a zebra on every arm of every junction (bars 0.5 m, parallel to traffic), a stop line for the lane that enters (traffic keeps
+  right), yellow tactile patches where the footway meets the crossing, and a mid-block zebra with a beacon pole at each end on some straights
+  (`MidBlockCrossing`: two plain tiles each side, 50 m from the spawn). `_cityCrossings` keeps parked cars off them (`NearCrossing`).
+- **Signals:** at every junction of 3+ arms, a pinwheel of four footway-corner poles. Each carries the head for the arm whose driver keeps to
+  that side and a pedestrian signal for each crossing it stands beside. Phase is fixed per junction (east-west green / north-south green / east-west
+  amber); a crossing shows walk while its arm's traffic is red. Emissive only, no lights.
+- **Lamps:** one per straight tile (20 m), alternating sides, 8.2 m with a 2.7 m arm. Every lamp has an additive pool (`City_LampPool`) on the road;
+  every second lamp has a real unshadowed spot (80 lights; scene total 99). URP allows only 4 additional lights per object (`PC_RPAsset`), so
+  real lamp lights are decoration for walls and cars; the pools carry the look. The 80 sit under `StreetFurniture/LampLights`: a `RooftopQuality`
+  rig should thin them per tier (the next step).

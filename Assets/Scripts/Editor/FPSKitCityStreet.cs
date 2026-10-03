@@ -69,24 +69,37 @@ namespace FPSKit.EditorTools
             void Strip(MeshBuild m, float x0, float z0, float x1, float z1)
                 => m.Quad(new Vector3(x0, y, z0), new Vector3(x0, y, z1), new Vector3(x1, y, z1), new Vector3(x1, y, z0));
 
+            _cityCrossings.Clear();
+            var dirs = new[] { Vector3.right, Vector3.back, Vector3.left, Vector3.forward };
+            var step = new[] { Vector2Int.right, Vector2Int.down, Vector2Int.left, Vector2Int.up };
+
             foreach (var tile in _roadTiles)
             {
                 bool n = _roadTiles.Contains(tile + Vector2Int.up), s = _roadTiles.Contains(tile + Vector2Int.down);
                 bool e = _roadTiles.Contains(tile + Vector2Int.right), w = _roadTiles.Contains(tile + Vector2Int.left);
                 float cx = tile.x * Tile, cz = tile.y * Tile;
+                var centre = new Vector3(cx, 0f, cz);
                 int arms = (n ? 1 : 0) + (s ? 1 : 0) + (e ? 1 : 0) + (w ? 1 : 0);
 
                 if (arms >= 3 || (arms == 2 && !((n && s) || (e && w))))
                 {
-                    // Crossing on each arm, just outside the junction square.
-                    float inner = CarriageHalf + 1.0f;
-                    for (float k = -CarriageHalf + 0.7f; k < CarriageHalf - 0.3f; k += 1.2f)
+                    // A zebra on each arm just outside the junction square, a stop line for the lane that enters it
+                    // (traffic keeps to the right), and tactile paving where the footway meets the crossing.
+                    for (int i = 0; i < 4; i++)
                     {
-                        if (n) Strip(white, cx + k, cz + inner, cx + k + 0.6f, cz + inner + 3f);
-                        if (s) Strip(white, cx + k, cz - inner - 3f, cx + k + 0.6f, cz - inner);
-                        if (e) Strip(white, cx + inner, cz + k, cx + inner + 3f, cz + k + 0.6f);
-                        if (w) Strip(white, cx - inner - 3f, cz + k, cx - inner, cz + k + 0.6f);
+                        if (!_roadTiles.Contains(tile + step[i])) continue;
+                        Zebra(white, yellow, centre, dirs[i], CarriageHalf + 0.8f, 3.2f, tactile: true);
+                        AddCrossingRect(centre, dirs[i], CarriageHalf + 0.8f, 3.2f);
+                        StopLine(white, centre, dirs[i], CarriageHalf + 4.3f, -2.5f);
                     }
+                }
+                else if (MidBlockCrossing(tile))
+                {
+                    var along = n ? Vector3.forward : Vector3.right;
+                    Zebra(white, yellow, centre, along, -1.6f, 3.2f, tactile: true);
+                    AddCrossingRect(centre, along, -1.6f, 3.2f);
+                    StopLine(white, centre, along, -3.2f, -2.5f);          // the lane going +along stops short of the zebra
+                    StopLine(white, centre, -along, -3.2f, -2.5f);         // and the other lane
                 }
                 else if (arms == 2 && n && s)
                     for (float t = -9f; t < 9f; t += 4f) Strip(yellow, cx - 0.1f, cz + t, cx + 0.1f, cz + t + 2f);
@@ -94,8 +107,10 @@ namespace FPSKit.EditorTools
                     for (float t = -9f; t < 9f; t += 4f) Strip(yellow, cx + t, cz - 0.1f, cx + t + 2f, cz + 0.1f);
             }
 
-            Flat(group, layer, "Crossings", white, "citycrossings", _cityLine);
-            Flat(group, layer, "CentreLines", yellow, "citycentre", _cityLineYellow);
+            int paint = LayerMask.NameToLayer("Backdrop");
+            if (paint < 0) paint = layer;
+            Flat(group, paint, "Crossings", white, "citycrossings", _cityLine);
+            Flat(group, paint, "CentreLines", yellow, "citycentre", _cityLineYellow);
         }
 
         // ==================================================================
@@ -108,21 +123,50 @@ namespace FPSKit.EditorTools
             int backdrop = LayerMask.NameToLayer("Backdrop");
             if (backdrop < 0) backdrop = layer;
 
-            // ---- lamps: a pole at the kerb every other tile, alternating sides ----
+            // ---- lamps: one on every straight tile (20 m), alternating sides, each with a pool of light on the road ----
             var poles = new MeshBuild { UVScale = 0.5f };
             var heads = new MeshBuild { UVScale = 1f };
-            foreach (var tile in _roadTiles)
+            var pools = new List<Vector4>();            // x, z, alongX (1) or alongZ (0), unused
+            var lampLights = new GameObject("LampLights").transform;
+            lampLights.SetParent(group, false);
+            int lamp = 0;
+            var ordered = new List<Vector2Int>(_roadTiles);
+            ordered.Sort((p, q) => (p.x * 7919 + p.y).CompareTo(q.x * 7919 + q.y));
+            foreach (var tile in ordered)
             {
-                if ((tile.x + tile.y) % 2 != 0) continue;
                 bool alongZ = _roadTiles.Contains(tile + Vector2Int.up) || _roadTiles.Contains(tile + Vector2Int.down);
                 bool alongX = _roadTiles.Contains(tile + Vector2Int.left) || _roadTiles.Contains(tile + Vector2Int.right);
                 float cx = tile.x * Tile, cz = tile.y * Tile;
-                float side = ((tile.x * 31 + tile.y * 17) & 1) == 0 ? 1f : -1f;
 
                 // Only on a straight: a pole in a junction is a pole in the road.
-                if (alongZ && !alongX) AddLamp(poles, heads, new Vector3(cx + side * 6f, 0f, cz), new Vector3(-side, 0f, 0f));
-                else if (alongX && !alongZ) AddLamp(poles, heads, new Vector3(cx, 0f, cz + side * 6f), new Vector3(0f, 0f, -side));
+                if (alongZ == alongX) continue;
+                float side = (alongZ ? tile.y : tile.x) % 2 == 0 ? 1f : -1f;
+                var at = alongZ ? new Vector3(cx + side * 6f, 0f, cz) : new Vector3(cx, 0f, cz + side * 6f);
+                var reach = alongZ ? new Vector3(-side, 0f, 0f) : new Vector3(0f, 0f, -side);
+
+                AddLamp(poles, heads, at, reach);
+                var tip = at + Vector3.up * LampHeight + reach * LampReach;
+                pools.Add(new Vector4(tip.x, tip.z, alongZ ? 0f : 1f, 0f));
+
+                if (lamp % LampLightEvery == 0)
+                {
+                    var go = new GameObject($"LampLight_{lamp}");
+                    go.transform.SetParent(lampLights, false);
+                    go.transform.position = tip + Vector3.down * 0.25f;
+                    go.transform.rotation = Quaternion.LookRotation(Vector3.down, reach);
+                    var l = go.AddComponent<Light>();
+                    l.type = LightType.Spot;
+                    l.color = new Color(1.0f, 0.70f, 0.40f);
+                    l.intensity = 30f;
+                    l.range = 15f;
+                    l.spotAngle = 125f;
+                    l.innerSpotAngle = 55f;
+                    l.shadows = LightShadows.None;
+                }
+                lamp++;
             }
+
+            BuildLampPools(group, backdrop, pools);
 
             var poleGo = MeshObject(group, "LampPoles", ToMesh(poles, "citylamppoles"), _cityPlant, Vector3.zero, Quaternion.identity,
                                     Vector3.one, backdrop, "Metal", collider: false);
@@ -152,12 +196,54 @@ namespace FPSKit.EditorTools
                 }
         }
 
+        private const float LampHeight = 8.2f, LampReach = 2.7f;
+        private const int LampLightEvery = 2;
+
         private static void AddLamp(MeshBuild poles, MeshBuild heads, Vector3 at, Vector3 reach)
         {
-            poles.Tube(at, at + Vector3.up * 7.4f, 0.13f, 0.08f, 8);
-            Vector3 tip = at + Vector3.up * 7.4f + reach * 1.8f;
-            poles.Tube(at + Vector3.up * 7.3f, tip, 0.06f, 0.05f, 6);
-            heads.Box(tip + Vector3.down * 0.12f, new Vector3(0.9f, 0.16f, 0.5f), Quaternion.LookRotation(Vector3.Cross(reach, Vector3.up) == Vector3.zero ? Vector3.forward : Vector3.Cross(reach, Vector3.up)));
+            poles.Tube(at, at + Vector3.up * 0.35f, 0.22f, 0.15f, 8);                       // base
+            poles.Tube(at + Vector3.up * 0.3f, at + Vector3.up * LampHeight, 0.13f, 0.08f, 8);
+            Vector3 top = at + Vector3.up * (LampHeight - 0.1f);
+            Vector3 tip = at + Vector3.up * LampHeight + reach * LampReach;
+            poles.Tube(top, tip, 0.06f, 0.05f, 6);                                          // the arm
+            heads.Box(tip + Vector3.down * 0.10f + reach * 0.15f, new Vector3(0.50f, 0.16f, 1.05f), Quaternion.LookRotation(reach));   // luminaire, long axis along the arm
+        }
+
+        /// <summary>
+        /// One additive soft-edged quad of warm light on the road under each lamp head, elongated along the
+        /// street. Cheap: a lamp is a real light only on every second pole (and only a few reach any one wall),
+        /// so these carry the look of a lit street; the ground, which takes most of the light, shows it anyway.
+        /// </summary>
+        private static void BuildLampPools(Transform group, int layer, List<Vector4> pools)
+        {
+            if (pools.Count == 0) return;
+            EnsureRoadMaterials();
+            var v = new List<Vector3>();
+            var uv = new List<Vector2>();
+            var t = new List<int>();
+            const float y = 0.075f, across = 9f, along = 13f;
+            foreach (var p in pools)
+            {
+                float hx = p.z > 0.5f ? along * 0.5f : across * 0.5f;
+                float hz = p.z > 0.5f ? across * 0.5f : along * 0.5f;
+                int i0 = v.Count;
+                v.Add(new Vector3(p.x - hx, y, p.y - hz)); uv.Add(new Vector2(0f, 0f));
+                v.Add(new Vector3(p.x - hx, y, p.y + hz)); uv.Add(new Vector2(0f, 1f));
+                v.Add(new Vector3(p.x + hx, y, p.y + hz)); uv.Add(new Vector2(1f, 1f));
+                v.Add(new Vector3(p.x + hx, y, p.y - hz)); uv.Add(new Vector2(1f, 0f));
+                t.AddRange(new[] { i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3 });
+            }
+            var mesh = new Mesh { name = "citylamppools" };
+            mesh.SetVertices(v);
+            mesh.SetUVs(0, uv);
+            mesh.SetTriangles(t, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            var go = MeshObject(group, "LampPools", mesh, _cityPool, Vector3.zero, Quaternion.identity, Vector3.one, layer, null, collider: false);
+            Hide(go);
+            var r = go.GetComponent<MeshRenderer>();
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
         }
 
         private static bool AlleyProp(Transform parent, System.Random rng, Vector3 at, float yaw)
@@ -216,6 +302,7 @@ namespace FPSKit.EditorTools
                     // The spawn crossing stays clear.
                     var at = alongZ ? new Vector3(cx + side * 3.5f, 0f, cz + slot) : new Vector3(cx + slot, 0f, cz + side * 3.5f);
                     if (at.magnitude < 34f) continue;
+                    if (NearCrossing(at, 3.2f)) continue;
                     float yaw = (alongZ ? 90f : 0f) + (rng.NextDouble() < 0.5 ? 0f : 180f) + (float)(rng.NextDouble() - 0.5) * 4f;
 
                     int p = rng.Next(0, _cityPaint.Length);

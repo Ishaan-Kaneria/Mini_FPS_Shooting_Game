@@ -30,12 +30,12 @@ MonoBehaviour:
   atmosphereThickness: 1.5
   skyExposure: 1.45
   sunColor: {r: 1, g: 0.9, b: 0.72, a: 1}
-  sunIntensity: 1.4
+  sunIntensity: 1.6
   sunAngles: {x: 38, y: 140}
   shadowStrength: 0.55
   fogEnabled: 1
-  fogColor: {r: 0.8, g: 0.7, b: 0.62, a: 1}
-  fogDensity: 0.0013
+  fogColor: {r: 0.9, g: 0.76, b: 0.58, a: 1}
+  fogDensity: 0.0018
   ambientSky: {r: 0.94, g: 0.88, b: 0.78, a: 1}
   ambientEquator: {r: 0.86, g: 0.76, b: 0.63, a: 1}
   ambientGround: {r: 0.68, g: 0.58, b: 0.44, a: 1}

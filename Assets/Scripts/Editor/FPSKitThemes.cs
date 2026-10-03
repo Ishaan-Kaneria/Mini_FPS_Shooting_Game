@@ -268,7 +268,7 @@ namespace FPSKit.EditorTools
                     t.atmosphereThickness = 1.5f;
                     t.skyExposure = 1.45f;
                     t.sunColor = new Color(1f, 0.90f, 0.72f);
-                    t.sunIntensity = 1.4f;
+                    t.sunIntensity = 1.6f;
                     // Mid-afternoon rather than noon, and this is a terrain decision more
                     // than a lighting one. A dune is read entirely through the shading
                     // across its own slope, and a sun sixty-eight degrees up puts almost
@@ -284,7 +284,7 @@ namespace FPSKit.EditorTools
                     // and the shape of the ground is the one thing the player reads at range.
                     // Ambient is lifted so no face goes black.
                     t.sunAngles = new Vector2(38f, 140f);
-                    t.fogColor = new Color(0.80f, 0.70f, 0.62f);
+                    t.fogColor = new Color(0.90f, 0.76f, 0.58f);   // as at the 21:07 build Ishaan was looking at (restored 2026-10-03)
                     t.fogDensity = 0.004f;
                     // Lifted for the open zone. One hard sun over a map with
                     // hundred-metre rock on it puts whole faces in shadow, and at the
@@ -323,7 +323,7 @@ namespace FPSKit.EditorTools
 
                     // Thin, because the whole point of this arena is that you can see to
                     // the horizon. At the walled arena's 0.004 the mesas are solid fog.
-                    t.fogDensity = 0.0013f;
+                    t.fogDensity = 0.0018f;
 
                     t.hazard = LevelTheme.Hazard.River;
                     t.hazardWidth = 58f;

@@ -232,8 +232,11 @@ namespace FPSKit.EditorTools
         static int _expIndex, _expView;
         static int _expPhase;                 // 0 start, 1 settle, 2 sample
         static double _expStart;
-        static readonly List<(string view, string name, float avg, float p95, long tris, long casters, long setpass)> _expResults = new List<(string, string, float, float, long, long, long)>();
-        static readonly string[] ExpViews = { "spawn", "oldgrowth" };
+        static readonly List<(string view, string name, float avg, float p95, long tris, long casters, long setpass, float cpu, float gpu, float wait)> _expResults = new List<(string, string, float, float, long, long, long, float, float, float)>();
+        static readonly string[] ExpViews = { "spawn", "ferris", "oldgrowth" };
+        static ProfilerRecorder _waitPresent, _waitGfx;
+        static readonly List<float> _expCpu = new List<float>(), _expGpu = new List<float>();
+        static readonly List<double> _expWait = new List<double>();
 
         [MenuItem("Tools/MiniFPS/Performance/Run Experiments (play mode)")]
         public static void BeginExperiments()
@@ -262,20 +265,23 @@ namespace FPSKit.EditorTools
             float sd = urp.shadowDistance; int cc = urp.shadowCascadeCount; int msaa = urp.msaaSampleCount;
             float far = cam != null ? cam.farClipPlane : 1000f;
             float lod = QualitySettings.lodBias;
+            float scale = urp.renderScale;
+            var features = new List<ScriptableRendererFeature>();
+            var field = typeof(UniversalRenderPipelineAsset).GetField("m_RendererDataList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null && field.GetValue(urp) is ScriptableRendererData[] datas)
+                foreach (var d in datas) if (d != null) features.AddRange(d.rendererFeatures.Where(f => f != null && f.name.IndexOf("Occlusion", StringComparison.OrdinalIgnoreCase) >= 0));
+            var featureOn = features.ToDictionary(f => f, f => f.isActive);
             return new List<Experiment>
             {
-                new Experiment { name = "baseline", apply = () => { }, revert = () => { } },
-                new Experiment { name = "no realtime shadows at all", apply = () => { foreach (var l in shadowLights) l.shadows = LightShadows.None; }, revert = () => { foreach (var kv in shadowModes) kv.Key.shadows = kv.Value; } },
-                new Experiment { name = "sun shadows only (spot shadows off)", apply = () => { foreach (var l in shadowLights) if (l.type != LightType.Directional) l.shadows = LightShadows.None; }, revert = () => { foreach (var kv in shadowModes) kv.Key.shadows = kv.Value; } },
-                new Experiment { name = "shadow distance 95 -> 60", apply = () => urp.shadowDistance = 60f, revert = () => urp.shadowDistance = sd },
-                new Experiment { name = "cascades 4 -> 2", apply = () => urp.shadowCascadeCount = 2, revert = () => urp.shadowCascadeCount = cc },
-                new Experiment { name = "distance 60 + 2 cascades", apply = () => { urp.shadowDistance = 60f; urp.shadowCascadeCount = 2; }, revert = () => { urp.shadowDistance = sd; urp.shadowCascadeCount = cc; } },
+                new Experiment { name = "baseline (start)", apply = () => { }, revert = () => { } },
+                new Experiment { name = "MSAA 4x -> 2x", apply = () => urp.msaaSampleCount = 2, revert = () => urp.msaaSampleCount = msaa },
                 new Experiment { name = "MSAA 4x -> off", apply = () => urp.msaaSampleCount = 1, revert = () => urp.msaaSampleCount = msaa },
-                new Experiment { name = "all point/spot lights off", apply = () => { foreach (var l in pointLights) l.enabled = false; }, revert = () => { foreach (var l in pointLights) l.enabled = true; } },
-                new Experiment { name = "terrain trees + detail off", apply = () => { foreach (var t in terrains) t.drawTreesAndFoliage = false; }, revert = () => { foreach (var t in terrains) t.drawTreesAndFoliage = true; } },
+                new Experiment { name = "no realtime shadows at all", apply = () => { foreach (var l in shadowLights) l.shadows = LightShadows.None; }, revert = () => { foreach (var kv in shadowModes) kv.Key.shadows = kv.Value; } },
+                new Experiment { name = "additional lights off (all point/spot)", apply = () => { foreach (var l in pointLights) l.enabled = false; }, revert = () => { foreach (var l in pointLights) l.enabled = true; } },
+                new Experiment { name = $"SSAO off ({features.Count} feature)", apply = () => { foreach (var f in features) f.SetActive(false); }, revert = () => { foreach (var kv in featureOn) kv.Key.SetActive(kv.Value); } },
                 new Experiment { name = "post-processing volumes off", apply = () => { foreach (var v in volumes) v.enabled = false; }, revert = () => { foreach (var v in volumes) v.enabled = true; } },
-                new Experiment { name = "far clip 1000 -> 220", apply = () => { if (cam != null) cam.farClipPlane = 220f; }, revert = () => { if (cam != null) cam.farClipPlane = far; } },
-                new Experiment { name = "LOD bias 2 -> 1", apply = () => QualitySettings.lodBias = 1f, revert = () => QualitySettings.lodBias = lod },
+                new Experiment { name = "render scale 1.0 -> 0.8", apply = () => urp.renderScale = 0.8f, revert = () => urp.renderScale = scale },
+                new Experiment { name = "baseline (end)", apply = () => { }, revert = () => { } },
             };
         }
 
@@ -292,6 +298,8 @@ namespace FPSKit.EditorTools
                     _tris = _batches;
                     _shadowCasters = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Shadow Casters Count");
                     _setpass = ProfilerRecorder.StartNew(ProfilerCategory.Render, "SetPass Calls Count");
+                    _waitPresent = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Gfx.WaitForPresentOnGfxThread");
+                    _waitGfx = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Gfx.WaitForGfxCommandsFromMainThread");
                     _expStart = now; _expPhase = -1; return;
                 }
                 if (_expPhase == -1) { if (now - _expStart > 8.0) { _expPhase = 0; } return; }      // let the level start
@@ -303,19 +311,26 @@ namespace FPSKit.EditorTools
                     if (_expView >= ExpViews.Length) { FinishExperiments(); return; }
                     if (_expIndex == 0) Teleport(ExpViews[_expView]);
                     _exps[_expIndex].apply();
-                    _dt.Clear(); _expPhase = 1; _expStart = now; _lastFrame = Time.frameCount;
+                    _dt.Clear(); _expCpu.Clear(); _expGpu.Clear(); _expWait.Clear(); _expPhase = 1; _expStart = now; _lastFrame = Time.frameCount;
                     return;
                 }
                 if (Time.frameCount != _lastFrame)
                 {
                     _lastFrame = Time.frameCount;
-                    if (_expPhase == 2) _dt.Add(Time.unscaledDeltaTime * 1000f);
+                    if (_expPhase == 2)
+                    {
+                        _dt.Add(Time.unscaledDeltaTime * 1000f);
+                        FrameTimingManager.CaptureFrameTimings();
+                        var ft = new FrameTiming[1];
+                        if (FrameTimingManager.GetLatestTimings(1, ft) > 0) { if (ft[0].cpuMainThreadFrameTime > 0) _expCpu.Add((float)ft[0].cpuMainThreadFrameTime); if (ft[0].gpuFrameTime > 0) _expGpu.Add((float)ft[0].gpuFrameTime); }
+                        _expWait.Add((_waitPresent.Valid ? _waitPresent.LastValue : 0) / 1e6 + (_waitGfx.Valid ? _waitGfx.LastValue : 0) / 1e6);
+                    }
                 }
-                if (_expPhase == 1 && now - _expStart > 1.5) { _expPhase = 2; _expStart = now; _dt.Clear(); return; }
-                if (_expPhase == 2 && now - _expStart > 4.0)
+                if (_expPhase == 1 && now - _expStart > 2.5) { _expPhase = 2; _expStart = now; _dt.Clear(); return; }
+                if (_expPhase == 2 && now - _expStart > 10.0)
                 {
                     float avg = _dt.Count > 0 ? _dt.Average() : 0f;
-                    _expResults.Add((ExpViews[_expView], _exps[_expIndex].name, avg, Pct(_dt, 0.95f), _tris.LastValue, _shadowCasters.LastValue, _setpass.LastValue));
+                    _expResults.Add((ExpViews[_expView], _exps[_expIndex].name, avg, Pct(_dt, 0.95f), _tris.LastValue, _shadowCasters.LastValue, _setpass.LastValue, _expCpu.Count > 0 ? _expCpu.Average() : 0f, _expGpu.Count > 0 ? _expGpu.Average() : 0f, _expWait.Count > 0 ? (float)_expWait.Average() : 0f));
                     _expPhase = 0;
                 }
             }
@@ -342,13 +357,13 @@ namespace FPSKit.EditorTools
         {
             EditorApplication.update -= ExpTick;
             if (_exps != null && _expIndex >= 0 && _expIndex < _exps.Count) _exps[_expIndex].revert();     // never leave a shared asset changed
-            _tris.Dispose(); _shadowCasters.Dispose(); _setpass.Dispose();
+            _tris.Dispose(); _shadowCasters.Dispose(); _setpass.Dispose(); _waitPresent.Dispose(); _waitGfx.Dispose();
             var sb = new StringBuilder();
             foreach (var g in _expResults.GroupBy(r => r.view))
             {
                 float baseMs = g.First().avg;
                 sb.AppendLine($"== view '{g.Key}' (baseline {baseMs:0.0} ms = {1000f / Mathf.Max(baseMs, 0.01f):0} fps)");
-                foreach (var r in g) sb.AppendLine($"   {r.name,-46} avg {r.avg,5:0.0} ms ({1000f / Mathf.Max(r.avg, 0.01f),3:0} fps)  p95 {r.p95,5:0.0}  delta {r.avg - baseMs,+6:0.0} ms | tris {r.tris / 1000}k, shadow casters {r.casters}, setpass {r.setpass}");
+                foreach (var r in g) sb.AppendLine($"   {r.name,-46} avg {r.avg,5:0.0} ms ({1000f / Mathf.Max(r.avg, 0.01f),3:0} fps)  p95 {r.p95,5:0.0}  delta {r.avg - baseMs,+6:0.0} ms | main-thread cpu {r.cpu:0.0} ms, gpu {r.gpu:0.0} ms, gfx waits {r.wait:0.0} ms | tris {r.tris / 1000}k, casters {r.casters}, setpass {r.setpass}");
             }
             File.WriteAllText($"{Dir}/experiments.txt", sb.ToString());
             File.WriteAllText($"{Dir}/status_exp.txt", "done");

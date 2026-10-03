@@ -360,14 +360,14 @@ namespace FPSKit.EditorTools
         static void Bulbs(Transform dressing)
         {
             if (dressing == null) return;
-            int i = 0;
             foreach (var t in dressing.Cast<Transform>().Where(t => t.name == "BulbLive").ToList())
             {
                 t.gameObject.isStatic = false;                                  // its emission changes at runtime
-                Light l = null;
-                if (i++ % 3 == 0) l = MakeLight(g, "BulbLight", t.position, LightType.Point, new Color(1f, 0.62f, 0.28f), 4.5f, 6.5f);
+                // Emissive only. A third of these used to carry a real point light; nine lights for string-light
+                // bulbs cost 3-4 ms at the spawn and a bulb reads the same through bloom. The practical lights
+                // that matter for mood (fires, work lights, beacons, the booth) are the ones that stay.
                 var r = t.GetComponent<Renderer>();
-                Flicker(l, FlickerLight.Mode.Dropout, new Vector2(0.55f, 1.1f), 5f, r);
+                Flicker(null, FlickerLight.Mode.Dropout, new Vector2(0.55f, 1.1f), 5f, r);
             }
         }
 

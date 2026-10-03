@@ -42,7 +42,7 @@ public class FairgroundQuality : MonoBehaviour
     [Header("Shadows")]
     [Tooltip("The most distance the sun's shadows reach here, per tier (Low, Medium, High). The pipeline asset is shared by every arena " +
              "and sets 95 m with 4 cascades; this arena has thousands of shadow casters, so it asks for less and gives it back on exit.")]
-    public float[] shadowDistance = { 45f, 60f, 70f };
+    public float[] shadowDistance = { 45f, 60f, 50f };
 
     [Tooltip("The most shadow cascades here, per tier (Low, Medium, High). Never raises what the pipeline asset already has.")]
     public int[] shadowCascades = { 2, 2, 3 };

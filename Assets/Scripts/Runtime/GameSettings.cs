@@ -49,6 +49,19 @@ public static class GameSettings
     }
 
     /// <summary>
+    /// The player's render scale, 0.6 to 1, or -1 for "whatever the quality tier was built with" (High renders at
+    /// 0.85 and upscales). Moving the quality tier clears it, so a slider set on High does not follow the player to Medium.
+    /// </summary>
+    public static float RenderScale
+    {
+        get { float v = PlayerPrefs.GetFloat(Prefix + "renderScale", -1f); return v <= 0f ? -1f : Mathf.Clamp(v, 0.6f, 1f); }
+        set => SetFloat("renderScale", Mathf.Clamp(value, 0.6f, 1f));
+    }
+
+    /// <summary>Drops the render scale back to the tier's own without announcing it (the tier change already did).</summary>
+    public static void ForgetRenderScale() => PlayerPrefs.DeleteKey(Prefix + "renderScale");
+
+    /// <summary>
     /// 30 or 60. A phone that holds 30 runs cooler and lasts longer; a PC ignores this for
     /// vsync, which already paces to the display.
     /// </summary>
@@ -265,7 +278,7 @@ public static class GameSettings
     {
         foreach (var key in new[]
                  {
-                     "uiScale", "quality", "fps", "battery", "touchSens", "padSens", "deadzone", "curve",
+                     "uiScale", "quality", "renderScale", "fps", "battery", "touchSens", "padSens", "deadzone", "curve",
                      "invertY", "assist", "assistStrength", "autoFire", "gyro", "gyroSens", "aimMode",
                      "leftHanded", "touchOpacity",
                      "mouseSens", "fov", "vsync", "volMaster", "volMusic", "volSfx", "hudScale", "minimapRotates", "blood",

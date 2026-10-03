@@ -19,7 +19,9 @@ namespace FPSKit.EditorTools
     ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 60m on two
     ///             cascades, 2x MSAA, full resolution, and the cheaper renderer, with no
     ///             ambient occlusion.
-    ///   High   -- PC_RPAsset, untouched: what the desktop build has always had.
+    ///   High   -- PC_RPAsset: shadows to 50m on three cascades, 2x MSAA, rendered at 85% and upscaled with FSR 1,
+    ///             and ambient occlusion at half resolution with four samples. Measured on the Intel Arc laptop: MSAA
+    ///             4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass was ~4.7 ms.
     ///
     /// Post-processing and particles are cut at runtime by <see cref="QualityTiers"/>,
     /// because they belong to the camera and the scene rather than to the pipeline.
@@ -58,6 +60,9 @@ namespace FPSKit.EditorTools
                 changed = true;
             }
 
+            changed |= Configure(high, shadows: true, distance: 50f, cascades: 3, msaa: 2, hdr: true, scale: 0.85f, soft: true,
+                                 renderer: null, upscaling: 3);                               // 3 = FSR 1
+            changed |= CheapSsao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
             changed |= Configure(medium, shadows: true, distance: 60f, cascades: 2, msaa: 2, hdr: true, scale: 1f, soft: false,
                                  renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer));
@@ -67,7 +72,7 @@ namespace FPSKit.EditorTools
         }
 
         static bool Configure(UniversalRenderPipelineAsset asset, bool shadows, float distance, int cascades,
-                              int msaa, bool hdr, float scale, bool soft, ScriptableRendererData renderer)
+                              int msaa, bool hdr, float scale, bool soft, ScriptableRendererData renderer, int upscaling = 0)
         {
             var so = new SerializedObject(asset);
             bool changed = false;
@@ -82,6 +87,7 @@ namespace FPSKit.EditorTools
             changed |= SetBool(so, "m_SupportsHDR", hdr);
             changed |= SetFloat(so, "m_RenderScale", scale);
             changed |= SetBool(so, "m_SoftShadowsSupported", soft);
+            changed |= SetInt(so, "m_UpscalingFilter", upscaling);
             if (renderer != null)
             {
                 var list = so.FindProperty("m_RendererDataList");
@@ -101,6 +107,37 @@ namespace FPSKit.EditorTools
             }
             return changed;
         }
+
+        /// <summary>
+        /// Half-resolution, four-sample, Gaussian-blurred SSAO on the High renderer. The feature keeps its settings in an
+        /// internal class, so they are written through the serialized path, which also re-runs the feature's Create().
+        /// </summary>
+        static bool CheapSsao(UniversalRenderPipelineAsset high)
+        {
+            var list = new SerializedObject(high).FindProperty("m_RendererDataList");
+            bool changed = false;
+            for (int i = 0; list != null && i < list.arraySize; i++)
+            {
+                var data = list.GetArrayElementAtIndex(i).objectReferenceValue as ScriptableRendererData;
+                if (data == null) continue;
+                foreach (var f in data.rendererFeatures)
+                {
+                    if (f == null || f.name.IndexOf("Occlusion", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    var so = new SerializedObject(f);
+                    var m = so.FindProperty("m_Settings");
+                    if (m == null) continue;
+                    bool c = false;
+                    c |= SetBool(m.FindPropertyRelative("Downsample"), true);
+                    c |= SetInt(m.FindPropertyRelative("Samples"), 2);        // Low = 4 samples
+                    c |= SetInt(m.FindPropertyRelative("BlurQuality"), 1);    // Gaussian
+                    if (c) { so.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(f); EditorUtility.SetDirty(data); changed = true; }
+                }
+            }
+            return changed;
+        }
+
+        static bool SetBool(SerializedProperty p, bool v) { if (p == null || p.boolValue == v) return false; p.boolValue = v; return true; }
+        static bool SetInt(SerializedProperty p, int v) { if (p == null || p.intValue == v) return false; p.intValue = v; return true; }
 
         /// <summary>Rewrites QualitySettings to exactly Low, Medium, High, in that order.</summary>
         static bool Levels(RenderPipelineAsset low, RenderPipelineAsset medium, RenderPipelineAsset high)

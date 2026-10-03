@@ -226,7 +226,7 @@ namespace FPSKit.EditorTools
 
         // ------------------------------------------------------------------ experiments (one change at a time, restored after)
 
-        sealed class Experiment { public string name; public Action apply, revert; }
+        sealed class Experiment { public string name; public Action apply, revert; public bool shot; }
 
         static List<Experiment> _exps;
         static int _expIndex, _expView;
@@ -234,6 +234,7 @@ namespace FPSKit.EditorTools
         static double _expStart;
         static readonly List<(string view, string name, float avg, float p95, long tris, long casters, long setpass, float cpu, float gpu, float wait)> _expResults = new List<(string, string, float, float, long, long, long, float, float, float)>();
         static readonly string[] ExpViews = { "spawn", "ferris", "oldgrowth" };
+        static bool _shotTaken;
         static ProfilerRecorder _waitPresent, _waitGfx;
         static readonly List<float> _expCpu = new List<float>(), _expGpu = new List<float>();
         static readonly List<double> _expWait = new List<double>();
@@ -270,17 +271,36 @@ namespace FPSKit.EditorTools
             var field = typeof(UniversalRenderPipelineAsset).GetField("m_RendererDataList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             if (field != null && field.GetValue(urp) is ScriptableRendererData[] datas)
                 foreach (var d in datas) if (d != null) features.AddRange(d.rendererFeatures.Where(f => f != null && f.name.IndexOf("Occlusion", StringComparison.OrdinalIgnoreCase) >= 0));
-            var featureOn = features.ToDictionary(f => f, f => f.isActive);
+
+            // SSAO settings live in an internal class; the serialized path is the one way in, and it re-runs the feature's Create().
+            void Ssao(bool cheap)
+            {
+                foreach (var f in features)
+                {
+                    var so = new SerializedObject(f);
+                    var m = so.FindProperty("m_Settings");
+                    m.FindPropertyRelative("Downsample").boolValue = cheap;
+                    m.FindPropertyRelative("Samples").intValue = cheap ? 2 : 1;        // Low = 4 samples, Medium = 8
+                    m.FindPropertyRelative("BlurQuality").intValue = cheap ? 1 : 0;    // Gaussian, not bilateral
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+            var upFilter = urp.upscalingFilter;
+            Experiment Scale(string name, float rs, UpscalingFilterSelection filter, int msaaOverride) => new Experiment
+            {
+                name = name, shot = true,
+                apply = () => { urp.renderScale = rs; urp.upscalingFilter = filter; if (msaaOverride > 0) urp.msaaSampleCount = msaaOverride; },
+                revert = () => { urp.renderScale = scale; urp.upscalingFilter = upFilter; urp.msaaSampleCount = msaa; }
+            };
             return new List<Experiment>
             {
-                new Experiment { name = "baseline (start)", apply = () => { }, revert = () => { } },
-                new Experiment { name = "MSAA 4x -> 2x", apply = () => urp.msaaSampleCount = 2, revert = () => urp.msaaSampleCount = msaa },
-                new Experiment { name = "MSAA 4x -> off", apply = () => urp.msaaSampleCount = 1, revert = () => urp.msaaSampleCount = msaa },
-                new Experiment { name = "no realtime shadows at all", apply = () => { foreach (var l in shadowLights) l.shadows = LightShadows.None; }, revert = () => { foreach (var kv in shadowModes) kv.Key.shadows = kv.Value; } },
-                new Experiment { name = "additional lights off (all point/spot)", apply = () => { foreach (var l in pointLights) l.enabled = false; }, revert = () => { foreach (var l in pointLights) l.enabled = true; } },
-                new Experiment { name = $"SSAO off ({features.Count} feature)", apply = () => { foreach (var f in features) f.SetActive(false); }, revert = () => { foreach (var kv in featureOn) kv.Key.SetActive(kv.Value); } },
-                new Experiment { name = "post-processing volumes off", apply = () => { foreach (var v in volumes) v.enabled = false; }, revert = () => { foreach (var v in volumes) v.enabled = true; } },
-                new Experiment { name = "render scale 1.0 -> 0.8", apply = () => urp.renderScale = 0.8f, revert = () => urp.renderScale = scale },
+                new Experiment { name = "baseline (start)", shot = true, apply = () => { }, revert = () => { } },
+                new Experiment { name = "SSAO cheap (half res, 4 samples, gaussian)", shot = true, apply = () => Ssao(true), revert = () => Ssao(false) },
+                new Experiment { name = "SSAO off (reference)", apply = () => { foreach (var f in features) f.SetActive(false); }, revert = () => { foreach (var f in features) f.SetActive(true); } },
+                Scale("scale 0.85 bilinear", 0.85f, UpscalingFilterSelection.Linear, 0),
+                Scale("scale 0.85 FSR 1", 0.85f, UpscalingFilterSelection.FSR, 0),
+                Scale("scale 0.85 STP (MSAA off)", 0.85f, UpscalingFilterSelection.STP, 1),
+                new Experiment { name = "shadow distance 50", apply = () => urp.shadowDistance = 50f, revert = () => urp.shadowDistance = sd },
                 new Experiment { name = "baseline (end)", apply = () => { }, revert = () => { } },
             };
         }
@@ -311,7 +331,7 @@ namespace FPSKit.EditorTools
                     if (_expView >= ExpViews.Length) { FinishExperiments(); return; }
                     if (_expIndex == 0) Teleport(ExpViews[_expView]);
                     _exps[_expIndex].apply();
-                    _dt.Clear(); _expCpu.Clear(); _expGpu.Clear(); _expWait.Clear(); _expPhase = 1; _expStart = now; _lastFrame = Time.frameCount;
+                    _dt.Clear(); _expCpu.Clear(); _expGpu.Clear(); _expWait.Clear(); _shotTaken = false; _expPhase = 1; _expStart = now; _lastFrame = Time.frameCount;
                     return;
                 }
                 if (Time.frameCount != _lastFrame)
@@ -327,6 +347,12 @@ namespace FPSKit.EditorTools
                     }
                 }
                 if (_expPhase == 1 && now - _expStart > 2.5) { _expPhase = 2; _expStart = now; _dt.Clear(); return; }
+                // The shot is taken while the setting is applied: end-of-frame capture after the revert shows the baseline.
+                if (_expPhase == 2 && !_shotTaken && now - _expStart > 6.0 && _exps[_expIndex].shot && ExpViews[_expView] == "oldgrowth")
+                {
+                    _shotTaken = true;
+                    ScreenCapture.CaptureScreenshot(Path.GetFullPath($"{Dir}/shot_{_expIndex}_{_exps[_expIndex].name.Split(' ')[0]}.png"));
+                }
                 if (_expPhase == 2 && now - _expStart > 10.0)
                 {
                     float avg = _dt.Count > 0 ? _dt.Average() : 0f;

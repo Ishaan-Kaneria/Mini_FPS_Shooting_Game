@@ -424,6 +424,10 @@ public class SettingsPanel : OverlayPanel
         Heading(page, "Performance", t);
         AddChoice(page, "Quality", "Low turns off shadows and post-processing.", new[] { "Low", "Medium", "High" },
                   () => (int)QualityTiers.Current, i => GameSettings.QualityTier = i, t);
+        if (desktop)
+            AddSlider(page, "Render scale", "Below 100% draws fewer pixels and stretches them: faster, softer. High starts at 85%.", 0.6f, 1f,
+                      () => GameSettings.RenderScale > 0f ? GameSettings.RenderScale : QualityTiers.TierRenderScale,
+                      v => GameSettings.RenderScale = v, Percent, t);
         if (QualityTiers.Handheld || ScreenInfo.SimulatedMobile == true)
         {
             AddChoice(page, "Frame rate", "30 runs cooler and lasts longer.", new[] { "30", "60" },

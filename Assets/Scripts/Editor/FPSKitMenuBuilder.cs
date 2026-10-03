@@ -214,7 +214,10 @@ namespace FPSKit.EditorTools
                     sceneName = row.SceneName,
                     description = row.Description,
                     theme = AssetDatabase.LoadAssetAtPath<LevelTheme>(row.ThemePath),
-                    preview = AssetDatabase.LoadAssetAtPath<Texture2D>(row.PreviewPath),
+                    // A card image made with Tools > MiniFPS > Thumbnails wins over the quick preview render.
+                    preview = FPSKitThumbnails.CardImage(row.DisplayName) != null
+                        ? FPSKitThumbnails.CardImage(row.DisplayName)
+                        : AssetDatabase.LoadAssetAtPath<Texture2D>(row.PreviewPath),
                     levels = AssetDatabase.LoadAssetAtPath<LevelSet>(row.LevelsPath)
                 });
             }

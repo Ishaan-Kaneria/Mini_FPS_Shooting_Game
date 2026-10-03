@@ -2670,3 +2670,7 @@ The menu card and the campaign read the label when they are generated, so changi
 first switched everything on **in memory only** (all 131 lights, directional shadows Soft 0.6, every renderer casting) and discarded that by opening the Menu scene; the scene file was never saved.
 `Shots.asset` in that folder has `m_Script: {fileID: 0}` (the `ThumbnailShots` class lives in `FPSKitThumbnails.cs`, whose file name does not match it), so it does not load as a typed asset and
 `CaptureArena` would recreate it with defaults: a pre-existing fault, so the camera above is recorded here rather than there. The dashboard card picks the image up at the next menu rebuild.
+
+**Night Citylife in the menu (2026-10-03):** `MainMenuController` builds the cards at run time from `Arenas.asset`, so no menu rebuild is needed for a rename: the Rooftop entry's `displayName`, `description` and `preview` were set directly
+(`Build Dashboard` would also do it, but it captures a preview of all seven arenas first). `ProgressKey` stays `NightRooftop`, which is the save key. The card folder follows the display name
+(`Assets/UI/Thumbnails/NightCitylife/`, as `FPSKitThumbnails.CardImage(displayName)` expects); the PNG imports at 512x256 (NPOT-to-nearest), which the 16:9 card frame stretches back. A later `Build Dashboard` finds the card by that folder.

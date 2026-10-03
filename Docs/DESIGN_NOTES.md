@@ -2664,3 +2664,9 @@ Also deleted this session (regenerable, untracked): `Build/Android` IL2CPP symbo
 **Renames (2026-10-03):** the word "Lite" is gone: `LiteSceneSettings` -> `ArenaPerformance`, `FPSKitLite` -> `FPSKitReducedCopy` (menu `FPSKit > Performance`), copies are saved as `Scenes/Reduced/<Name>_Reduced.unity`, and the two post profiles live in
 `Assets/FPSKit_Generated/Profiles/`. The Night Rooftop is **Night Citylife** to the player (`LevelTheme.displayName`, as the Unknown Planet is); its key `Night Rooftop`, scene `NightRooftop.unity`, save key and campaign slot are unchanged.
 The menu card and the campaign read the label when they are generated, so changing `displayName` needs the theme re-applied, `ResetCampaign` and a menu rebuild.
+
+**Night Citylife card image (2026-10-03):** a low street-level shot down an avenue at blue hour: camera `(-72, 1.25, -1.2)` looking at `(30, 19, 8)`, FOV 56, sun exposure 1.1, rendered with
+`FPSKitThumbnails.Render` (1280x720 saved at 640x360) into `Assets/UI/Thumbnails/NightRooftop/Arena.png`. The shipped scene has its lights, moon shadows and shadow casters switched off, so the render
+first switched everything on **in memory only** (all 131 lights, directional shadows Soft 0.6, every renderer casting) and discarded that by opening the Menu scene; the scene file was never saved.
+`Shots.asset` in that folder has `m_Script: {fileID: 0}` (the `ThumbnailShots` class lives in `FPSKitThumbnails.cs`, whose file name does not match it), so it does not load as a typed asset and
+`CaptureArena` would recreate it with defaults: a pre-existing fault, so the camera above is recorded here rather than there. The dashboard card picks the image up at the next menu rebuild.

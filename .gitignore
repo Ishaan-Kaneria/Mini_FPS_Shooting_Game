@@ -155,3 +155,7 @@ InitTestScene*.unity*
 /Assets/Flooded_Grounds.meta
 /Assets/_TerrainAutoUpgrade/
 /Assets/_TerrainAutoUpgrade.meta
+
+# Editor swap files (machine-specific)
+*.swp
+*.swo

@@ -2628,3 +2628,7 @@ Ishaan fell off the fire escapes whenever he missed the turn at a landing, found
   gets two floodlight posts on corners clear of stairs and plant, an additive warm pool under each, a real point light, string lights between
   the posts and amber corner lamps on the parapet. Lights: 131 in the scene (99 -> 131), 539 k triangles. **A quality rig must thin the lamp
   and roof lights per tier before this ships on Medium/Low.**
+
+**RooftopQuality (2026-10-03):** `Runtime/RooftopQuality.cs`, wired by `BuildCityZone` onto `Arena/RooftopQuality` (80 lamp lights, 32 roof lights). Low: no lamp lights,
+every third roof light, shadows 45 m / 2 cascades; Medium: every other lamp light, every roof light, 60 m / 2; High: all, 55 m / 3. The pipeline asset's
+shadow range is saved and restored on disable, like `FairgroundQuality`: never call `Apply` on it in edit mode (nothing restores it). Reach check unchanged.

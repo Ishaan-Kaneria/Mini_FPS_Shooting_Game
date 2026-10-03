@@ -138,6 +138,13 @@ namespace FPSKit.EditorTools
 
             BuildCitySkyline(root, backdrop, rng, half);
 
+            // The tier rig: the lamp and roof lights it thins, wired here so nothing looks anything up by name at run time.
+            var rig = new GameObject("RooftopQuality").AddComponent<RooftopQuality>();
+            rig.transform.SetParent(root, false);
+            var lampGroup = root.Find("StreetFurniture/LampLights");
+            rig.lampLights = lampGroup != null ? lampGroup.GetComponentsInChildren<Light>() : new Light[0];
+            rig.roofLights = _roofLights != null ? _roofLights.GetComponentsInChildren<Light>() : new Light[0];
+
             int walk = 0, tower = 0;
             foreach (var l in _lots) { if (l.walkable) walk++; else tower++; }
             Debug.Log($"[FPSKit] rooftop zone: {_lots.Count} buildings ({walk} walkable roofs, {tower} towers), {_bridges.Count} skybridges, " +

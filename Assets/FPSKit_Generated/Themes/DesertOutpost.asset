@@ -30,7 +30,7 @@ MonoBehaviour:
   atmosphereThickness: 1.15
   skyExposure: 1.45
   sunColor: {r: 1, g: 0.9, b: 0.72, a: 1}
-  sunIntensity: 1.6
+  sunIntensity: 1.4
   sunAngles: {x: 38, y: 140}
   shadowStrength: 0.55
   fogEnabled: 1

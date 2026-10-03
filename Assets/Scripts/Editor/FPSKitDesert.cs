@@ -264,28 +264,19 @@ namespace FPSKit.EditorTools
 
                 for (int b = 0; b < CanyonBands.Length - 1; b++)
                 {
-                    var build = new MeshBuild { UVScale = 0.16f };
+                    // Finer and smooth (2026-10-03, "the riverside path is still low poly"): three
+                    // columns per slice and three rows per row, interpolated off the same grid and
+                    // roughened with a fine noise, on shared vertices so the shading runs across the
+                    // faces. The coarse version was one flat-shaded quad per 4.5 m.
+                    // The top shelf (band 0) is ground, so in the desert it wears the dunes' own material and
+                    // takes its UVs from the world, which makes it continuous with the sand either side of it
+                    // instead of a flat strip of smooth pale rock (Ishaan: "the riverside path").
+                    bool shelf = b == 0 && IsDesertArena() && _groundMat != null;
+                    var cliff = CliffMesh(grid, CanyonBands[b], CanyonBands[b + 1], side, seed, $"Cliff_{sideName}_{b}", shelf);
 
-                    // <b>Wound per side.</b> Row k steps towards the river, which is +x on
-                    // the west wall and -x on the east, so one winding cannot face both
-                    // walls at the water. Written once for both, the east wall faced into
-                    // the rock: culled from every angle anybody sees it, so the eye went
-                    // straight through it to the sky below the horizon. Over the desert that
-                    // sky is sand-coloured and the hole passed for a shadowed cliff; over
-                    // the volcanic world it is near black, and the whole east side of the
-                    // canyon came out as a black band.
-                    for (int i = 0; i < slices; i++)
-                        for (int k = CanyonBands[b]; k < CanyonBands[b + 1]; k++)
-                        {
-                            if (side < 0)
-                                build.Quad(grid[i][k], grid[i + 1][k], grid[i + 1][k + 1], grid[i][k + 1]);
-                            else
-                                build.Quad(grid[i][k], grid[i][k + 1], grid[i + 1][k + 1], grid[i + 1][k]);
-                        }
-
-                    var wall = MeshObject(group, $"Cliff{sideName}_{b}", build.ToMesh($"Cliff_{sideName}_{b}"),
-                                          materials[b], Vector3.zero, Quaternion.identity, Vector3.one,
-                                          layer, _theme.wallTag);
+                    var wall = MeshObject(group, $"Cliff{sideName}_{b}", cliff,
+                                          shelf ? _groundMat : materials[b], Vector3.zero, Quaternion.identity, Vector3.one,
+                                          layer, shelf ? GroundTag : _theme.wallTag);
 
                     // The top shelf stays on the bake; see CanyonBands.
                     if (b > 0) NoStanding(wall);
@@ -1084,9 +1075,16 @@ namespace FPSKit.EditorTools
 
             void Slab(Vector3 at, float span, float h)
             {
+                // A slab that starts at the ground is carried 1.2 m below it. Walls are built at the pad's
+                // height and the dune falls away past the pad, so a wall that stopped at zero stood in
+                // the air over a gap (the "floating" fence, 2026-10-03). Buried, it stands on the slope.
+                float extend = at.y - h * 0.5f < 0.05f ? 1.2f : 0f;
+                var centre = at + Vector3.down * (extend * 0.5f);
+                var size = Size(span, h + extend);
+
                 // Rounded, like the houses: a mud wall has soft edges and a hand-made face.
-                build.SoftBox(at, Size(span, h), Quaternion.identity, rng.Next(1, 9999), 0.1f, 4, 0.02f);
-                solid.Box(at, Size(span, h), Quaternion.identity);
+                build.SoftBox(centre, size, Quaternion.identity, rng.Next(1, 9999), 0.1f, 4, 0.02f);
+                solid.Box(centre, size, Quaternion.identity);
             }
 
             var up = Vector3.up * height * 0.5f;

@@ -133,12 +133,18 @@ namespace FPSKit.EditorTools
                     c |= SetBool(m.FindPropertyRelative("Downsample"), true);
                     c |= SetInt(m.FindPropertyRelative("Samples"), 2);        // Low = 4 samples
                     c |= SetInt(m.FindPropertyRelative("BlurQuality"), 1);    // Gaussian
+                    // Softer (2026-10-03): at 1.25 with four samples the occlusion was a black grain on every
+                    // rounded wall and prop in the desert. Lighter, and a touch less contact darkening.
+                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.45f);
+                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.1f);
+                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.18f);
                     if (c) { so.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(f); EditorUtility.SetDirty(data); changed = true; }
                 }
             }
             return changed;
         }
 
+        static bool SetFloat(SerializedProperty p, float v) { if (p == null || Mathf.Approximately(p.floatValue, v)) return false; p.floatValue = v; return true; }
         static bool SetBool(SerializedProperty p, bool v) { if (p == null || p.boolValue == v) return false; p.boolValue = v; return true; }
         static bool SetInt(SerializedProperty p, int v) { if (p == null || p.intValue == v) return false; p.intValue = v; return true; }
 

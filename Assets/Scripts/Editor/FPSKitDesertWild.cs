@@ -207,7 +207,8 @@ namespace FPSKit.EditorTools
             var ground = new MeshBuild { UVScale = 0.2f };
             float hw = plan.Width * 0.5f + 3f, hd = plan.Depth * 0.5f + 3f;
             AddUp(ground, f.P(-hw, 0.03f, -hd), f.P(-hw, 0.03f, hd), f.P(hw, 0.03f, hd), f.P(hw, 0.03f, -hd));
-            Flat(hamlet, backdrop, "HamletGround", ground, DenseKey("hamletground"), _earthMat);
+            // (Hard-edged earth patch removed: the ground colour map blends packed earth in smoothly.)
+            // Flat(hamlet, backdrop, "HamletGround", ground, DenseKey("hamletground"), _earthMat);
 
             for (int i = 0; i < 2; i++)
                 for (int j = 0; j < 3; j++)
@@ -261,7 +262,8 @@ namespace FPSKit.EditorTools
             // Packed earth inside.
             var yard = new MeshBuild { UVScale = 0.2f };
             AddUp(yard, f.P(-hw, 0.03f, -hd), f.P(-hw, 0.03f, hd), f.P(hw, 0.03f, hd), f.P(hw, 0.03f, -hd));
-            Flat(farm, backdrop, "FarmYard", yard, DenseKey("farmyard"), _earthMat);
+            // (Hard-edged earth patch removed: the ground colour map blends packed earth in smoothly.)
+            // Flat(farm, backdrop, "FarmYard", yard, DenseKey("farmyard"), _earthMat);
 
             // The wall: two gates on two sides.
             var wall = new MeshBuild { UVScale = 0.28f };

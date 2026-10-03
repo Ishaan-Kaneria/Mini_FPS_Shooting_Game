@@ -394,6 +394,10 @@ namespace FPSKit.EditorTools
                                      _theme.volcanicZone ? BasaltTiling : 0.09f,
                                      _theme.floorSmoothness * 0.4f, 0f, 1.15f);
 
+            // The canyon's top shelf borrows this material (see BuildGorge): it is flat ground beside the
+            // river and has to be the same ground, not a smooth strip of pale rock.
+            _groundMat = sand;
+
             const int chunkCells = 30;
             int chunks = Mathf.CeilToInt(cells / (float)chunkCells);
 
@@ -616,6 +620,8 @@ namespace FPSKit.EditorTools
         /// hair, and a hair is enough for a visible lighting seam every thirty metres in
         /// both directions.
         /// </summary>
+        private static Material _groundMat;
+
         private static void BuildDuneChunk(Transform parent, int layer, Material material,
                                            int originI, int originJ, int cellsI, int cellsJ)
         {

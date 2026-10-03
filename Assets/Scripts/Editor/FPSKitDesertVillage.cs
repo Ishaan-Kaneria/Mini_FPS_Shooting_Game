@@ -52,7 +52,8 @@ namespace FPSKit.EditorTools
                       new Vector3(c.x + Mathf.Cos(a1) * r1, floor + 0.03f, c.y + Mathf.Sin(a1) * r1),
                       new Vector3(c.x + Mathf.Cos(a1) * r1, floor + 0.03f, c.y + Mathf.Sin(a1) * r1));
             }
-            Flat(town, backdrop, "TownGround", earth, DenseKey("townground"), _earthMat);
+            // (Hard-edged earth patch removed: the ground colour map blends packed earth in smoothly.)
+            // Flat(town, backdrop, "TownGround", earth, DenseKey("townground"), _earthMat);
 
             // ---- lots on a grid of lanes ----
             const float lot = 11f, lane = 4f, pitch = lot + lane;
@@ -562,6 +563,7 @@ namespace FPSKit.EditorTools
             var metal = new MeshBuild { UVScale = 0.5f };
             var dish = new MeshBuild { UVScale = 0.5f };
             var cloth = new MeshBuild { UVScale = 0.5f };
+            var cloth2 = new MeshBuild { UVScale = 0.5f };
             float hw = Mathf.Max(0.5f, w * 0.5f - 1f), hd = Mathf.Max(0.5f, d * 0.5f - 1f);
 
             if (rng.NextDouble() < 0.75)
@@ -587,22 +589,12 @@ namespace FPSKit.EditorTools
 
             if (rng.NextDouble() < 0.3 && w > 4f)
             {
-                // A washing line between two poles, and what is hanging on it.
+                // A washing line between two poles, and what is hanging on it (see Washing).
                 var a = f.P(cu - hw, roofY, cv + Rand(rng, -hd, hd));
                 var b = f.P(cu + hw, roofY, cv + Rand(rng, -hd, hd));
-                metal.Tube(a, a + Vector3.up * 1.8f, 0.03f, 0.03f, 4);
-                metal.Tube(b, b + Vector3.up * 1.8f, 0.03f, 0.03f, 4);
-                metal.Tube(a + Vector3.up * 1.75f, b + Vector3.up * 1.75f, 0.008f, 0.008f, 3);
-                int items = 3 + rng.Next(3);
-                for (int i = 0; i < items; i++)
-                {
-                    float t0 = (i + 0.2f) / items, t1 = t0 + Rand(rng, 0.08f, 0.14f);
-                    var p0 = Vector3.Lerp(a, b, t0) + Vector3.up * 1.74f;
-                    var p1 = Vector3.Lerp(a, b, t1) + Vector3.up * 1.74f;
-                    float drop = Rand(rng, 0.5f, 0.9f);
-                    AddUp(cloth, p0, p1, p1 + Vector3.down * drop, p0 + Vector3.down * drop);
-                    AddDown(cloth, p0, p1, p1 + Vector3.down * drop, p0 + Vector3.down * drop);
-                }
+                metal.Tube(a, a + Vector3.up * 1.8f, 0.03f, 0.03f, 6);
+                metal.Tube(b, b + Vector3.up * 1.8f, 0.03f, 0.03f, 6);
+                Washing(cloth, cloth2, metal, a + Vector3.up * 1.78f, b + Vector3.up * 1.78f, rng);
             }
 
             // The extras a flat roof collects: air-conditioners, solar panels, vents, masts.
@@ -618,6 +610,7 @@ namespace FPSKit.EditorTools
             if (metal.Triangles.Count > 0) Visual(parent, "RoofMetal", metal, _steelMat, layer);
             if (dish.Triangles.Count > 0) Visual(parent, "Dish", dish, _dishMat, layer);
             if (cloth.Triangles.Count > 0) Visual(parent, "Washing", cloth, _clothPaints[rng.Next(_clothPaints.Length)], layer);
+            if (cloth2.Triangles.Count > 0) Visual(parent, "Washing2", cloth2, _clothPaints[rng.Next(_clothPaints.Length)], layer);
         }
 
         /// <summary>

@@ -195,7 +195,8 @@ namespace FPSKit.EditorTools
 
             var soil = new MeshBuild { UVScale = 0.25f };
             AddUp(soil, f.P(-hw, 0.03f, -hd), f.P(-hw, 0.03f, hd), f.P(hw, 0.03f, hd), f.P(hw, 0.03f, -hd));
-            Flat(grove, backdrop, "GroveSoil", soil, DenseKey("grovesoil"), _earthMat);
+            // (Hard-edged earth patch removed: the ground colour map blends packed earth in smoothly.)
+            // Flat(grove, backdrop, "GroveSoil", soil, DenseKey("grovesoil"), _earthMat);
 
             var ditches = new MeshBuild { UVScale = 0.4f };
             int row = 0;
@@ -294,7 +295,8 @@ namespace FPSKit.EditorTools
 
             var yard = new MeshBuild { UVScale = 0.25f };
             AddUp(yard, f.P(-hw, 0.03f, -hd), f.P(-hw, 0.03f, hd), f.P(hw, 0.03f, hd), f.P(hw, 0.03f, -hd));
-            Flat(kiln, backdrop, "KilnYard", yard, DenseKey("kilnyard"), _earthMat);
+            // (Hard-edged earth patch removed: the ground colour map blends packed earth in smoothly.)
+            // Flat(kiln, backdrop, "KilnYard", yard, DenseKey("kilnyard"), _earthMat);
 
             var bricksMat = _adobeTints[3];
             var block = new MeshBuild { UVScale = 0.3f };

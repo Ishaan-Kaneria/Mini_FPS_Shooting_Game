@@ -263,7 +263,7 @@ namespace FPSKit.EditorTools
                     // atmosphere by this, and an orange tint turned the zenith a muddy green.
                     t.skyTint = new Color(0.66f, 0.52f, 0.62f);
                     t.skyGroundColor = new Color(0.52f, 0.38f, 0.26f);
-                    t.atmosphereThickness = 1.5f;
+                    t.atmosphereThickness = 1.15f;
                     t.skyExposure = 1.45f;
                     t.sunColor = new Color(1f, 0.90f, 0.72f);
                     t.sunIntensity = 1.6f;
@@ -282,7 +282,7 @@ namespace FPSKit.EditorTools
                     // and the shape of the ground is the one thing the player reads at range.
                     // Ambient is lifted so no face goes black.
                     t.sunAngles = new Vector2(38f, 140f);
-                    t.fogColor = new Color(0.90f, 0.76f, 0.58f);
+                    t.fogColor = new Color(0.80f, 0.70f, 0.62f);
                     t.fogDensity = 0.004f;
                     // Lifted for the open zone. One hard sun over a map with
                     // hundred-metre rock on it puts whole faces in shadow, and at the
@@ -321,7 +321,7 @@ namespace FPSKit.EditorTools
 
                     // Thin, because the whole point of this arena is that you can see to
                     // the horizon. At the walled arena's 0.004 the mesas are solid fog.
-                    t.fogDensity = 0.0018f;
+                    t.fogDensity = 0.0013f;
 
                     t.hazard = LevelTheme.Hazard.River;
                     t.hazardWidth = 58f;

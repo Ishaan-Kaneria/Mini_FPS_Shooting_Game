@@ -37,11 +37,11 @@ namespace FPSKit.EditorTools
             var layers = new[]
             {
                 new RangeLayer { Radius = 640f,  MinHeight = 38f,  MaxHeight = 120f, Tiling = 0.010f, Seed = 11,
-                                 Colour = new Color(0.46f, 0.35f, 0.27f) },
+                                 Colour = new Color(0.40f, 0.31f, 0.26f) },
                 new RangeLayer { Radius = 900f,  MinHeight = 70f,  MaxHeight = 190f, Tiling = 0.008f, Seed = 23,
-                                 Colour = new Color(0.58f, 0.46f, 0.40f) },
+                                 Colour = new Color(0.50f, 0.42f, 0.38f) },
                 new RangeLayer { Radius = 1180f, MinHeight = 100f, MaxHeight = 260f, Tiling = 0.006f, Seed = 37,
-                                 Colour = new Color(0.64f, 0.57f, 0.58f) }
+                                 Colour = new Color(0.60f, 0.55f, 0.55f) }
             };
 
             for (int i = 0; i < layers.Length; i++)
@@ -81,6 +81,17 @@ namespace FPSKit.EditorTools
                 float jitter = 1f + Fbm2(cx * 26f, sz * 26f, l.Seed + 3, 2) * 0.28f;
 
                 float height = Mathf.Lerp(l.MinHeight, l.MaxHeight, Mathf.Clamp01(ridged * envelope)) * jitter;
+
+                // <b>A gap where the river runs out.</b> The river carries on across the apron, so a range
+                // standing across its line reads as a mountain passing over the water (Ishaan, 2026-10-03).
+                // Along the river's axis -- the ring points far north and far south of the arena, within a
+                // couple of hundred metres of its x -- the range is brought down to low foothills, and
+                // rises back to full height further out either side.
+                if (Mathf.Abs(sz) > 0.5f)
+                {
+                    float away = Mathf.Abs(cx * l.Radius - _theme.hazardOffset);
+                    height *= Mathf.Lerp(0.05f, 1f, Mathf.SmoothStep(0f, 1f, (away - 90f) / 220f));
+                }
 
                 for (int r = 0; r <= rows; r++)
                 {

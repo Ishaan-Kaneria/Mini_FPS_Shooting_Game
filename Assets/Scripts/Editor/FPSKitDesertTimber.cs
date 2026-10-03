@@ -413,12 +413,7 @@ namespace FPSKit.EditorTools
             {
                 var at = Spot() + Vector3.up * 0.3f;
                 var turn = f.Rot * Quaternion.Euler(0f, rng.Next(4) * 90f, 0f);
-                units.SoftBox(at, new Vector3(0.85f, 0.56f, 0.34f), turn, rng.Next(1, 999), 0.05f, 4, 0.005f);
-                var grille = at + turn * new Vector3(0f, 0f, 0.18f);
-                dark.Tube(grille, grille + turn * new Vector3(0f, 0f, 0.015f), 0.22f, 0.22f, 14);
-                for (float x = -0.2f; x <= 0.2f; x += 0.1f)
-                    metal.Box(grille + turn * new Vector3(x, 0f, 0.03f), new Vector3(0.012f, 0.42f, 0.012f), turn);
-                metal.Box(at + Vector3.down * 0.34f, new Vector3(0.7f, 0.08f, 0.26f), turn);
+                AirConditioner(units, dark, metal, at, turn, rng.Next(1, 999));
             }
 
             if (rng.NextDouble() < 0.25)
@@ -689,6 +684,7 @@ namespace FPSKit.EditorTools
             float slope = Mathf.Sqrt(sx * sx + sz * sz) / 3.2f;     // rise over run
 
             var c = sand;
+            float detail = 1f;      // how much of the sand's ripple and grain shows; packed ground is smoother
 
             // Regional drift: ochre-red one way, bleached the other.
             c = Color.Lerp(c, new Color(0.69f, 0.49f, 0.32f), Mathf.Clamp01(big * 1.6f) * 0.55f);
@@ -704,31 +700,48 @@ namespace FPSKit.EditorTools
             var clay = new Color(0.75f, 0.70f, 0.59f);
             clay = Color.Lerp(clay, clay * 0.7f, Mathf.Clamp01(cracks) * 0.6f);
             c = Color.Lerp(c, clay, basin * 0.85f);
+            detail = Mathf.Lerp(detail, 0.55f, basin);
 
             // Scree on the steep faces.
             float steep = Mathf.SmoothStep(0.34f, 0.62f, slope + mid * 0.06f);
             var scree = new Color(0.55f, 0.47f, 0.38f) * (0.92f + fine * 0.2f);
             c = Color.Lerp(c, scree, steep * 0.75f);
+            detail = Mathf.Lerp(detail, 0.8f, steep * 0.5f);
 
             // Packed earth round a place and along the track.
+            // Soft, not a yes/no: "inside a site" is a rectangle, and a blend that switches on at its edge
+            // is a visible rectangle (Ishaan, 2026-10-03: "the transition ... is not done properly"). So the
+            // question is asked at a run of widening margins, each with a smaller weight, and the point
+            // asked about is pushed around by a noise so the edge wanders instead of running straight.
             var p2 = new Vector2(wx, wz);
+            var pw = p2 + new Vector2(Fbm2(wx * 0.045f, wz * 0.045f, seed + 11, 2), Fbm2(wx * 0.045f + 40f, wz * 0.045f, seed + 12, 2)) * 8f;
+
             float earth = 0f;
-            if (NearTrack(p2, 3.2f)) earth = 0.85f;
-            else if (InSite(p2, 3f)) earth = 0.7f;
-            else if (InSite(p2, 20f)) earth = 0.35f * (0.6f + mid * 0.8f);
-            c = Color.Lerp(c, new Color(0.50f, 0.40f, 0.28f), Mathf.Clamp01(earth));
+            float[] margins = { 0f, 3f, 6f, 10f, 15f, 21f, 28f, 36f };
+            float[] weights = { 0.85f, 0.72f, 0.58f, 0.44f, 0.32f, 0.22f, 0.13f, 0.06f };
+            for (int i = 0; i < margins.Length; i++)
+                if (InSite(pw, margins[i])) { earth = weights[i]; break; }
+
+            float[] trackReach = { 1.5f, 3.2f, 5.5f, 8f, 11f };
+            float[] trackWeight = { 0.9f, 0.7f, 0.45f, 0.22f, 0.08f };
+            for (int i = 0; i < trackReach.Length; i++)
+                if (NearTrack(pw, trackReach[i])) { earth = Mathf.Max(earth, trackWeight[i]); break; }
+
+            earth *= 0.85f + mid * 0.3f;
+            c = Color.Lerp(c, new Color(0.56f, 0.45f, 0.31f), Mathf.Clamp01(earth));
+            detail = Mathf.Lerp(detail, 0.22f, Mathf.Clamp01(earth));
 
             // The river's banks: damp silt, greener towards the water.
             float bank = Mathf.Abs(wx - GorgeCentreAt(wz)) - _theme.hazardWidth * 0.5f;
             float silt = 1f - Mathf.SmoothStep(0f, 34f + mid * 10f, bank);
-            c = Color.Lerp(c, new Color(0.38f, 0.32f, 0.22f), Mathf.Clamp01(silt) * 0.7f);
+            c = Color.Lerp(c, new Color(0.44f, 0.37f, 0.26f), Mathf.Clamp01(silt) * 0.7f);
+            detail = Mathf.Lerp(detail, 0.45f, Mathf.Clamp01(silt) * 0.8f);
             float green = 1f - Mathf.SmoothStep(14f, 34f, bank + mid * 6f);
             c = Color.Lerp(c, new Color(0.37f, 0.40f, 0.23f), Mathf.Clamp01(green * (0.4f + fine * 0.9f)) * 0.45f);
 
             // Stains and mottling so no stretch is clean.
             float shade = 1f + mid * 0.1f + fine * 0.05f;
-            c = new Color(Mathf.Clamp01(c.r * shade), Mathf.Clamp01(c.g * shade), Mathf.Clamp01(c.b * shade), 1f);
-            return c;
+            return new Color(Mathf.Clamp01(c.r * shade), Mathf.Clamp01(c.g * shade), Mathf.Clamp01(c.b * shade), Mathf.Clamp01(detail));
         }
 
         /// <summary>
@@ -764,7 +777,9 @@ namespace FPSKit.EditorTools
                     c = Color.Lerp(plain, c, Mathf.SmoothStep(0f, 1f, fromEdge / 60f));
 
                     var lin = c.linear;
-                    pixels[y * n + x] = new Color(lin.r * compensate, lin.g * compensate, lin.b * compensate, 1f).gamma;
+                    var px = new Color(lin.r * compensate, lin.g * compensate, lin.b * compensate, 1f).gamma;
+                    px.a = c.a;     // the detail mask rides in alpha, so ripples fade out over packed earth
+                    pixels[y * n + x] = px;
                 }
 
             string texPath = $"{TextureFolder}/DesertMacro.png";
@@ -775,6 +790,8 @@ namespace FPSKit.EditorTools
                 importer.wrapMode = TextureWrapMode.Clamp;
                 importer.filterMode = FilterMode.Bilinear;
                 importer.mipmapEnabled = true;
+                importer.alphaSource = TextureImporterAlphaSource.FromInput;
+                importer.alphaIsTransparency = false;
             });
             var macro = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
 
@@ -817,6 +834,10 @@ namespace FPSKit.EditorTools
                 mat.SetTextureScale("_DetailNormalMap", tile);
                 if (mat.HasProperty("_DetailNormalMapScale")) mat.SetFloat("_DetailNormalMapScale", 1.15f);
             }
+            // The detail mask is sampled at the base tiling, which is exactly the colour map, so its
+            // alpha (smoother where the ground is packed, silted or clay) fades the ripples and the
+            // grain out smoothly instead of the ground changing texture at a hard edge.
+            if (mat.HasProperty("_DetailMask")) mat.SetTexture("_DetailMask", macro);
             mat.EnableKeyword("_DETAIL_MULX2");
 
             EditorUtility.SetDirty(mat);
@@ -856,6 +877,227 @@ namespace FPSKit.EditorTools
 
             var palm = f.P(-1f, 0f, 11f);
             BuildPalm(post, layer, rng, new Vector3(palm.x, GroundHeightAt(palm.x, palm.z) - 0.2f, palm.z));
+        }
+
+        // ==================================================================
+        // The canyon walls
+        // ==================================================================
+        /// <summary>
+        /// One band of one canyon wall as a fine, smooth-shaded grid. The builder's grid (4.5 m
+        /// along the river, a handful of rows down) is interpolated three ways each direction and
+        /// roughened with a fine noise below the lip, on shared vertices so the normals blend across
+        /// faces. Rows on a band's border sit exactly where the neighbouring band's do (the noise is
+        /// a function of position alone), so the bands still meet without a seam, and the lip rows
+        /// keep their built shape because the terrain's edge lies over them.
+        ///
+        /// Wound per side, as the old quads were: row k steps towards the river, which is +x on the
+        /// west wall and -x on the east.
+        /// </summary>
+        private static Mesh CliffMesh(Vector3[][] grid, int k0, int k1, int side, int seed, string name, bool worldUv = false)
+        {
+            const int sz = 3, sk = 3;
+            int slices = grid.Length - 1;
+            int rows = k1 - k0;
+            int nx = slices * sz + 1, nk = rows * sk + 1;
+
+            var verts = new Vector3[nx * nk];
+            var uvs = new Vector2[verts.Length];
+
+            for (int a = 0; a < nx; a++)
+            {
+                float fi = a / (float)sz;
+                int i0 = Mathf.Min(Mathf.FloorToInt(fi), slices - 1);
+                float ti = fi - i0;
+
+                for (int b = 0; b < nk; b++)
+                {
+                    float fk = k0 + b / (float)sk;
+                    int j0 = Mathf.Min(Mathf.FloorToInt(fk + 1e-4f), k1 - 1);
+                    float tk = fk - j0;
+
+                    var p = Vector3.Lerp(Vector3.Lerp(grid[i0][j0], grid[i0 + 1][j0], ti),
+                                         Vector3.Lerp(grid[i0][j0 + 1], grid[i0 + 1][j0 + 1], ti), tk);
+
+                    // Nothing on the lip rows (0 and 1); full from row two down.
+                    float w = Mathf.Clamp01(fk - 1f);
+                    p.x += Fbm2(p.z * 0.2f, p.y * 0.4f, seed + 501, 3) * 0.55f * w;
+                    p.z += Fbm2(p.z * 0.25f + 50f, p.y * 0.45f, seed + 502, 2) * 0.3f * w;
+
+                    verts[a * nk + b] = p;
+                    // The shelf is horizontal ground and takes world x/z so it lines up with the dune map;
+                    // the walls below it are vertical and take z/y.
+                    uvs[a * nk + b] = worldUv ? new Vector2(p.x, p.z) : new Vector2(p.z * 0.16f, p.y * 0.16f);
+                }
+            }
+
+            var tris = new System.Collections.Generic.List<int>(slices * sz * rows * sk * 6);
+            for (int a = 0; a < nx - 1; a++)
+                for (int b = 0; b < nk - 1; b++)
+                {
+                    int i00 = a * nk + b, i01 = i00 + 1, i10 = i00 + nk, i11 = i10 + 1;
+                    if (side < 0)
+                    {
+                        tris.Add(i00); tris.Add(i10); tris.Add(i11);
+                        tris.Add(i00); tris.Add(i11); tris.Add(i01);
+                    }
+                    else
+                    {
+                        tris.Add(i00); tris.Add(i01); tris.Add(i11);
+                        tris.Add(i00); tris.Add(i11); tris.Add(i10);
+                    }
+                }
+
+            var mesh = new Mesh { name = name };
+            if (verts.Length > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        // ==================================================================
+        // Air-conditioners and washing
+        // ==================================================================
+        /// <summary>
+        /// A split-unit condenser: rounded casing, a louvred front, a fan behind a ring-and-spoke
+        /// guard, a control panel with its lamps, a drain pipe and two feet. Local +z is the front.
+        /// </summary>
+        private static void AirConditioner(MeshBuild casing, MeshBuild dark, MeshBuild metal, Vector3 at, Quaternion turn, int seed)
+        {
+            casing.SoftBox(at, new Vector3(0.86f, 0.56f, 0.34f), turn, seed, 0.05f, 3, 0f);
+
+            // Louvres across the right half of the front, each one tilted.
+            for (int i = 0; i < 7; i++)
+            {
+                float y = -0.2f + i * 0.066f;
+                dark.Box(at + turn * new Vector3(0.2f, y, 0.176f), new Vector3(0.36f, 0.022f, 0.02f), turn * Quaternion.Euler(-18f, 0f, 0f));
+            }
+
+            // The fan and its guard on the left half.
+            var fan = at + turn * new Vector3(-0.2f, 0f, 0.175f);
+            dark.Tube(fan, fan + turn * new Vector3(0f, 0f, 0.012f), 0.205f, 0.205f, 16);
+            for (int blade = 0; blade < 5; blade++)
+            {
+                var d = turn * Quaternion.Euler(0f, 0f, blade * 72f) * new Vector3(0.11f, 0f, 0f);
+                metal.Box(fan + d * 0.5f + turn * new Vector3(0f, 0f, 0.02f), new Vector3(0.11f, 0.05f, 0.008f),
+                          turn * Quaternion.Euler(0f, 0f, blade * 72f + 12f));
+            }
+            foreach (float r in new[] { 0.07f, 0.13f, 0.19f })
+                for (int k = 0; k < 14; k++)
+                {
+                    float a = k * Mathf.PI * 2f / 14f;
+                    var q = fan + turn * new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0.032f);
+                    metal.Box(q, new Vector3(r * 0.46f, 0.011f, 0.011f), turn * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg + 90f));
+                }
+            for (int k = 0; k < 4; k++)
+                metal.Box(fan + turn * Quaternion.Euler(0f, 0f, k * 45f) * Vector3.zero + turn * new Vector3(0f, 0f, 0.032f),
+                          new Vector3(0.4f, 0.011f, 0.011f), turn * Quaternion.Euler(0f, 0f, k * 45f));
+
+            // Control panel on the end, with three lamps.
+            dark.Box(at + turn * new Vector3(0.405f, 0.1f, 0.03f), new Vector3(0.03f, 0.2f, 0.18f), turn);
+            for (int k = 0; k < 3; k++)
+                metal.Box(at + turn * new Vector3(0.422f, 0.17f - k * 0.05f, 0.03f), new Vector3(0.01f, 0.02f, 0.02f), turn);
+
+            // A drain pipe out of the bottom, and two feet.
+            metal.Tube(at + turn * new Vector3(0.3f, -0.28f, -0.05f), at + turn * new Vector3(0.3f, -0.48f, -0.05f), 0.016f, 0.016f, 6);
+            metal.Tube(at + turn * new Vector3(0.3f, -0.48f, -0.05f), at + turn * new Vector3(0.45f, -0.5f, -0.05f), 0.016f, 0.016f, 6);
+            foreach (float x in new[] { -0.32f, 0.32f })
+                metal.Box(at + turn * new Vector3(x, -0.31f, 0f), new Vector3(0.08f, 0.07f, 0.28f), turn);
+        }
+
+        /// <summary>
+        /// A washing line: a sagging cord, pegs, and garments -- sheets, shirts with sleeves and
+        /// trousers -- each a draped grid with folds in it, a swinging hem and a wavy edge, hanging
+        /// from the line. They were flat rectangles. <paramref name="a"/> and <paramref name="b"/> are
+        /// the line's ends; the garments alternate between two meshes so two colours show.
+        /// </summary>
+        private static void Washing(MeshBuild clothA, MeshBuild clothB, MeshBuild metal, Vector3 a, Vector3 b, System.Random rng)
+        {
+            var span = b - a;
+            float length = span.magnitude;
+            if (length < 1.5f) return;
+            var along = new Vector3(span.x, 0f, span.z).normalized;
+            var n = Vector3.Cross(along, Vector3.up).normalized;
+            float sag = Mathf.Clamp(length * 0.025f, 0.05f, 0.16f);
+
+            Vector3 Line(float t) => Vector3.Lerp(a, b, t) - Vector3.up * sag * (1f - (2f * t - 1f) * (2f * t - 1f));
+
+            const int segs = 10;
+            for (int i = 0; i < segs; i++)
+                metal.Tube(Line(i / (float)segs), Line((i + 1) / (float)segs), 0.007f, 0.007f, 3);
+
+            float t0 = 0.08f;
+            int idx = 0;
+            while (t0 < 0.9f)
+            {
+                int kind = rng.Next(3);
+                float w = kind == 0 ? Rand(rng, 0.8f, 1.2f) : kind == 1 ? Rand(rng, 0.55f, 0.7f) : Rand(rng, 0.5f, 0.62f);
+                float h = kind == 0 ? Rand(rng, 0.85f, 1.25f) : kind == 1 ? Rand(rng, 0.65f, 0.85f) : Rand(rng, 0.85f, 1.05f);
+                float tw = w / length;
+                if (t0 + tw > 0.94f) break;
+
+                Garment(idx++ % 2 == 0 ? clothA : clothB, metal, Line(t0), Line(t0 + tw), along, n, w, h, kind, rng);
+                t0 += tw + Rand(rng, 0.03f, 0.07f);
+            }
+        }
+
+        /// <summary>Hangs one garment's grid between two points on the line, double-sided, with folds.</summary>
+        private static void Garment(MeshBuild m, MeshBuild metal, Vector3 left, Vector3 right, Vector3 along, Vector3 n,
+                                    float w, float h, int kind, System.Random rng)
+        {
+            float phase = Rand(rng, 0f, 6.28f);
+            float folds = kind == 0 ? Rand(rng, 2f, 3.5f) : Rand(rng, 1.5f, 2.5f);
+
+            Vector3 P(float u, float v, float hang)
+            {
+                var top = Vector3.Lerp(left, right, u);
+                // A droop along the top edge between the pegs, folds that deepen towards the hem, a hem that
+                // swings out, and an edge that is never straight.
+                float fold = Mathf.Sin((u * folds + phase) * Mathf.PI) * 0.05f * (0.25f + v)
+                           + Fbm2(u * 4f + phase, v * 3f, 7, 2) * 0.025f * v;
+                float swing = v * v * 0.06f;
+                float ragged = Mathf.Sin(u * 9f + phase) * 0.018f * v;
+                return top + along * (Mathf.Sin(v * 3f + phase) * 0.015f * v) - Vector3.up * (v * hang + ragged) + n * (fold + swing);
+            }
+
+            void Panel(float u0, float u1, float v0, float v1, float hang, int cols, int rows)
+            {
+                for (int i = 0; i < cols; i++)
+                    for (int j = 0; j < rows; j++)
+                    {
+                        float ua = Mathf.Lerp(u0, u1, i / (float)cols), ub = Mathf.Lerp(u0, u1, (i + 1) / (float)cols);
+                        float va = Mathf.Lerp(v0, v1, j / (float)rows), vb = Mathf.Lerp(v0, v1, (j + 1) / (float)rows);
+                        var p00 = P(ua, va, hang); var p10 = P(ub, va, hang); var p11 = P(ub, vb, hang); var p01 = P(ua, vb, hang);
+                        m.Quad(p00, p10, p11, p01);
+                        m.Quad(p01, p11, p10, p00);
+                    }
+            }
+
+            if (kind == 0)
+            {
+                Panel(0f, 1f, 0f, 1f, h, 7, 8);
+            }
+            else if (kind == 1)
+            {
+                // A shirt: the body, and a sleeve out each side hanging a little way down.
+                Panel(0.22f, 0.78f, 0f, 1f, h, 4, 8);
+                Panel(0f, 0.22f, 0f, 0.5f, h, 2, 4);
+                Panel(0.78f, 1f, 0f, 0.5f, h, 2, 4);
+            }
+            else
+            {
+                // Trousers: a waistband, then two legs with a gap between.
+                Panel(0f, 1f, 0f, 0.12f, h, 5, 2);
+                Panel(0f, 0.46f, 0.12f, 1f, h, 3, 8);
+                Panel(0.54f, 1f, 0.12f, 1f, h, 3, 8);
+            }
+
+            // Pegs at both top corners.
+            metal.Box(left + Vector3.down * 0.02f, new Vector3(0.025f, 0.06f, 0.03f), Quaternion.identity);
+            metal.Box(right + Vector3.down * 0.02f, new Vector3(0.025f, 0.06f, 0.03f), Quaternion.identity);
         }
     }
 }

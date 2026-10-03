@@ -853,6 +853,9 @@ namespace FPSKit.EditorTools
                 var pos = new Vector3(Mathf.Cos(angle) * distance, -h * 0.1f,
                                       Mathf.Sin(angle) * distance);
 
+                // Not across the river's line (see FPSKitDesertRanges): the water runs on to the horizon.
+                if (desertSky && Mathf.Abs(pos.z) > 250f && Mathf.Abs(pos.x - _theme.hazardOffset) < 230f) continue;
+
                 // Further is hazier, which is the whole of aerial perspective and most
                 // of why a flat-shaded backdrop reads as distance at all.
                 float haze = Mathf.InverseLerp(_theme.backdropDistance.x,

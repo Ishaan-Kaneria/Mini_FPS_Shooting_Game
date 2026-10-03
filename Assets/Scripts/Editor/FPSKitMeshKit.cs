@@ -217,7 +217,11 @@ namespace FPSKit.EditorTools
                             var nrm = dir.sqrMagnitude > 1e-8f ? dir.normalized : face.n;
                             var pos = q + nrm * r;
 
-                            pos += nrm * (Fbm2(pos.x * 0.55f + seed * 0.13f, pos.z * 0.55f + pos.y * 0.7f, seed, 2) * bulge);
+                            // Capped to four millimetres. The first version bulged by up to 2.5 cm, which the
+                            // normals did not follow; the depth buffer came out lumpy and the project's
+                            // screen-space ambient occlusion drew black grime in every dent (Ishaan, 2026-10-03:
+                            // "so much black shadow on the houses, objects").
+                            pos += nrm * (Fbm2(pos.x * 0.55f + seed * 0.13f, pos.z * 0.55f + pos.y * 0.7f, seed, 2) * Mathf.Min(bulge, 0.004f));
 
                             Push(centre + rotation * pos, (rotation * nrm).normalized);
                         }

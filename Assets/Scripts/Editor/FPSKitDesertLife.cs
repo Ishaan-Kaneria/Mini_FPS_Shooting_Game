@@ -368,7 +368,8 @@ namespace FPSKit.EditorTools
                         float rut = Mathf.Abs(x - 0.45f) < 0.12f ? -0.03f : 0f;
                         return Mathf.Lerp(0.07f, -0.12f, x * x) + rut;
                     }, 0.5f);
-                    Drape(parent, "Track", mesh, _trackMat, layer);
+                    // The track is in the ground colour map now (smooth edges); the hard-edged strip is gone.
+                    // Drape(parent, "Track", mesh, _trackMat, layer);
                     index++;
                 }
 
@@ -732,8 +733,7 @@ namespace FPSKit.EditorTools
             }
 
             // Dry grass under them, where the shade is.
-            Drape(parent, "AcaciaShade", BlobMesh("AcaciaShade", centre, 15f, 7501 + rng.Next(100), 0.06f, 1f,
-                                                  Rand(rng, 1f, 1.6f), Rand(rng, 0f, 3f)), _grassMat, LayerMask.NameToLayer("Backdrop"));
+            // (The hard-edged green shade blob under the trees is gone; it read as a patch of carpet.)
         }
 
         /// <summary>
@@ -866,16 +866,8 @@ namespace FPSKit.EditorTools
             glint.tintAlt = new Color(1f, 0.72f, 0.42f, 0.16f);
             glint.size = new Vector2(0.012f, 0.035f);
 
-            for (int i = 0, made = 0; i < 160 && made < 7; i++)
-            {
-                var p = new Vector2(Rand(rng, -half * 0.85f, half * 0.85f), Rand(rng, -half * 0.85f, half * 0.85f));
-                if (p.magnitude < 70f || !Drapeable(p.x, p.y, 10f)) continue;
-                // A devil wanders up to fifty metres: kept that far off the places, where a
-                // column of orange dust drifting between the tents reads as a fire.
-                if (InSite(p, 55f)) continue;
-                DustDevil(parent, rng, new Vector3(p.x, GroundHeightAt(p.x, p.y), p.y));
-                made++;
-            }
+            // No dust devils (Ishaan, 2026-10-03: the rising columns were "very annoying"). DustDevil
+            // below is kept, unused, in case a calmer version is wanted later.
         }
 
         private static void DustDevil(Transform parent, System.Random rng, Vector3 at)

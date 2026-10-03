@@ -122,7 +122,11 @@ namespace FPSKit.EditorTools
                 if (s1 - s0 < 0.04f || y1 - y0 < 0.04f) return;
                 var mid = a + dir * ((s0 + s1) * 0.5f);
                 // Soft-edged panels (see SoftBox); a wall of dead-square boxes read as plasterboard.
-                build.SoftBox(f.P(mid.x, baseY + (y0 + y1) * 0.5f, mid.y), new Vector3(s1 - s0, y1 - y0, thick), rot,
+                // Ground-level panels go 1.2 m into the ground (see AdobeWall: walls were floating
+                // over the slope past their pad).
+                float yb = y0, hh = y1 - y0;
+                if (baseY + y0 < 0.05f) { yb -= 1.2f; hh += 1.2f; }
+                build.SoftBox(f.P(mid.x, baseY + (yb + y1) * 0.5f, mid.y), new Vector3(s1 - s0, hh, thick), rot,
                               Mathf.RoundToInt(mid.x * 7f + mid.y * 13f + y0 * 5f), 0.06f, 3, 0.012f);
             }
 

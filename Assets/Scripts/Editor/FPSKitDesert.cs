@@ -106,7 +106,7 @@ namespace FPSKit.EditorTools
                                            _theme.wallSmoothness, 0f, 0.9f);
             _foliageMat = MakeDetailMaterial("Foliage", new Color(0.33f, 0.37f, 0.19f), "Timber",
                                              0.8f, 0.18f, 0f, 0.6f);
-            _waterMat = MakeDetailMaterial("Water", _theme.hazardColor, "Water", 0.035f, 0.94f, 0.08f, 0.8f);
+            _waterMat = MakeDetailMaterial("Water", _theme.hazardColor, "Water", 0.05f, 0.82f, 0.04f, 1.0f);
 
             // The one thing on this map that is meant to be seen before anything else it
             // is next to, so it is the one thing not wearing the theme's palette.
@@ -397,7 +397,10 @@ namespace FPSKit.EditorTools
 
                 GameObject water;
 
-                if (_theme.hazard == LevelTheme.Hazard.Lava)
+                // World-space slices for water too (2026-10-03): the shared quad put a seam
+                // line at every slice joint on the river, because each slice restarted the
+                // texture. Laid in world space the ripples run on unbroken across every joint.
+                if (_theme.hazard == LevelTheme.Hazard.Lava || _theme.hazard == LevelTheme.Hazard.River)
                 {
                     // <b>World-space UVs for lava, one mesh per slice.</b> The shared quad
                     // gives every slice the same patch of texture, which on water is a
@@ -407,7 +410,9 @@ namespace FPSKit.EditorTools
                     // across every seam and the scroll moves it as one flow.
                     var rotation = Quaternion.Euler(0f, yaw, 0f);
                     var centre = new Vector3(GorgeCentreAt(z), WaterSurfaceY, z);
-                    float hw = bedHalf * 1.05f, hl = slice * 0.5f + 1f;
+                    // Three metres of overlap either side (was one): a faint line showed at every joint
+                    // where two turned slices left a sliver of the bed uncovered.
+                    float hw = bedHalf * 1.05f, hl = slice * 0.5f + 3f;
 
                     var build = new MeshBuild { UVScale = 1f };
                     build.Quad(centre + rotation * new Vector3(-hw, 0f, -hl),
@@ -609,23 +614,27 @@ namespace FPSKit.EditorTools
                 Vector3 At(float z) => new Vector3(GorgeCentreAt(z) + side * standOff,
                                                   GroundHeightAt(GorgeCentreAt(z) + side * standOff, z), z);
 
+                bool rustic = IsDesertArena();
+
                 for (float z = -half; z < half; z += panel, panelIndex++)
                 {
                     bool open = NearCrossing(z + panel * 0.5f, clear);
 
-                    var a = At(z);
-                    var b = At(z + panel);
+                    // Posts are not evenly spaced on a fence somebody put up by hand.
+                    var a = At(z + (rustic ? FenceJitter(panelIndex, side) : 0f));
+                    var b = At(z + panel + (rustic ? FenceJitter(panelIndex + 1, side) : 0f));
 
                     // A pillar wherever the run starts or stops. Both ends of every gap
                     // get one, which is what turns "the fence is missing here" into "this
                     // is the way through".
-                    if (open != wasOpen) GatePost(build, solid, a);
+                    if (open != wasOpen) { if (rustic) GatePostRustic(build, solid, a); else GatePost(build, solid, a); }
                     wasOpen = open;
 
                     if (!open)
                     {
-                        FencePanel(build, solid, signs, a, b, side,
-                                   sign: panelIndex % 7 == 3);
+                        if (rustic) FencePanelRustic(build, solid, signs, a, b, side, panelIndex % 7 == 3, panelIndex);
+                        else FencePanel(build, solid, signs, a, b, side,
+                                        sign: panelIndex % 7 == 3);
                         inChunk++;
                     }
 
@@ -638,7 +647,7 @@ namespace FPSKit.EditorTools
                     inChunk = 0;
                 }
 
-                if (!wasOpen) GatePost(build, solid, At(half));
+                if (!wasOpen) { if (rustic) GatePostRustic(build, solid, At(half)); else GatePost(build, solid, At(half)); }
 
                 FlushFence(group, layer, build, solid, signs, side, chunk);
             }
@@ -654,8 +663,9 @@ namespace FPSKit.EditorTools
             // Rendered in full and collided against as slabs. A mesh collider over
             // pickets is thousands of triangles of collision geometry for a surface
             // nothing ever needs to resolve more finely than "there is a fence here".
-            var run = MeshObject(parent, name, build.ToMesh(name), _steelMat, Vector3.zero,
-                                 Quaternion.identity, Vector3.one, layer, "Metal",
+            bool rusticRun = IsDesertArena();
+            var run = MeshObject(parent, name, build.ToMesh(name), rusticRun ? _timberMat : _steelMat, Vector3.zero,
+                                 Quaternion.identity, Vector3.one, layer, rusticRun ? "Wood" : "Metal",
                                  collider: true, collisionMesh: solid.ToMesh(name + "_Collision"));
 
             // Ninety metres of fence in one mesh is, to the map, one ninety-metre
@@ -766,6 +776,10 @@ namespace FPSKit.EditorTools
             float halfLength = length * 0.5f;
             float halfWidth = width * 0.5f;
 
+            // The desert's bridge is village carpentry, not a steel truss; see FPSKitDesertRustic.
+            bool rustic = IsDesertArena();
+            var rr = new System.Random(index * 131 + 17);
+
             // The deck, a hand above the sand rather than exactly level with it.
             //
             // Flush was the obvious build and it is two bugs. The ground at a bridge
@@ -794,6 +808,20 @@ namespace FPSKit.EditorTools
             }
 
             // Plank courses across it, so the deck is not one flat sheet under the feet.
+            if (rustic)
+            {
+                // Boards of every width, laid by eye: gaps, a lifted end, a patch.
+                for (float x = -halfLength + 0.5f; x < halfLength;)
+                {
+                    float w = Rand(rr, 0.45f, 1.15f);
+                    float len = width - Rand(rr, 0.1f, 0.5f);
+                    timber.Box(new Vector3(x, 0.03f + Rand(rr, -0.03f, 0.05f), Rand(rr, -0.12f, 0.12f)),
+                               new Vector3(w, Rand(rr, 0.07f, 0.14f), len),
+                               Quaternion.Euler(Rand(rr, -1.5f, 1.5f), Rand(rr, -3f, 3f), Rand(rr, -1.2f, 1.2f)));
+                    x += w + Rand(rr, 0.01f, 0.09f);
+                }
+            }
+            else
             for (float x = -halfLength + 0.6f; x < halfLength; x += 1.2f)
                 timber.Box(new Vector3(x, 0.03f, 0f), new Vector3(0.9f, 0.1f, width - 0.2f),
                            Quaternion.identity);
@@ -804,7 +832,8 @@ namespace FPSKit.EditorTools
 
                 // Kerb and top chord.
                 timber.Box(new Vector3(0f, 0.25f, zSide), new Vector3(length, 0.5f, 0.5f), Quaternion.identity);
-                steel.Box(new Vector3(0f, 1.55f, zSide), new Vector3(length, 0.24f, 0.3f), Quaternion.identity);
+                if (rustic) BridgeRailRustic(timber, rr, halfLength, zSide);
+                else steel.Box(new Vector3(0f, 1.55f, zSide), new Vector3(length, 0.24f, 0.3f), Quaternion.identity);
 
                 // Verticals and the diagonals between them: a Warren truss, which is what
                 // anybody who has seen a bridge expects to be looking through.
@@ -812,14 +841,14 @@ namespace FPSKit.EditorTools
                 int bays = Mathf.Max(2, Mathf.RoundToInt(length / bay));
                 float actual = length / bays;
 
-                for (int i = 0; i <= bays; i++)
+                for (int i = 0; !rustic && i <= bays; i++)
                 {
                     float x = -halfLength + actual * i;
                     steel.Box(new Vector3(x, 0.85f, zSide), new Vector3(0.26f, 1.6f, 0.26f),
                               Quaternion.identity);
                 }
 
-                for (int i = 0; i < bays; i++)
+                for (int i = 0; !rustic && i < bays; i++)
                 {
                     float x = -halfLength + actual * (i + 0.5f);
                     float lean = Mathf.Atan2(1.3f, actual) * Mathf.Rad2Deg;
@@ -855,7 +884,12 @@ namespace FPSKit.EditorTools
                     tops[leg] = new Vector3(x, -0.5f, s * (halfWidth - 0.8f));
                     feet[leg] = new Vector3(x + p * 3.2f, -depth + 0.6f, s * (halfWidth + 2.4f));
 
-                    timber.Tube(tops[leg], feet[leg], 0.62f, 0.82f, 7);
+                    // Uneven legs on the desert bridge: each one sunk where the bed let it.
+                    if (rustic)
+                        feet[leg] += new Vector3(Rand(rr, -0.7f, 0.7f), 0f, Rand(rr, -0.6f, 0.6f));
+
+                    if (rustic) timber.Tube(tops[leg], feet[leg], Rand(rr, 0.45f, 0.62f), Rand(rr, 0.6f, 0.86f), 7);
+                    else timber.Tube(tops[leg], feet[leg], 0.62f, 0.82f, 7);
                 }
 
                 // Horizontal ties and a sway brace per storey, which is what a timber
@@ -888,10 +922,13 @@ namespace FPSKit.EditorTools
 
             Mark(deck, _theme.bridgeColor, order: 4);
 
-            var truss = MeshObject(bridge, "Truss", steel.ToMesh($"BridgeTruss_{index}"), _steelMat,
-                                   Vector3.zero, Quaternion.identity, Vector3.one, layer, "Metal",
-                                   collider: false);
-            Hide(truss);
+            if (steel.Triangles.Count > 0)
+            {
+                var truss = MeshObject(bridge, "Truss", steel.ToMesh($"BridgeTruss_{index}"), _steelMat,
+                                       Vector3.zero, Quaternion.identity, Vector3.one, layer, "Metal",
+                                       collider: false);
+                Hide(truss);
+            }
 
             // A gate at each end: two battered towers and a beam across them.
             //

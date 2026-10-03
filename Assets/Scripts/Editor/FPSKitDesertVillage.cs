@@ -182,7 +182,8 @@ namespace FPSKit.EditorTools
             }
 
             var shell = new MeshBuild { UVScale = 0.28f };
-            shell.Box(f.P(cu, storey * 0.5f, cv), new Vector3(w, storey, d), f.Rot);
+            int softSeed = rng.Next(1, 9999);
+            shell.SoftBox(f.P(cu, storey * 0.5f, cv), new Vector3(w, storey, d), f.Rot, softSeed);
 
             float top = storey;
             float w2 = 0f, d2 = 0f, u2 = 0f, v2 = 0f;
@@ -192,7 +193,7 @@ namespace FPSKit.EditorTools
                 d2 = d * Rand(rng, 0.6f, 0.85f);
                 u2 = cu + (w - w2) * 0.5f * (rng.Next(2) == 0 ? 1 : -1);
                 v2 = cv + (d - d2) * 0.5f;
-                shell.Box(f.P(u2, storey + 1.6f, v2), new Vector3(w2, 3.2f, d2), f.Rot);
+                shell.SoftBox(f.P(u2, storey + 1.6f, v2), new Vector3(w2, 3.2f, d2), f.Rot, softSeed + 7);
                 top = storey + 3.2f;
             }
 
@@ -201,6 +202,7 @@ namespace FPSKit.EditorTools
             NoStanding(house);
             SealLocal(parent, f, cu, top * 0.5f, cv, new Vector3(w, top, d));
 
+            Footing(parent, layer, f, cu, cv, w, d);
             Parapet(parent, layer, f, mat, cu, cv, w, d, storey, float.NaN);
             if (twoStorey) Parapet(parent, layer, f, mat, u2, v2, w2, d2, top, float.NaN);
 
@@ -272,6 +274,7 @@ namespace FPSKit.EditorTools
             MeshObject(parent, "HouseRoof", ToMesh(roof, DenseKey("houseroof")), mat, Vector3.zero, Quaternion.identity,
                        Vector3.one, layer, "Concrete");
 
+            Footing(parent, layer, f, cu, cv, w, d);
             Parapet(parent, layer, f, mat, cu, cv, w, d, storey, gapV);
 
             // ---- inside ----
@@ -290,6 +293,25 @@ namespace FPSKit.EditorTools
 
             // The stair: along the +u side, climbing towards +v, landing beside the parapet's gap.
             StairLocal(parent, layer, mat, f, cu + hw + 0.95f, gapV, Vector3.forward, storey);
+        }
+
+        /// <summary>
+        /// A stone plinth under a house, sunk two metres into the ground with a hand's breadth
+        /// of lip showing. A house is a box on a flat pad, and wherever the pad meets a slope
+        /// the ground drops away from the base of the wall; the plinth is what a real builder
+        /// puts there, and it means no house can ever hang over a gap. Two metres is more
+        /// than the pad's blend can fall away across a footprint. No collider (the lip is a
+        /// step the player is never meant to notice) and kept off the navigation bake.
+        /// </summary>
+        private static void Footing(Transform parent, int layer, Frame f, float cu, float cv, float w, float d)
+        {
+            var build = new MeshBuild { UVScale = 0.5f };
+            build.Box(f.P(cu, -0.85f, cv), new Vector3(w + 0.4f, 2.3f, d + 0.4f), f.Rot);
+
+            var go = MeshObject(parent, "Footing", ToMesh(build, DenseKey("footing")), _plinthMat, Vector3.zero,
+                                Quaternion.identity, Vector3.one, layer, "Concrete", collider: false);
+            NoStanding(go);
+            Hide(go);
         }
 
         /// <summary>

@@ -259,12 +259,14 @@ namespace FPSKit.EditorTools
                     // read as a mild day rather than a desert. Thicker air scatters the blue out
                     // towards the horizon, and the fog is warmer and a little denser so the far
                     // rock sits in haze -- still well short of hiding it.
-                    t.skyTint = new Color(0.80f, 0.64f, 0.44f);
-                    t.skyGroundColor = new Color(0.55f, 0.44f, 0.30f);
-                    t.atmosphereThickness = 1.25f;
+                    // A dusty violet-rose tint, not orange: the procedural sky multiplies its blue
+                    // atmosphere by this, and an orange tint turned the zenith a muddy green.
+                    t.skyTint = new Color(0.66f, 0.52f, 0.62f);
+                    t.skyGroundColor = new Color(0.52f, 0.38f, 0.26f);
+                    t.atmosphereThickness = 1.5f;
                     t.skyExposure = 1.45f;
-                    t.sunColor = new Color(1f, 0.94f, 0.78f);
-                    t.sunIntensity = 1.45f;
+                    t.sunColor = new Color(1f, 0.90f, 0.72f);
+                    t.sunIntensity = 1.6f;
                     // Mid-afternoon rather than noon, and this is a terrain decision more
                     // than a lighting one. A dune is read entirely through the shading
                     // across its own slope, and a sun sixty-eight degrees up puts almost
@@ -274,16 +276,26 @@ namespace FPSKit.EditorTools
                     // separate, the crests throw a shadow down their lee side, and the
                     // shape of the ground becomes something the player can actually see
                     // from a distance and navigate by.
-                    t.sunAngles = new Vector2(42f, 140f);
-                    t.fogColor = new Color(0.86f, 0.74f, 0.55f);
+                    // Golden hour (2026-10-03, "make it sexier"): thirty-eight degrees, down from
+                    // forty-two. (Twenty-six was tried and put the rooftops and the player's hands
+                    // in shadow, and read too orange and too dark, worse still on a phone.) The lower the sun the longer the lee-side shadow of every dune,
+                    // and the shape of the ground is the one thing the player reads at range.
+                    // Ambient is lifted so no face goes black.
+                    t.sunAngles = new Vector2(38f, 140f);
+                    t.fogColor = new Color(0.90f, 0.76f, 0.58f);
                     t.fogDensity = 0.004f;
                     // Lifted for the open zone. One hard sun over a map with
                     // hundred-metre rock on it puts whole faces in shadow, and at the
                     // walled arena's ambient those faces came back near black -- which
                     // is a place an enemy can stand and not be seen.
-                    t.ambientSky = new Color(0.74f, 0.68f, 0.56f);
-                    t.ambientEquator = new Color(0.60f, 0.53f, 0.42f);
-                    t.ambientGround = new Color(0.44f, 0.37f, 0.27f);
+                    // Shade is where a fight happens here: a dune's lee side, the foot of a wall,
+                    // a roof's shadow. At the old ambient those places came back near black
+                    // with the sun behind them (2026-10-03 screenshot), so the shadow side is
+                    // lifted to well over half of what the sunlit side gets.
+                    t.shadowStrength = 0.55f;
+                    t.ambientSky = new Color(0.94f, 0.88f, 0.78f);
+                    t.ambientEquator = new Color(0.86f, 0.76f, 0.63f);
+                    t.ambientGround = new Color(0.68f, 0.58f, 0.44f);
                     t.floorColor = new Color(0.62f, 0.54f, 0.38f);
                     t.wallColor = new Color(0.70f, 0.62f, 0.46f);
                     t.coverColors = new[]
@@ -309,7 +321,7 @@ namespace FPSKit.EditorTools
 
                     // Thin, because the whole point of this arena is that you can see to
                     // the horizon. At the walled arena's 0.004 the mesas are solid fog.
-                    t.fogDensity = 0.0016f;
+                    t.fogDensity = 0.0018f;
 
                     t.hazard = LevelTheme.Hazard.River;
                     t.hazardWidth = 58f;
@@ -319,7 +331,7 @@ namespace FPSKit.EditorTools
                     // Silt, not lagoon. A river that has crossed a desert to get here is
                     // carrying the desert with it, and the blue it started at read as
                     // tropical water in a canyon.
-                    t.hazardColor = new Color(0.25f, 0.42f, 0.38f);
+                    t.hazardColor = new Color(0.30f, 0.43f, 0.36f);
                     t.bankColor = new Color(0.52f, 0.44f, 0.31f);
                     t.bridgeColor = new Color(0.50f, 0.45f, 0.38f);
                     t.bridgeWidth = 9f;
@@ -347,7 +359,7 @@ namespace FPSKit.EditorTools
                     t.duneWavelength = 95f;
                     t.duneWindAngle = 34f;
 
-                    t.backdropCount = 38;
+                    t.backdropCount = 14;
                     t.backdropDistance = new Vector2(640f, 1180f);
                     t.backdropHeight = new Vector2(60f, 210f);
                     t.backdropWidth = new Vector2(80f, 280f);
@@ -377,8 +389,14 @@ namespace FPSKit.EditorTools
                     t.pillarCount = 8;
                     t.propCount = 14;
 
-                    t.saturation = -6f;
-                    t.contrast = 6f;
+                    // Graded warm and punchy rather than drained: the desaturated pass read as
+                    // a dull photograph of a desert, not somewhere you want to look at.
+                    t.bloomIntensity = 0.85f;
+                    t.postExposure = 0.25f;
+                    t.saturation = 4f;
+                    t.colorFilter = new Color(1f, 0.98f, 0.94f);
+                    t.vignetteIntensity = 0.26f;
+                    t.contrast = 10f;
                     t.filmGrain = 0.12f;
                     t.randomSeed = 21;
                     break;

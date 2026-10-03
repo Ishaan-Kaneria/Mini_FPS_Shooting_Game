@@ -157,6 +157,7 @@ namespace FPSKit.EditorTools
             BuildGorge(root, layer, half);
             BuildCrossings(root, layer, half);
             BuildRiverFence(root, layer, half);
+            if (IsDesertArena()) BuildRiverLife(root, layer, rng, half);
             BuildBoundary(root, layer, half);
 
             if (_theme.volcanicZone) BuildVolcanicBackdrop(root, backdrop, rng);
@@ -833,6 +834,12 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Backdrop").transform;
             group.SetParent(root, false);
 
+            // The desert gets continuous ranges behind a thinner row of banded mesas; see
+            // FPSKitDesertRanges. Every other open arena keeps what it had.
+            bool desertSky = _theme.openZone && _theme.floorDetail == "Sand"
+                             && !_theme.volcanicZone && !_theme.snowZone && !_theme.parkZone;
+            if (desertSky) BuildDesertRanges(group, layer, rng);
+
             for (int i = 0; i < _theme.backdropCount; i++)
             {
                 // Golden angle, so they never line up into a visible ring however many
@@ -854,8 +861,14 @@ namespace FPSKit.EditorTools
 
                 var mesa = ButteMesh(rng.Next(1, 999), sides: rng.Next(7, 11), levels: rng.Next(5, 9));
 
+                // Three haze buckets with a rock-strata map in the desert, so the mesas are
+                // banded and the material count is fixed; elsewhere the old flat colour.
+                var mesaMat = desertSky
+                    ? MakeDetailMaterial($"Mesa{Mathf.Min(2, Mathf.FloorToInt(haze * 3f))}", tint, "Rock", 1f, 0.05f, 0f, 1.2f)
+                    : MakeMaterial($"Mesa_{ColorKey(tint)}", tint, 0.05f, 0f);
+
                 MeshObject(group, "Mesa", mesa,
-                           MakeMaterial($"Mesa_{ColorKey(tint)}", tint, 0.05f, 0f),
+                           mesaMat,
                            pos, Quaternion.Euler(0f, Rand(rng, 0f, 360f), 0f),
                            new Vector3(w * 0.5f, h, w * 0.5f * Rand(rng, 0.5f, 1.1f)),
                            layer, "Untagged", collider: false);

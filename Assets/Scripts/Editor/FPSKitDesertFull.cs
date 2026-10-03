@@ -267,12 +267,12 @@ namespace FPSKit.EditorTools
             {
                 case VehicleKind.Pickup:
                     length = 5.2f; width = 1.9f;
-                    body.Box(new Vector3(0f, 0.75f, 0f), new Vector3(width, 0.55f, length), Quaternion.identity);
-                    body.Box(new Vector3(0f, 1.35f, 0.9f), new Vector3(width - 0.1f, 0.75f, 1.9f), Quaternion.identity);
-                    body.Box(new Vector3(0f, 1.1f, 2.15f), new Vector3(width, 0.2f, 0.9f), Quaternion.Euler(-8f, 0f, 0f));
+                    body.SoftBox(new Vector3(0f, 0.75f, 0f), new Vector3(width, 0.55f, length), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.35f, 0.9f), new Vector3(width - 0.1f, 0.75f, 1.9f), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.1f, 2.15f), new Vector3(width, 0.2f, 0.9f), Quaternion.Euler(-8f, 0f, 0f));
                     foreach (float s in new[] { -1f, 1f })
-                        body.Box(new Vector3(s * (width * 0.5f - 0.05f), 1.2f, -1.4f), new Vector3(0.1f, 0.45f, 2.3f), Quaternion.identity);
-                    body.Box(new Vector3(0f, 1.2f, -2.55f), new Vector3(width, 0.45f, 0.1f), Quaternion.identity);
+                        body.SoftBox(new Vector3(s * (width * 0.5f - 0.05f), 1.2f, -1.4f), new Vector3(0.1f, 0.45f, 2.3f), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.2f, -2.55f), new Vector3(width, 0.45f, 0.1f), Quaternion.identity);
                     glass.Box(new Vector3(0f, 1.42f, 1.86f), new Vector3(width - 0.2f, 0.55f, 0.06f), Quaternion.Euler(-24f, 0f, 0f));
                     foreach (float s in new[] { -1f, 1f })
                         glass.Box(new Vector3(s * (width * 0.5f - 0.03f), 1.45f, 0.9f), new Vector3(0.05f, 0.45f, 1.5f), Quaternion.identity);
@@ -281,7 +281,7 @@ namespace FPSKit.EditorTools
                     // Something in the back: sacks, a drum, a spare.
                     if (rng.NextDouble() < 0.6)
                     {
-                        body.Box(new Vector3(0.3f, 1.2f, -1.2f), new Vector3(0.7f, 0.4f, 0.9f), Quaternion.Euler(0f, 12f, 0f));
+                        body.SoftBox(new Vector3(0.3f, 1.2f, -1.2f), new Vector3(0.7f, 0.4f, 0.9f), Quaternion.Euler(0f, 12f, 0f));
                         Drum(trim, new Vector3(-0.45f, 1.0f, -1.9f));
                     }
                     foreach (float z in new[] { 1.6f, -1.6f })
@@ -291,11 +291,11 @@ namespace FPSKit.EditorTools
 
                 case VehicleKind.Truck:
                     length = 7.6f; width = 2.4f;
-                    body.Box(new Vector3(0f, 1.0f, 0f), new Vector3(width - 0.3f, 0.35f, length), Quaternion.identity);
-                    body.Box(new Vector3(0f, 1.85f, 2.9f), new Vector3(width, 1.5f, 1.8f), Quaternion.identity);
-                    body.Box(new Vector3(0f, 1.4f, 3.85f), new Vector3(width - 0.1f, 0.8f, 0.3f), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.0f, 0f), new Vector3(width - 0.3f, 0.35f, length), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.85f, 2.9f), new Vector3(width, 1.5f, 1.8f), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.4f, 3.85f), new Vector3(width - 0.1f, 0.8f, 0.3f), Quaternion.identity);
                     // The bed, a canvas tilt over it on hoops.
-                    body.Box(new Vector3(0f, 1.3f, -1.0f), new Vector3(width, 0.25f, 5f), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.3f, -1.0f), new Vector3(width, 0.25f, 5f), Quaternion.identity);
                     var tilt = new MeshBuild { UVScale = 0.5f };
                     ArchShell(tilt, new Vector3(0f, 1.42f, -1.0f), width * 0.5f, 1.2f, 5f, 8, Quaternion.identity);
                     var tiltGo = MeshObject(parent, "TruckTilt", ToMesh(tilt, DenseKey("tilt")), _tentCanvasMat,
@@ -311,11 +311,11 @@ namespace FPSKit.EditorTools
                 default:
                     length = 6.2f; width = 2.5f;
                     // A v-hulled patrol car: sloped lower flanks, a boxy cabin, a turret ring.
-                    body.Box(new Vector3(0f, 1.05f, 0f), new Vector3(width - 0.5f, 0.7f, length), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.05f, 0f), new Vector3(width - 0.5f, 0.7f, length), Quaternion.identity);
                     foreach (float s in new[] { -1f, 1f })
-                        body.Box(new Vector3(s * (width * 0.5f - 0.35f), 1.0f, 0f), new Vector3(0.3f, 0.75f, length - 0.4f), Quaternion.Euler(0f, 0f, s * 28f));
-                    body.Box(new Vector3(0f, 2.0f, -0.3f), new Vector3(width, 1.3f, 4.6f), Quaternion.identity);
-                    body.Box(new Vector3(0f, 1.45f, 2.55f), new Vector3(width - 0.1f, 0.5f, 1.1f), Quaternion.Euler(10f, 0f, 0f));
+                        body.SoftBox(new Vector3(s * (width * 0.5f - 0.35f), 1.0f, 0f), new Vector3(0.3f, 0.75f, length - 0.4f), Quaternion.Euler(0f, 0f, s * 28f));
+                    body.SoftBox(new Vector3(0f, 2.0f, -0.3f), new Vector3(width, 1.3f, 4.6f), Quaternion.identity);
+                    body.SoftBox(new Vector3(0f, 1.45f, 2.55f), new Vector3(width - 0.1f, 0.5f, 1.1f), Quaternion.Euler(10f, 0f, 0f));
                     trim.Tube(new Vector3(0f, 2.65f, -0.6f), new Vector3(0f, 3.0f, -0.6f), 0.7f, 0.7f, 12);
                     trim.Box(new Vector3(0f, 3.1f, -0.1f), new Vector3(0.12f, 0.12f, 1.1f), Quaternion.identity);
                     glass.Box(new Vector3(0f, 2.25f, 1.93f), new Vector3(width - 0.4f, 0.55f, 0.06f), Quaternion.identity);

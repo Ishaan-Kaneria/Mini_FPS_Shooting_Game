@@ -894,16 +894,25 @@ namespace FPSKit.EditorTools
         /// <summary>A tuft of dry grass: thin blades fanned out from a point, drawn both sides.</summary>
         private static void Tuft(MeshBuild build, Vector3 at, float height, int seed)
         {
-            int blades = 7;
+            // Eleven blades, each in two bent segments (was seven straight triangles): a blade
+            // of grass arches over, and the arch is what makes a tuft read as grass and not as
+            // a spiky fan.
+            int blades = 11;
             for (int i = 0; i < blades; i++)
             {
                 float a = (i + Hash01(seed, i)) * Mathf.PI * 2f / blades;
                 var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                var side = Vector3.Cross(Vector3.up, dir) * 0.035f;
+                var side = Vector3.Cross(Vector3.up, dir) * 0.04f;
                 var foot = at + dir * 0.05f;
-                var tip = at + dir * height * (0.35f + 0.3f * Hash01(seed, 20 + i)) + Vector3.up * height * (0.7f + 0.4f * Hash01(seed, 40 + i));
-                build.Tri(foot - side, tip, foot + side);
-                build.Tri(foot + side, tip, foot - side);
+                float h = height * (0.7f + 0.4f * Hash01(seed, 40 + i));
+                float reach = height * (0.35f + 0.3f * Hash01(seed, 20 + i));
+                var mid = foot + dir * reach * 0.35f + Vector3.up * h * 0.62f;
+                var tip = at + dir * reach + Vector3.up * h * 0.95f;
+
+                build.Quad(foot - side, mid - side * 0.6f, mid + side * 0.6f, foot + side);
+                build.Quad(foot + side, mid + side * 0.6f, mid - side * 0.6f, foot - side);
+                build.Tri(mid - side * 0.6f, tip, mid + side * 0.6f);
+                build.Tri(mid + side * 0.6f, tip, mid - side * 0.6f);
             }
         }
 

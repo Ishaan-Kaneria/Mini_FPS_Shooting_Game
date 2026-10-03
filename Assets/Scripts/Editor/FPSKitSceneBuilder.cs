@@ -1860,6 +1860,8 @@ namespace FPSKit.EditorTools
             cam.transform.localRotation = Quaternion.identity;
             cam.fieldOfView = 75f;
             cam.nearClipPlane = 0.02f;
+            // The desert's far ranges sit out to ~1250 m; the default 1000 clipped them.
+            if (_theme.openZone) cam.farClipPlane = 1800f;
 
             // An open zone puts its horizon a kilometre out, and Unity's default far
             // plane is 1000 -- so the mesas that exist to say "this is a place" get
@@ -1886,6 +1888,21 @@ namespace FPSKit.EditorTools
             weaponHolder.transform.SetParent(cam.transform);
             weaponHolder.transform.localPosition = Vector3.zero;
             weaponHolder.AddComponent<WeaponSway>();
+
+            // A soft fill on the hands and gun in the open desert-style arenas. A low sun
+            // behind the player, or any roof shadow, left the rifle nearly black; no
+            // shadows and a short range, so it lights the view model and nothing else.
+            if (_theme.openZone && !_theme.volcanicZone && !_theme.snowZone && !_theme.rooftopZone && !_theme.parkZone)
+            {
+                var fill = new GameObject("HandsFill").AddComponent<Light>();
+                fill.transform.SetParent(weaponHolder.transform, false);
+                fill.transform.localPosition = new Vector3(0f, 0.25f, -0.15f);
+                fill.type = LightType.Point;
+                fill.color = new Color(1f, 0.93f, 0.82f);
+                fill.intensity = 3f;
+                fill.range = 3f;
+                fill.shadows = LightShadows.None;
+            }
 
             var model = BuildWeaponModel(weaponHolder.transform);
 

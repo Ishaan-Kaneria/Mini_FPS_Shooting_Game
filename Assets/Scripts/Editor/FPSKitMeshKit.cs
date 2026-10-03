@@ -170,6 +170,84 @@ namespace FPSKit.EditorTools
             }
 
             /// <summary>
+            /// A box with rounded edges, a subdivided surface and a little hand-made bulge: the
+            /// shape of a mud-brick wall rather than of a cube. About six hundred triangles at the
+            /// default <paramref name="sub"/>, smooth-shaded across each face and round each edge.
+            ///
+            /// Rounded the way a CSG rounded box is: every point of the cube surface is pulled to
+            /// <paramref name="radius"/> from the inner box, so flat faces stay flat and only the
+            /// edges and corners curve. The grid is packed towards the edges (a sine spacing) so
+            /// the curve has vertices to live on. The bulge is a low-frequency noise along the
+            /// normal, a function of position, so it is continuous across the seams between faces.
+            /// </summary>
+            public void SoftBox(Vector3 centre, Vector3 size, Quaternion rotation, int seed = 17,
+                                float radius = 0.2f, int sub = 7, float bulge = 0.02f)
+            {
+                Vector3 h = size * 0.5f;
+                float r = Mathf.Min(radius, Mathf.Min(h.x, Mathf.Min(h.y, h.z)) * 0.9f);
+                Vector3 inner = h - Vector3.one * r;
+
+                var axes = new[]
+                {
+                    (n: Vector3.right,   u: Vector3.up,      v: Vector3.forward),
+                    (n: Vector3.left,    u: Vector3.forward, v: Vector3.up),
+                    (n: Vector3.up,      u: Vector3.forward, v: Vector3.right),
+                    (n: Vector3.down,    u: Vector3.right,   v: Vector3.forward),
+                    (n: Vector3.forward, u: Vector3.right,   v: Vector3.up),
+                    (n: Vector3.back,    u: Vector3.up,      v: Vector3.right)
+                };
+
+                int row = sub + 1;
+
+                foreach (var face in axes)
+                {
+                    int start = Vertices.Count;
+
+                    for (int i = 0; i <= sub; i++)
+                        for (int j = 0; j <= sub; j++)
+                        {
+                            float tu = Mathf.Sin((i / (float)sub * 2f - 1f) * Mathf.PI * 0.5f);
+                            float tv = Mathf.Sin((j / (float)sub * 2f - 1f) * Mathf.PI * 0.5f);
+
+                            var local = Vector3.Scale(face.n + face.u * tu + face.v * tv, h);
+                            var q = new Vector3(Mathf.Clamp(local.x, -inner.x, inner.x),
+                                                Mathf.Clamp(local.y, -inner.y, inner.y),
+                                                Mathf.Clamp(local.z, -inner.z, inner.z));
+                            var dir = local - q;
+                            var nrm = dir.sqrMagnitude > 1e-8f ? dir.normalized : face.n;
+                            var pos = q + nrm * r;
+
+                            pos += nrm * (Fbm2(pos.x * 0.55f + seed * 0.13f, pos.z * 0.55f + pos.y * 0.7f, seed, 2) * bulge);
+
+                            Push(centre + rotation * pos, (rotation * nrm).normalized);
+                        }
+
+                    // Wound so the geometric normal agrees with the stored one.
+                    var a = Vertices[start];
+                    var b = Vertices[start + 1];
+                    var c = Vertices[start + row];
+                    bool flip = Vector3.Dot(Vector3.Cross(b - a, c - a), Normals[start]) < 0f;
+
+                    for (int i = 0; i < sub; i++)
+                        for (int j = 0; j < sub; j++)
+                        {
+                            int i00 = start + i * row + j, i01 = i00 + 1, i10 = i00 + row, i11 = i10 + 1;
+
+                            if (!flip)
+                            {
+                                Triangles.Add(i00); Triangles.Add(i01); Triangles.Add(i10);
+                                Triangles.Add(i01); Triangles.Add(i11); Triangles.Add(i10);
+                            }
+                            else
+                            {
+                                Triangles.Add(i00); Triangles.Add(i10); Triangles.Add(i01);
+                                Triangles.Add(i01); Triangles.Add(i10); Triangles.Add(i11);
+                            }
+                        }
+                }
+            }
+
+            /// <summary>
             /// A tapered tube between two points -- a trunk, a post, a pipe, a pylon.
             /// Capped, because an open end is a hole you can see the inside of the world
             /// through the moment the camera is above it.
@@ -536,7 +614,23 @@ namespace FPSKit.EditorTools
         /// -- you could say "the big square rock" -- and that is all they were; a dozen
         /// of them across a map read as ruins of something built rather than as rock.
         /// </summary>
+        /// <summary>
+        /// Rock for the desert gets finer geometry (2026-10-03, "improve the quality of
+        /// everything"): about 1.7x the sides and 1.6x the courses, plus a second, finer
+        /// noise in <see cref="ButteMeshCore"/>. Other arenas keep what they had. The pool key
+        /// is built from the adjusted counts, so the two never share a mesh.
+        /// </summary>
         private static Mesh ButteMesh(int seed, int sides = 9, int levels = 7)
+        {
+            if (IsDesertArena())
+            {
+                sides = Mathf.RoundToInt(sides * 1.7f);
+                levels = Mathf.RoundToInt(levels * 1.6f);
+            }
+            return ButteMeshCore(seed, sides, levels);
+        }
+
+        private static Mesh ButteMeshCore(int seed, int sides = 9, int levels = 7)
             => Pooled($"butte_{seed}_{sides}_{levels}", () =>
             {
                 var build = new MeshBuild { UVScale = 0.18f };
@@ -570,6 +664,10 @@ namespace FPSKit.EditorTools
 
                         float wobble = 1f + Fbm2(Mathf.Cos(a) * 2.3f + l * 0.7f,
                                                  Mathf.Sin(a) * 2.3f, seed, 2) * 0.3f;
+
+                        // A second, finer layer of noise: the broad wobble gives the shape and
+                        // this gives the rock its broken, weathered surface.
+                        wobble += Fbm2(Mathf.Cos(a) * 7f + l * 1.9f, Mathf.Sin(a) * 7f - l * 1.3f, seed + 5, 2) * 0.07f;
 
                         float r = taper * ledge * wobble;
                         rings[l][s] = new Vector3(Mathf.Cos(a) * r, t, Mathf.Sin(a) * r);
@@ -660,7 +758,9 @@ namespace FPSKit.EditorTools
                 var build = new MeshBuild { UVScale = 1.1f };
                 var rng = new System.Random(seed);
 
-                const int segments = 9;
+                // Fourteen rings of ten sides (was nine of seven): a trunk is the one smooth
+                // curve in a palm and it showed its facets from across the map.
+                const int segments = 14;
                 float bendX = Rand(rng, -0.18f, 0.18f);
                 float bendZ = Rand(rng, -0.14f, 0.14f);
 
@@ -679,7 +779,7 @@ namespace FPSKit.EditorTools
 
                     // Every other segment is a touch fatter, which is the ring of scar
                     // left where a frond fell off.
-                    build.Tube(previous, next, rFrom * (i % 2 == 0 ? 1.15f : 1f), rTo, 7);
+                    build.Tube(previous, next, rFrom * (i % 2 == 0 ? 1.15f : 1f), rTo, 10);
                     previous = next;
                 }
 
@@ -712,7 +812,7 @@ namespace FPSKit.EditorTools
                     var outward = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw));
                     var side = new Vector3(-Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
 
-                    const int steps = 5;
+                    const int steps = 7;
                     var previous = Vector3.zero;
                     float previousWidth = 0.02f;
 
@@ -730,6 +830,24 @@ namespace FPSKit.EditorTools
                                    next + side * width, previous + side * previousWidth);
                         build.Quad(previous + side * previousWidth, next + side * width,
                                    next - side * width, previous - side * previousWidth);
+
+                        // Leaflets: a pinnate frond is a spine with a row of narrow blades down
+                        // both sides, angled forward and drooping. This is what turned the crown
+                        // from a star of ribbons into something that reads as a palm up close.
+                        if (s < steps)
+                        {
+                            var spine = (next - previous).normalized;
+                            float leafLen = (0.2f - 0.09f * t) * (0.8f + 0.4f * Hash01(seed * 17 + f, s));
+
+                            foreach (float sd in new[] { -1f, 1f })
+                            {
+                                var dir = (side * sd + spine * 0.55f + Vector3.down * 0.5f).normalized * leafLen;
+                                var tipL = next + dir;
+                                var w = spine * 0.02f;
+                                build.Tri(next - w, tipL, next + w);
+                                build.Tri(next + w, tipL, next - w);
+                            }
+                        }
 
                         previous = next;
                         previousWidth = width;

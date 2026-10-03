@@ -105,7 +105,7 @@ namespace FPSKit.EditorTools
             WriteHeightPair("Sand", SandHeight, albedoContrast: 0.42f, normalStrength: 2.6f);
             WriteHeightPair("Rock", RockHeight, albedoContrast: 0.72f, normalStrength: 4.2f);
             WriteHeightPair("Timber", TimberHeight, albedoContrast: 0.55f, normalStrength: 2.2f);
-            WriteHeightPair("Adobe", AdobeHeight, albedoContrast: 0.34f, normalStrength: 2.4f);
+            WriteHeightPair("Adobe", AdobeHeight, albedoContrast: 0.5f, normalStrength: 2.8f);
             WriteHeightPair("Water", WaterHeight, albedoContrast: 0.12f, normalStrength: 1.4f);
 
             // The four walled-box arenas are built out of these. Until they existed those
@@ -397,7 +397,16 @@ namespace FPSKit.EditorTools
             float plaster = TileFbm(u, v, 5, 4, 5503);
             float grit = TileFbm(u, v, 40, 2, 5504);
 
-            return face * 0.4f + plaster * 0.44f + grit * 0.16f;
+            // Weathering (2026-10-03, "make the structures more realistic"): where the plaster has
+            // fallen away the brick shows through -- darker, with its courses and joints standing
+            // out -- in patches far bigger than a brick, so no wall repeats at brick scale. Without
+            // this the walls were an even wash that read as a flat colour from any distance.
+            float patch = TileFbm(u, v, 3, 3, 5505);
+            float exposed = Mathf.SmoothStep(0.56f, 0.70f, patch);
+            float plastered = face * 0.4f + plaster * 0.44f + grit * 0.16f;
+            float bare = face * 0.78f + grit * 0.22f - 0.12f;
+
+            return Mathf.Lerp(plastered, bare, exposed);
         }
 
         /// <summary>Straight grain along u, with knots and split ends.</summary>

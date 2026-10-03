@@ -579,14 +579,20 @@ namespace FPSKit.EditorTools
             var at = new Vector3(site.x, ground + 0.7f, site.y);
 
             var body = new MeshBuild { UVScale = 0.25f };
-            body.Tube(new Vector3(0f, 0f, -12f), new Vector3(0f, 0f, 9f), 2f, 2f, 14);
-            body.Tube(new Vector3(0f, 0f, 9f), new Vector3(0f, -0.3f, 13f), 2f, 0.4f, 14);
-            body.Tube(new Vector3(0f, 0.2f, -17f), new Vector3(0f, 0f, -12f), 0.6f, 2f, 14);
-            body.Box(new Vector3(0f, 3.4f, -15.5f), new Vector3(0.35f, 5f, 3.4f), Quaternion.Euler(-18f, 0f, 0f));
-            body.Box(new Vector3(0f, 0.6f, -15.8f), new Vector3(8f, 0.25f, 2f), Quaternion.identity);
-            body.Box(new Vector3(-5f, -0.8f, 0f), new Vector3(8f, 0.35f, 3.6f), Quaternion.Euler(0f, 0f, 6f));   // the wing still on
+            int planeSeed = rng.Next(1, 999);
+            PlaneBody(body, planeSeed);
+            body.SoftBox(new Vector3(0f, 3.4f, -15.5f), new Vector3(0.35f, 5f, 3.4f), Quaternion.Euler(-18f, 0f, 0f), planeSeed, 0.12f, 5, 0.01f);   // tail fin
+            body.SoftBox(new Vector3(0f, 0.6f, -15.8f), new Vector3(8f, 0.25f, 2f), Quaternion.identity, planeSeed + 1, 0.1f, 5, 0.01f);          // tailplane
+            PlaneWing(body, new Vector3(-1.7f, -0.8f, 0.5f), -1f, 9f, 3.8f, 1.5f, 3.2f, 0.45f);                  // the wing still on
+            body.Tube(new Vector3(-5.4f, -1.5f, 1.7f), new Vector3(-5.4f, -1.4f, -1.6f), 0.72f, 0.62f, 12);       // its engine
+            body.Tube(new Vector3(-5.4f, -1.5f, 1.7f), new Vector3(-5.4f, -1.5f, 2.3f), 0.5f, 0.2f, 12);          // and the cowl
             var go = MeshObject(parent, "PlaneFuselage", ToMesh(body, DenseKey("plane")), _alloyMat, at, rot, Vector3.one, layer, "Metal");
             NoStanding(go);
+
+            var windowMesh = new MeshBuild { UVScale = 0.5f };
+            PlaneWindows(windowMesh, rng);
+            Hide(MeshObject(parent, "PlaneWindows", ToMesh(windowMesh, DenseKey("planewin")), _glassDarkMat, at, rot,
+                            Vector3.one, layer, null, collider: false));
             if (go != null) Mark(go, new Color(0.62f, 0.63f, 0.64f), 4);
             SealBox(parent, at, new Vector3(9f, 5f, 9f));
             SealBox(parent, at + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, 0f, -8f), new Vector3(8f, 5f, 8f));
@@ -595,8 +601,8 @@ namespace FPSKit.EditorTools
             // The other wing, torn off and lying flat on the sand.
             var wingAt = site + (Vector2)(Quaternion.Euler(0f, 0f, -yaw) * new Vector2(12f, 4f));
             var wing = new MeshBuild { UVScale = 0.25f };
-            wing.Box(Vector3.zero, new Vector3(11f, 0.35f, 3.6f), Quaternion.identity);
-            wing.Tube(new Vector3(-2f, -0.9f, -1.5f), new Vector3(-2f, -0.9f, 2.2f), 0.8f, 0.7f, 10);
+            PlaneWing(wing, new Vector3(-5.5f, 0f, 0f), 1f, 11f, 3.8f, 1.5f, 3.2f, 0.42f);
+            wing.Tube(new Vector3(-1f, -0.5f, 1.5f), new Vector3(-1f, -0.45f, -1.7f), 0.72f, 0.62f, 12);
             float wy = GroundHeightAt(wingAt.x, wingAt.y);
             var wingGo = MeshObject(parent, "PlaneWing", ToMesh(wing, DenseKey("planewing")), _alloyMat,
                                     new Vector3(wingAt.x, wy + 0.5f, wingAt.y),
@@ -868,7 +874,24 @@ namespace FPSKit.EditorTools
             fall.tintAlt = new Color(0.72f, 0.62f, 0.46f, 0.24f);
             fall.size = new Vector2(0.025f, 0.075f);
 
-            for (int i = 0, made = 0; i < 120 && made < 5; i++)
+            // Golden-hour motes (2026-10-03): fine bright dust hanging in the low sun at head
+            // height and above, drifting with the wind. The ankle layer above is what you walk
+            // through; this is what the light catches. Few and small, so it reads as glints
+            // in the air and never as weather that hides an enemy.
+            var motes = new GameObject("SunMotes");
+            motes.transform.SetParent(parent, false);
+            var glint = motes.AddComponent<Snowfall>();
+            glint.flakeMaterial = FlakeMaterial();
+            glint.flakes = 420;
+            glint.ceiling = 14f;
+            glint.spread = 38f;
+            glint.fallSpeed = 0.08f;
+            glint.wind = new Vector3(2.4f, 0.1f, 1.4f);
+            glint.tint = new Color(1f, 0.86f, 0.58f, 0.30f);
+            glint.tintAlt = new Color(1f, 0.72f, 0.42f, 0.16f);
+            glint.size = new Vector2(0.012f, 0.035f);
+
+            for (int i = 0, made = 0; i < 160 && made < 7; i++)
             {
                 var p = new Vector2(Rand(rng, -half * 0.85f, half * 0.85f), Rand(rng, -half * 0.85f, half * 0.85f));
                 if (p.magnitude < 70f || !Drapeable(p.x, p.y, 10f)) continue;
@@ -917,6 +940,10 @@ namespace FPSKit.EditorTools
             var velocity = system.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.Local;
+            // All three orbital curves in the same mode, or Unity logs "Orbital Velocity
+            // curves must all be in the same mode" and ignores the lot.
+            velocity.orbitalX = new ParticleSystem.MinMaxCurve(0f, 0f);
+            velocity.orbitalY = new ParticleSystem.MinMaxCurve(0f, 0f);
             velocity.orbitalZ = new ParticleSystem.MinMaxCurve(1.2f, 1.9f);
             velocity.radial = new ParticleSystem.MinMaxCurve(0.1f, 0.3f);
             velocity.x = new ParticleSystem.MinMaxCurve(0f, 0f);

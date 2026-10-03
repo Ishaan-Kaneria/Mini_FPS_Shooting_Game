@@ -263,7 +263,9 @@ namespace FPSKit.EditorTools
                     // atmosphere by this, and an orange tint turned the zenith a muddy green.
                     t.skyTint = new Color(0.66f, 0.52f, 0.62f);
                     t.skyGroundColor = new Color(0.52f, 0.38f, 0.26f);
-                    t.atmosphereThickness = 1.15f;
+                    // Back to 1.5 (2026-10-03): 1.15 turned the golden horizon blue. The mountains' yellow came from
+                    // the fog colour, which stays greyer; the sky keeps its glow.
+                    t.atmosphereThickness = 1.5f;
                     t.skyExposure = 1.45f;
                     t.sunColor = new Color(1f, 0.90f, 0.72f);
                     t.sunIntensity = 1.4f;

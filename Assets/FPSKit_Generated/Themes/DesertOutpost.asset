@@ -27,7 +27,7 @@ MonoBehaviour:
   skyboxOverride: {fileID: 0}
   skyTint: {r: 0.66, g: 0.52, b: 0.62, a: 1}
   skyGroundColor: {r: 0.52, g: 0.38, b: 0.26, a: 1}
-  atmosphereThickness: 1.15
+  atmosphereThickness: 1.5
   skyExposure: 1.45
   sunColor: {r: 1, g: 0.9, b: 0.72, a: 1}
   sunIntensity: 1.4

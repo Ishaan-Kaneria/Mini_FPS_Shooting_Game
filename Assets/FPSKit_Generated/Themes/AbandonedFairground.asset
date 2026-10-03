@@ -97,6 +97,11 @@ MonoBehaviour:
   iglooCamps: 5
   lakeRadius: 62
   volcanicZone: 0
+  rooftopZone: 0
+  cityLitWindows: 0.22
+  cityBridgeCount: 7
+  cityParkedCars: 70
+  cityTowerShare: 0.2
   subwayZone: 1
   floorDetail: Adobe
   wallDetail: Timber

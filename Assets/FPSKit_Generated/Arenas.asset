@@ -34,7 +34,7 @@ MonoBehaviour:
   - displayName: Night Rooftop
     sceneName: NightRooftop
     description: City night. Dark sky, warm practicals, heavy bloom.
-    preview: {fileID: 2800000, guid: 345a1d8e13e6e9f239fb2c6b9a77ccd8, type: 3}
+    preview: {fileID: 2800000, guid: c0b31b027128668a3b965238b24ed662, type: 3}
     theme: {fileID: 11400000, guid: 4a23f423ccbc1304380c41462e4800cb, type: 2}
     levels: {fileID: 11400000, guid: eafd0b974f354d6e09074c7a1181b549, type: 2}
   - displayName: Abandoned Fairground

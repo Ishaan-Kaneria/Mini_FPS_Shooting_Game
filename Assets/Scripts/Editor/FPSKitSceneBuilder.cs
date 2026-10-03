@@ -750,6 +750,7 @@ namespace FPSKit.EditorTools
         {
             // The industrial zone is asked about first: a theme that sets both is asking
             // for a factory, and a factory cannot also be a river valley.
+            if (_theme.rooftopZone) { BuildCityZone(); return; }
             if (_theme.industrialZone) { BuildIndustrialZone(); return; }
             if (_theme.parkZone && FairgroundRealisticActive) { BuildFairgroundRealistic(); return; }
             if (_theme.parkZone) { BuildParkZone(); return; }
@@ -2682,7 +2683,7 @@ namespace FPSKit.EditorTools
         private static Transform[] BuildSpawnPoints()
         {
             if (FairgroundRealisticActive) return BuildFairgroundSpawnPoints();
-            if (_theme.industrialZone) return BuildZoneSpawnPoints();
+            if (_theme.rooftopZone || _theme.industrialZone) return BuildZoneSpawnPoints();
             if (_theme.parkZone) return BuildOpenZoneSpawnPoints();
             if (_theme.snowZone) return BuildOpenZoneSpawnPoints();
             if (_theme.openZone) return BuildOpenZoneSpawnPoints();

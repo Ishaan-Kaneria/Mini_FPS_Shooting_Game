@@ -2548,3 +2548,41 @@ asset, so edits to `Night()` did nothing). Old-growth fix: the fallen-log overla
 - **Old formats:** 97 old Flooded Grounds assets were re-saved in the Unity 6 format (originals in `~/MiniFPS_PackBackup_preResave/`);
   `FpsController.prefab` lost its dead post-processing component. `HudEditor.HandleDrag.handle` is `[NonSerialized]`.
 - **Checked afterwards:** 382 prefabs and 8 build scenes: no missing scripts, no empty material slots; Console clean.
+
+## Night Rooftop is a city district (2026-10-03)
+
+Ishaan found no suitable Asset Store pack and asked for a real or semi-real 450 m arena, so the Night Rooftop was rebuilt as a night
+city. `LevelTheme.rooftopZone` (precedence over `industrialZone`); `FPSKitCity.cs` (plan, textures, materials), `FPSKitCityBuildings.cs`
+(shell, roof, fire escapes, bridges), `FPSKitCityStreet.cs` (crossings, lamps, cars, signs, lights, skyline), `FPSKitCityCheck.cs`
+(`Tools > MiniFPS > Rooftop > Check Reach`, runs in the open scene). It reuses the industrial street grid (`PlanStreets`, `BuildStreets`,
+the fence, `BuildZoneSpawnPoints`): 16 blocks of 80 m on a 20 m tile, cut into 40 lots (cross of four, two, or one big and two small).
+
+- **Facade:** one texture pair per wall type (masonry, glass curtain wall): 16 bays of 3.3 m, a window in each, and an emission map of
+  the same layout with 26-30 % of the bays lit (warm, cool white, screen blue, pink). Every wall is snapped to the 3.3 m bay so a window is
+  never cut by a corner; every building is built in world coordinates so each reads a different part of the tile. Six tints, no lights.
+  The skyline beyond the fence is the same material.
+- **Roofs:** 32 of 40 lots are walkable (roof 3-9 floors of 3.3 m), 8 are towers (12-18 floors, setbacks, antenna, red beacon, no way up).
+  Towers lean north-east. A walkable roof has two fire escapes on two faces (zig-zag, two 2.2 m lanes, 15 treads of 0.22 per floor,
+  3 m landings; the last landing overlaps the deck 1.8 m) and a parapet open at each. A lot that cannot be given two escapes becomes a
+  tower. Seven skybridges join roofs across a street or alley; each pair is raised to the lower height (groups unioned).
+- **Navigation rules that cost a rebuild each:**
+  1. **A closed box has an inside to the bake.** The voxelizer rasterizes triangles, so the slab under a building baked a room of navmesh
+     (spawn points inside buildings, 4 of 16 unreachable). Every tier has a `NavMeshModifierVolume` (`NoEnter`) that stops a metre under the
+     deck so the roof stays walkable; the roof stair bulkhead has one too.
+  2. **Lanes of 1.6 m baked on some buildings and not others** (the bake erodes half a metre off each edge): 2.2 m lanes and 3 m landings.
+  3. Everything flat with no way up (towers' roofs, parapets, cornices, rooftop plant, car roofs, awnings, signs) is `NoStanding`.
+- **Emission:** `globalIlluminationFlags` must be `RealtimeEmissive`. With `None`, URP cleared the `_EMISSION` keyword on import and no
+  window lit.
+- **Lights:** one sodium point light at each junction (no shadows, a quarter flicker); windows, signs and lamp heads are emissive.
+- **Verified:** reach check 32/32 roofs, 16/16 spawns, 800/800 sampled navmesh triangles reachable from the player (11 k triangles); a
+  30 s play session on level 1 had 6 enemies on the navmesh within 120 m and no errors. Static report: 208 k triangles, 1444 renderers,
+  19 lights, 11 MB of textures (the Fairground is 3.9 M, 4895 and 656 MB). **Not run:** the batch `Verify*` checks (editor was open).
+- **Not done yet:** per-level card images, minimap check, a quality rig like `FairgroundQuality` (lights and particles per tier), street
+  trees/rubble, interiors. Cars are boxes; the pack has none.
+
+## FPSKitGraphics must not write the tier assets (2026-10-03)
+
+`FPSKitGraphics.Apply()` runs on every scene build. It first calls `FPSKitQualityTiers.Ensure()` and then used to raise every active
+pipeline asset to 95 m shadows, four cascades, 4x MSAA and put full SSAO back, which silently undid the tier settings (and is why Medium
+had 95 m). It now skips `FPSKitQualityTiers.IsTierAsset`; only `Ensure()` writes Low/Medium/High. High is 50 m, 3 cascades, 2x MSAA, 85 %
+render scale with FSR 1, half-resolution 4-sample SSAO.

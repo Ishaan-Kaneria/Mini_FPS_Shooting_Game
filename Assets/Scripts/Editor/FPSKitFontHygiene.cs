@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -6,50 +7,38 @@ using UnityEngine;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// Gives the dynamic TMP font assets back as they were when play mode ends.
+    /// Keeps the dynamic TMP font assets from being written to disk by anything except the font generator.
     ///
-    /// The UI fonts are Dynamic: a glyph is rasterised into the atlas the first time a string needs it. In the editor
-    /// that writes the glyphs and atlas into the .asset, so every play session left the Barlow assets modified (thousands
-    /// of lines of glyph data) and showing in git. Builds already clear this data (<c>m_ClearDynamicDataOnBuild</c>).
+    /// The UI fonts are Dynamic: a glyph is rasterised into the atlas the first time a string needs it. In the
+    /// editor that dirties the asset, and the next save of the project writes the glyphs and the atlas into the
+    /// .asset file -- so every play session, and every scene that rendered a TMP label in edit mode, left both
+    /// Barlow assets modified (thousands of lines of glyph data) and showing in git. Builds already clear this
+    /// data (<c>m_ClearDynamicDataOnBuild</c>); this does the same for the editor by refusing the write.
     ///
-    /// The font is copied to Library/ before play and put back after. It is a file copy and not
-    /// <c>TMP_FontAsset.ClearFontAssetData</c> because that also empties the kerning and ligature tables, which are
-    /// part of the committed asset. Dynamic is kept (rather than a pre-built static atlas) because the keyboard and
-    /// player names can type characters nothing pre-generated.
+    /// <b>Why a save filter and not a snapshot or a clear.</b> Restoring a copy after play missed the edit-mode
+    /// cases. <c>TMP_FontAsset.ClearFontAssetData</c> empties the kerning and ligature tables too, which are part
+    /// of the committed asset, and cost the UI its kerning. Dynamic is kept rather than a pre-built static atlas
+    /// because the keyboard and player names can type characters nothing pre-generated.
     /// </summary>
-    [InitializeOnLoad]
-    static class FPSKitFontHygiene
+    public class FPSKitFontHygiene : AssetModificationProcessor
     {
-        const string Folder = "Assets/FPSKit_Generated/UI/Fonts";
-        const string Snapshot = "Library/FPSKitFontSnapshot";
+        private const string Folder = "Assets/FPSKit_Generated/UI/Fonts/";
 
-        static FPSKitFontHygiene() => EditorApplication.playModeStateChanged += OnState;
+        /// <summary>Set by the font generator for the length of a deliberate rebuild, so its output is saved.</summary>
+        public static bool AllowSave;
 
-        static void OnState(PlayModeStateChange state)
+        static string[] OnWillSaveAssets(string[] paths)
         {
-            if (state == PlayModeStateChange.ExitingEditMode) Save();
-            else if (state == PlayModeStateChange.EnteredEditMode) Restore();
-        }
+            if (AllowSave) return paths;
 
-        static void Save()
-        {
-            Directory.CreateDirectory(Snapshot);
-            foreach (var f in Directory.GetFiles(Folder, "*SDF.asset"))
-                File.Copy(f, Path.Combine(Snapshot, Path.GetFileName(f)), true);
-        }
-
-        static void Restore()
-        {
-            if (!Directory.Exists(Snapshot)) return;
-            bool any = false;
-            foreach (var saved in Directory.GetFiles(Snapshot, "*SDF.asset"))
+            List<string> keep = null;
+            for (int i = 0; i < paths.Length; i++)
             {
-                string live = Path.Combine(Folder, Path.GetFileName(saved));
-                if (!File.Exists(live) || File.ReadAllBytes(live).Length == new FileInfo(saved).Length && File.ReadAllText(live) == File.ReadAllText(saved)) continue;
-                File.Copy(saved, live, true);
-                any = true;
+                bool font = paths[i].StartsWith(Folder) && paths[i].EndsWith("SDF.asset");
+                if (font && keep == null) { keep = new List<string>(paths.Length); for (int j = 0; j < i; j++) keep.Add(paths[j]); }
+                if (!font && keep != null) keep.Add(paths[i]);
             }
-            if (any) AssetDatabase.Refresh();
+            return keep == null ? paths : keep.ToArray();
         }
     }
 }

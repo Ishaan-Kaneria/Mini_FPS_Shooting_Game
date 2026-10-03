@@ -82,6 +82,41 @@ namespace FPSKit.EditorTools
             Debug.Log($"[Thumbnails] {png}");
         }
 
+        /// <summary>
+        /// One look at the open scene from a camera, written as a PNG of the given size. For checking a built arena
+        /// from the editor without batch mode: the scene must already be open.
+        /// </summary>
+        public static void Snap(Vector3 position, Vector3 lookAt, float fov, string path, int width = 1280, int height = 720)
+        {
+            DynamicGI.UpdateEnvironment();
+            var rig = new GameObject("SnapCamera");
+            var cam = rig.AddComponent<Camera>();
+            RenderTexture rt = null;
+            try
+            {
+                rig.transform.position = position;
+                rig.transform.rotation = Quaternion.LookRotation((lookAt - position).normalized, Vector3.up);
+                cam.fieldOfView = fov; cam.nearClipPlane = 0.1f; cam.farClipPlane = 3000f; cam.clearFlags = CameraClearFlags.Skybox;
+                rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 2 };
+                var request = new RenderPipeline.StandardRequest { destination = rt };
+                RenderPipeline.SubmitRenderRequest(cam, request);
+                RenderPipeline.SubmitRenderRequest(cam, request);
+                var prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                var img = new Texture2D(width, height, TextureFormat.RGB24, false);
+                img.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                img.Apply();
+                RenderTexture.active = prev;
+                File.WriteAllBytes(path, img.EncodeToPNG());
+                Object.DestroyImmediate(img);
+            }
+            finally
+            {
+                if (rt != null) { rt.Release(); Object.DestroyImmediate(rt); }
+                Object.DestroyImmediate(rig);
+            }
+        }
+
         static void HideRuntimeOnly()
         {
             foreach (var c in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None)) c.gameObject.SetActive(false);

@@ -155,7 +155,7 @@ namespace FPSKit.EditorTools
         /// the two modes drifting apart on three separate numbers.
         /// </summary>
         private static bool WideArena =>
-            _theme != null && (_theme.openZone || _theme.industrialZone);
+            _theme != null && (_theme.openZone || _theme.industrialZone || _theme.rooftopZone);
 
         // ==================================================================
         // Layout state

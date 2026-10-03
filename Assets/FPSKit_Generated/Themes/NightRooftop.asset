@@ -28,24 +28,24 @@ MonoBehaviour:
   skyTint: {r: 0.1, g: 0.13, b: 0.22, a: 1}
   skyGroundColor: {r: 0.06, g: 0.07, b: 0.1, a: 1}
   atmosphereThickness: 0.4
-  skyExposure: 0.45
+  skyExposure: 0.55
   sunColor: {r: 0.55, g: 0.65, b: 0.95, a: 1}
   sunIntensity: 0.35
   sunAngles: {x: 32, y: 250}
   shadowStrength: 0.6
   fogEnabled: 1
   fogColor: {r: 0.09, g: 0.11, b: 0.17, a: 1}
-  fogDensity: 0.016
-  ambientSky: {r: 0.12, g: 0.15, b: 0.24, a: 1}
-  ambientEquator: {r: 0.09, g: 0.1, b: 0.14, a: 1}
-  ambientGround: {r: 0.04, g: 0.04, b: 0.05, a: 1}
-  arenaSize: 95
+  fogDensity: 0.0022
+  ambientSky: {r: 0.16, g: 0.19, b: 0.3, a: 1}
+  ambientEquator: {r: 0.13, g: 0.14, b: 0.2, a: 1}
+  ambientGround: {r: 0.06, g: 0.06, b: 0.08, a: 1}
+  arenaSize: 450
   wallHeight: 5
   randomSeed: 88
   scaleLayoutWithArea: 1
   layoutReferenceSize: 60
   openZone: 0
-  apronSize: 900
+  apronSize: 500
   hazard: 0
   hazardWidth: 55
   hazardDepth: 20
@@ -59,7 +59,7 @@ MonoBehaviour:
   duneHeight: 0
   duneWavelength: 95
   duneWindAngle: 34
-  backdropCount: 34
+  backdropCount: 60
   backdropDistance: {x: 620, y: 1150}
   backdropHeight: {x: 55, y: 190}
   backdropWidth: {x: 70, y: 260}
@@ -97,6 +97,11 @@ MonoBehaviour:
   iglooCamps: 5
   lakeRadius: 62
   volcanicZone: 0
+  rooftopZone: 1
+  cityLitWindows: 0.22
+  cityBridgeCount: 7
+  cityParkedCars: 70
+  cityTowerShare: 0.2
   subwayZone: 0
   floorDetail: Concrete
   wallDetail: Concrete

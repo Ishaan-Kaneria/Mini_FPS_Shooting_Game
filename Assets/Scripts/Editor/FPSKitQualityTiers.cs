@@ -40,6 +40,9 @@ namespace FPSKit.EditorTools
 
         public static readonly string[] Names = { "Low", "Medium", "High" };
 
+        /// <summary>Whether a pipeline asset is one of the three tiers, which only <see cref="Ensure"/> may write.</summary>
+        public static bool IsTierAsset(string path) => path == LowAsset || path == MediumAsset || path == HighAsset;
+
         /// <summary>Makes the three levels exist and be right. Idempotent; returns whether anything changed.</summary>
         public static bool Ensure()
         {

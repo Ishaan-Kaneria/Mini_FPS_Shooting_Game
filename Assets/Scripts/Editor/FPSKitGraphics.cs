@@ -114,6 +114,11 @@ namespace FPSKit.EditorTools
 
             foreach (var asset in ActivePipelineAssets())
             {
+                // The three tier assets are written by FPSKitQualityTiers.Ensure above, and it is the only thing that
+                // may write them: this pass used to raise High back to 95 m, four cascades and 4x MSAA and put full
+                // ambient occlusion back, on every scene build, which silently undid the tier settings.
+                if (FPSKitQualityTiers.IsTierAsset(AssetDatabase.GetAssetPath(asset))) continue;
+
                 bool lowEnd = IsLowEndTier(AssetDatabase.GetAssetPath(asset));
 
                 if (ApplyToPipeline(asset, lowEnd)) changed++;

@@ -586,7 +586,17 @@ namespace FPSKit.EditorTools
                         new Color(0.10f, 0.12f, 0.15f)
                     };
                     t.coverTag = "Metal";
-                    t.arenaSize = 95f;
+                    t.arenaSize = 450f;
+                    t.rooftopZone = true;
+                    t.apronSize = 500f;
+                    // 450 m: a night city district. The old 95 m box is gone; the lit windows, bridges and the
+                    // fog are what carry the size, so the fog is light (it is exponential-squared).
+                    t.fogDensity = 0.0022f;
+                    t.skyExposure = 0.55f;
+                    t.ambientSky = new Color(0.16f, 0.19f, 0.30f);
+                    t.ambientEquator = new Color(0.13f, 0.14f, 0.20f);
+                    t.ambientGround = new Color(0.06f, 0.06f, 0.08f);
+                    t.backdropCount = 60;
                     // Rooftops live or die on verticality.
                     t.roomCount = 3;
                     t.platformCount = 4;

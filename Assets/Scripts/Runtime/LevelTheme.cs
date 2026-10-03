@@ -295,6 +295,31 @@ public class LevelTheme : ScriptableObject
              "wants hazard set to Lava.")]
     public bool volcanicZone;
 
+    // ==================================================================
+    // Rooftop zone
+    // ==================================================================
+    [Header("Rooftop Zone")]
+    [Tooltip("Build this arena as a night city district laid out on a street grid: blocks of " +
+             "buildings with lit windows, fire escapes up their sides to walkable roofs, " +
+             "skybridges between roofs across the streets, parked cars, lamps and neon. " +
+             "Takes precedence over the industrial zone when both are on.")]
+    public bool rooftopZone;
+
+    [Tooltip("Fraction of windows that are lit at night. Higher reads as a busy district, " +
+             "lower as a half-empty one.")]
+    [Range(0.05f, 0.6f)] public float cityLitWindows = 0.22f;
+
+    [Tooltip("Skybridges joining two roofs across a street or alley. Each pair of roofs is " +
+             "raised to the same height so the bridge is level.")]
+    [Min(0)] public int cityBridgeCount = 7;
+
+    [Tooltip("Parked cars along the kerbs. They are cover on the street.")]
+    [Min(0)] public int cityParkedCars = 70;
+
+    [Tooltip("Share of lots that are towers: tall, lit, no way up. They are the skyline " +
+             "and cost nothing to walk around.")]
+    [Range(0f, 0.5f)] public float cityTowerShare = 0.2f;
+
     [Tooltip("Superseded by parkZone. Kept so an asset written with it still loads rather " +
              "than silently losing the field; nothing reads it.")]
     public bool subwayZone;

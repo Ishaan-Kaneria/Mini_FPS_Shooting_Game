@@ -67,7 +67,11 @@ namespace FPSKit.EditorTools
             if (!EditorUtility.DisplayDialog("Rebuild font assets",
                     "This deletes and recreates the TMP font assets. Anything that referenced the old ones loses its font until its builder runs again.",
                     "Rebuild", "Cancel")) return;
-            Import(rebuildFonts: true);
+
+            // The font assets are otherwise never saved (FPSKitFontHygiene); a rebuild is the one deliberate write.
+            FPSKitFontHygiene.AllowSave = true;
+            try { Import(rebuildFonts: true); AssetDatabase.SaveAssets(); }
+            finally { FPSKitFontHygiene.AllowSave = false; }
         }
 
         [MenuItem("FPSKit/UI Kit/Build Component Gallery", priority = 320)]

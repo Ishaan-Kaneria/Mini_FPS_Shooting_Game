@@ -140,6 +140,11 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Every attraction/shop door is an `Entrance(...)` in the plan; `CheckWalkwayGraph` and
   `VerifyWalkways` fail if the paving is not one network or a door has none. Anything placed late (clutter, trees) must clear `Keep()` circles, `_fgRoutes` and `SpotEmpty`. Every
   building/tent needs 2+ openings of 2.6m+. Trunks 2.8m apart, fixed tree budget (300). Glow is emissive.
+- Rooftop (`rooftopZone`) is a city district (`FPSKitCity*.cs`, `Docs/DESIGN_NOTES.md` "Night Rooftop is a city district"): every building shell needs a
+  `NoEnter` volume (a closed box bakes an inside), fire-escape lanes stay 2.2 m wide, every walkable roof keeps two escapes, emissive materials need
+  `RealtimeEmissive`. Check with `Tools > MiniFPS > Rooftop > Check Reach` after any change.
+- `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
+  (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.
 - Generated textures are grayscale; colour stays on the material. `_NORMALMAP` keyword required.
 

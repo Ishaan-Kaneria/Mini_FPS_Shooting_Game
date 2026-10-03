@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// What the quality tier switches in the Abandoned Fairground, on top of the pipeline asset the tier selects.
@@ -37,8 +39,23 @@ public class FairgroundQuality : MonoBehaviour
     [Tooltip("The flood surface. On Low it switches to the cheap path of its shader.")]
     public Renderer[] water;
 
+    [Header("Shadows")]
+    [Tooltip("The most distance the sun's shadows reach here, per tier (Low, Medium, High). The pipeline asset is shared by every arena " +
+             "and sets 95 m with 4 cascades; this arena has thousands of shadow casters, so it asks for less and gives it back on exit.")]
+    public float[] shadowDistance = { 45f, 60f, 70f };
+
+    [Tooltip("The most shadow cascades here, per tier (Low, Medium, High). Never raises what the pipeline asset already has.")]
+    public int[] shadowCascades = { 2, 2, 3 };
+
     ParticleSystem _rainSystem;
     float _rainRate = -1f;
+
+    // What the shared pipeline asset had before this arena lowered it. Not serialized: a domain reload with
+    // play mode on would otherwise carry a stale pair into the next arena.
+    UniversalRenderPipelineAsset _urp;
+    float _savedDistance;
+    int _savedCascades;
+    bool _shadowsSaved;
 
     void OnEnable()
     {
@@ -46,7 +63,45 @@ public class FairgroundQuality : MonoBehaviour
         Apply();
     }
 
-    void OnDisable() => GameSettings.Changed -= OnChanged;
+    void OnDisable()
+    {
+        GameSettings.Changed -= OnChanged;
+        RestoreShadows();
+    }
+
+    void ApplyShadows(GameSettings.Quality tier)
+    {
+        var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        if (urp == null) return;
+
+        // The asset can change under a tier switch (each tier has its own), so give the old one back first.
+        if (_shadowsSaved && urp != _urp) RestoreShadows();
+        if (!_shadowsSaved)
+        {
+            _urp = urp;
+            _savedDistance = urp.shadowDistance;
+            _savedCascades = urp.shadowCascadeCount;
+            _shadowsSaved = true;
+        }
+
+        int t = (int)tier;
+        if (shadowDistance != null && t < shadowDistance.Length)
+            urp.shadowDistance = Mathf.Min(_savedDistance, shadowDistance[t]);
+        if (shadowCascades != null && t < shadowCascades.Length)
+            urp.shadowCascadeCount = Mathf.Min(_savedCascades, shadowCascades[t]);
+    }
+
+    void RestoreShadows()
+    {
+        if (!_shadowsSaved) return;
+        if (_urp != null)
+        {
+            _urp.shadowDistance = _savedDistance;
+            _urp.shadowCascadeCount = _savedCascades;
+        }
+        _shadowsSaved = false;
+        _urp = null;
+    }
 
     void OnChanged(string key)
     {
@@ -60,6 +115,8 @@ public class FairgroundQuality : MonoBehaviour
     {
         bool low = tier == GameSettings.Quality.Low;
         bool high = tier == GameSettings.Quality.High;
+
+        ApplyShadows(tier);
 
         if (rain != null)
         {

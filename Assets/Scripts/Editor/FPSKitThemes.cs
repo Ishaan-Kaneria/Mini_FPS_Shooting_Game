@@ -267,8 +267,8 @@ namespace FPSKit.EditorTools
                     // the fog colour, which stays greyer; the sky keeps its glow.
                     t.atmosphereThickness = 1.5f;
                     t.skyExposure = 1.45f;
-                    t.sunColor = new Color(1f, 0.90f, 0.72f);
-                    t.sunIntensity = 1.6f;
+                    t.sunColor = new Color(1f, 0.84f, 0.62f);
+                    t.sunIntensity = 1.55f;
                     // Mid-afternoon rather than noon, and this is a terrain decision more
                     // than a lighting one. A dune is read entirely through the shading
                     // across its own slope, and a sun sixty-eight degrees up puts almost
@@ -283,8 +283,11 @@ namespace FPSKit.EditorTools
                     // in shadow, and read too orange and too dark, worse still on a phone.) The lower the sun the longer the lee-side shadow of every dune,
                     // and the shape of the ground is the one thing the player reads at range.
                     // Ambient is lifted so no face goes black.
-                    t.sunAngles = new Vector2(38f, 140f);
-                    t.fogColor = new Color(0.90f, 0.76f, 0.58f);   // as at the 21:07 build Ishaan was looking at (restored 2026-10-03)
+                    t.sunAngles = new Vector2(33f, 140f);
+                    // An amber haze (2026-10-03, matched to Ishaan's reference screenshot, milder): the real colour
+                    // grade only works now that the PostFX asset is saved properly, so this is tuned against the
+                    // in-game view, not the editor camera.
+                    t.fogColor = new Color(0.90f, 0.68f, 0.45f);
                     t.fogDensity = 0.004f;
                     // Lifted for the open zone. One hard sun over a map with
                     // hundred-metre rock on it puts whole faces in shadow, and at the
@@ -323,7 +326,7 @@ namespace FPSKit.EditorTools
 
                     // Thin, because the whole point of this arena is that you can see to
                     // the horizon. At the walled arena's 0.004 the mesas are solid fog.
-                    t.fogDensity = 0.0018f;
+                    t.fogDensity = 0.0022f;
 
                     t.hazard = LevelTheme.Hazard.River;
                     t.hazardWidth = 58f;
@@ -393,12 +396,12 @@ namespace FPSKit.EditorTools
 
                     // Graded warm and punchy rather than drained: the desaturated pass read as
                     // a dull photograph of a desert, not somewhere you want to look at.
-                    t.bloomIntensity = 0.85f;
-                    t.postExposure = 0.25f;
-                    t.saturation = 4f;
-                    t.colorFilter = new Color(1f, 0.98f, 0.94f);
+                    t.bloomIntensity = 0.6f;
+                    t.postExposure = 0.05f;
+                    t.saturation = 9f;
+                    t.colorFilter = new Color(1f, 0.93f, 0.84f);
                     t.vignetteIntensity = 0.26f;
-                    t.contrast = 10f;
+                    t.contrast = 14f;
                     t.filmGrain = 0.12f;
                     t.randomSeed = 21;
                     break;

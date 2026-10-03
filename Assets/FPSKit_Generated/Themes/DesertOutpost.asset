@@ -29,13 +29,13 @@ MonoBehaviour:
   skyGroundColor: {r: 0.52, g: 0.38, b: 0.26, a: 1}
   atmosphereThickness: 1.5
   skyExposure: 1.45
-  sunColor: {r: 1, g: 0.9, b: 0.72, a: 1}
-  sunIntensity: 1.6
-  sunAngles: {x: 38, y: 140}
+  sunColor: {r: 1, g: 0.84, b: 0.62, a: 1}
+  sunIntensity: 1.55
+  sunAngles: {x: 33, y: 140}
   shadowStrength: 0.55
   fogEnabled: 1
-  fogColor: {r: 0.9, g: 0.76, b: 0.58, a: 1}
-  fogDensity: 0.0018
+  fogColor: {r: 0.9, g: 0.68, b: 0.45, a: 1}
+  fogDensity: 0.0022
   ambientSky: {r: 0.94, g: 0.88, b: 0.78, a: 1}
   ambientEquator: {r: 0.86, g: 0.76, b: 0.63, a: 1}
   ambientGround: {r: 0.68, g: 0.58, b: 0.44, a: 1}
@@ -125,10 +125,10 @@ MonoBehaviour:
   ambienceLoop: {fileID: 0}
   ambienceVolume: 0.35
   enablePostProcessing: 1
-  bloomIntensity: 0.85
-  postExposure: 0.25
-  saturation: 4
-  contrast: 10
-  colorFilter: {r: 1, g: 0.98, b: 0.94, a: 1}
+  bloomIntensity: 0.6
+  postExposure: 0.05
+  saturation: 9
+  contrast: 14
+  colorFilter: {r: 1, g: 0.93, b: 0.84, a: 1}
   vignetteIntensity: 0.26
   filmGrain: 0.12

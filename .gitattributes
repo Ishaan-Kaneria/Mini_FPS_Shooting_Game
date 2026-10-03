@@ -192,3 +192,6 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# The desert scene is generated and now over 100 MB, GitHub's hard limit for a plain file.
+Assets/FPSKit_Generated/Scenes/DesertOutpost.unity filter=lfs diff=lfs merge=lfs -text

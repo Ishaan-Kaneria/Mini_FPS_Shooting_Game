@@ -614,8 +614,8 @@ namespace FPSKit.EditorTools
                 var bounce = new GameObject("Bounce Light").AddComponent<Light>();
                 bounce.type = LightType.Directional;
                 bounce.shadows = LightShadows.None;
-                bounce.color = new Color(1f, 0.86f, 0.68f);
-                bounce.intensity = 0.55f;
+                bounce.color = new Color(1f, 0.78f, 0.58f);
+                bounce.intensity = 0.4f;
                 bounce.transform.rotation = Quaternion.Euler(_theme.sunAngles.x * 0.6f, _theme.sunAngles.y + 180f, 0f);
             }
         }
@@ -3117,6 +3117,16 @@ namespace FPSKit.EditorTools
             grain.type.value = FilmGrainLookup.Medium1;
             grain.intensity.overrideState = true;
             grain.intensity.value = _theme.filmGrain;
+
+            // <b>The effects have to be saved into the asset, not just added to the list.</b> VolumeProfile.Add
+            // creates the components in memory; without AddObjectToAsset the profile file holds a list of
+            // null references and the grade only exists until the next script reload. Every PostFX asset in
+            // the project was like that: each recompile silently removed the tonemapping, bloom and colour
+            // grade, and the scene fell back to raw, washed-out lighting (Ishaan, 2026-10-03: "you changed
+            // the skybox colour" -- nothing had touched the sky; the grade was gone).
+            foreach (var component in profile.components)
+                if (component != null && !AssetDatabase.Contains(component))
+                    AssetDatabase.AddObjectToAsset(component, profile);
 
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();

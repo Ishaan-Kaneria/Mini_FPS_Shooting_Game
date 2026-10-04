@@ -377,7 +377,7 @@ public class ViewModelRig : MonoBehaviour
 
     /// <summary>Behind the eye and the player's centre, so the camera is never inside the chest.</summary>
     static readonly Vector3 BodyOffset = new Vector3(0f, -0.04f, -0.24f);
-    static readonly Vector3 LookDownOffset = new Vector3(0f, -0.3f, -0.1f);
+    static readonly Vector3 LookDownOffset = new Vector3(0f, -0.12f, -0.32f);
 
     Leg MakeLeg(Animator animator, bool right)
     {

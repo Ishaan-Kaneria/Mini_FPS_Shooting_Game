@@ -27,6 +27,7 @@ MonoBehaviour:
   reserveAmmo: 150
   maxReserveAmmo: 360
   reloadTime: 2.4
+  tacticalReloadShare: 0.8
   autoReloadWhenEmpty: 1
   infiniteReserve: 1
   infiniteAmmo: 0
@@ -55,6 +56,7 @@ MonoBehaviour:
   reloadInClip: {fileID: 8300000, guid: 353b32eeb915acf73abb9a1b29812788, type: 3}
   reloadBoltClip: {fileID: 8300000, guid: a6983fd9b8fd487b9800ba6931fca9fe, type: 3}
   pitchVariance: 0.06
+  viewModel: {fileID: 917934720887914429, guid: 7c5b0e9fdf405001f8035c05aa70a433, type: 3}
   muzzleFlashPrefab: {fileID: 2134951606029692187, guid: 8a79f2628d8bdbc7e804f0f81f251750, type: 3}
   tracerPrefab: {fileID: 2247844606418610152, guid: cafbe0e8fd18c73c9b941c758f06c078, type: 3}
   tracerSpeed: 240

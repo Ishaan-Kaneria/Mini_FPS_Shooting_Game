@@ -120,7 +120,7 @@ namespace FPSKit.EditorTools
                     {
                         if (_shot >= StrikeAt.Length) { Done(0); return; }
 
-                        if (Time.time < _mark + StrikeAt[_shot] * _melee.swingSeconds) return;
+                        if (Time.time < _mark + StrikeAt[_shot] * MeleeSettings.Active.jabSeconds) return;
 
                         Shoot($"03_strike_{_shot + 1}_{Mathf.RoundToInt(StrikeAt[_shot] * 100)}pct");
                         _shot++;

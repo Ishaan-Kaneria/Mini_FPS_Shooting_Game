@@ -73,6 +73,13 @@ public static class MobileInput
     static bool _reloadQueued;
     static bool _useItemQueued;
     static bool _meleeQueued;
+    static bool _kickQueued;
+
+    /// <summary>
+    /// Someone is in reach of a punch or a kick. Written by MeleeStrike, read by the touch
+    /// buttons so they light up; cleared with everything else on a reset.
+    /// </summary>
+    public static bool MeleeReady;
 
     /// <summary>
     /// A touch player has no Escape key, so without this there is no way to pause --
@@ -147,6 +154,16 @@ public static class MobileInput
         return queued;
     }
 
+    public static void QueueKick() => _kickQueued = true;
+
+    /// <summary>Reads and clears. Only MeleeStrike should call this.</summary>
+    public static bool ConsumeKick()
+    {
+        bool queued = _kickQueued;
+        _kickQueued = false;
+        return queued;
+    }
+
     /// <summary>
     /// Static state survives play-mode restarts in the editor, so the touch UI
     /// clears it on enable and disable.
@@ -172,6 +189,7 @@ public static class MobileInput
         _sprintButton = _sprintStick = false;
         _fireButton = _fireTap = _autoFire = false;
         _fireHolds = 0;
-        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = _meleeQueued = false;
+        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = _meleeQueued = _kickQueued = false;
+        MeleeReady = false;
     }
 }

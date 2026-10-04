@@ -2,126 +2,146 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// The punch: a close-range strike that costs no ammunition. Drawn as a rifle-butt
-/// strike (Ishaan's choice over a fist): the rifle is cocked back, pitched over so the
-/// stock leads, and driven up into the target, both hands on it, out and back in under
-/// half a second (see AnimateButt). A fist
-/// is still supported if one is wired, but the builder no longer makes one.
+/// The player's close-quarters fighting. None of it costs ammunition.
 ///
 /// It exists for the level where every round counts. Up against an enemy, the player
-/// gets a choice -- spend bullets, or put them down with a fist -- and on One Magazine
-/// that choice is the difference between finishing with rounds in hand and running dry.
+/// gets a choice -- spend bullets, or put them down by hand -- and on One Magazine that
+/// choice is the difference between finishing with rounds in hand and running dry.
 ///
-/// A punch drops an ordinary enemy outright, takes a large bite out of an elite, and
-/// only chips a boss. The damage is a fraction of the target's own pool rather than a
-/// number, so it means the same thing on level one and level eight, where the level
-/// curve has scaled every enemy's health up.
+/// One key carries a whole fight, the way a soldier's hands would (Ishaan's design):
 ///
-/// Reach is found, not aimed: whoever is closest to the crosshair within arm's length
-/// and a wide cone in front gets hit, as long as nothing solid is in between. A punch is
-/// thrown at someone standing in your face, and asking for pixel aim at that range would
-/// make it the least reliable thing in the game.
+/// - **First press: the rifle butt.** The gun is in the hands, so it is the gun that hits.
+/// - **Press again while the fight is on** (inside the chain window): the gun swings
+///   onto the back and the fists come up. From then on each press is a punch, jab and
+///   cross in turn, thrown hard. The fists stay up until the player stops for a moment,
+///   or fires, aims or reloads -- then the gun comes back off the back.
+/// - **Kick** (its own key): with the gun in the hands it is slid aside out of the leg's
+///   way first; then a front kick that throws an ordinary enemy off its feet.
+/// - **Takedown**: any strike at a target that is badly hurt, reeling, or on the floor
+///   becomes the finishing blow -- the butt with the gun in hand, a heavy cross with the
+///   fists up.
+///
+/// Damage is a share of the target's own pool by role (see <see cref="MeleeSettings"/>),
+/// dealt on the press so a strike counts as quickly as it is thrown, and booked to the
+/// body part the blow lands on, so the enemy's own reaction is in the right place. The
+/// sound, the shake and the hit-stop wait for the frame the blow lands on.
+///
+/// Reach is found, not aimed: whoever is closest to the crosshair within reach and a cone
+/// in front gets hit, as long as nothing solid is in between. A target just outside reach
+/// draws the player in a step (the lunge). On a pad or a touch screen the view is also
+/// pulled onto the target; never with a mouse, which is the aim-assist rule.
+///
+/// Stamina stops the keys being held down into a blender: every strike draws on it, and
+/// a winded player cannot throw until it comes back. The takedown is free.
+///
+/// Drawn by <see cref="ViewModelRig"/> when the gun has rigged arms; without them every
+/// strike is the rifle butt (<see cref="AnimateButt"/>).
 /// </summary>
 [DisallowMultipleComponent]
 public class MeleeStrike : MonoBehaviour
 {
+    public enum Strike { None, Jab, Cross, Kick, Takedown, Butt }
+
     [Header("Wiring")]
-    [Tooltip("Found below this object when empty. Lowered while the fist is out, and " +
+    [Tooltip("Found below this object when empty. Lowered while the hands are busy, and " +
              "where the hitmarker is raised.")]
     public Weapon weapon;
-
     [Tooltip("The camera the reach is measured from. The weapon's when empty.")]
     public Camera fpsCamera;
-
     [Tooltip("Bindings. Taken from the motor when empty, so both stay in sync.")]
     public ControlSettings controls;
-
+    [Tooltip("The numbers. MeleeSettings.Active (Resources/MeleeSettings) when empty.")]
+    public MeleeSettings settings;
     public AudioSource audioSource;
     public AudioClip swingClip;
     public AudioClip hitClip;
 
     [Header("Hands")]
-    [Tooltip("The left fist and forearm, parented to the weapon holder. Hidden at rest; " +
-             "thrown forward on a punch.")]
+    [Tooltip("Unused since the arms are rigged; kept so older scenes still load it.")]
     public Transform fist;
-
-    [Tooltip("The left hand on the gun's handguard. Hidden while the fist is out, so " +
-             "the player never has two left hands.")]
+    [Tooltip("The left hand on the gun's handguard in a scene-built gun.")]
     public GameObject supportHand;
 
-    [Tooltip("Where the fist waits, out of frame below and to the left, in the weapon " +
-             "holder's space.")]
-    public Vector3 fistRest = new Vector3(-0.30f, -0.42f, 0.18f);
-
-    [Tooltip("Where the fist lands: a little left of and below the crosshair.")]
-    public Vector3 fistStrike = new Vector3(-0.05f, -0.09f, 0.58f);
-
-    [Tooltip("How far the gun drops out of the fist's way, in the model's local space. " +
-             "Only with a fist; without one the rifle itself is the strike.")]
-    public Vector3 gunDip = new Vector3(0.07f, -0.16f, -0.06f);
+    [Header("The gun's moves, on top of its pose (model space, metres and degrees)")]
+    [Tooltip("Where the gun goes on its way onto the back: up, right and back over the shoulder.")]
+    public Vector3 holsterOffset = new Vector3(0.22f, 0.28f, -0.55f);
+    [Tooltip("How it turns as it goes: muzzle up and over, rolled onto its side.")]
+    public Vector3 holsterTurn = new Vector3(-70f, 35f, 55f);
+    [Tooltip("Where the gun is slid to for the kick: across to the left and down, out of the leg's way.")]
+    public Vector3 kickAsideOffset = new Vector3(-0.11f, -0.05f, -0.03f);
+    [Tooltip("How it turns aside for the kick: muzzle down and across.")]
+    public Vector3 kickAsideTurn = new Vector3(22f, -30f, 24f);
 
     [Header("Rifle Butt")]
     [Tooltip("The cock before the blow, in degrees (pitch, yaw, then lean across the " +
              "view): muzzle tipped up and leaning out to the right, the way the rifle is " +
              "drawn back to load a strike.")]
     public Vector3 buttCockTurn = new Vector3(-18f, 10f, -22f);
-
     [Tooltip("Where the rifle is drawn back to for the cock: down, right and in.")]
     public Vector3 buttCockOffset = new Vector3(0.06f, -0.05f, -0.1f);
-
     [Tooltip("Where the butt plate lands, in the view's space (x right, y up, z ahead, " +
              "metres): just under the crosshair, at arm's length.")]
     public Vector3 buttStrikePoint = new Vector3(0.05f, -0.06f, 0.62f);
-
     [Tooltip("Which way the stock points at the blow, in the view's space: up and forward, " +
              "a little to the right, so the rifle lies across the view from the muzzle, " +
              "low and near on the left, to the butt at the centre.")]
     public Vector3 buttStrikeAim = new Vector3(0.22f, 0.75f, 0.62f);
-
     [Tooltip("Which way the sights face at the blow, in the view's space: out to the left, " +
              "so the rifle shows its side and the grip, with the right hand round it, is " +
              "on the right rather than between the rifle and the eye.")]
     public Vector3 buttStrikeSightsFace = new Vector3(-1f, 0.1f, 0f);
-
     [Tooltip("Metres from the model's pivot, at the receiver, back to the butt plate.")]
     [Range(0.1f, 0.5f)] public float buttLength = 0.25f;
-
     [Tooltip("Degrees the view dips on the thrust: the body leaning into the blow.")]
     [Range(0f, 5f)] public float buttLunge = 1.6f;
 
-    [Header("Strike")]
-    [Tooltip("Metres from the eye to the nearest point of the target. About an arm and " +
-             "a half-step: close enough that it is a choice, far enough that it lands.")]
-    [Range(1f, 4f)] public float reach = 2.3f;
-
-    [Tooltip("Degrees either side of the crosshair a target can be and still be hit.")]
-    [Range(10f, 80f)] public float coneDegrees = 50f;
-
-    [Tooltip("Seconds between punches.")]
-    [Range(0.2f, 2f)] public float cooldown = 0.55f;
-
-    [Tooltip("Seconds the whole throw takes, out and back. The gun is down for this long.")]
-    [Range(0.15f, 1f)] public float swingSeconds = 0.42f;
-
-    [Header("Damage, as a share of the target's full health and armour")]
-    [Tooltip("An ordinary enemy is put down by one punch whatever this says. Kept as a " +
-             "number for the ones that are not ordinary.")]
-    [Range(0f, 1f)] public float eliteShare = 0.45f;
-
-    [Tooltip("Small on purpose: a boss that could be punched to death would make the " +
-             "fight a matter of walking up to it.")]
-    [Range(0f, 1f)] public float bossShare = 0.08f;
-
-    [Tooltip("Camera shake on a landed punch.")]
-    [Range(0f, 1f)] public float hitShake = 0.35f;
-
     // ======================================================================
 
-    /// <summary>Who a punch would hit right now, or null. Refreshed ten times a second.</summary>
+    /// <summary>Who a strike would hit right now, or null. Refreshed ten times a second.</summary>
     public Health Target { get; private set; }
 
     /// <summary>True while someone is in reach. The HUD's prompt follows it.</summary>
     public bool InReach => Target != null;
+
+    /// <summary>The target in reach can be finished: any strike now is the takedown.</summary>
+    public bool TakedownReady => Target != null && CanTakedown(Target);
+
+    /// <summary>Too tired to throw a punch.</summary>
+    public bool Winded => Stamina < Settings.jabCost;
+
+    /// <summary>Stamina left, 0 to <see cref="MeleeSettings.maxStamina"/>.</summary>
+    public float Stamina { get; private set; } = -1f;
+
+    public float Stamina01 => Mathf.Clamp01(Stamina / Mathf.Max(1f, Settings.maxStamina));
+
+    /// <summary>The strike being thrown now, or None.</summary>
+    public Strike Current => StrikeProgress >= 0f ? _strike : Strike.None;
+
+    /// <summary>Share of the way through the current strike, 0 to 1, or -1 between strikes.</summary>
+    public float StrikeProgress
+    {
+        get
+        {
+            if (_strike == Strike.None || _strikeLength <= 0f) return -1f;
+            float k = (Time.time - _strikeStart) / _strikeLength;
+            return k >= 0f && k < 1f ? k : -1f;
+        }
+    }
+
+    /// <summary>The takedown being thrown is a fist (the gun is on the back), not the rifle butt.</summary>
+    public bool TakedownWithFists { get; private set; }
+
+    /// <summary>How far the gun is onto the back, 0 (in the hands) to 1 (gone).</summary>
+    public float GunAway { get; private set; }
+
+    /// <summary>How far up the fists are, 0 to 1: they come up as the gun goes.</summary>
+    public float FistsUp => Mathf.Clamp01((GunAway - 0.35f) / 0.65f);
+
+    /// <summary>The fists are the weapon now; the gun is on the back or going there.</summary>
+    public bool FistsOut => _fists;
+
+    /// <summary>When the next strike may start. For checks that throw strikes on a timer.</summary>
+    public float ReadyAt => _nextStrike;
 
     /// <summary>Raised when <see cref="InReach"/> flips.</summary>
     public event Action<MeleeStrike, bool> ReachChanged;
@@ -129,22 +149,48 @@ public class MeleeStrike : MonoBehaviour
     /// <summary>Raised on every punch thrown, with who it hit (null for a miss).</summary>
     public event Action<MeleeStrike, Health> Punched;
 
+    /// <summary>Raised on every strike of any kind, with who it hit (null for a miss).</summary>
+    public event Action<MeleeStrike, Strike, Health> Struck;
+
+    /// <summary>Share of each strike at which the blow lands.</summary>
+    public static float ImpactAt(Strike s) => s switch
+    {
+        Strike.Jab => 0.34f,
+        Strike.Cross => 0.38f,
+        Strike.Kick => 0.45f,
+        Strike.Takedown => 0.38f,
+        Strike.Butt => 0.38f,
+        _ => 0.4f,
+    };
+
     PlayerMotor _motor;
     BombThrower _bombs;
     Health _self;
     ControlSettings _fallbackControls;
 
-    float _nextPunch;
-    float _swingStart = -99f;
+    Strike _strike;
+    float _strikeStart = -99f;
+    float _strikeLength;
+    float _nextStrike;
+    float _chainUntil = -99f;
+    bool _fists;
+    float _fistsUntil;
+    bool _crossNext;
+    float _lastStrikeTime = -99f;
     float _nextScan;
     bool _lunged;
     bool _impactPending;
+    Strike _impactStrike;
+
+    float _hitStopUntil;
+    float _hitStopScale;
 
     Collider[] _overlap;
     Collider[] Overlap => _overlap ??= new Collider[32];
-
     int _enemyMask = -1;
     int _blockMask;
+
+    MeleeSettings Settings => settings != null ? settings : MeleeSettings.Active;
 
     ControlSettings Bindings
     {
@@ -156,21 +202,22 @@ public class MeleeStrike : MonoBehaviour
         }
     }
 
+    /// <summary>The gun has rigged arms that can let go of it; without them every strike is the rifle butt.</summary>
+    bool HasArms => weapon != null && weapon.HasArms;
+
     void Awake()
     {
         _motor = GetComponentInParent<PlayerMotor>();
         _bombs = GetComponentInParent<BombThrower>();
         _self = GetComponent<Health>();
+
         if (weapon == null) weapon = GetComponentInChildren<Weapon>();
         if (fpsCamera == null && weapon != null) fpsCamera = weapon.fpsCamera;
         if (fpsCamera == null) fpsCamera = Camera.main;
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (fist != null) fist.gameObject.SetActive(false);
 
-        if (fist != null)
-        {
-            fist.localPosition = fistRest;
-            fist.gameObject.SetActive(false);
-        }
+        Stamina = Settings.maxStamina;
     }
 
     void OnDisable()
@@ -181,89 +228,295 @@ public class MeleeStrike : MonoBehaviour
             weapon.HandsRotation = Vector3.zero;
         }
 
-        if (fist != null) fist.gameObject.SetActive(false);
         if (supportHand != null) supportHand.SetActive(true);
         _impactPending = false;
+        _strike = Strike.None;
+        _fists = false;
+        GunAway = 0f;
+        EndHitStop();
         SetTarget(null);
     }
 
     void Update()
     {
+        UpdateHitStop();
+
         bool able = PlayerMotor.InputEnabled && (_self == null || !_self.IsDead)
                     && !(_bombs != null && _bombs.IsAiming);
 
         if (Time.time >= _nextScan)
         {
             _nextScan = Time.time + 0.1f;
-            SetTarget(able ? FindTarget() : null);
+            SetTarget(able ? FindTarget(Mathf.Max(Settings.punchRange, Settings.kickRange)) : null);
         }
 
-        // Read every frame whether or not a punch is possible, so a tap queued while it
+        MobileInput.MeleeReady = able && Target != null;
+
+        // Read every frame whether or not a strike is possible, so a tap queued while it
         // was not cannot fire late, at an enemy the player has since turned away from.
-        bool pressed = ControlSettings.Pressed(Bindings.melee)
-                       | MobileInput.ConsumeMelee()
-                       | GameInput.PadPressed(GameAction.Melee);
+        var keys = Bindings;
+        bool punch = ControlSettings.Pressed(keys.melee) | ControlSettings.Pressed(keys.altMelee)
+                     | MobileInput.ConsumeMelee() | GameInput.PadPressed(GameAction.Melee);
+        bool kick = ControlSettings.Pressed(keys.kick) | ControlSettings.Pressed(keys.altKick)
+                    | MobileInput.ConsumeKick() | GameInput.PadPressed(GameAction.Kick);
 
-        if (pressed && able) TryPunch();
+        if (able && punch) TryPunch();
+        else if (able && kick) TryKick();
 
+        UpdateFists(keys);
+        RegenStamina();
         Animate();
     }
 
+    /// <summary>
+    /// The gun on the back: going there while the fists are wanted, coming back after a
+    /// pause or the moment the player reaches for it (fire, aim, reload). Nothing fires
+    /// while it is anywhere but the hands.
+    /// </summary>
+    void UpdateFists(ControlSettings keys)
+    {
+        var s = Settings;
+
+        if (_fists && Current == Strike.None)
+        {
+            bool wantsGun = ControlSettings.Pressed(keys.fire) || ControlSettings.Pressed(keys.aim)
+                            || ControlSettings.Pressed(keys.reload) || MobileInput.Fire || MobileInput.Aim
+                            || GameInput.PadPressed(GameAction.Fire) || GameInput.PadPressed(GameAction.Aim)
+                            || GameInput.PadPressed(GameAction.Reload);
+
+            if (wantsGun || Time.time > _fistsUntil) _fists = false;
+        }
+
+        float speed = 1f / Mathf.Max(0.05f, _fists ? s.holsterSeconds : s.drawSeconds);
+        GunAway = Mathf.MoveTowards(GunAway, _fists ? 1f : 0f, Time.deltaTime * speed);
+
+        if ((_fists || GunAway > 0f) && weapon != null)
+        {
+            weapon.CancelReload();
+            weapon.Lower(0.15f);
+        }
+    }
+
+    // ======================================================================
+    // Throwing
     // ======================================================================
 
     /// <summary>
-    /// Throws a punch at whoever is in reach, or at the air. Returns who it hit.
-    /// Public so a check can throw one without a keyboard.
+    /// The punch key: the rifle butt with the gun in the hands; with the fight already on,
+    /// the gun goes on the back and the fists take over, jab and cross in turn; the takedown
+    /// whenever the target is ready for one. Returns who it hit. Public so a check can throw
+    /// one without a keyboard.
     /// </summary>
     public Health TryPunch()
     {
-        if (Time.time < _nextPunch) return null;
-        _nextPunch = Time.time + cooldown;
-        _swingStart = Time.time;
+        if (Time.time < _nextStrike) return null;
 
-        if (weapon != null) weapon.Lower(swingSeconds);
-        PlayClip(swingClip, 0.8f);
+        if (!HasArms) return Throw(Strike.Butt, 0f);
+
+        if (!_fists && Time.time > _chainUntil) return Throw(Strike.Butt, 0f);
+
+        // Into the fists, or already in them. The first punch waits for the hand that
+        // swings the gun away; the ones after it go at once.
+        bool entering = !_fists;
+        float delay = Settings.holsterSeconds * (1f - GunAway) * 0.6f;
+        _fists = true;
+
+        var strike = entering || !_crossNext ? Strike.Jab : Strike.Cross;
+        _crossNext = strike == Strike.Jab;
+        return Throw(strike, delay);
+    }
+
+    /// <summary>The kick key, or the takedown if the target is ready for one. Returns who it hit.</summary>
+    public Health TryKick() => Time.time < _nextStrike ? null : Throw(Strike.Kick, 0f);
+
+    Health Throw(Strike strike, float delay)
+    {
+        var s = Settings;
+        float range = strike == Strike.Kick ? s.kickRange : s.punchRange;
 
         // Asked again now rather than trusted from the last scan: a tenth of a second is
         // long enough for the enemy in the prompt to have died to a teammate's bomb.
-        var target = FindTarget();
+        var target = FindTarget(range);
         SetTarget(target);
 
-        if (target != null) Strike(target);
+        if (target != null && CanTakedown(target))
+        {
+            strike = Strike.Takedown;
+            TakedownWithFists = _fists;
+        }
 
-        Punched?.Invoke(this, target);
+        float cost = strike switch
+        {
+            Strike.Jab => s.jabCost,
+            Strike.Cross => s.crossCost,
+            Strike.Kick => s.kickCost,
+            Strike.Butt => s.jabCost,
+            _ => s.takedownCost,
+        };
+
+        if (Stamina < cost) return null;
+
+        Stamina -= cost;
+        _lastStrikeTime = Time.time;
+
+        float length = strike switch
+        {
+            Strike.Jab => s.jabSeconds,
+            Strike.Cross => s.crossSeconds,
+            Strike.Kick => s.kickSeconds,
+            Strike.Butt => s.buttSeconds,
+            _ => s.takedownSeconds,
+        };
+
+        float recovery = strike switch
+        {
+            Strike.Jab => s.jabRecovery,
+            Strike.Cross => s.crossRecovery,
+            Strike.Kick => s.kickRecovery,
+            Strike.Butt => s.buttRecovery,
+            _ => s.takedownRecovery,
+        };
+
+        _strike = strike;
+        _strikeStart = Time.time + delay;
+        _strikeLength = length;
+        _lunged = false;
+
+        float impact = _strikeStart + length * ImpactAt(strike);
+        _nextStrike = strike == Strike.Kick || strike == Strike.Takedown
+            ? _strikeStart + length + recovery * 0.5f
+            : impact + recovery;
+        _chainUntil = _strikeStart + length + s.chainWindow;
+        if (_fists) _fistsUntil = _strikeStart + length + s.fistIdleSeconds;
+
+        // Hands off the trigger: the reload goes, and nothing fires until the strike is done.
+        if (weapon != null)
+        {
+            weapon.CancelReload();
+            weapon.Lower(delay + length + 0.1f);
+        }
+
+        PlayClip(swingClip, strike == Strike.Kick ? 0.95f : 0.8f);
+
+        if (target != null)
+        {
+            Close(target, range);
+            Hit(target, strike);
+        }
+
+        if (strike != Strike.Kick) Punched?.Invoke(this, target);
+        Struck?.Invoke(this, strike, target);
         return target;
     }
 
-    void Strike(Health target)
+    /// <summary>
+    /// A target that can be finished: hurt past the takedown share, reeling from a heavy
+    /// blow, or down and crawling. A boss qualifies too, for the chunk the takedown takes
+    /// out of it; it is never one blow from dead.
+    /// </summary>
+    public bool CanTakedown(Health target)
     {
+        if (target == null || target.IsDead) return false;
+        var s = Settings;
+
+        float pool = target.Current + target.Shield;
+        float full = Mathf.Max(1f, target.maxHealth + target.maxShield);
+        if (pool / full <= s.takedownHealthShare) return true;
+
+        var ai = target.GetComponent<EnemyAI>();
+        if (ai == null) return false;
+
+        // Reeling from something heavier than the player's own last punch: a stagger the
+        // chain itself causes would otherwise turn every second punch into a finisher.
+        bool ownStagger = Time.time - _lastStrikeTime < 1.2f && _strike != Strike.Kick;
+        if (s.takedownWhenStaggered && ai.IsStaggered && !ownStagger) return true;
+        if (s.takedownWhenCrawling && ai.Crawling) return true;
+        return false;
+    }
+
+    /// <summary>The step in, and on a pad or a touch screen the pull of the view onto the target.</summary>
+    void Close(Health target, float range)
+    {
+        var s = Settings;
         Transform cam = fpsCamera.transform;
+        Vector3 point = ClosestPoint(target, cam.position, out _);
+
+        Vector3 flat = Vector3.ProjectOnPlane(point - cam.position, Vector3.up);
+        float distance = flat.magnitude;
+
+        if (_motor != null && s.lungeRange > 0f && distance > s.lungeStopDistance && distance <= Mathf.Max(range, s.lungeRange))
+        {
+            float step = Mathf.Min(distance - s.lungeStopDistance, s.lungeMaxStep);
+            if (step > 0.05f) _motor.Lunge(flat.normalized * step, s.lungeSeconds);
+        }
+
+        if (_motor != null && s.magnetism > 0f && GameInput.Scheme != InputScheme.KeyboardMouse)
+            _motor.TurnTowards(point, s.magnetism);
+    }
+
+    void Hit(Health target, Strike strike)
+    {
+        var s = Settings;
+        Transform cam = fpsCamera.transform;
+
+        var role = RoleOf(target);
+        float share = strike switch
+        {
+            Strike.Jab => s.jabDamage.For(role),
+            Strike.Cross => s.crossDamage.For(role),
+            Strike.Kick => s.kickDamage.For(role),
+            Strike.Butt => s.buttDamage.For(role),
+            _ => s.takedownDamage.For(role),
+        };
 
         float pool = target.Current + target.Shield;
         float full = target.maxHealth + target.maxShield;
 
-        float amount = RoleOf(target) switch
-        {
-            EnemyArchetype.Role.Boss => Mathf.Max(1f, full * bossShare),
-            EnemyArchetype.Role.Elite => Mathf.Max(1f, full * eliteShare),
-            // A hair over what it has left, so the shield-then-health split cannot leave
-            // it standing on a rounding error.
-            _ => pool + 1f,
-        };
+        // A hair over what is left when the share would finish it, so the
+        // shield-then-health split cannot leave it standing on a rounding error.
+        float amount = Mathf.Max(1f, full * share);
+        if (amount >= pool) amount = pool + 1f;
 
-        var point = ClosestPoint(target, cam.position);
+        // Where the blow lands decides where the body answers it: the head snaps back from
+        // a punch to the face, the gut folds round one to the stomach.
+        var point = AimPoint(target, cam, out BodyPart part);
         var info = new DamageInfo(amount, point, -cam.forward, cam.forward, gameObject)
         {
             fromMelee = true,
+            part = part,
         };
-        info.amount = target.ApplyDamage(info);
 
+        info.amount = target.ApplyDamage(info);
         if (info.amount <= 0f) return;
 
-        // The sound and the jolt wait for the frame the stock lands on (see Animate);
-        // the damage does not, so the strike is as quick to count as it is to press.
         _impactPending = true;
+        _impactStrike = strike;
         if (weapon != null) weapon.ReportHit(info);
+
+        if (target.IsDead) return;
+
+        var ai = target.GetComponent<EnemyAI>();
+        if (ai == null) return;
+
+        switch (strike)
+        {
+            case Strike.Jab: ai.ForceStagger(s.jabStagger); break;
+            case Strike.Butt:
+            case Strike.Cross: ai.ForceStagger(s.crossStagger); break;
+            case Strike.Kick:
+            {
+                Vector3 away = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
+                if (role == EnemyArchetype.Role.Boss)
+                {
+                    ai.Shove(away * 0.4f, 0.3f, 0.3f);
+                    break;
+                }
+
+                float push = role == EnemyArchetype.Role.Elite ? s.eliteKnockbackShare : 1f;
+                ai.Knock((away + Vector3.up * 0.35f) * s.kickLaunchSpeed * push, s.kickStagger);
+                break;
+            }
+        }
     }
 
     static EnemyArchetype.Role RoleOf(Health target)
@@ -272,13 +525,24 @@ public class MeleeStrike : MonoBehaviour
         return ai != null && ai.archetype != null ? ai.archetype.role : EnemyArchetype.Role.Standard;
     }
 
+    void RegenStamina()
+    {
+        var s = Settings;
+        if (Stamina < 0f) Stamina = s.maxStamina;
+        if (Time.time - _lastStrikeTime < s.staminaRegenDelay) return;
+        Stamina = Mathf.Min(s.maxStamina, Stamina + s.staminaRegen * Time.deltaTime);
+    }
+
+    // ======================================================================
+    // Finding a target
     // ======================================================================
 
     /// <summary>
     /// The enemy nearest the crosshair within reach and the cone, with nothing solid
-    /// between the eye and it. Null when there is none.
+    /// between the eye and it. Null when there is none. Reach includes the lunge: a
+    /// target the step will close on counts.
     /// </summary>
-    Health FindTarget()
+    Health FindTarget(float range)
     {
         if (fpsCamera == null) return null;
 
@@ -290,6 +554,9 @@ public class MeleeStrike : MonoBehaviour
             _blockMask = ~((enemy >= 0 ? 1 << enemy : 0) | (player >= 0 ? 1 << player : 0));
         }
 
+        var s = Settings;
+        float reach = s.lungeRange > 0f ? Mathf.Max(range, Mathf.Min(s.lungeRange, range + s.lungeMaxStep)) : range;
+
         Transform cam = fpsCamera.transform;
         Vector3 eye = cam.position;
 
@@ -297,7 +564,7 @@ public class MeleeStrike : MonoBehaviour
                                                   QueryTriggerInteraction.Ignore);
 
         Health best = null;
-        float bestAngle = coneDegrees;
+        float bestAngle = s.coneDegrees;
 
         for (int i = 0; i < count; i++)
         {
@@ -326,20 +593,67 @@ public class MeleeStrike : MonoBehaviour
         return best;
     }
 
-    Vector3 ClosestPoint(Health target, Vector3 from)
+    /// <summary>The point of the target nearest the eye, and the body part it belongs to.</summary>
+    Vector3 ClosestPoint(Health target, Vector3 from, out BodyPart part)
     {
         Vector3 best = target.transform.position + Vector3.up;
         float bestDistance = float.MaxValue;
+        part = BodyPart.Torso;
 
         foreach (var col in target.GetComponentsInChildren<Collider>())
         {
             if (col.isTrigger || !col.enabled) continue;
             Vector3 p = col.ClosestPoint(from);
             float d = (p - from).sqrMagnitude;
-            if (d < bestDistance) { bestDistance = d; best = p; }
+            if (d < bestDistance)
+            {
+                bestDistance = d;
+                best = p;
+                var hitbox = col.GetComponent<Hitbox>();
+                part = hitbox != null ? hitbox.Part : BodyPart.Torso;
+            }
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// Where on the target the strike lands: the hitbox under the crosshair if the line of
+    /// the blow meets one (a punch thrown at the head hits the head), otherwise the part
+    /// of the body nearest the line.
+    /// </summary>
+    Vector3 AimPoint(Health target, Transform cam, out BodyPart part)
+    {
+        Vector3 bestPoint = target.transform.position + Vector3.up;
+        part = BodyPart.Torso;
+        float best = float.MaxValue;
+
+        var ray = new Ray(cam.position, cam.forward);
+        foreach (var hitbox in target.GetComponentsInChildren<Hitbox>())
+        {
+            var col = hitbox.GetComponent<Collider>();
+            if (col == null || !col.enabled) continue;
+
+            if (col.Raycast(ray, out RaycastHit hit, 6f))
+            {
+                part = hitbox.Part;
+                return hit.point;
+            }
+
+            // Not under the crosshair: score it by how far it sits off the line.
+            Vector3 c = col.bounds.center;
+            float along = Vector3.Dot(c - ray.origin, ray.direction);
+            float off = (c - (ray.origin + ray.direction * Mathf.Max(0f, along))).sqrMagnitude;
+            if (off < best)
+            {
+                best = off;
+                part = hitbox.Part;
+                bestPoint = col.ClosestPoint(ray.origin + ray.direction * Mathf.Max(0.3f, along));
+            }
+        }
+
+        if (best == float.MaxValue) bestPoint = ClosestPoint(target, cam.position, out part);
+        return bestPoint;
     }
 
     void SetTarget(Health target)
@@ -350,57 +664,108 @@ public class MeleeStrike : MonoBehaviour
     }
 
     // ======================================================================
-
-    /// <summary>Share of the swing at which the blow lands, for each way of drawing it.</summary>
-    const float ButtImpactAt = 0.38f, FistImpactAt = 0.28f;
+    // Hit-stop
+    // ======================================================================
 
     /// <summary>
-    /// Out fast, a beat at full stretch, back slower -- the shape of a jab, and the
-    /// reason it reads as a punch rather than as the arm sliding across the screen.
-    /// Driven from a timestamp rather than a coroutine, so a domain reload mid-swing
-    /// cannot leave the gun dipped.
+    /// Freezes the world for a few hundredths of a second on a landed blow: the single
+    /// thing that most makes a hit feel heavy. Real time, so it lasts the same at any frame
+    /// rate. Put back only if the time scale is still the one this set -- a pause or the
+    /// end of the level writing zero in the meantime wins.
+    /// </summary>
+    void StartHitStop(float seconds)
+    {
+        if (seconds <= 0f || Time.timeScale != 1f) return;
+
+        _hitStopScale = 0.04f;
+        Time.timeScale = _hitStopScale;
+        _hitStopUntil = Time.realtimeSinceStartup + seconds;
+    }
+
+    void UpdateHitStop()
+    {
+        if (_hitStopScale > 0f && Time.realtimeSinceStartup >= _hitStopUntil) EndHitStop();
+    }
+
+    void EndHitStop()
+    {
+        if (_hitStopScale <= 0f) return;
+        if (Mathf.Approximately(Time.timeScale, _hitStopScale)) Time.timeScale = 1f;
+        _hitStopScale = 0f;
+    }
+
+    // ======================================================================
+    // Drawing
+    // ======================================================================
+
+    /// <summary>
+    /// The impact beat (sound, shake, hit-stop) and the gun's part in each strike. Driven
+    /// from timestamps rather than coroutines, so a domain reload mid-swing cannot leave
+    /// the gun dipped.
     /// </summary>
     void Animate()
     {
-        float k = swingSeconds <= 0f ? 1f : (Time.time - _swingStart) / swingSeconds;
-        bool swinging = k >= 0f && k < 1f;
+        float k = StrikeProgress;
+        bool swinging = k >= 0f;
 
-        if (_impactPending && (!swinging || k >= (fist == null ? ButtImpactAt : FistImpactAt)))
+        if (_impactPending && (!swinging && Time.time >= _strikeStart || k >= ImpactAt(_impactStrike)))
         {
             _impactPending = false;
-            PlayClip(hitClip, 1f);
-            if (_motor != null) _motor.AddShake(hitShake);
+            var s = Settings;
+
+            switch (_impactStrike)
+            {
+                case Strike.Kick:
+                    PlayClip(hitClip, 1f);
+                    if (_motor != null) _motor.AddShake(s.kickShake);
+                    StartHitStop(s.kickHitStop);
+                    break;
+                case Strike.Takedown:
+                    PlayClip(hitClip, 1f);
+                    if (_motor != null) _motor.AddShake(s.takedownShake);
+                    StartHitStop(s.takedownHitStop);
+                    break;
+                default:
+                    PlayClip(hitClip, 0.9f);
+                    if (_motor != null) _motor.AddShake(s.punchShake);
+                    StartHitStop(s.punchHitStop);
+                    break;
+            }
         }
 
-        if (fist == null)
+        if (weapon == null) return;
+
+        // The rifle butt: every strike without arms, and the first of a fight with them.
+        bool butt = swinging && (!HasArms || _strike == Strike.Butt || (_strike == Strike.Takedown && !TakedownWithFists));
+        if (butt || !HasArms)
         {
-            AnimateButt(k, swinging);
+            AnimateButt(k, butt);
             return;
         }
 
-        // The gun: down over the first fifth, held, back up over the last half.
-        float dip = !swinging ? 0f
-                  : k < 0.2f ? UITheme.EaseOut(k / 0.2f)
-                  : k < 0.5f ? 1f
-                  : 1f - UITheme.EaseOut((k - 0.5f) / 0.5f);
+        // Onto the back and off it again.
+        float away = UITheme.EaseOut(GunAway);
+        Vector3 offset = holsterOffset * away;
+        Vector3 turn = holsterTurn * away;
 
-        if (weapon != null) weapon.HandsOffset = gunDip * dip;
-        if (supportHand != null) supportHand.SetActive(dip < 0.3f);
+        // The kick with the gun in the hands: slid aside fast, held there through the
+        // kick, and brought back as the foot comes down.
+        if (swinging && _strike == Strike.Kick && GunAway < 0.5f)
+        {
+            float aside = k < 0.2f ? UITheme.EaseOut(k / 0.2f) : k < 0.72f ? 1f : 1f - UITheme.EaseOut((k - 0.72f) / 0.28f);
+            offset += kickAsideOffset * aside;
+            turn += kickAsideTurn * aside;
+        }
 
-        if (fist == null) return;
+        weapon.HandsOffset = offset;
+        weapon.HandsRotation = turn;
 
-        fist.gameObject.SetActive(swinging);
-        if (!swinging) return;
-
-        float reachOut = k < 0.28f ? UITheme.EaseOut(k / 0.28f)
-                       : k < 0.45f ? 1f
-                       : 1f - UITheme.EaseOut((k - 0.45f) / 0.55f);
-
-        fist.localPosition = Vector3.LerpUnclamped(fistRest, fistStrike, reachOut);
-        // Knuckles turn over as the arm extends, which is what makes it a punch and not a push.
-        fist.localRotation = Quaternion.Euler(Mathf.Lerp(20f, -2f, reachOut),
-                                              Mathf.Lerp(22f, 4f, reachOut),
-                                              Mathf.Lerp(-30f, -8f, reachOut));
+        if (swinging && !_lunged && k >= ImpactAt(_strike) * 0.7f)
+        {
+            _lunged = true;
+            // Into a punch the view leans forward; on a kick it dips, so the foot is seen.
+            if (_motor != null) _motor.AddRecoil(_strike == Strike.Kick ? -6f : -0.9f, 0f, 5f);
+        }
     }
 
     /// <summary>
@@ -409,8 +774,7 @@ public class MeleeStrike : MonoBehaviour
     /// muzzle drops away and the stock drives up and forward to the crosshair, the view
     /// dipping into it; it stops dead on the blow and rebounds a little, the way wood
     /// does off a body; and comes back to the shoulder in its own time. Both hands stay
-    /// on it throughout. It was once a flat quarter-turn with the gun sliding across the
-    /// screen, which read as holding the rifle out sideways rather than hitting with it.
+    /// on it throughout.
     ///
     /// Key times, as a share of the swing: cocked by 0.2, blow at 0.38, rebound by 0.5,
     /// home at 1.
@@ -423,14 +787,16 @@ public class MeleeStrike : MonoBehaviour
         {
             weapon.HandsOffset = Vector3.zero;
             weapon.HandsRotation = Vector3.zero;
-            _lunged = false;
             return;
         }
+
+        const float blowAt = 0.38f;
 
         // Blended as rotations, not as three angles: the lean is across the view, after
         // the pitch, which Euler angles cannot say and a per-axis blend would wobble.
         Quaternion cock = Turn(buttCockTurn);
         BlowPose(out Quaternion blow, out Vector3 blowOffset);
+
         Quaternion turn;
         Vector3 offset;
 
@@ -440,10 +806,10 @@ public class MeleeStrike : MonoBehaviour
             turn = Quaternion.Slerp(Quaternion.identity, cock, t);
             offset = buttCockOffset * t;
         }
-        else if (k < ButtImpactAt)
+        else if (k < blowAt)
         {
             // Accelerating into the blow: slow off the cock, fastest at the moment it lands.
-            float t = (k - 0.2f) / (ButtImpactAt - 0.2f);
+            float t = (k - 0.2f) / (blowAt - 0.2f);
             t *= t;
             turn = Quaternion.Slerp(cock, blow, t);
             offset = Vector3.Lerp(buttCockOffset, blowOffset, t);
@@ -451,7 +817,7 @@ public class MeleeStrike : MonoBehaviour
         else if (k < 0.5f)
         {
             // Stopped dead, then a small rebound off whatever it hit.
-            float t = Mathf.Sin((k - ButtImpactAt) / (0.5f - ButtImpactAt) * Mathf.PI);
+            float t = Mathf.Sin((k - blowAt) / (0.5f - blowAt) * Mathf.PI);
             turn = Quaternion.Slerp(blow, cock, 0.07f * t);
             offset = blowOffset + new Vector3(0f, -0.01f, -0.035f) * t;
         }
@@ -487,8 +853,10 @@ public class MeleeStrike : MonoBehaviour
 
         // The model looks down its barrel, the opposite way to the stock.
         var look = Quaternion.LookRotation(-stock, sights);
-        turn = Quaternion.Inverse(weapon.HipRotation) * look;
-        offset = buttStrikePoint - stock * buttLength - weapon.HipPosition;
+
+        float length = weapon.HasArms && weapon.ViewButtLength > 0f ? weapon.ViewButtLength : buttLength;
+        turn = Quaternion.Inverse(weapon.PoseHipRotation) * look;
+        offset = buttStrikePoint - stock * length - weapon.PoseHipPosition;
     }
 
     /// <summary>Pitch, then yaw, then a lean about the line of sight.</summary>

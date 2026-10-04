@@ -304,6 +304,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void CaptureViewModel() => FPSKitViewModelShots.Capture(ReadArg("-fpskitOut"));
 
+        /// <summary>The first-person arms, legs and guns (FPSKit > View Models > Build).</summary>
+        public static void BuildViewModels() => Run(FPSKitViewModels.Build);
+
         /// <summary>
         /// Plays the loop the player sees: dashboard, into an arena, quit, back to the
         /// dashboard with the run recorded.

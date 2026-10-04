@@ -470,6 +470,7 @@ public class EnemyAI : MonoBehaviour
         if (Time.time < _staggerUntil)
         {
             Stop();
+            ApplyShove();
             CurrentState = State.Stagger;
             UpdateAnimator();
             return;
@@ -1160,6 +1161,63 @@ public class EnemyAI : MonoBehaviour
 
         _nextAttackTime = Mathf.Max(_nextAttackTime, _staggerUntil + flinchAttackDelay);
         _chargeUntil = 0f;
+    }
+
+    /// <summary>Knocked off balance right now: by a heavy hit, a wound or a strike.</summary>
+    public bool IsStaggered => CurrentState != State.Dead && Time.time < _staggerUntil;
+
+    Vector3 _shove;
+    float _shoveUntil, _shoveLength;
+
+    /// <summary>
+    /// Pushes it back across the navmesh over a moment, and staggers it for at least that
+    /// long: the kick. Through the agent, so the push stops at a wall or a ledge rather
+    /// than carrying the body off the mesh it has to walk back on.
+    /// </summary>
+    public void Shove(Vector3 displacement, float seconds, float staggerSeconds)
+    {
+        if (CurrentState == State.Dead) return;
+
+        displacement.y = 0f;
+        _shove = displacement;
+        _shoveLength = Mathf.Max(0.05f, seconds);
+        _shoveUntil = Time.time + _shoveLength;
+        ForceStagger(Mathf.Max(staggerSeconds, seconds));
+    }
+
+    /// <summary>
+    /// A blow that throws the body: a kick. A body that can ragdoll is thrown through the
+    /// air at <paramref name="velocity"/>, lands and gets up (<see cref="Knocked"/>); one that
+    /// cannot is driven back across the ground instead.
+    /// </summary>
+    public void Knock(Vector3 velocity, float staggerSeconds)
+    {
+        if (CurrentState == State.Dead) return;
+
+        if (Knocked != null && Knocked(velocity))
+        {
+            ForceStagger(staggerSeconds);
+            return;
+        }
+
+        Vector3 flat = new Vector3(velocity.x, 0f, velocity.z);
+        Shove(flat.normalized * Mathf.Min(4f, flat.magnitude * 0.45f), 0.4f, staggerSeconds);
+    }
+
+    /// <summary>
+    /// Answers a knock with a body that flies (the rigged soldier's EnemyBody). Returns
+    /// true when it took the blow; false leaves the shove to the AI.
+    /// </summary>
+    [System.NonSerialized] public System.Func<Vector3, bool> Knocked;
+
+    /// <summary>This frame's share of the shove, fast at first and dying away.</summary>
+    void ApplyShove()
+    {
+        if (Time.time >= _shoveUntil || _agent == null || !_agent.enabled || !_agent.isOnNavMesh) return;
+
+        float remaining = (_shoveUntil - Time.time) / _shoveLength;
+        float share = Mathf.Clamp01(Time.deltaTime / _shoveLength) * 2f * remaining;
+        _agent.Move(_shove * share);
     }
 
     /// <summary>

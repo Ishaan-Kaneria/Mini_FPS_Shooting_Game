@@ -194,6 +194,9 @@ public class PlayerMotor : MonoBehaviour
     public bool IsCrouching { get; private set; }
     public bool IsGrounded { get; private set; }
 
+    /// <summary>World-space velocity, vertical included. For the body's legs.</summary>
+    public Vector3 Velocity => _velocity;
+
     /// <summary>0 when still, 1 at full sprint speed. Drives weapon spread and bob.</summary>
     public float PlanarSpeed01 { get; private set; }
 
@@ -581,6 +584,25 @@ public class PlayerMotor : MonoBehaviour
         _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
     }
 
+    /// <summary>
+    /// Turns the view a share of the way onto a point: a strike's pull onto its target.
+    /// Straight onto the angles, so it is the same whichever way the look is inverted.
+    /// </summary>
+    public void TurnTowards(Vector3 worldPoint, float share)
+    {
+        Vector3 from = cameraHolder != null ? cameraHolder.position : transform.position + Vector3.up * 1.6f;
+        Vector3 to = worldPoint - from;
+        if (to.sqrMagnitude < 0.0001f || share <= 0f) return;
+
+        float yaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+        float pitch = -Mathf.Asin(Mathf.Clamp(to.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+
+        share = Mathf.Clamp01(share);
+        _yaw += Mathf.DeltaAngle(_yaw, yaw) * share;
+        _pitch += Mathf.DeltaAngle(_pitch, pitch) * share;
+        _pitch = Mathf.Clamp(_pitch, -pitchClamp, pitchClamp);
+    }
+
     /// <summary>Called by Weapon on every shot. Vertical is degrees up, horizontal is plus/minus yaw.</summary>
     public void AddRecoil(float vertical, float horizontal, float recovery = 9f)
     {
@@ -594,6 +616,33 @@ public class PlayerMotor : MonoBehaviour
     /// summing, so a burst of fire cannot stack into an unplayable screen.
     /// </summary>
     public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount));
+
+    Vector3 _lunge;
+    float _lungeUntil;
+    float _lungeLeft;
+
+    /// <summary>
+    /// Carries the player a short way across the ground over a fraction of a second: the
+    /// step a punch or a kick takes into the target, so a strike thrown from just outside
+    /// reach still lands. Horizontal only, and through the controller's own Move, so it
+    /// stops at a wall or a body like walking does. A second call replaces the first.
+    /// </summary>
+    public void Lunge(Vector3 displacement, float seconds)
+    {
+        displacement.y = 0f;
+        _lunge = displacement;
+        _lungeLeft = Mathf.Max(0.01f, seconds);
+        _lungeUntil = Time.time + _lungeLeft;
+    }
+
+    /// <summary>This frame's share of the lunge, front-loaded so it reads as a step and not a slide.</summary>
+    Vector3 LungeStep()
+    {
+        if (Time.time >= _lungeUntil || _lungeLeft <= 0f) return Vector3.zero;
+        float remaining = (_lungeUntil - Time.time) / _lungeLeft;          // 1 at the start, 0 at the end
+        float share = Mathf.Clamp01(Time.deltaTime / _lungeLeft) * 2f * remaining;
+        return _lunge * share;
+    }
 
     /// <summary>
     /// Whether the sprint key itself is down *and* is allowed to carry the player
@@ -806,7 +855,7 @@ public class PlayerMotor : MonoBehaviour
         _velocity.y += gravity * Time.deltaTime;
 
         float impactSpeed = -_velocity.y;
-        CollisionFlags flags = _cc.Move(_velocity * Time.deltaTime);
+        CollisionFlags flags = _cc.Move(_velocity * Time.deltaTime + LungeStep());
 
         // Clipping the head on an overhang has to kill the upward velocity, or you
         // hang under the ceiling for the rest of the arc still travelling up.

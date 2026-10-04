@@ -55,6 +55,15 @@ public class ControlSettings : ScriptableObject
     [Tooltip("Punches whoever is within arm's reach in front of you. A tap, never a hold, " +
              "and next to the movement keys so it can be thrown mid-strafe.")]
     public KeyCode melee = KeyCode.V;
+    [Tooltip("A second key for the punch. The mouse's back side button by default, for a " +
+             "player whose left hand is busy moving.")]
+    public KeyCode altMelee = KeyCode.Mouse3;
+    [Tooltip("Kicks whoever is in reach: shoves an ordinary enemy back and off its feet. " +
+             "Slower to come round than a punch. B sits next to V, so the two strikes are " +
+             "one finger apart.")]
+    public KeyCode kick = KeyCode.B;
+    [Tooltip("A second key for the kick. The mouse's forward side button by default.")]
+    public KeyCode altKick = KeyCode.Mouse4;
 
     [Header("Sprint")]
     [Tooltip("Sprint by double-tapping the key below rather than holding one down.")]
@@ -187,6 +196,9 @@ public class ControlSettings : ScriptableObject
         bomb = KeyCode.G;
         useItem = KeyCode.F;
         melee = KeyCode.V;
+        altMelee = KeyCode.Mouse3;
+        kick = KeyCode.B;
+        altKick = KeyCode.Mouse4;
         sprintEndsWhenNotAdvancing = true;
         sprintNeedsMovement = false;
         sprintDrivesForward = true;

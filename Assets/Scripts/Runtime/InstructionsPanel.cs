@@ -409,7 +409,8 @@ public class InstructionsPanel : OverlayPanel
                 L("bullet", "Fire", K(c.fire)),
                 L("crosshair", "Aim down sights", K(c.aim)),
                 L("magazine", "Reload", K(c.reload)),
-                L("fist", "Punch, up close. Saves a round.", K(c.melee)),
+                L("fist", "Punch, up close. Press again quickly for a second punch.", K(c.melee)),
+                L("kick", "Kick, up close. Knocks an enemy back.", K(c.kick)),
             }),
 
             // The two nobody finds by experiment.
@@ -452,7 +453,8 @@ public class InstructionsPanel : OverlayPanel
                 L("bullet", "Fire", P(GameAction.Fire)),
                 L("crosshair", "Aim down sights", P(GameAction.Aim)),
                 L("magazine", "Reload", P(GameAction.Reload)),
-                L("fist", "Punch, up close. Saves a round.", P(GameAction.Melee)),
+                L("fist", "Punch, up close. Press again quickly for a second punch.", P(GameAction.Melee)),
+                L("kick", "Kick, up close. Knocks an enemy back.", P(GameAction.Kick)),
             }),
 
             new Page("Equipment", "backpack", BombEarned
@@ -492,7 +494,8 @@ public class InstructionsPanel : OverlayPanel
                 L("bullet", "Fire. Keep dragging to aim while it fires.", T(GameAction.Fire)),
                 L("crosshair", "Spread two fingers to aim down sights, pinch to stop.", "PINCH"),
                 L("magazine", "Reload", T(GameAction.Reload)),
-                L("fist", "Punch, up close. Saves a round.", T(GameAction.Melee)),
+                L("fist", "Punch, up close. Tap again quickly for a second punch.", T(GameAction.Melee)),
+                L("kick", "Kick, up close. Knocks an enemy back.", T(GameAction.Kick)),
                 L("arrow-up", "Jump", T(GameAction.Jump)),
                 L("arrow-bar-to-down", "Crouch", T(GameAction.Crouch)),
             }),

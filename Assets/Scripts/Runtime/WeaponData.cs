@@ -34,6 +34,9 @@ public class WeaponData : ScriptableObject
              "Without one, a long run turns ammo drops into litter.")]
     [Min(0)] public int maxReserveAmmo = 360;
     public float reloadTime = 2.1f;
+    [Tooltip("A tactical reload -- rounds still in the gun, so no bolt to run -- takes this " +
+             "share of the full reload time. The empty reload is the full time.")]
+    [Range(0.3f, 1f)] public float tacticalReloadShare = 0.8f;
     public bool autoReloadWhenEmpty = true;
 
     [Tooltip("Reserve never runs out. You still reload every magazine, which is what " +
@@ -86,6 +89,11 @@ public class WeaponData : ScriptableObject
     public AudioClip reloadBoltClip;
 
     [Range(0f, 0.3f)] public float pitchVariance = 0.06f;
+
+    [Header("First Person")]
+    [Tooltip("The first-person model: arms and this gun, built by FPSKit > View Models. " +
+             "Empty keeps the gun the scene was built with.")]
+    public GameObject viewModel;
 
     [Header("VFX (optional)")]
     public GameObject muzzleFlashPrefab;

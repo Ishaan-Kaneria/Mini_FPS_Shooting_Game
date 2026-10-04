@@ -509,8 +509,12 @@ namespace FPSKit.EditorTools
                 // throwaway instance is empty -- so the asset comes back nameless, and
                 // anything that identifies a WeaponData by name is quietly comparing two
                 // empty strings. Put back explicitly.
+                // The first-person model is FPSKitViewModels' and not part of the tuning, so
+                // it is carried across a reset the way a bomb's prefabs are.
+                var viewModel = data.viewModel;
                 EditorUtility.CopySerialized(ScriptableObject.CreateInstance<WeaponData>(), data);
                 data.name = $"Gun_{fileName}";
+                data.viewModel = viewModel;
 
                 data.infiniteReserve = true;
                 configure(data);

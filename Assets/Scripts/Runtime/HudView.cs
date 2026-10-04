@@ -772,7 +772,7 @@ public class HudView : MonoBehaviour
     }
 
     /// <summary>
-    /// "V PUNCH" under the crosshair while someone is in arm's reach. Only then: the
+    /// "V PUNCH · B KICK" under the crosshair while someone is in reach. Only then: the
     /// point is to say "you could punch this one", and a prompt that was always up would
     /// stop saying anything by the second level.
     /// </summary>
@@ -856,11 +856,33 @@ public class HudView : MonoBehaviour
                 ? _reveal.group.alpha : 0f;
     }
 
-    void OnReach(MeleeStrike m, bool inReach)
+    void OnReach(MeleeStrike m, bool inReach) => _promptState = -1;
+
+    int _promptState = -1;
+    InputScheme _promptScheme;
+
+    /// <summary>
+    /// What the strike keys would do to the enemy in reach: punch or kick it, finish it
+    /// when it is ready to be finished, or nothing yet when the player is winded. Redrawn
+    /// only when that changes, or the device does (the glyphs differ).
+    /// </summary>
+    void UpdatePunchPrompt()
     {
-        if (_punchPrompt == null) return;
-        _punchText.text = $"{InputPrompts.For(GameAction.Melee)}  PUNCH";
-        _punchPrompt.SetActive(inReach);
+        if (_punchPrompt == null || _melee == null) return;
+
+        int state = !_melee.InReach ? 0 : _melee.TakedownReady ? 2 : _melee.Winded ? 3 : 1;
+        if (state == _promptState && GameInput.Scheme == _promptScheme) return;
+        _promptState = state;
+        _promptScheme = GameInput.Scheme;
+
+        _punchPrompt.SetActive(state != 0);
+        _punchText.text = state switch
+        {
+            2 => $"{InputPrompts.For(GameAction.Melee)}  TAKEDOWN",
+            3 => "WINDED",
+            _ => UIText.Row($"{InputPrompts.For(GameAction.Melee)}  PUNCH", $"{InputPrompts.For(GameAction.Kick)}  KICK"),
+        };
+        _punchText.color = state == 2 ? _t.accent : state == 3 ? _t.textSecondary : _t.textPrimary;
     }
 
     GameObject _pauseShade, _pauseLayer;
@@ -1336,6 +1358,7 @@ public class HudView : MonoBehaviour
         }
 
         UpdateBriefingCard();
+        UpdatePunchPrompt();
 
         float now = Time.unscaledTime;
 

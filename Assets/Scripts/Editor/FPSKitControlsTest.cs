@@ -125,14 +125,14 @@ namespace FPSKit.EditorTools
         /// </summary>
         static readonly HashSet<string> Alternates = new HashSet<string>
         {
-            "altForward", "altBack", "altLeft", "altRight", "altCrouch"
+            "altForward", "altBack", "altLeft", "altRight", "altCrouch", "altMelee", "altKick"
         };
 
         /// <summary>Actions a keyboard player cannot do without.</summary>
         static readonly string[] Essential =
         {
             "moveForward", "moveBack", "moveLeft", "moveRight",
-            "fire", "jump", "aim", "reload", "crouch", "bomb", "useItem", "melee", "sprintKey"
+            "fire", "jump", "aim", "reload", "crouch", "bomb", "useItem", "melee", "kick", "sprintKey"
         };
 
         static bool IsPair(string a, string b, string x, string y)

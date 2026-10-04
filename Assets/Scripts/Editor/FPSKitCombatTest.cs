@@ -42,7 +42,7 @@ namespace FPSKit.EditorTools
         /// <summary>How close the player is held during the point-blank phase.</summary>
         const float PointBlank = 1.6f;
 
-        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Punch, PunchMiss, Judge }
+        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Punch, PunchCross, PunchMiss, Judge }
 
         /// <summary>
         /// Seconds the level is given while this test runs.
@@ -91,6 +91,7 @@ namespace FPSKit.EditorTools
         static bool _punchKilled, _gunLowered, _fistShown, _punchMissed;
         static string _punchMissHit = "";
         static float _punchAt;
+        static Health _punchTarget;
 
         // --- diagnostics, printed on failure so a red run says why ---------
         static float _minDistance = float.MaxValue;
@@ -123,6 +124,7 @@ namespace FPSKit.EditorTools
                 _sawRangedShot = false;
                 _punchThrown = _punchKilled = _gunLowered = _fistShown = _punchMissed = false;
                 _punchRole = _punchMissHit = "";
+                _punchTarget = null;
                 _punchPoolBefore = _punchPoolAfter = -1f;
                 _startedAt = EditorApplication.timeSinceStartup;
                 _phase = Phase.Enter;
@@ -312,16 +314,48 @@ namespace FPSKit.EditorTools
                         Time.captureDeltaTime = 1f / 60f;
                         _punchAt = Time.time;
 
+                        // The rifle butt, the first strike of a fight. A punch follows inside the
+                        // chain window (PunchCross), and the two together put an ordinary enemy down.
                         var hit = melee.TryPunch();
                         _punchThrown = true;
+                        _punchTarget = target;
                         _punchPoolAfter = target.Current + target.Shield;
                         _punchKilled = target.IsDead;
                         _gunLowered = melee.weapon != null && melee.weapon.IsLowered;
 
-                        Notes.Append($"\n  punch at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
+                        Notes.Append($"\n  jab at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
                                      $"hit {(hit != null ? hit.name : "nothing")} ({_punchRole}): pool " +
                                      $"{_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0}");
 
+                        Wait(30.0, Phase.PunchCross);
+                        return;
+                    }
+
+                    case Phase.PunchCross:
+                    {
+                        var player = GameObject.FindGameObjectWithTag("Player");
+                        var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
+                        if (melee != null && (melee.FistsUp > 0.3f || (melee.weapon != null && melee.weapon.HandsRotation.magnitude > 5f)))
+                            _fistShown = true;
+
+                        // Past the jab's recovery, still inside the window for the cross.
+                        // The second press of the fight: the gun goes on the back and a fist lands.
+                        float ready = melee != null ? melee.ReadyAt + 0.02f : _punchAt;
+                        if (Time.time < ready)
+                        {
+                            if (Waiting()) return;
+                            Notes.Append("\n  punch: game time never reached the cross");
+                        }
+
+                        if (melee != null && _punchTarget != null && !_punchTarget.IsDead)
+                        {
+                            var hit = melee.TryPunch();
+                            _punchPoolAfter = _punchTarget.Current + _punchTarget.Shield;
+                            Notes.Append($"\n  cross hit {(hit != null ? hit.name : "nothing")}: pool now {_punchPoolAfter:0.0}");
+                        }
+
+                        _punchKilled = _punchTarget != null && _punchTarget.IsDead;
+                        _punchAt = Time.time;
                         Wait(30.0, Phase.PunchMiss);
                         return;
                     }
@@ -332,13 +366,14 @@ namespace FPSKit.EditorTools
                         var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
                         // The strike is the rifle turned stock-first and driven forward (or,
                         // with a fist wired, the fist out). Either is seen, a frame on.
-                        if (melee != null && ((melee.fist != null && melee.fist.gameObject.activeInHierarchy)
+                        if (melee != null && (melee.FistsUp > 0.3f
                                               || (melee.weapon != null && melee.weapon.HandsRotation.magnitude > 5f)))
                             _fistShown = true;
 
                         // Past the cooldown, then well out of reach: a punch must not
                         // land on anyone eight metres away.
-                        if (melee != null && Time.time < _punchAt + melee.cooldown + 0.05f)
+                        var ms = MeleeSettings.Active;
+                        if (melee != null && Time.time < Mathf.Max(melee.ReadyAt, _punchAt + ms.crossSeconds) + 0.05f)
                         {
                             if (Waiting()) return;
                             Notes.Append("\n  punch: game time never passed the cooldown");
@@ -686,8 +721,8 @@ namespace FPSKit.EditorTools
                                     $"(pool {_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0})");
 
                 if (_punchRole == "Standard" && !_punchKilled)
-                    problems.Append("\n  - a punch did not put down an ordinary enemy, which is the whole " +
-                                    "point of it on a level with no spare rounds");
+                    problems.Append("\n  - the rifle butt and a punch did not put down an ordinary enemy, which " +
+                                    "is the whole point of them on a level with no spare rounds");
 
                 if (!_gunLowered)
                     problems.Append("\n  - the gun was not lowered during the punch: it could fire through the swing");

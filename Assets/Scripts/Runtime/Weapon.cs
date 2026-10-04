@@ -45,6 +45,19 @@ public class Weapon : MonoBehaviour
     public int CurrentAmmo { get; private set; }
     public int ReserveAmmo { get; private set; }
     public bool IsReloading { get; private set; }
+
+    /// <summary>
+    /// The reload running now began on an empty gun: the long one, with the bolt run at the
+    /// end. A tactical reload (rounds still in the gun) skips the bolt and is quicker.
+    /// </summary>
+    public bool ReloadIsEmpty { get; private set; }
+
+    /// <summary>When the last round left the barrel, for the bolt cycling on the model.</summary>
+    public float LastShotTime { get; private set; } = -99f;
+
+    /// <summary>Share of the way through the reload, 0 to 1, or -1 when not reloading.</summary>
+    public float ReloadProgress => IsReloading && _reloadLength > 0f
+        ? Mathf.Clamp01((Time.time - _reloadStart) / _reloadLength) : -1f;
     public bool IsAiming { get; private set; }
 
     /// <summary>0 at the hip, 1 fully aimed. Sway scales itself down by this.</summary>
@@ -212,8 +225,27 @@ public class Weapon : MonoBehaviour
         ReserveAmmo = weapon.reserveAmmo;
         _spreadBonus = 0f;
 
+        Draw();
+        Equipped?.Invoke(this);
         AmmoChanged?.Invoke(this);
     }
+
+    /// <summary>Raised when a different gun is put in the player's hands.</summary>
+    public event Action<Weapon> Equipped;
+
+    /// <summary>
+    /// Brings the gun up from below the frame, as at the start of a level or when the gun
+    /// in the hands changes. Nothing fires until it is up.
+    /// </summary>
+    public void Draw()
+    {
+        _drawStart = Time.time;
+        _nextFireTime = Mathf.Max(_nextFireTime, Time.time + DrawSeconds * 0.8f);
+    }
+
+    const float DrawSeconds = 0.45f;
+    float _drawStart = -99f;
+    float _sprintPose;
 
     public event Action<Weapon> Fired;
     public event Action<Weapon> AmmoChanged;
@@ -232,6 +264,27 @@ public class Weapon : MonoBehaviour
     /// rifle round to drive the stock forward with it.
     /// </summary>
     [NonSerialized] public Vector3 HandsRotation;
+
+    /// <summary>
+    /// Rigged arms are holding this gun (<see cref="ViewModelRig"/>), so the hands can let
+    /// go of it to throw a punch. Without them, <see cref="MeleeStrike"/> strikes with the
+    /// rifle butt, since a scene-built gun has no fist to throw.
+    /// </summary>
+    [NonSerialized] public bool HasArms;
+
+    /// <summary>
+    /// Where the rigged gun really rests, in the holder's space, and how it is turned, and
+    /// how far behind its pivot the butt plate is. Set by the rig. A strike that aims the
+    /// gun at an absolute place (the rifle butt) measures from these rather than from the
+    /// scene-built gun's pose, which sits somewhere else entirely.
+    /// </summary>
+    [NonSerialized] public Vector3 ViewHipPosition;
+    [NonSerialized] public Quaternion ViewHipRotation = Quaternion.identity;
+    [NonSerialized] public float ViewButtLength;
+
+    /// <summary>The resting pose a strike should measure from: the rig's when it has one.</summary>
+    public Vector3 PoseHipPosition => HasArms ? ViewHipPosition : _hipPosition;
+    public Quaternion PoseHipRotation => HasArms ? ViewHipRotation : _hipRotation;
 
     /// <summary>True while the gun is lowered for something else the hands are doing.</summary>
     public bool IsLowered => Time.time < _loweredUntil;
@@ -306,9 +359,17 @@ public class Weapon : MonoBehaviour
             CurrentAmmo = MagazineSize;
             ReserveAmmo = data.reserveAmmo;
         }
+
+        // The rigged arms and the gun's own model, when its data has one. Added here
+        // rather than by the scene builder so every arena already built gets them.
+        if (GetComponent<ViewModelRig>() == null) gameObject.AddComponent<ViewModelRig>();
     }
 
-    void Start() => AmmoChanged?.Invoke(this);
+    void Start()
+    {
+        Draw();
+        AmmoChanged?.Invoke(this);
+    }
 
     /// <summary>Forgets that a reload or a burst was ever in progress.</summary>
     void ClearRoutineState()
@@ -350,6 +411,14 @@ public class Weapon : MonoBehaviour
 
         if (inputAllowed && (ControlSettings.Pressed(controls.reload) || MobileInput.ConsumeReload() || GameInput.PadPressed(GameAction.Reload)))
             TryReload();
+
+        // Breaking into a sprint drops the reload, the way it does in every shooter: the
+        // hands go to running. Only the moment the sprint starts -- a reload begun while
+        // already running carries on, or a touch player whose stick sits at the edge
+        // could never reload on the move at all.
+        bool sprinting = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f;
+        if (sprinting && !_wasSprinting && IsReloading) CancelReload();
+        _wasSprinting = sprinting;
 
         UpdateSpread();
         UpdateAimAndKick();
@@ -428,6 +497,8 @@ public class Weapon : MonoBehaviour
     }
 
     // ======================================================================
+    bool _wasSprinting;
+
     void FireOnce()
     {
         if (IsReloading) return;
@@ -442,6 +513,7 @@ public class Weapon : MonoBehaviour
 
         if (!data.infiniteAmmo) CurrentAmmo--;
         _nextFireTime = Time.time + SecondsBetweenShots;
+        LastShotTime = Time.time;
 
         for (int i = 0; i < Mathf.Max(1, data.pelletsPerShot); i++)
             FireRay();
@@ -553,9 +625,12 @@ public class Weapon : MonoBehaviour
     {
         IsReloading = true;
         IsAiming = false;
+        ReloadIsEmpty = CurrentAmmo <= 0;
         ReloadStarted?.Invoke(this);
 
-        float length = Mathf.Max(0.2f, ReloadTime);
+        // The tactical reload is the same beats without the bolt, so the whole thing is
+        // shorter by the bolt's share; the sounds stay on their beats either way.
+        float length = Mathf.Max(0.2f, ReloadTime) * (ReloadIsEmpty ? 1f : Mathf.Clamp(data.tacticalReloadShare, 0.3f, 1f));
         _reloadStart = Time.time;
         _reloadLength = length;
 
@@ -576,7 +651,7 @@ public class Weapon : MonoBehaviour
             yield return new WaitForSeconds(length * (MagInAt - MagOutAt));
             PlayClip(data.reloadInClip, 0.95f);
             yield return new WaitForSeconds(length * (BoltAt - MagInAt));
-            PlayClip(data.reloadBoltClip, 1f);
+            if (ReloadIsEmpty) PlayClip(data.reloadBoltClip, 1f);
             yield return new WaitForSeconds(length * (1f - BoltAt));
         }
 
@@ -600,6 +675,42 @@ public class Weapon : MonoBehaviour
         _reloadStart = -99f;
         AmmoChanged?.Invoke(this);
         ReloadFinished?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Abandons a reload part-way: no rounds are moved, and the magazine and hand go back
+    /// where they were. A sprint or a strike does this; the player reloads again after.
+    /// </summary>
+    public void CancelReload()
+    {
+        if (!IsReloading) return;
+
+        if (_reloadRoutine != null) StopCoroutine(_reloadRoutine);
+        IsReloading = false;
+        _reloadRoutine = null;
+        _reloadStart = -99f;
+        ResetReloadParts();
+        AmmoChanged?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Points the reload at the parts of a model built at runtime: the magazine that drops
+    /// and the empty the left hand follows. Their resting places are taken from where they
+    /// are now, which is what Awake does for the parts a scene was built with.
+    /// </summary>
+    public void BindReloadParts(Transform newMagazine, Transform newSupportHand)
+    {
+        ResetReloadParts();
+        magazine = newMagazine;
+        supportHandRig = newSupportHand;
+
+        if (magazine != null)
+        {
+            _magazineRest = magazine.localPosition;
+            _magazineRestRotation = magazine.localRotation;
+        }
+
+        if (supportHandRig != null) _handRest = supportHandRig.localPosition;
     }
 
     /// <summary>
@@ -718,8 +829,21 @@ public class Weapon : MonoBehaviour
         Vector3 basePosition = Vector3.Lerp(_hipPosition, data.adsPosition, AimProgress);
         ReloadPose(out Vector3 reloadOffset, out Vector3 reloadTurn);
 
-        transform.localPosition = basePosition + Vector3.back * _kickback + HandsOffset + reloadOffset;
-        var turned = Quaternion.Euler(reloadTurn + HandsRotation);
+        // Carried low and across the chest while running, the muzzle down and in; lowered
+        // below the frame and swung up while being drawn. Both only ever add to the pose.
+        bool runningPose = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f
+                           && !IsReloading && !IsLowered;
+        _sprintPose = Mathf.MoveTowards(_sprintPose, runningPose ? 1f : 0f, Time.deltaTime * 5f);
+        float sprint = UITheme.EaseOut(_sprintPose) * (1f - AimProgress);
+
+        float drawn = Mathf.Clamp01((Time.time - _drawStart) / DrawSeconds);
+        float down = 1f - UITheme.EaseOut(drawn);
+
+        Vector3 poseOffset = new Vector3(-0.07f, -0.05f, -0.04f) * sprint + new Vector3(0.02f, -0.28f, -0.08f) * down;
+        Vector3 poseTurn = new Vector3(14f, -32f, 12f) * sprint + new Vector3(35f, -12f, 8f) * down;
+
+        transform.localPosition = basePosition + Vector3.back * _kickback + HandsOffset + reloadOffset + poseOffset;
+        var turned = Quaternion.Euler(reloadTurn + HandsRotation + poseTurn);
         transform.localRotation = _hipRotation * turned;
 
         // The hands turn with the gun; the forearms behind them do not. They pivot at the
@@ -896,7 +1020,7 @@ public class Weapon : MonoBehaviour
         offset = new Vector3(-0.1f, 0.03f, -0.03f) * tilt;
 
         // The bolt: a sharp kick back and up, and a settle.
-        float bolt = p >= BoltAt && p < BoltAt + 0.1f ? Mathf.Sin((p - BoltAt) / 0.1f * Mathf.PI) : 0f;
+        float bolt = ReloadIsEmpty && p >= BoltAt && p < BoltAt + 0.1f ? Mathf.Sin((p - BoltAt) / 0.1f * Mathf.PI) : 0f;
         turn += new Vector3(-7f, 0f, -4f) * bolt;
         offset += new Vector3(0f, 0.012f, -0.035f) * bolt;
 

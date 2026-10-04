@@ -394,6 +394,12 @@ namespace FPSKit.EditorTools
                                    false, Neutral, profile);
             Slot(cluster, punch, column: 1, row: 0);
 
+            // KICK above JUMP, in the thumb's own column: the punch's partner, one reach up
+            // from it, and nowhere near FIRE so a kick is never thrown by a slipped thumb.
+            var kick = MakeButton(parent, "KickButton", "KICK", TouchButton.ActionKind.Kick,
+                                  false, Neutral, profile);
+            Slot(cluster, kick, column: 0, row: 2);
+
             // Top right, away from the thumbs, because it is the one button you never
             // want to hit by accident and the only way off this screen: a phone has no
             // Escape key, so without it a touch player cannot pause, cannot quit and
@@ -537,6 +543,7 @@ namespace FPSKit.EditorTools
             TouchButton.ActionKind.Bomb => GameAction.Bomb,
             TouchButton.ActionKind.UseItem => GameAction.UseItem,
             TouchButton.ActionKind.Melee => GameAction.Melee,
+            TouchButton.ActionKind.Kick => GameAction.Kick,
             _ => GameAction.Pause,
         };
 

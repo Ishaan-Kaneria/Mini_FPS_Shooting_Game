@@ -28,7 +28,10 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         /// Punches whoever is in reach. Edge-triggered. Last in the list because the
         /// kind is serialized by number into every staged touch scene.
         /// </summary>
-        Melee
+        Melee,
+
+        /// <summary>Kicks whoever is in reach. Edge-triggered; appended for the same reason.</summary>
+        Kick
     }
 
     public ActionKind action = ActionKind.Fire;
@@ -71,6 +74,27 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     }
 
     void Start() => EnforceMinimumSize();
+
+    bool _lit;
+
+    /// <summary>
+    /// The strike buttons light in the accent colour while someone is in reach, so a thumb
+    /// knows a press will land before it presses. Always shown either way: a button that
+    /// appeared only up close would jump in under the thumb mid-fight.
+    /// </summary>
+    void Update()
+    {
+        if (action != ActionKind.Melee && action != ActionKind.Kick) return;
+        if (target == null || _on) return;
+
+        bool lit = MobileInput.MeleeReady;
+        if (lit == _lit) return;
+        _lit = lit;
+
+        var theme = UITheme.Active;
+        Color accent = theme != null ? theme.accent : new Color(0.91f, 0.64f, 0.24f);
+        target.color = lit ? new Color(accent.r * 0.6f, accent.g * 0.6f, accent.b * 0.6f, Mathf.Max(_idleColor.a, 0.85f)) : _idleColor;
+    }
 
     /// <summary>
     /// Grows the button until it is at least the profile's minimum physical size.
@@ -120,6 +144,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         else if (action == ActionKind.Pause) MobileInput.QueuePause();
         else if (action == ActionKind.UseItem) MobileInput.QueueUseItem();
         else if (action == ActionKind.Melee) MobileInput.QueueMelee();
+        else if (action == ActionKind.Kick) MobileInput.QueueKick();
     }
 
     /// <summary>
@@ -161,6 +186,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         }
 
         if (target != null) target.color = on ? activeColor : _idleColor;
+        _lit = false;
     }
 
     void OnDisable()

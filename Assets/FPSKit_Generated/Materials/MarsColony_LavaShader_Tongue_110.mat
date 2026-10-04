@@ -57,12 +57,12 @@ Material:
     m_Floats:
     - _BackGround_Strenght: 0
     - _BottomPower: 0.89
-    - _Frenselpower: 0.6
+    - _Frenselpower: 1.1
     - _LavaNormalSpeed: 0.05
     - _Metallic: 0
     - _NoiseAmount: 1
     - _NoiseScale: 5
-    - _Normal_Strength: 5
+    - _Normal_Strength: 7
     - _Power: 2
     - _QueueControl: 0
     - _QueueOffset: 0
@@ -76,13 +76,13 @@ Material:
     - _FresnelColor: {r: 5.960785, g: 2.6527052, b: 1.46679, a: 0}
     - _LavaBackground: {r: 7.958114, g: 7.958114, b: 7.958114, a: 0}
     - _LavaColor: {r: 4.372362, g: 1.1458604, b: 0, a: 1}
-    - _LavaNormalSpeed: {r: 0, g: 0.0011, b: 0, a: 0}
+    - _LavaNormalSpeed: {r: 0, g: 0.0066000004, b: 0, a: 0}
     - _LavaScale: {r: 0.7727273, g: 0.7727273, b: 0, a: 0}
     - _LavaScaleNormal: {r: 1.5454546, g: 1.5454546, b: 0, a: 0}
-    - _LavaSpeed: {r: 0.00066, g: 0.00132, b: 0, a: 0}
+    - _LavaSpeed: {r: 0.00396, g: 0.00792, b: 0, a: 0}
     - _Lavaremap: {r: 0, g: 1.5, b: 0, a: 0}
-    - _NoiseSpeed: {r: 0.00022, g: 0.00022, b: 0, a: 0}
-    - _VoronoiSpeed: {r: 0, g: 0.00008800001, b: 0, a: 0}
+    - _NoiseSpeed: {r: 0.00132, g: 0.00132, b: 0, a: 0}
+    - _VoronoiSpeed: {r: 0, g: 0.00052800006, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &3541657053340131536

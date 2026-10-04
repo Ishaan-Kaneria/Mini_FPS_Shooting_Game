@@ -1420,6 +1420,7 @@ namespace FPSKit.EditorTools
         private static void Boulder(Transform parent, int layer, System.Random rng, Vector3 at,
                                     float width)
         {
+            if (_theme.volcanicZone) width *= 1.8f; // Unknown Planet: everything is on a larger scale
             float scale = width / BoulderSpread;
             float tall = Rand(rng, 0.6f, 1.1f);
 

@@ -171,7 +171,7 @@ namespace FPSKit.EditorTools
             // Clear of the spawn and of the river's rim, both of which are held flat and
             // have things built on them.
             float rimClear = _theme.hazardWidth * 0.5f + RimBandWidth + RiverValleyRamp;
-            int pits = 7 + rng.Next(4);
+            int pits = 15 + rng.Next(8);
 
             for (int i = 0, tries = 0; i < pits && tries < 200; tries++)
             {
@@ -222,7 +222,7 @@ namespace FPSKit.EditorTools
             // Tumuli: the crust of a flow pushed up from below into low swellings about
             // thirty metres across. Taller on the flows, where there was crust to lift.
             float swell = Mathf.Max(0f, Fbm2(x * 0.031f, z * 0.031f, seed * 43 + 7, 2) - 0.1f);
-            float tumuli = swell * (1.6f + top * 0.7f);
+            float tumuli = swell * (3.4f + top * 1.2f);
 
             // Pits: a cosine bowl each, so the rim has no lip to trip on.
             float pits = 0f;
@@ -683,7 +683,7 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void BuildFissures(Transform parent, int layer, System.Random rng, float half)
         {
-            int fissures = 16 + rng.Next(8);
+            int fissures = _theme.volcanicZone ? 34 + rng.Next(14) : 16 + rng.Next(8);
 
             for (int f = 0; f < fissures; f++)
             {
@@ -745,7 +745,7 @@ namespace FPSKit.EditorTools
                 // The glow sits a little above the ground so the ground cannot hide it, and
                 // the lips stand higher still, so from the side a fissure is a dark ridge
                 // with light coming out of it.
-                var glow = DrapeMesh($"Fissure_{f}", core, (_, _) => 0.05f, 0.8f);
+                var glow = LavaUv(DrapeMesh($"Fissure_{f}", core, (_, _) => 0.05f, 0.8f));
                 Drape(parent, "Fissure", glow, ShaderLava("Fissure", 0.8f), layer);
 
                 var rim = DrapeMesh($"FissureLip_{f}", lips, (_, across) =>

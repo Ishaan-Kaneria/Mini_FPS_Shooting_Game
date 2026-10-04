@@ -198,6 +198,7 @@ namespace FPSKit.EditorTools
                 BuildAlienSites(root, layer, rng);
                 BuildDesertLife(root, layer, backdrop, half);
                 BuildShardLines(root, layer, rng, half);
+                BuildSpikeFields(root, layer, rng, half);
             }
             else
             {
@@ -963,8 +964,8 @@ namespace FPSKit.EditorTools
                 // crater somebody can walk up to is a perch nothing else can reach.
                 if (_theme.volcanicZone)
                 {
-                    w *= 1.6f;
-                    h = Mathf.Max(h * 1.35f, w * 0.48f);
+                    w *= 2.3f;
+                    h = Mathf.Max(h * 2f, w * 0.5f);
                 }
 
                 if (!TryClaim(rng, half * 0.94f, w * 0.75f, out Vector2 p)) continue;

@@ -57,12 +57,12 @@ Material:
     m_Floats:
     - _BackGround_Strenght: 0
     - _BottomPower: 0.89
-    - _Frenselpower: 0.6
+    - _Frenselpower: 1.1
     - _LavaNormalSpeed: 0.05
     - _Metallic: 0
     - _NoiseAmount: 1
-    - _NoiseScale: 61.875
-    - _Normal_Strength: 5
+    - _NoiseScale: 58.437496
+    - _Normal_Strength: 7
     - _Power: 2
     - _QueueControl: 0
     - _QueueOffset: 0
@@ -70,19 +70,19 @@ Material:
     - _Smoothness: 0
     - _VoronoiAO: 1
     - _VoronoiAmount: -0.05
-    - _VoronoiScale: 24.75
+    - _VoronoiScale: 23.374998
     m_Colors:
     - _BottomRemap: {r: 0.5, g: 1, b: 0, a: 0}
     - _FresnelColor: {r: 5.960785, g: 2.6527052, b: 1.46679, a: 0}
     - _LavaBackground: {r: 7.958114, g: 7.958114, b: 7.958114, a: 0}
     - _LavaColor: {r: 4.372362, g: 1.1458604, b: 0, a: 1}
-    - _LavaNormalSpeed: {r: 0, g: 0.0000888889, b: 0, a: 0}
-    - _LavaScale: {r: 5.625, g: 5.625, b: 0, a: 0}
-    - _LavaScaleNormal: {r: 2.475, g: 2.475, b: 0, a: 0}
-    - _LavaSpeed: {r: 0.000053333333, g: 0.00010666667, b: 0, a: 0}
+    - _LavaNormalSpeed: {r: 0, g: 0.00056470593, b: 0, a: 0}
+    - _LavaScale: {r: 5.3125, g: 5.3125, b: 0, a: 0}
+    - _LavaScaleNormal: {r: 2.3374999, g: 2.3374999, b: 0, a: 0}
+    - _LavaSpeed: {r: 0.00033882356, g: 0.0006776471, b: 0, a: 0}
     - _Lavaremap: {r: 0, g: 1.5, b: 0, a: 0}
-    - _NoiseSpeed: {r: 0.000017777778, g: 0.000017777778, b: 0, a: 0}
-    - _VoronoiSpeed: {r: 0, g: 0.0000071111117, b: 0, a: 0}
+    - _NoiseSpeed: {r: 0.00011294118, g: 0.00011294118, b: 0, a: 0}
+    - _VoronoiSpeed: {r: 0, g: 0.000045176475, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &7233516119221904759

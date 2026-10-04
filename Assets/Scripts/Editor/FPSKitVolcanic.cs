@@ -1096,7 +1096,7 @@ namespace FPSKit.EditorTools
                           centre + new Vector3(Mathf.Cos(t0) * r, 0f, Mathf.Sin(t0) * r));
             }
 
-            return build.ToMesh("CraterPool");
+            return LavaUv(build.ToMesh("CraterPool"));
         });
 
         /// <summary>
@@ -1142,7 +1142,7 @@ namespace FPSKit.EditorTools
                     build.Quad(At(l, a0 - w0), At(l + 1, a1 - w1), At(l + 1, a1 + w1), At(l, a0 + w0));
                 }
 
-                return build.ToMesh("LavaTongue");
+                return LavaUv(build.ToMesh("LavaTongue"));
             });
 
         /// <summary>
@@ -1345,7 +1345,7 @@ namespace FPSKit.EditorTools
 
                 // Skewed: most volcanoes are small, a few dominate their part of the sky.
                 float size = Mathf.Pow((float)rng.NextDouble(), 2.2f);
-                float h = Mathf.Lerp(_theme.backdropHeight.x, _theme.backdropHeight.y, size);
+                float h = Mathf.Lerp(_theme.backdropHeight.x, _theme.backdropHeight.y, size) * (_theme.volcanicZone ? 1.5f : 1f);
 
                 var shape = new ConeShape
                 {
@@ -1421,10 +1421,10 @@ namespace FPSKit.EditorTools
 
             for (int i = 0; i < vents; i++)
             {
-                float width = Rand(rng, 7f, 12f);
+                float width = Rand(rng, 7f, 12f) * 1.8f;
                 if (!TryClaim(rng, half * 0.88f, width * 0.6f, out var point, 24)) continue;
 
-                float height = Rand(rng, 1.8f, 3.2f);
+                float height = Rand(rng, 1.8f, 3.2f) * 1.6f;
                 float ground = LowestGroundIn(point.x, point.y, width * 0.66f);
                 var foot = new Vector3(point.x, ground - 0.5f, point.y);
 

@@ -70,17 +70,38 @@ namespace FPSKit.EditorTools
             float crust = u < 0.05f ? 0.05f : 0.085f, fine = u < 0.05f ? 0.022f : 0.17f;
             V2("_LavaScale", crust / u, crust / u);
             V2("_LavaScaleNormal", fine / u, fine / u);
-            F("_Normal_Strength", 5f);
-            V2("_LavaSpeed", 0.03f * u * 0.2f, 0.06f * u * 0.2f);
-            V2("_LavaNormalSpeed", 0.0f, 0.05f * u * 0.2f);
-            V2("_VoronoiSpeed", 0f, 0.004f * u * 0.2f);
-            V2("_NoiseSpeed", 0.01f * u * 0.2f, 0.01f * u * 0.2f);
+            F("_Normal_Strength", 7f);
+            // Volatile: a boiling crust that churns, with deeper dark seams and a hotter core.
+            F("_NoiseAmount", 1f);
+            F("_VoronoiAmount", -0.05f);
+            F("_Frenselpower", 1.1f);
+            V2("_LavaSpeed", 0.03f * u * 1.2f, 0.06f * u * 1.2f);
+            V2("_LavaNormalSpeed", 0.0f, 0.05f * u * 1.2f);
+            V2("_VoronoiSpeed", 0f, 0.004f * u * 1.2f);
+            V2("_NoiseSpeed", 0.01f * u * 1.2f, 0.01f * u * 1.2f);
             F("_VoronoiScale", 0.22f / u);
             F("_NoiseScale", 0.55f / u);
 
             EditorUtility.SetDirty(mat);
             _shaderLavas[key] = mat;
             return mat;
+        }
+
+        /// <summary>
+        /// Moves a lava mesh's UVs so the smallest is (1, 1). The graph returns NaN (black) on negative UVs and
+        /// loses precision on large ones (a flat white blob across the screen), and pools, tongues and fissures
+        /// had both: unit-space UVs centred on zero, and world-metre UVs out to 150. Only the origin moves, so
+        /// the crust keeps its size.
+        /// </summary>
+        private static Mesh LavaUv(Mesh mesh)
+        {
+            var uvs = mesh.uv;
+            if (uvs.Length == 0) return mesh;
+            var min = new Vector2(float.MaxValue, float.MaxValue);
+            foreach (var uv in uvs) min = Vector2.Min(min, uv);
+            for (int i = 0; i < uvs.Length; i++) uvs[i] = uvs[i] - min + Vector2.one;
+            mesh.uv = uvs;
+            return mesh;
         }
 
         // ==================================================================
@@ -134,7 +155,7 @@ namespace FPSKit.EditorTools
         {
             if (_crystalMat != null) return _crystalMat;
             _crystalMat = MakeMaterial("AlienCrystal", new Color(0.55f, 0.07f, 0.04f), 0.92f, 0.1f);
-            SetEmission(_crystalMat, new Color(1.4f, 0.2f, 0.05f));
+            SetEmission(_crystalMat, new Color(0.7f, 0.10f, 0.03f));
             return _crystalMat;
         }
 
@@ -260,7 +281,7 @@ namespace FPSKit.EditorTools
 
             for (int i = 0; i < Mathf.Max(7, _theme.vantageCount); i++)
             {
-                float radius = Rand(rng, 10f, 14f);
+                float radius = Rand(rng, 10f, 14f) * 1.45f;
                 if (!TryClaim(rng, half * 0.9f, radius + 3f, out var p, 60)) continue;
                 // Slope kept under about seventeen degrees so a lattice of columns, one step to the next, stays a
                 // climb a player and an enemy can make.
@@ -310,8 +331,8 @@ namespace FPSKit.EditorTools
                 float r = s.Radius * Rand(rng, 0.78f, 0.9f);
                 var at = new Vector3(s.Centre.x + Mathf.Cos(a) * r, 0f, s.Centre.y + Mathf.Sin(a) * r);
                 float g = GroundHeightAt(at.x, at.z);
-                float h = Rand(rng, 6.5f, 11f);
-                float w = Rand(rng, 2.0f, 3.0f), d = Rand(rng, 1.1f, 1.6f);
+                float h = Rand(rng, 6.5f, 11f) * 1.7f;
+                float w = Rand(rng, 2.0f, 3.0f) * 1.6f, d = Rand(rng, 1.1f, 1.6f) * 1.6f;
                 // Facing the middle of the ring.
                 float yaw = (-a * Mathf.Rad2Deg) + 90f + Rand(rng, -10f, 10f);
                 var facing = Quaternion.Euler(0f, yaw, 0f);
@@ -437,9 +458,9 @@ namespace FPSKit.EditorTools
                 float a = Rand(rng, 0f, Mathf.PI * 2f);
                 float away = k == 0 ? 0f : s.Radius * Mathf.Sqrt(Rand(rng, 0.03f, 1f)) * 0.85f;
                 float x = s.Centre.x + Mathf.Cos(a) * away, z = s.Centre.y + Mathf.Sin(a) * away;
-                float len = Rand(rng, 2.2f, 8.5f) * Mathf.Lerp(1.5f, 0.6f, away / s.Radius);
-                if (k == 0) len = Rand(rng, 8f, 11f);
-                float rad = Mathf.Clamp(len * Rand(rng, 0.06f, 0.1f), 0.28f, 0.95f);
+                float len = Rand(rng, 2.2f, 8.5f) * Mathf.Lerp(1.5f, 0.6f, away / s.Radius) * 1.8f;
+                if (k == 0) len = Rand(rng, 8f, 11f) * 1.8f;
+                float rad = Mathf.Clamp(len * Rand(rng, 0.06f, 0.1f), 0.28f, 1.7f);
                 // Leaning outward from the middle.
                 var lean = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * Mathf.Tan(Rand(rng, 4f, 28f) * Mathf.Deg2Rad);
                 var foot = new Vector3(x, ground - 0.8f, z);
@@ -475,6 +496,52 @@ namespace FPSKit.EditorTools
         /// Lines of broken obsidian across the approaches, laid across the line between two places that matter with a
         /// gap in them -- the sandbag and timber lines this replaces, made of what the ground would throw up.
         /// </summary>
+        /// <summary>
+        /// Impaler fields: clusters of black glass spikes thrust out of the ground at random angles, the tallest
+        /// leaning over the cluster, tips a dull red. Scattered with no plan at all, which is the point: the
+        /// ground looks hostile and unplanned, and none of it is a place anyone could stand.
+        /// </summary>
+        private static void BuildSpikeFields(Transform root, int layer, System.Random rng, float half)
+        {
+            var group = new GameObject("SpikeFields").transform;
+            group.SetParent(root, false);
+            var spikes = new MeshBuild { UVScale = 0.3f };
+            var tips = new MeshBuild { UVScale = 0.5f };
+            int placed = 0;
+
+            for (int i = 0, tries = 0; i < 46 && tries < 400; tries++)
+            {
+                var at = new Vector2(Rand(rng, -half * 0.92f, half * 0.92f), Rand(rng, -half * 0.92f, half * 0.92f));
+                float spread = Rand(rng, 2.2f, 4.5f);
+                if (at.magnitude < 28f || !Free(at, spread + 1f)) continue;
+                if (Mathf.Abs(at.x - GorgeCentreAt(at.y)) < _theme.hazardWidth * 0.5f + RimBandWidth + 10f) continue;
+                Claim(at.x, at.y, spread + 1f);
+                i++;
+
+                int count = 5 + rng.Next(7);
+                for (int k = 0; k < count; k++)
+                {
+                    float a = Rand(rng, 0f, Mathf.PI * 2f), d = spread * Mathf.Sqrt(Rand(rng, 0f, 1f));
+                    float x = at.x + Mathf.Cos(a) * d, z = at.y + Mathf.Sin(a) * d;
+                    float len = Rand(rng, 3f, 13f) * (k == 0 ? 1.5f : 1f);
+                    float rad = Mathf.Clamp(len * Rand(rng, 0.04f, 0.08f), 0.25f, 0.8f);
+                    float tilt = Rand(rng, 4f, 34f) * Mathf.Deg2Rad, dir = Rand(rng, 0f, Mathf.PI * 2f);
+                    var foot = new Vector3(x, LowestGroundIn(x, z, rad) - 0.7f, z);
+                    var axis = (Vector3.up + new Vector3(Mathf.Cos(dir), 0f, Mathf.Sin(dir)) * Mathf.Tan(tilt)).normalized;
+                    var mid = foot + axis * len * 0.8f;
+                    spikes.Tube(foot, mid, rad, rad * 0.55f, 5);
+                    spikes.Tube(mid, foot + axis * len, rad * 0.55f, 0.02f, 5);
+                    tips.Tube(foot + axis * len * 0.9f, foot + axis * len, rad * 0.30f, 0.015f, 5);
+                    placed++;
+                }
+            }
+
+            var mat = _obsidianMat;
+            Solid(group, "Spikes", spikes, mat, layer, "Concrete");
+            SnowCapLike(group, "SpikeTips", tips, AlienGlowMaterial(), layer);
+            Debug.Log($"[FPSKit] spike fields: {placed} spike(s).");
+        }
+
         private static void BuildShardLines(Transform root, int layer, System.Random rng, float half)
         {
             if (_anchors.Count < 2) return;
@@ -594,12 +661,12 @@ namespace FPSKit.EditorTools
         // ==================================================================
         // The sky
         // ==================================================================
-        private const string AlienSkyRecipe = "alien-sky-v1";
+        private const string AlienSkyRecipe = "alien-sky-v2";
 
         /// <summary>
         /// The Unknown Planet's sky, painted: a red giant filling a tenth of the horizon (limb-darkened, grained,
         /// spotted, with prominences and a corona), a horizon that glows, banks of ash lit from underneath and
-        /// from the sun's side, a ringed planet hanging in the dark opposite it, and stars where the air thins.
+        /// from the sun's side, no planet, nothing but the sun, and stars where the air thins.
         /// Same equirectangular layout and the same shader as Snowbound's (Skybox/Panoramic), so the sun in the
         /// picture is where the scene's directional light says it is.
         /// </summary>
@@ -626,19 +693,11 @@ namespace FPSKit.EditorTools
                 var mid = new Color(0.24f, 0.03f, 0.03f);
                 var zenith = new Color(0.035f, 0.004f, 0.012f);
                 int seed = _theme.randomSeed * 17 + 3;
-                const float SunR = 0.115f;                              // about 6.6 degrees: a giant
+                const float SunR = 0.19f;                               // about 11 degrees: a looming, dying giant
 
                 // The sun's tangent frame, for the disc, the prominences and the spots.
                 var e1 = Vector3.Cross(Vector3.up, sun).normalized;
                 var e2 = Vector3.Cross(sun, e1);
-
-                // A ringed planet opposite the sun, thirty-odd degrees up.
-                float pAz = az + Mathf.PI * 0.82f, pEl = 34f * Mathf.Deg2Rad;
-                var planet = new Vector3(-Mathf.Sin(pAz) * Mathf.Cos(pEl), Mathf.Sin(pEl), -Mathf.Cos(pAz) * Mathf.Cos(pEl)).normalized;
-                var p1 = Vector3.Cross(Vector3.up, planet).normalized;
-                var p2 = Vector3.Cross(planet, p1);
-                const float PlanetR = 0.15f;
-                var lightInPlanet = new Vector3(Vector3.Dot(sun, p1), Vector3.Dot(sun, p2), Vector3.Dot(sun, planet)).normalized;
 
                 Parallel.For(0, H, j =>
                 {
@@ -676,9 +735,9 @@ namespace FPSKit.EditorTools
 
                         // ---- the glare round the sun, and the corona ----
                         float over = Mathf.Max(0f, theta - SunR);
-                        col += new Color(1.0f, 0.30f, 0.07f) * (0.85f * Mathf.Exp(-over / 0.07f));
-                        col += new Color(0.9f, 0.18f, 0.04f) * (0.55f * Mathf.Exp(-over / 0.35f));
-                        col += new Color(0.6f, 0.10f, 0.03f) * (0.30f * Mathf.Exp(-over / 1.1f));
+                        col += new Color(1.0f, 0.30f, 0.07f) * (1.1f * Mathf.Exp(-over / 0.10f));
+                        col += new Color(0.9f, 0.18f, 0.04f) * (0.8f * Mathf.Exp(-over / 0.5f));
+                        col += new Color(0.6f, 0.10f, 0.03f) * (0.5f * Mathf.Exp(-over / 1.4f));
 
                         // ---- ash banks and clouds on a plane overhead, lit from beneath ----
                         if (y > 0.004f)
@@ -705,37 +764,6 @@ namespace FPSKit.EditorTools
                             }
                         }
 
-                        // ---- the ringed planet ----
-                        float dp = Vector3.Dot(d, planet);
-                        if (dp > 0.5f)
-                        {
-                            float a = Vector3.Dot(d, p1) / dp, bb = Vector3.Dot(d, p2) / dp;
-                            float rho = PlanetR;
-                            float ax = a * 0.9397f + bb * 0.3420f, ay = (-a * 0.3420f + bb * 0.9397f) / 0.26f;
-                            float q = Mathf.Sqrt(ax * ax + ay * ay) / rho;
-                            bool ringHere = q > 1.32f && q < 2.25f && !(q > 1.74f && q < 1.84f);
-                            bool ringFront = ay < 0f;
-                            float d2 = a * a + bb * bb;
-                            bool onPlanet = d2 < rho * rho;
-                            Color ringCol = Color.Lerp(new Color(0.55f, 0.30f, 0.20f), new Color(0.85f, 0.55f, 0.35f), Sstep(1.3f, 2.2f, q));
-                            ringCol *= 0.55f + 0.45f * SkyNoise(q * 14f, 0f, 3f, seed + 5);
-                            if (onPlanet)
-                            {
-                                float nz = Mathf.Sqrt(Mathf.Max(0f, rho * rho - d2)) / rho;
-                                var n = new Vector3(a / rho, bb / rho, nz);
-                                float lam = Mathf.Clamp01(Vector3.Dot(n, lightInPlanet) * 1.1f + 0.12f);
-                                float bands = 0.5f + 0.5f * Mathf.Sin(bb / rho * 13f + SkyFbm(a * 9f, bb * 9f, 2f, seed + 8, 3) * 4f);
-                                var pc = Color.Lerp(new Color(0.34f, 0.15f, 0.09f), new Color(0.78f, 0.42f, 0.24f), bands);
-                                pc = Color.Lerp(pc * 0.25f, pc, lam);
-                                col = Color.Lerp(col, pc, 0.92f);
-                                if (ringHere && ringFront) col = Color.Lerp(col, ringCol * lam, 0.75f);
-                            }
-                            else if (ringHere)
-                            {
-                                col = Color.Lerp(col, ringCol, 0.6f);
-                            }
-                        }
-
                         // ---- the sun: a disc of limb-darkened, grained, spotted fire, with prominences ----
                         {
                             float da = Vector3.Dot(d, e1), db = Vector3.Dot(d, e2);
@@ -744,12 +772,12 @@ namespace FPSKit.EditorTools
                             {
                                 float rr = theta / SunR;
                                 float mu = Mathf.Sqrt(Mathf.Max(0f, 1f - rr * rr));
-                                var core = new Color(1.0f, 0.86f, 0.50f);
-                                var limb = new Color(0.78f, 0.13f, 0.035f);
+                                var core = new Color(1.0f, 0.95f, 0.70f);
+                                var limb = new Color(0.62f, 0.04f, 0.01f);
                                 var disc = Color.Lerp(limb, core, Mathf.Pow(mu, 0.75f));
                                 float grain = SkyFbm(d.x * 46f, d.y * 46f, d.z * 46f, seed + 51, 4);
-                                disc *= 0.84f + grain * 0.38f;
-                                float spot = Sstep(0.60f, 0.70f, SkyFbm(d.x * 11f + 3f, d.y * 11f, d.z * 11f, seed + 61, 3));
+                                disc *= 0.70f + grain * 0.75f;
+                                float spot = Sstep(0.52f, 0.64f, SkyFbm(d.x * 13f + 3f, d.y * 13f, d.z * 13f, seed + 61, 3));
                                 disc = Color.Lerp(disc, disc * new Color(0.55f, 0.2f, 0.1f), spot * 0.8f * Sstep(0.15f, 0.55f, rr));
                                 col = Color.Lerp(disc, col, Sstep(0.96f, 1.0f, rr) * 0.6f);
                             }
@@ -757,12 +785,12 @@ namespace FPSKit.EditorTools
                             {
                                 // Prominences: loops of fire standing off the limb where a slow noise around it peaks.
                                 float around = SkyFbm(Mathf.Cos(ang) * 2.4f + 9f, Mathf.Sin(ang) * 2.4f, 4.4f, seed + 71, 3);
-                                float height = SunR * (0.10f + 0.55f * Sstep(0.5f, 0.78f, around));
+                                float height = SunR * (0.18f + 1.1f * Sstep(0.42f, 0.74f, around));
                                 float off = theta - SunR;
                                 if (off < height)
                                 {
                                     float f = 1f - off / height;
-                                    col += new Color(1.0f, 0.5f, 0.16f) * (f * f * 0.95f);
+                                    col += new Color(1.0f, 0.42f, 0.10f) * (f * f * 1.15f);
                                 }
                             }
                         }

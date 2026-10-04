@@ -746,7 +746,7 @@ namespace FPSKit.EditorTools
                 // the lips stand higher still, so from the side a fissure is a dark ridge
                 // with light coming out of it.
                 var glow = DrapeMesh($"Fissure_{f}", core, (_, _) => 0.05f, 0.8f);
-                Drape(parent, "Fissure", glow, _lavaMat, layer);
+                Drape(parent, "Fissure", glow, ShaderLava("Fissure", 0.8f), layer);
 
                 var rim = DrapeMesh($"FissureLip_{f}", lips, (_, across) =>
                 {

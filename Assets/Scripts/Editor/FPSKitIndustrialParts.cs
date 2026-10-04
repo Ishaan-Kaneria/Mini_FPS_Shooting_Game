@@ -644,7 +644,7 @@ namespace FPSKit.EditorTools
         {
             // Snowbound (2026-10-04, "at least double the triangles of every object"): whatever was not given
             // real extra detail is at least split in two here. See SnowBisect.
-            if (_theme != null && _theme.snowZone && build.Triangles.Count < 12000) build = SnowBisect(build);
+            if (IsFineArena() && build.Triangles.Count < 12000) build = SnowBisect(build);
 
             return Pooled(key, () =>
             {

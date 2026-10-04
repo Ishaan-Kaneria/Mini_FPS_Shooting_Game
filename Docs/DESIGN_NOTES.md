@@ -2769,3 +2769,10 @@ roof was cut off from the ground** (the reach test only samples, so it had repor
 walls beside the roof stair, (2) open-window frames on the +u wall the stair climbs, (3) a 1.8 m flight. Now: walls left standing,
 windows on faces 0 and 2 only, and `AlpStair` at 2.6 m. Check roof reach directly (`NavMesh.CalculatePath` from the spawn to each
 roof) and do not trust the sampled percentage. Result: 27 of 27 roofs reachable, VerifyReach 0.2 %, VerifyTerrain and VerifyZone clean.
+
+## Unknown Planet rebuilt from scratch (2026-10-04)
+
+Theme key stays "Mars Colony" (displayName Unknown Planet). `FPSKitUnknown.cs` holds all of it: basalt-column causeways instead of bridges (no human-made crossing), rim boulders instead of fences, monolith rings, column hills, crystal groves, ridged alien massifs, painted red-sun sky (`UnknownSky`, recipe `alien-sky-v1`), 1.5 m ground and fine meshes (`IsFineArena`).
+- Lava is the shader-graph asset `Assets/Shaders/Lava/Lava.mat`, copied per role by `ShaderLava(role, uvPerMetre)`. The graph goes NaN on negative UVs and loses precision on big ones: the river maps at 0.01 UV/m with +4 added (`BuildRiver`), never plain world metres.
+- Emissive HDR values over about (3, 0.5, 0.08) wash to pale yellow under the grade; crystals 1.4, glyphs 3.0, veins 2.2.
+- Do not put `NoStanding` on the causeway sides: the volume reaches the top plane and cut the walkable tops out of the bake (far bank unreachable). Reach 0.4 %, Zone clean.

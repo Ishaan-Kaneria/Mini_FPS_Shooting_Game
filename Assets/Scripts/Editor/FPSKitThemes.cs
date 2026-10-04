@@ -737,42 +737,43 @@ namespace FPSKit.EditorTools
                     // is what stars are saved under -- renaming it would move the arena
                     // out from under every save that has reached it.
                     t.displayName = "Unknown Planet";
-                    t.description = "A world still being made. Molten river, red sky, ash on the wind.";
+                    t.description = "Nobody has named it. A red sun the size of a hand hangs over rivers of molten rock.";
 
                     // ---- the sky ----
                     // Painted, not these four: volcanicZone swaps the procedural sky for a
                     // panorama (FPSKitVolcanic.VolcanicSky), because the procedural one
                     // scatters red away and came back green. Kept tuned so turning the
                     // dressing off still gives a warm sky rather than the default blue.
-                    t.skyTint = new Color(0.95f, 0.36f, 0.14f);
+                    t.skyTint = new Color(0.95f, 0.18f, 0.08f);
                     t.skyGroundColor = new Color(0.30f, 0.10f, 0.05f);
                     t.atmosphereThickness = 3.1f;
                     t.skyExposure = 1.15f;
-                    t.sunColor = new Color(1f, 0.58f, 0.32f);
-                    t.sunIntensity = 1.05f;
-                    t.sunAngles = new Vector2(24f, 300f);
+                    // A red giant: the light is red and strong, and low, so the shadows are long and the lit faces burn.
+                    t.sunColor = new Color(1f, 0.30f, 0.12f);
+                    t.sunIntensity = 1.45f;
+                    t.sunAngles = new Vector2(17f, 300f);
                     t.shadowStrength = 0.75f;
 
                     // Smoky rather than dusty. Thinner than the old colony's 0.014, which
                     // was an interior number: exponential-squared at 450m hides the far
                     // half of the map, and an arena whose volcanoes cannot be seen is an
                     // arena with no volcanoes.
-                    t.fogColor = new Color(0.52f, 0.22f, 0.11f);
-                    t.fogDensity = 0.0014f;
+                    t.fogColor = new Color(0.42f, 0.10f, 0.055f);
+                    t.fogDensity = 0.0019f;
 
                     // Lit from below as well as above: the ground colour is the glow off
                     // the river and the vents, and it is what stops every face turned away
                     // from a low sun going black -- the desert records that a face in
                     // shadow dark enough to hide an enemy is a fault, not a mood.
-                    t.ambientSky = new Color(0.52f, 0.26f, 0.16f);
-                    t.ambientEquator = new Color(0.40f, 0.20f, 0.12f);
-                    t.ambientGround = new Color(0.34f, 0.14f, 0.07f);
+                    t.ambientSky = new Color(0.50f, 0.13f, 0.08f);
+                    t.ambientEquator = new Color(0.46f, 0.12f, 0.06f);
+                    t.ambientGround = new Color(0.62f, 0.17f, 0.05f);
 
                     // ---- the ground ----
                     // Cooled basalt: near black, with the glow in its cracks supplied by
                     // the material rather than by the colour. Light enough to model the
                     // relief under a low red sun; at true basalt black the dunes vanish.
-                    t.floorColor = new Color(0.25f, 0.20f, 0.18f);
+                    t.floorColor = new Color(0.20f, 0.14f, 0.13f);
                     t.floorSmoothness = 0.35f;
                     t.floorDetail = "Basalt";
                     t.wallDetail = "Rock";
@@ -846,11 +847,11 @@ namespace FPSKit.EditorTools
                     t.accentLightColor = new Color(1f, 0.45f, 0.15f);
 
                     // Bloom is what makes the lava glow rather than merely be orange.
-                    t.bloomIntensity = 1.1f;
-                    t.saturation = 10f;
-                    t.contrast = 14f;
-                    t.colorFilter = new Color(1f, 0.93f, 0.88f);
-                    t.vignetteIntensity = 0.32f;
+                    t.bloomIntensity = 1.6f;
+                    t.saturation = 18f;
+                    t.contrast = 16f;
+                    t.colorFilter = new Color(1f, 0.80f, 0.72f);
+                    t.vignetteIntensity = 0.38f;
                     t.filmGrain = 0.18f;
                     t.randomSeed = 66;
                     break;

@@ -579,7 +579,7 @@ namespace FPSKit.EditorTools
         /// plane. Cut flat at its base it sits on whatever it is put on, every time.
         /// </summary>
         private static Mesh BoulderMesh(int seed, float lumpiness = 0.34f, float squash = 0.72f)
-            => BoulderMeshAt(seed, lumpiness, squash, (IsDesertArena() || IsSnowArena()) ? 3 : 2);
+            => BoulderMeshAt(seed, lumpiness, squash, (IsDesertArena() || IsFineArena()) ? 3 : 2);
 
         /// <summary>
         /// The desert's rocks are a subdivision-3 icosphere (1,280 facets, not 320) with two more octaves of
@@ -649,14 +649,14 @@ namespace FPSKit.EditorTools
                 sides = Mathf.RoundToInt(sides * 1.7f);
                 levels = Mathf.RoundToInt(levels * 1.6f);
             }
-            else if (IsSnowArena())
+            else if (IsFineArena())
             {
-                // Snowbound (2026-10-04, "at least double ... all objects"): four times the facets.
+                // Snowbound and the Unknown Planet (2026-10-04, "at least double ... all objects"): four times the facets.
                 sides = Mathf.RoundToInt(sides * 2.2f);
                 levels = Mathf.RoundToInt(levels * 2.1f);
             }
             // A finer butte has more rings, not more ledges: spaced in proportion, snow only (the desert's are as they were).
-            int ledgeEvery = IsSnowArena() ? Mathf.Max(3, Mathf.RoundToInt(levels / 2.4f)) : 3;
+            int ledgeEvery = IsFineArena() ? Mathf.Max(3, Mathf.RoundToInt(levels / 2.4f)) : 3;
             return ButteMeshCore(seed, sides, levels, ledgeEvery);
         }
 

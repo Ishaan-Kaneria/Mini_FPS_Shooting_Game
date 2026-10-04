@@ -144,8 +144,16 @@ namespace FPSKit.EditorTools
             PlanDesertLife(half);
 
             PlanLandmarks(rng, half);
-            PlanOutposts(rng, half);
-            PlanVantages(rng, half);
+            if (IsAlien())
+            {
+                // The Unknown Planet has no compounds and no decks: see FPSKitUnknown.
+                PlanAlienSites(rng, half);
+            }
+            else
+            {
+                PlanOutposts(rng, half);
+                PlanVantages(rng, half);
+            }
 
             // ---- ground ----
             if (_theme.duneHeight > 0f) BuildDuneField(root, layer, half);
@@ -155,12 +163,26 @@ namespace FPSKit.EditorTools
             if (_theme.duneHeight <= 0f) BuildGroundPatches(root, backdrop, rng, half);
 
             BuildGorge(root, layer, half);
-            BuildCrossings(root, layer, half);
-            BuildRiverFence(root, layer, half);
+            if (IsAlien())
+            {
+                BuildCauseways(root, layer, half);
+                BuildRimRocks(root, layer, rng, half);
+            }
+            else
+            {
+                BuildCrossings(root, layer, half);
+                BuildRiverFence(root, layer, half);
+            }
             if (IsDesertArena()) BuildRiverLife(root, layer, rng, half);
             BuildBoundary(root, layer, half);
 
-            if (_theme.volcanicZone) BuildVolcanicBackdrop(root, backdrop, rng);
+            if (_theme.volcanicZone)
+            {
+                BuildVolcanicBackdrop(root, backdrop, rng);
+                var ranges = new GameObject("AlienRanges").transform;
+                ranges.SetParent(root, false);
+                BuildAlienMountains(ranges, backdrop, rng);
+            }
             else BuildBackdrop(root, backdrop, rng, half);
 
             // Nothing outside the seal is anybody's to stand on, however much sand
@@ -171,10 +193,19 @@ namespace FPSKit.EditorTools
             if (_theme.volcanicZone) BuildVolcanoLandmarks(root, layer, rng);
             else BuildLandmarks(root, layer, rng);
 
-            BuildOutposts(root, layer, rng);
-            BuildVantages(root, layer, rng);
-            BuildDesertLife(root, layer, backdrop, half);
-            BuildCoverLines(root, layer, rng, half);
+            if (IsAlien())
+            {
+                BuildAlienSites(root, layer, rng);
+                BuildDesertLife(root, layer, backdrop, half);
+                BuildShardLines(root, layer, rng, half);
+            }
+            else
+            {
+                BuildOutposts(root, layer, rng);
+                BuildVantages(root, layer, rng);
+                BuildDesertLife(root, layer, backdrop, half);
+                BuildCoverLines(root, layer, rng, half);
+            }
             BuildScatter(root, layer, rng, half);
 
             // Nothing grows here. What stands on the plain instead is what the heat made:

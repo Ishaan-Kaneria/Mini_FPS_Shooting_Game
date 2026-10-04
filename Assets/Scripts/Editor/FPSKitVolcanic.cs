@@ -488,7 +488,7 @@ namespace FPSKit.EditorTools
         {
             string texPath = $"{TextureFolder}/Sky_{SafeName(_theme.themeName)}.png";
             var panorama = WriteVolcanicSky(texPath);
-            ReflectSky(panorama, $"{TextureFolder}/Reflection_{SafeName(_theme.themeName)}.cubemap");
+            ReflectSky(panorama, SkyWidth, SkyHeight, $"{TextureFolder}/Reflection_{SafeName(_theme.themeName)}.cubemap");
 
             string path = $"{MaterialFolder}/Sky_{SafeName(_theme.themeName)}.mat";
             var shader = Shader.Find("Skybox/Panoramic");
@@ -614,7 +614,9 @@ namespace FPSKit.EditorTools
         /// custom reflection. Its mips are what rougher surfaces read, so a box-filtered
         /// chain is enough for a sky that is a gradient and some smoke.
         /// </summary>
-        private static void ReflectSky(Color32[] panorama, string path)
+        private static void ReflectSky(Color32[] panorama, string path) => ReflectSky(panorama, SkyWidth, SkyHeight, path);
+
+        private static void ReflectSky(Color32[] panorama, int skyW, int skyH, string path)
         {
             const int N = 64;
             var cube = new Cubemap(N, TextureFormat.RGBA32, true);
@@ -626,10 +628,10 @@ namespace FPSKit.EditorTools
                 float u = 0.5f - Mathf.Atan2(d.z, d.x) / (Mathf.PI * 2f);
                 float v = 0.5f + Mathf.Asin(Mathf.Clamp(d.y, -1f, 1f)) / Mathf.PI;
 
-                int x = Mathf.Clamp((int)(Mathf.Repeat(u, 1f) * SkyWidth), 0, SkyWidth - 1);
-                int y = Mathf.Clamp((int)(v * SkyHeight), 0, SkyHeight - 1);
+                int x = Mathf.Clamp((int)(Mathf.Repeat(u, 1f) * skyW), 0, skyW - 1);
+                int y = Mathf.Clamp((int)(v * skyH), 0, skyH - 1);
 
-                return panorama[y * SkyWidth + x];
+                return panorama[y * skyW + x];
             }
 
             var faces = new[]
@@ -709,10 +711,13 @@ namespace FPSKit.EditorTools
             Glow(_hotGroundMat, "Basalt_Cracks", MoltenGlow * 3.4f);
             Macro(_hotGroundMat, "Basalt_Macro", 1f / MacroRepeat);
 
-            // The river. Crust-dark under the glow: see the class summary.
-            _lavaMat = MakeDetailMaterial("Lava", new Color(0.20f, 0.09f, 0.06f), "Lava", 0.05f,
-                                          0.5f, 0f, 1.1f);
-            Glow(_lavaMat, "Lava_Glow", MoltenGlow * 3.2f);
+            // The river: the project's Lava shader graph (Assets/Shaders/Lava), mapped to world metres. The old
+            // texture-and-emission lava is the fallback if the shader asset is ever missing.
+            var fallback = MakeDetailMaterial("Lava", new Color(0.20f, 0.09f, 0.06f), "Lava", 0.05f, 0.5f, 0f, 1.1f);
+            Glow(fallback, "Lava_Glow", MoltenGlow * 3.2f);
+            _lavaMat = fallback;
+            _shaderLavas.Clear();
+            _lavaMat = ShaderLava("River", 0.01f);
             _waterMat = _lavaMat;
 
             // The rock nearest the melt, lit by it. Dark, because it is lit from below and
@@ -1015,11 +1020,33 @@ namespace FPSKit.EditorTools
 
                 var rings = ConeRings(seed, shape);
 
+                // Each ring-quad is cut into 4 by 3 and roughened (2026-10-04, "improve triangles"): about sixteen
+                // times the facets, with a ridged break in the rock on the flank. The rings stay the authority --
+                // the pool and the tongues are laid on them -- so nothing moves at the foot, the rim or inside the
+                // crater, and the displacement is a function of position alone, so it is continuous across quads.
+                const int SubU = 4, SubV = 3;
                 for (int l = 0; l < levels - 1; l++)
                     for (int s = 0; s < sides; s++)
                     {
                         int n = (s + 1) % sides;
-                        build.Quad(rings[l][s], rings[l + 1][s], rings[l + 1][n], rings[l][n]);
+                        var a0 = rings[l][s]; var b0 = rings[l][n]; var c0 = rings[l + 1][n]; var d0 = rings[l + 1][s];
+                        bool flank = l < ConeRim;
+
+                        Vector3 P(int iu, int iv)
+                        {
+                            float tu = iu / (float)SubU, tv = iv / (float)SubV;
+                            var p = Vector3.Lerp(Vector3.Lerp(a0, b0, tu), Vector3.Lerp(d0, c0, tu), tv);
+                            if (!flank) return p;
+                            float w = Smooth(Mathf.Clamp01((p.y - 0.03f) / 0.17f)) * (1f - Smooth(Mathf.Clamp01((p.y - 0.84f) / 0.12f)));
+                            float broken = Fbm2(p.x * 7f + seed * 0.1f, p.z * 7f + p.y * 5f, seed + 3, 3)
+                                         + 0.5f * Mathf.Abs(Fbm2(p.x * 19f, p.z * 19f + p.y * 11f, seed + 7, 2));
+                            var radial = new Vector3(p.x, 0f, p.z);
+                            return p + (radial.sqrMagnitude > 1e-6f ? radial.normalized : Vector3.zero) * (broken * 0.024f * w);
+                        }
+
+                        for (int iu = 0; iu < SubU; iu++)
+                            for (int iv = 0; iv < SubV; iv++)
+                                build.Quad(P(iu, iv), P(iu, iv + 1), P(iu + 1, iv + 1), P(iu + 1, iv));
                     }
 
                 // The crater floor facing up, and the base facing down, so the shape is
@@ -1140,7 +1167,7 @@ namespace FPSKit.EditorTools
             var cone = MeshObject(at, name, VolcanoMesh(seed, shape), rock,
                                   Vector3.zero, turn, scale, layer, _theme.wallTag, collider);
 
-            var pool = MeshObject(at, "CraterPool", CraterPoolMesh(seed, shape), _lavaMat, Vector3.zero, turn, scale,
+            var pool = MeshObject(at, "CraterPool", CraterPoolMesh(seed, shape), ShaderLava("Pool", 1.6f / Mathf.Max(1f, Mathf.Round(scale.x / 10f) * 10f)), Vector3.zero, turn, scale,
                                   layer, "Untagged", collider: false);
             Hide(pool);
 
@@ -1151,7 +1178,7 @@ namespace FPSKit.EditorTools
                 var tongue = MeshObject(at, "LavaTongue",
                                         LavaTongueMesh(seed, shape, i, start,
                                                        Rand(rng, 0.03f, 0.055f), 3 + rng.Next(3)),
-                                        _lavaMat, Vector3.zero, turn, scale, layer, "Untagged",
+                                        ShaderLava("Tongue", 2.2f / Mathf.Max(1f, Mathf.Round(scale.x / 10f) * 10f)), Vector3.zero, turn, scale, layer, "Untagged",
                                         collider: false);
                 Hide(tongue);
             }

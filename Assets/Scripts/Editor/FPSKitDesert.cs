@@ -405,13 +405,23 @@ namespace FPSKit.EditorTools
                     // where two turned slices left a sliver of the bed uncovered.
                     float hw = bedHalf * 1.05f, hl = slice * 0.5f + 3f;
 
-                    var build = new MeshBuild { UVScale = 1f };
+                    // Volcanic: the lava shader goes NaN on negative UVs and loses precision on big ones, so the
+                    // river maps at 0.01 per metre and is lifted +4 into positive, small values.
+                    float lavaUv = _theme.volcanicZone ? 0.01f : 1f;
+                    var build = new MeshBuild { UVScale = lavaUv };
                     build.Quad(centre + rotation * new Vector3(-hw, 0f, -hl),
                                centre + rotation * new Vector3(-hw, 0f, hl),
                                centre + rotation * new Vector3(hw, 0f, hl),
                                centre + rotation * new Vector3(hw, 0f, -hl));
 
-                    water = MeshObject(group, "Water", build.ToMesh("LavaSlice"), _waterMat,
+                    var sliceMesh = build.ToMesh("LavaSlice");
+                    if (_theme.volcanicZone)
+                    {
+                        var uvs = sliceMesh.uv;
+                        for (int u = 0; u < uvs.Length; u++) uvs[u] += new Vector2(4f, 4f);
+                        sliceMesh.uv = uvs;
+                    }
+                    water = MeshObject(group, "Water", sliceMesh, _waterMat,
                                        Vector3.zero, Quaternion.identity, Vector3.one,
                                        layer, "Water", collider: false);
                 }
@@ -432,9 +442,11 @@ namespace FPSKit.EditorTools
             // the renderers once and pushes a scrolling UV offset through a property
             // block, so nothing instances a material and nothing leaks one.
             // Lava creeps. At the water's speed it read as a conveyor belt of orange tiles.
-            group.gameObject.AddComponent<ScrollingWater>().scrollSpeed =
-                _theme.hazard == LevelTheme.Hazard.Lava ? new Vector2(0.003f, 0.012f)
-                                                        : new Vector2(0.012f, 0.05f);
+            // The Lava shader animates itself; a property-block scroll on top of it would fight the graph.
+            if (!_theme.volcanicZone)
+                group.gameObject.AddComponent<ScrollingWater>().scrollSpeed =
+                    _theme.hazard == LevelTheme.Hazard.Lava ? new Vector2(0.003f, 0.012f)
+                                                            : new Vector2(0.012f, 0.05f);
         }
 
         /// <summary>The trigger is cut into slices of this many metres of z.</summary>

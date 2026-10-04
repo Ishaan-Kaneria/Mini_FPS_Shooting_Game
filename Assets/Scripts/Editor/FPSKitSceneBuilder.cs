@@ -626,7 +626,7 @@ namespace FPSKit.EditorTools
 
             // Painted rather than simulated: see VolcanicSky for why a red sky cannot be
             // asked of the procedural shader.
-            if (_theme.volcanicZone) return VolcanicSky();
+            if (_theme.volcanicZone) return UnknownSky();
             if (_theme.rooftopZone) return NightCitySky();
             if (_theme.snowZone) return SnowSky();   // a painted arctic sky (FPSKitSnowSky)
 

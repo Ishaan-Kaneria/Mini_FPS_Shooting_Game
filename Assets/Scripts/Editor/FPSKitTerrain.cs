@@ -279,7 +279,7 @@ namespace FPSKit.EditorTools
 
             // Snow is built finer (1.5 m): the drifts, the lip of every crevasse and the foot of every wall read
             // at walking pace, and a three-metre grid shows its triangles as facets in low sun.
-            _groundStep = _theme.snowZone ? 1f : 3f;
+            _groundStep = _theme.snowZone ? 1f : _theme.volcanicZone ? 1.5f : 3f;
             float reach = half + TerrainOverhang;
             _groundMin = -reach;
 

@@ -32,7 +32,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AtmosphereThickness: 3.1
-    - _Exposure: 1
+    - _Exposure: 1.12
     - _ImageType: 0
     - _Layout: 0
     - _Mapping: 1

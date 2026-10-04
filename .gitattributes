@@ -198,3 +198,4 @@ Assets/FPSKit_Generated/Scenes/DesertOutpost.unity filter=lfs diff=lfs merge=lfs
 
 # Snowbound is generated, dense (1.5 m ground, branch-built pines, log chalets) and over 100 MB too.
 Assets/FPSKit_Generated/Scenes/SnowboundStation.unity filter=lfs diff=lfs merge=lfs -text
+Assets/FPSKit_Generated/Scenes/MarsColony.unity filter=lfs diff=lfs merge=lfs -text

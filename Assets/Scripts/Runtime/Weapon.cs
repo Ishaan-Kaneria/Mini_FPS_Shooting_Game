@@ -16,6 +16,8 @@ public class Weapon : MonoBehaviour
     public Camera fpsCamera;
     public Transform muzzlePoint;
     public Light muzzleLight;
+    [Tooltip("Draws the crossed-blade flash prefab at the player's own muzzle. Off: it showed as a white plus sign beside the rifle.")]
+    public bool drawMuzzleFlash = false;
     public AudioSource audioSource;
 
     [Header("Reload Animation")]
@@ -777,6 +779,11 @@ public class Weapon : MonoBehaviour
     /// </summary>
     void PlayMuzzleFlash()
     {
+        // The player's own flash is not drawn (Ishaan, 2026-10-04: "that white rifle side flash still
+        // appears, get rid of them"). Seen from behind the gun the crossed blades are a white plus sign
+        // floating beside the barrel, and under bloom it reads as a glitch. The muzzle light, tracer and
+        // sound still sell the shot. Enemies keep theirs: EnemyAI plays its own, seen from the front.
+        if (!drawMuzzleFlash) return;
         if (data.muzzleFlashPrefab == null || muzzlePoint == null) return;
 
         // Only a prefab that switches itself off can be replayed. Anything else has to

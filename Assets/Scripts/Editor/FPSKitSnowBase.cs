@@ -70,6 +70,14 @@ namespace FPSKit.EditorTools
             GeneratorYard(post, layer, rng, f, new Vector2(-1f, -17.5f));
             SnowcatDepot(post, layer, rng, new Frame(f.P(24f, 0f, -21f), f.Yaw + 180f));
 
+            // Trucks and a pickup in the lanes; snowmobiles by the fuel.
+            BuildUtilityTruck(post, layer, rng, f.P(-13.4f, 0f, -9f), f.Yaw + 2f);
+            BuildUtilityTruck(post, layer, rng, f.P(-13.4f, 0f, 18f), f.Yaw + 178f);
+            BuildPickup(post, layer, rng, f.P(21f, 0f, -2f), f.Yaw + 90f);
+            BuildPickup(post, layer, rng, f.P(-4f, 0f, -26.5f + 9.5f), f.Yaw + 180f);
+            BuildSnowmobile(post, layer, rng, f.P(32f, 0f, -17f), f.Yaw + 70f);
+            BuildSnowmobile(post, layer, rng, f.P(34f, 0f, -14.5f), f.Yaw + 95f);
+
             // ---- north side: hangar, two barracks ----
             Hangar(post, layer, rng, new Frame(f.P(-25f, 0f, 12f), f.Yaw));
             BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(14f, 0f, 15f), f.Yaw), 12f, flatRoof: false, wIn: 7.4f, dIn: 20f);
@@ -375,8 +383,10 @@ namespace FPSKit.EditorTools
                 stuff.Box(p + Vector3.up * 1.2f + f.Axis(Vector3.right) * 0.3f, new Vector3(0.12f, 2.4f, 0.12f), Quaternion.identity);
             }
             Solid(lodge, "LodgeStuff", stuff, _plankMat, layer, "Wood");
-            Snowcat(lodge, layer, rng, f.P(12f, 0f, -4f), f.Yaw + 70f);
+            BuildPickup(lodge, layer, rng, f.P(12f, 0f, -5f), f.Yaw + 70f);
             Snowcat(lodge, layer, rng, f.P(-4f, 0f, -11f), f.Yaw + 190f);
+            BuildSnowmobile(lodge, layer, rng, f.P(13.5f, 0f, -9.5f), f.Yaw + 30f);
+            BuildSnowmobile(lodge, layer, rng, f.P(15.5f, 0f, -9f), f.Yaw + 55f);
         }
     }
 }

@@ -2709,3 +2709,24 @@ lodge), `FPSKitSnowPass.cs` (ski lift, mine, pass, cabins, camps, the wild pass)
 - Solid rock masses get `SealLocal` over their footprint (the terrain under a solid box otherwise bakes unreachable).
 - VerifyReach Snowbound: 0.0 % stranded (was 1.9 %); VerifyTerrain clean. VerifyZone's two gorge messages do not
   apply to a river-less arena.
+
+### Snowbound detail pass (2026-10-04, later the same day)
+
+Ishaan: village denser; check the Game view; the crevasse area was broken; houses and cars realistic; "use more and
+more triangles ... ground, snow, trees, houses, cars". What changed, and why:
+
+- **Ground is 1.5 m (was 3 m) for snow only** (`_groundStep`), with wind-packed sastrugi ridges in `DuneHeightAt`. The
+  relaxation sweeps and smoothing passes scale with the step so their reach in metres stays the same. 253k triangles.
+- **Pines are built branch by branch** (`Pine`, ~1200 triangles each instead of ~140): flared leaning trunk, root
+  buttresses, 6-7 whorls of drooping boughs, a snow load on most. **Chalets** (`FPSKitSnowLogs.cs`): round logs with
+  notched, overhanging corners (`LogBox`), stone course (`StoneBase`), shingle rows + ridge cap + fascia + board gables
+  + lumpy snow blanket (`GableRoof`), balcony with balusters on two-storey ones. Logs are render-only; each builder
+  keeps a thin core wall for collision and the bake. **Vehicles** (`FPSKitSnowVehicles.cs`): groomer with real tracks,
+  glazed cab, blade and tiller; crew-cab pickup; snowmobile; 6x6 truck. Detail materials (normal maps) throughout.
+- **The "broken ground" was the crevasse.** The terrain mesher cuts every cell the crack touches *plus a margin*, so the
+  hole runs a few metres past the crack's ends and sides; the 12 m walls did not cover it and the **sky showed through
+  as yellow slabs**, with a 6 m blue ice blanket hiding the rest. Now there is a floor under the whole hole (5 m past
+  each end), a thin snow cornice of 1.1 m strips sampled from the ground (and a grid over each end) in place of the
+  blue skin, and the cornice carries the `Snow` tag.
+- Reading a render mesh's bake effect: stranded samples after the finer ground are 0.3 % (tiny pockets), under the 2 %
+  limit. The scene is now ~160 MB and **Git LFS** (see `.gitattributes`), like the desert's.

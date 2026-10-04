@@ -277,7 +277,9 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Dunes").transform;
             group.SetParent(root, false);
 
-            _groundStep = 3f;
+            // Snow is built finer (1.5 m): the drifts, the lip of every crevasse and the foot of every wall read
+            // at walking pace, and a three-metre grid shows its triangles as facets in low sun.
+            _groundStep = _theme.snowZone ? 1.5f : 3f;
             float reach = half + TerrainOverhang;
             _groundMin = -reach;
 
@@ -494,7 +496,14 @@ namespace FPSKit.EditorTools
             // ground that is genuinely jagged. So the ripples live in the sand normal
             // map instead, where they cost nothing, are the right size, and are not
             // something a vehicle can drive on.
-            return primary + secondary + basin + hills - amplitude * 0.9f;
+            // Snow only: wind-packed ridges (sastrugi), long along the wind and about six metres across --
+            // coarse enough for the 1.5 m grid to hold, which the sand's two-metre ripple was not.
+            float drift = 0f;
+            if (_theme.snowZone)
+                drift = Fbm2(across * 0.16f, along * 0.045f, _theme.randomSeed * 3 + 1, 2) * 0.55f
+                      + Fbm2(x * 0.21f, z * 0.21f, _theme.randomSeed * 5 + 2, 2) * 0.22f;
+
+            return primary + secondary + basin + hills + drift - amplitude * 0.9f;
         }
 
         /// <summary>
@@ -536,7 +545,7 @@ namespace FPSKit.EditorTools
             // of the middle of a flattened pad and off the end of its blend. At ten the
             // steepest ground in the arena was still on the lip of a pad, because the
             // relaxation simply had not reached that far before it stopped.
-            const int sweeps = 30;
+            int sweeps = Mathf.RoundToInt(30f * 3f / _groundStep);   // a sweep is a cell; the reach in metres stays put
 
             // Eight neighbours, not four -- and the diagonals are the whole reason.
             //
@@ -592,7 +601,7 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void SmoothField()
         {
-            const int passes = 4;
+            int passes = Mathf.RoundToInt(4f * 3f / _groundStep);
 
             for (int p = 0; p < passes; p++)
             {

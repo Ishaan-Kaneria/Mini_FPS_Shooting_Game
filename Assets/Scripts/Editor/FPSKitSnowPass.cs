@@ -362,6 +362,9 @@ namespace FPSKit.EditorTools
             Woodpile(wood, f.P(-5.5f, 0f, -5f), f.Rot, 3, 2.4f);
             if (rng.NextDouble() < 0.6) Sled(wood, f.P(5.5f, 0f, -5.5f), f.Yaw + Rand(rng, -30f, 30f));
             Solid(parent, "CabinYard", wood, _logMat, layer, "Wood");
+            double vroll = rng.NextDouble();
+            if (vroll < 0.35) BuildSnowmobile(parent, layer, rng, f.P(-5.5f, 0f, 5.5f), f.Yaw + Rand(rng, 0f, 360f));
+            else if (vroll < 0.6) BuildPickup(parent, layer, rng, f.P(0f, 0f, -6.4f), f.Yaw + 90f);
         }
 
         /// <summary>An A-frame tent, ridge along v: canvas slopes and ends, closed at the back.</summary>
@@ -416,6 +419,7 @@ namespace FPSKit.EditorTools
             // A sled with crates, a drying rack, a flag.
             var wood = new MeshBuild { UVScale = 0.5f };
             Sled(wood, f.P(0f, 0f, 5.2f), f.Yaw + 95f);
+            BuildSnowmobile(camp, layer, rng, f.P(4.5f, 0f, -1.5f), f.Yaw + Rand(rng, 0f, 360f));
             foreach (float s in new[] { -1f, 1f })
                 wood.Box(f.P(-1.5f + s * 1.2f, 1.2f, -5.2f), new Vector3(0.1f, 2.4f, 0.1f), f.Rot);
             wood.Box(f.P(-1.5f, 2.3f, -5.2f), new Vector3(2.6f, 0.1f, 0.1f), f.Rot);
@@ -490,7 +494,8 @@ namespace FPSKit.EditorTools
                 else if (roll < 0.50)
                 {
                     // A snowcat sunk to its tracks, with a drift over its tail.
-                    Snowcat(wild, layer, rng, new Vector3(p.x, g - 0.9f, p.y), Rand(rng, 0f, 360f));
+                    if (rng.NextDouble() < 0.5) Snowcat(wild, layer, rng, new Vector3(p.x, g - 0.9f, p.y), Rand(rng, 0f, 360f));
+                    else BuildPickup(wild, layer, rng, new Vector3(p.x, g - 0.55f, p.y), Rand(rng, 0f, 360f));
                     var drift = MeshObject(wild, "WreckDrift", BoulderMesh(rng.Next(1, 40), 0.12f, 0.45f), _pineSnowMat,
                                            new Vector3(p.x, g, p.y) + Vector3.up * 0.1f, Quaternion.identity, new Vector3(4.2f, 1.4f, 3.2f), layer, null, collider: false);
                     NoStanding(drift); Hide(drift);

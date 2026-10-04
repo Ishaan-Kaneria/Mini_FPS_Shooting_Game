@@ -197,6 +197,7 @@ namespace FPSKit.EditorTools
         {
             if (!_theme.snowZone) return;
             ResolveSnowLifeMaterials();
+            ResolveSnowFullMaterials();   // the station's snowcats want the vehicle and glass materials too
 
             var rng = new System.Random(_theme.randomSeed * 2957 + 1);
             var group = new GameObject("SnowLife").transform;
@@ -365,24 +366,6 @@ namespace FPSKit.EditorTools
             anchor.rotation = Quaternion.LookRotation(centre + new Vector3(0f, 4f, 0f) - anchor.position);
         }
 
-        private static void Snowcat(Transform parent, int layer, System.Random rng, Vector3 at, float yaw)
-        {
-            var rot = Quaternion.Euler(0f, yaw, 0f);
-            var body = new MeshBuild { UVScale = 0.4f };
-            body.Box(at + rot * new Vector3(0f, 1.6f, 0.4f), new Vector3(2.4f, 1.6f, 3.8f), rot);
-            body.Box(at + rot * new Vector3(0f, 1.2f, -2f), new Vector3(2.4f, 0.8f, 1.6f), rot);
-            var tracks = new MeshBuild { UVScale = 0.4f };
-            foreach (float s in new[] { -1.35f, 1.35f })
-                tracks.Box(at + rot * new Vector3(s, 0.45f, 0f), new Vector3(0.7f, 0.9f, 5f), rot);
-
-            var go = MeshObject(parent, "Snowcat", ToMesh(body, DenseKey("snowcat")), rng.Next(2) == 0 ? _moduleOrange : _moduleRed,
-                                Vector3.zero, Quaternion.identity, Vector3.one, layer, "Metal");
-            NoStanding(go);
-            NoStanding(MeshObject(parent, "SnowcatTracks", ToMesh(tracks, DenseKey("snowcattracks")), _moduleGrey,
-                                  Vector3.zero, Quaternion.identity, Vector3.one, layer, "Metal"));
-            SealBox(parent, at + Vector3.up * 1.2f, new Vector3(4f, 2.4f, 4f));
-        }
-
         // ==================================================================
         // Crevasses
         // ==================================================================
@@ -402,6 +385,7 @@ namespace FPSKit.EditorTools
             const float depth = 12f;
 
             var walls = new MeshBuild { UVScale = 0.3f };
+            var lip = new MeshBuild { UVScale = 0.3f };
             int steps = Mathf.CeilToInt(len / 2f);
 
             for (int s = -1; s <= 1; s += 2)
@@ -422,16 +406,74 @@ namespace FPSKit.EditorTools
                     var d0 = a0 + Vector3.down * depth; var d1 = a1 + Vector3.down * depth;
                     walls.Quad(a0, a1, d1, d0); walls.Quad(d0, d1, a1, a0);
 
-                    // The lip: a skin of ice from the edge out over the grid's staircase, lying on it.
-                    var o0 = Lip(i, 6f) + Vector3.up * 0.08f; var o1 = Lip(i + 1, 6f) + Vector3.up * 0.08f;
-                    var i0 = a0 + Vector3.up * 0.08f; var i1 = a1 + Vector3.up * 0.08f;
-                    AddUp(walls, i0, i1, o1, o0);
+                    // The lip: a skin of ice from the edge out over the grid's staircase, lying on it. In
+                    // strips a metre and a half wide, each sampled from the ground: one 6 m quad on a dune
+                    // slope floated over the dip and sank into the rise, and the snow showed through.
+                    for (int strip = 0; strip < 3; strip++)
+                    {
+                        float se0 = strip * 1.1f, se1 = (strip + 1) * 1.1f;
+                        var q0 = Lip(i, se0) + Vector3.up * 0.08f; var q1 = Lip(i + 1, se0) + Vector3.up * 0.08f;
+                        var r0 = Lip(i, se1) + Vector3.up * 0.08f; var r1 = Lip(i + 1, se1) + Vector3.up * 0.08f;
+                        AddUp(lip, q0, q1, r1, r0);
+                    }
                 }
+            }
+
+            // A floor at the bottom, under the *whole* hole. The terrain mesher cuts every cell the crack touches
+            // plus a margin, so the hole runs a few metres past both ends and sides of the crack itself; a floor
+            // only as long as the crack left sky showing there (the "yellow slabs"). Extended by five metres at
+            // each end and wide enough to cover the staircase edge.
+            {
+                int fsteps = steps + 6;
+                float ext = 5f / len;
+                for (int i = 0; i < fsteps; i++)
+                {
+                    float t0 = Mathf.Lerp(-ext, 1f + ext, i / (float)fsteps), t1 = Mathf.Lerp(-ext, 1f + ext, (i + 1) / (float)fsteps);
+                    Vector3 Floor(float t, float across)
+                    {
+                        float taper = Mathf.Max(0.35f, Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI));
+                        var p = c.A + dir * (t * len) + side * across * (c.Half * taper + 5f);
+                        return new Vector3(p.x, SurfaceHeightAt(p.x, p.y) - depth, p.y);
+                    }
+                    AddUp(walls, Floor(t0, -1f), Floor(t1, -1f), Floor(t1, 1f), Floor(t0, 1f));
+                }
+            }
+            {
+                // Closed ends: a wall across each pinched end so no void is visible along the crack.
+                foreach (float t in new[] { 0f, 1f })
+                {
+                    float taper = Mathf.Max(0.35f, Mathf.Sin(t * Mathf.PI));
+                    var p = c.A + dir * (t * len);
+                    var l = p - side * (c.Half * taper); var r = p + side * (c.Half * taper);
+                    var tl = new Vector3(l.x, SurfaceHeightAt(l.x, l.y), l.y); var tr = new Vector3(r.x, SurfaceHeightAt(r.x, r.y), r.y);
+                    walls.Quad(tl, tr, tr + Vector3.down * depth, tl + Vector3.down * depth);
+                    walls.Quad(tl + Vector3.down * depth, tr + Vector3.down * depth, tr, tl);
+                }
+            }
+
+            // Snow cornice across both ends, so the hole's staircase edge is covered there too: a grid on the
+            // ground, each corner sampled from it.
+            foreach (float e in new[] { 0f, 1f })
+            {
+                var endP = c.A + dir * (e * len);
+                float outward = e < 0.5f ? -1f : 1f;
+                float across = c.Half * 0.35f + 3.4f;
+                const int gu = 6, gv = 4;
+                Vector3 G(int iu, int iv)
+                {
+                    float tu = iu / (float)gu, tv = iv / (float)gv;
+                    var p = endP + dir * outward * (tu * 3.6f - 0.4f) + side * (tv * 2f - 1f) * across;
+                    return new Vector3(p.x, SurfaceHeightAt(p.x, p.y) + 0.08f, p.y);
+                }
+                for (int iu = 0; iu < gu; iu++)
+                    for (int iv = 0; iv < gv; iv++)
+                        AddUp(lip, G(iu, iv), G(iu, iv + 1), G(iu + 1, iv + 1), G(iu + 1, iv));
             }
 
             var wallGo = MeshObject(group, "CrevasseIce", ToMesh(walls, DenseKey("crevasse")), _glacierMat,
                                     Vector3.zero, Quaternion.identity, Vector3.one, layer, IceTag);
             if (wallGo != null) Mark(wallGo, new Color(0.30f, 0.46f, 0.62f), 2);
+            MeshObject(group, "CrevasseLip", ToMesh(lip, DenseKey("crevlip")), _pineSnowMat, Vector3.zero, Quaternion.identity, Vector3.one, layer, SnowTag);
 
             // The kill trigger, below the lip, along the crack.
             for (float t = 0.05f; t < 1f; t += 0.1f)
@@ -635,25 +677,59 @@ namespace FPSKit.EditorTools
             Debug.Log($"[FPSKit] snow: {trees} pine(s).");
         }
 
-        /// <summary>One pine: a trunk, three or four tiers of boughs narrowing upwards, snow on each.</summary>
+        /// <summary>
+        /// One pine, built branch by branch: a flared, slightly leaning trunk in three tapering pieces, root
+        /// buttresses, and six or seven whorls of drooping boughs -- each bough its own tapered tube, a snow
+        /// load lying along the upper side of most of them -- round a tapering inner cone that fills the gaps.
+        /// About twelve hundred triangles; it was a hundred and forty (three stacked cones).
+        /// </summary>
         private static void Pine(MeshBuild trunks, MeshBuild boughs, MeshBuild snow, System.Random rng, Vector3 foot)
         {
             float h = Rand(rng, 7f, 14f);
-            float r = h * Rand(rng, 0.2f, 0.26f);
-            trunks.Tube(foot, foot + Vector3.up * h * 0.35f, 0.3f, 0.22f, 6);
+            float R = h * Rand(rng, 0.2f, 0.27f);
+            float k = h / 10f;
 
-            int tiers = 3 + rng.Next(2);
+            var tilt = new Vector3(Rand(rng, -1f, 1f), 0f, Rand(rng, -1f, 1f)).normalized * Rand(rng, 0f, 0.035f) * h;
+            Vector3 On(float y) => foot + Vector3.up * y + tilt * (y / h) * (y / h);
+
+            // Trunk: flare, middle, top.
+            trunks.Tube(On(-0.4f), On(h * 0.12f), 0.46f * k, 0.30f * k, 9);
+            trunks.Tube(On(h * 0.12f), On(h * 0.55f), 0.30f * k, 0.19f * k, 8);
+            trunks.Tube(On(h * 0.55f), On(h), 0.19f * k, 0.025f, 6);
+            for (int r = 0; r < 5; r++)
+            {
+                float a = r * Mathf.PI * 2f / 5f + Rand(rng, -0.3f, 0.3f);
+                var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                trunks.Tube(foot + dir * 0.9f * k + Vector3.down * 0.15f, foot + Vector3.up * 0.45f * k, 0.12f * k, 0.2f * k, 5);
+            }
+
+            int tiers = 6 + rng.Next(2);
             for (int t = 0; t < tiers; t++)
             {
                 float f = t / (float)tiers;
-                float y0 = h * (0.2f + f * 0.72f);
-                float y1 = y0 + h * 0.36f;
-                float radius = r * (1f - f * 0.62f);
-                boughs.Tube(foot + Vector3.up * y0, foot + Vector3.up * y1, radius, 0.05f, 8);
+                float y = h * (0.13f + f * 0.82f);
+                float radius = R * (1f - f * 0.88f) * Rand(rng, 0.9f, 1.1f);
+                var c = On(y);
 
-                // Snow sitting on the upper half of the tier.
-                snow.Tube(foot + Vector3.up * (y0 + (y1 - y0) * 0.42f), foot + Vector3.up * (y1 - 0.02f),
-                          radius * 0.6f, 0.04f, 8);
+                // The inner mass the boughs hang from.
+                boughs.Tube(c + Vector3.up * 0.25f, c + Vector3.down * 0.15f * radius, radius * 0.5f, radius * 0.1f, 8);
+
+                int n = Mathf.Max(6, Mathf.RoundToInt(11f - f * 5f));
+                float phase = Rand(rng, 0f, Mathf.PI * 2f);
+                for (int b = 0; b < n; b++)
+                {
+                    float a = phase + b * Mathf.PI * 2f / n + Rand(rng, -0.18f, 0.18f);
+                    var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                    float len = radius * Rand(rng, 0.85f, 1.15f);
+                    float r0 = Mathf.Max(0.1f, len * 0.13f);
+                    var from = c + dir * 0.15f;
+                    var to = c + dir * len + Vector3.down * len * Rand(rng, 0.25f, 0.4f);
+                    boughs.Tube(from, to, r0, 0.025f, 5);
+
+                    if (Rand(rng, 0f, 1f) < 0.75f)
+                        snow.Tube(from + dir * len * 0.22f + Vector3.up * r0 * 0.75f, to - dir * len * 0.08f + Vector3.up * r0 * 0.25f,
+                                  r0 * 0.62f, r0 * 0.12f, 5);
+                }
             }
         }
 

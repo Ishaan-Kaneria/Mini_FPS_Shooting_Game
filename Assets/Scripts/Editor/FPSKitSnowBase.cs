@@ -19,6 +19,8 @@ namespace FPSKit.EditorTools
         // ==================================================================
         // The outpost
         // ==================================================================
+        private const float OutK = 1.15f;
+
         private static void BuildOutpost(Transform parent, int layer, int backdrop, System.Random rng, SitePlan plan)
         {
             var post = new GameObject("Outpost").transform;
@@ -26,13 +28,18 @@ namespace FPSKit.EditorTools
 
             float floor = GroundHeightAt(plan.Centre.x, plan.Centre.y);
             var f = new Frame(new Vector3(plan.Centre.x, floor, plan.Centre.y), plan.Yaw);
-            const float hu = 37.5f, hv = 26.5f;
+            // Everything below is laid out at OutK times the first plan (the buildings were too small to be
+            // anything to a player running past: "I can run round the houses in under a second").
+            const float K = OutK;
+            _outFrame = f;
+            _outFrameSet = true;
+            const float hu = 37.5f * K, hv = 26.5f * K;
 
             // ---- the palisade, with a gate at the front (-v) and one in the +u side ----
             var wall = new MeshBuild { UVScale = 0.3f };
             var tops = new MeshBuild { UVScale = 0.5f };
-            var gateFront = new List<Opening> { new Opening(hu - 12f, 8f, 0f, 5.2f) };       // from the -u corner
-            var gateSide = new List<Opening> { new Opening(hv - 10f, 8f, 0f, 5.2f) };        // from the -v corner
+            var gateFront = new List<Opening> { new Opening(hu - 12f * K, 10f, 0f, 5.6f) };       // from the -u corner
+            var gateSide = new List<Opening> { new Opening(hv - 10f * K, 10f, 0f, 5.6f) };        // from the -v corner
             Palisade(wall, tops, f, new Vector2(-hu, -hv), new Vector2(hu, -hv), gateFront);
             Palisade(wall, tops, f, new Vector2(-hu, hv), new Vector2(hu, hv), null);
             Palisade(wall, tops, f, new Vector2(-hu, -hv), new Vector2(-hu, hv), null);
@@ -44,64 +51,65 @@ namespace FPSKit.EditorTools
             var frames = new MeshBuild { UVScale = 0.5f };
             void GateFrame(Vector2 at, bool alongU)
             {
-                var across = alongU ? new Vector3(1f, 0f, 0f) : new Vector3(0f, 0f, 1f);
                 foreach (float s in new[] { -1f, 1f })
                 {
-                    var p = f.P(at.x + (alongU ? s * 4.4f : 0f), 3.2f, at.y + (alongU ? 0f : s * 4.4f));
-                    frames.Box(p, new Vector3(0.7f, 6.4f, 0.7f), f.Rot);
+                    var p = f.P(at.x + (alongU ? s * 5.4f : 0f), 3.4f, at.y + (alongU ? 0f : s * 5.4f));
+                    frames.Box(p, new Vector3(0.8f, 6.8f, 0.8f), f.Rot);
                 }
-                frames.Box(f.P(at.x, 5.9f, at.y), alongU ? new Vector3(9.6f, 0.6f, 0.7f) : new Vector3(0.7f, 0.6f, 9.6f), f.Rot);
-                _ = across;
+                frames.Box(f.P(at.x, 6.3f, at.y), alongU ? new Vector3(11.8f, 0.7f, 0.8f) : new Vector3(0.8f, 0.7f, 11.8f), f.Rot);
             }
-            GateFrame(new Vector2(-12f, -hv), true);
-            GateFrame(new Vector2(hu, -10f), false);
+            GateFrame(new Vector2(-12f * K, -hv), true);
+            GateFrame(new Vector2(hu, -10f * K), false);
             Solid(post, "GateFrames", frames, _logMat, layer, "Wood");
 
             // Watchtowers in the four corners: stilts, a cab, a hipped roof. Decoration -- nothing stands up there.
             for (int sx = -1; sx <= 1; sx += 2)
                 for (int sz = -1; sz <= 1; sz += 2)
-                    OutpostTower(post, layer, f, new Vector2(sx * (hu - 2.2f), sz * (hv - 2.2f)));
+                    OutpostTower(post, layer, f, new Vector2(sx * (hu - 2.6f), sz * (hv - 2.6f)));
 
             // ---- south side: mess hall (walkable roof), generator yard, depot ----
             {
-                var mess = new Frame(f.P(-26f, 0f, -14f), f.Yaw);
-                BuildEnterableChalet(post, layer, backdrop, rng, mess, 12f, flatRoof: true, wIn: 7.4f, dIn: 11.5f);
+                var mess = new Frame(f.P(-26f * K, 0f, -14f * K), f.Yaw);
+                BuildEnterableChalet(post, layer, backdrop, rng, mess, 18f, flatRoof: true, wIn: 12f, dIn: 17f);
             }
-            GeneratorYard(post, layer, rng, f, new Vector2(-1f, -17.5f));
-            SnowcatDepot(post, layer, rng, new Frame(f.P(24f, 0f, -21f), f.Yaw + 180f));
+            GeneratorYard(post, layer, rng, f, new Vector2(-1f * K, -17.5f * K));
+            SnowcatDepot(post, layer, rng, new Frame(f.P(24f * K, 0f, -21f * K), f.Yaw + 180f));
 
             // Trucks and a pickup in the lanes; snowmobiles by the fuel.
-            BuildUtilityTruck(post, layer, rng, f.P(-13.4f, 0f, -9f), f.Yaw + 2f);
-            BuildUtilityTruck(post, layer, rng, f.P(-13.4f, 0f, 18f), f.Yaw + 178f);
-            BuildPickup(post, layer, rng, f.P(21f, 0f, -2f), f.Yaw + 90f);
-            BuildPickup(post, layer, rng, f.P(-4f, 0f, -26.5f + 9.5f), f.Yaw + 180f);
-            BuildSnowmobile(post, layer, rng, f.P(32f, 0f, -17f), f.Yaw + 70f);
-            BuildSnowmobile(post, layer, rng, f.P(34f, 0f, -14.5f), f.Yaw + 95f);
+            BuildUtilityTruck(post, layer, rng, f.P(-13.4f * K, 0f, -9f * K), f.Yaw + 2f);
+            BuildUtilityTruck(post, layer, rng, f.P(-13.4f * K, 0f, 18f * K), f.Yaw + 178f);
+            BuildPickup(post, layer, rng, f.P(21f * K, 0f, -2f * K), f.Yaw + 90f);
+            BuildPickup(post, layer, rng, f.P(-4f * K, 0f, -17f * K), f.Yaw + 180f);
+            BuildSnowmobile(post, layer, rng, f.P(32f * K, 0f, -17f * K), f.Yaw + 70f);
+            BuildSnowmobile(post, layer, rng, f.P(34f * K, 0f, -14.5f * K), f.Yaw + 95f);
 
             // ---- north side: hangar, two barracks ----
-            Hangar(post, layer, rng, new Frame(f.P(-25f, 0f, 12f), f.Yaw));
-            BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(14f, 0f, 15f), f.Yaw), 12f, flatRoof: false, wIn: 7.4f, dIn: 20f);
-            BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(28f, 0f, 15f), f.Yaw), 12f, flatRoof: false, wIn: 7.4f, dIn: 20f);
+            Hangar(post, layer, rng, new Frame(f.P(-25f * K, 0f, 12f * K), f.Yaw), 1.15f);
+            BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(14f * K, 0f, 15f * K), f.Yaw), 18f, flatRoof: false, wIn: 11.5f, dIn: 26f);
+            BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(28f * K, 0f, 15f * K), f.Yaw), 18f, flatRoof: false, wIn: 11.5f, dIn: 26f);
 
             // ---- the middle: radio shed and mast, a block of containers, fuel ----
-            BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(8f, 0f, -3f), f.Yaw + 90f), 12f, flatRoof: false, wIn: 5.6f, dIn: 7.5f);
-            RadioMast(post, layer, f.P(-3f, 0f, 3f));
+            BuildEnterableChalet(post, layer, backdrop, rng, new Frame(f.P(8f * K, 0f, -3f * K), f.Yaw + 90f), 14f, flatRoof: false, wIn: 8.5f, dIn: 11f);
+            RadioMast(post, layer, f.P(-3f * K, 0f, 3f * K));
             ContainerBlock(post, layer, rng, f);
-            FuelFarm(post, layer, f, new Vector2(33f, 2f));
+            FuelFarm(post, layer, f, new Vector2(33f * K, 2f * K));
 
             // Sandbag lines and supply crates in the lanes' corners, so no lane is a bare corridor.
             var bags = new MeshBuild { UVScale = 0.5f };
             var crates = new MeshBuild { UVScale = 0.5f };
             var barrels = new MeshBuild { UVScale = 0.5f };
-            foreach (var at in new[] { new Vector2(-8f, -22f), new Vector2(-16f, 2f), new Vector2(19f, -9f), new Vector2(34f, -22f), new Vector2(-33f, -2f) })
+            foreach (var at0 in new[] { new Vector2(-8f, -22f), new Vector2(-16f, 2f), new Vector2(19f, -9f), new Vector2(34f, -22f), new Vector2(-33f, -2f),
+                                        new Vector2(5f, 14f), new Vector2(-4f, -8f), new Vector2(26f, -3f) })
             {
-                for (int i = 0; i < 6; i++)
-                    for (int r = 0; r < 2; r++)
-                        bags.SoftBox(f.P(at.x + i * 0.62f + r * 0.3f, 0.22f + r * 0.4f, at.y), new Vector3(0.6f, 0.38f, 0.42f), f.Rot, rng.Next(999), 0.12f, 2, 0.02f);
+                var at = at0 * K;
+                for (int i = 0; i < 8; i++)
+                    for (int r = 0; r < 3; r++)
+                        bags.SoftBox(f.P(at.x + i * 0.62f + r * 0.3f, 0.22f + r * 0.4f, at.y), new Vector3(0.6f, 0.38f, 0.42f), f.Rot, rng.Next(999), 0.12f, 3, 0.02f);
                 Crate(crates, f.P(at.x + 0.6f, 0f, at.y + 1.2f), 1.0f, f.Yaw + Rand(rng, -15f, 15f));
                 Crate(crates, f.P(at.x + 1.8f, 0f, at.y + 1.3f), 1.0f, f.Yaw + Rand(rng, -15f, 15f));
+                Crate(crates, f.P(at.x + 1.2f, 1.0f, at.y + 1.25f), 0.9f, f.Yaw + Rand(rng, -25f, 25f));
                 var d = f.P(at.x + 3f, 0f, at.y + 1.0f);
-                barrels.Tube(d, d + Vector3.up * 0.95f, 0.3f, 0.3f, 8);
+                barrels.Tube(d, d + Vector3.up * 0.95f, 0.3f, 0.3f, 12);
             }
             Solid(post, "Sandbags", bags, _alpCanvas, layer, "Wood");
             Solid(post, "Crates", crates, _plankMat, layer, "Wood");
@@ -113,7 +121,7 @@ namespace FPSKit.EditorTools
         /// <summary>Palisade run between two local points: a wall to the height of the logs, and a row of pointed log tops.</summary>
         private static void Palisade(MeshBuild wall, MeshBuild tops, Frame f, Vector2 a, Vector2 b, List<Opening> openings)
         {
-            WallRun(wall, f, a, b, 0f, 3.6f, 0.5f, openings);
+            WallRun(wall, f, a, b, 0f, 4.2f, 0.55f, openings);
             var d = b - a;
             float length = d.magnitude;
             var dir = d / length;
@@ -125,7 +133,7 @@ namespace FPSKit.EditorTools
                 if (s > gate0 && s < gate1) continue;
                 float jitter = ((Mathf.RoundToInt(s * 31f) % 5) - 2) * 0.12f;
                 var p = a + dir * s;
-                tops.Box(f.P(p.x, 3.6f + jitter * 0.5f + 0.35f, p.y), new Vector3(0.34f, 0.9f + jitter, 0.34f), rot);
+                tops.Box(f.P(p.x, 4.2f + jitter * 0.5f + 0.35f, p.y), new Vector3(0.34f, 0.9f + jitter, 0.34f), rot);
             }
         }
 
@@ -134,10 +142,10 @@ namespace FPSKit.EditorTools
             var legs = new MeshBuild { UVScale = 0.5f };
             var cab = new MeshBuild { UVScale = 0.4f };
             var roof = new MeshBuild { UVScale = 0.4f };
-            const float h = 7.5f;
+            const float h = 9f;
             foreach (float sx in new[] { -1f, 1f })
                 foreach (float sz in new[] { -1f, 1f })
-                    legs.Box(f.P(at.x + sx * 1.5f, h * 0.5f, at.y + sz * 1.5f), new Vector3(0.36f, h, 0.36f), f.Rot);
+                    legs.Box(f.P(at.x + sx * 1.9f, h * 0.5f, at.y + sz * 1.9f), new Vector3(0.44f, h, 0.44f), f.Rot);
             legs.Box(f.P(at.x, h, at.y), new Vector3(4.2f, 0.3f, 4.2f), f.Rot);
             cab.Box(f.P(at.x, h + 1.3f, at.y), new Vector3(3.6f, 2.2f, 3.6f), f.Rot);
             var top = f.P(at.x, h + 4.1f, at.y);
@@ -177,13 +185,14 @@ namespace FPSKit.EditorTools
             SnowFooting(parent, layer, f, 0f, d * 0.5f - 0.5f, w, 1f);
         }
 
-        private static void Hangar(Transform parent, int layer, System.Random rng, Frame f)
+        private static void Hangar(Transform parent, int layer, System.Random rng, Frame f, float sc = 1f)
         {
-            const float w = 18f, d = 21f, h = 7.2f, t = 0.4f;
+            float w = 18f * sc, d = 21f * sc, h = 7.2f * sc;
+            const float t = 0.4f;
             var walls = new MeshBuild { UVScale = 0.3f };
-            var op = new List<Opening> { new Opening(w * 0.5f, 11f, 0f, 6.2f) };
+            var op = new List<Opening> { new Opening(w * 0.5f, 11f * sc, 0f, 6.2f * sc) };
             WallRun(walls, f, new Vector2(-w * 0.5f, -d * 0.5f + t * 0.5f), new Vector2(w * 0.5f, -d * 0.5f + t * 0.5f), 0f, h, t, op);
-            op = new List<Opening> { new Opening(w * 0.5f, 11f, 0f, 6.2f) };
+            op = new List<Opening> { new Opening(w * 0.5f, 11f * sc, 0f, 6.2f * sc) };
             WallRun(walls, f, new Vector2(-w * 0.5f, d * 0.5f - t * 0.5f), new Vector2(w * 0.5f, d * 0.5f - t * 0.5f), 0f, h, t, op);
             var side = new List<Opening> { new Opening(d * 0.5f - t, 1.7f, 0f, 2.4f) };
             WallRun(walls, f, new Vector2(-w * 0.5f + t * 0.5f, -d * 0.5f + t), new Vector2(-w * 0.5f + t * 0.5f, d * 0.5f - t), 0f, h, t, side);
@@ -203,6 +212,7 @@ namespace FPSKit.EditorTools
             Visual(parent, "HangarBeams", trim, _ironMat, layer);
 
             Helicopter(parent, layer, rng, f.P(0f, 0f, 1f), f.Yaw + 8f);
+            if (sc > 1.2f) Helicopter(parent, layer, rng, f.P(0f, 0f, -d * 0.28f), f.Yaw + 172f);
 
             // Tool benches and a drum stack along the -u wall.
             var wood = new MeshBuild { UVScale = 0.5f };
@@ -269,9 +279,9 @@ namespace FPSKit.EditorTools
 
         private static void SnowcatDepot(Transform parent, int layer, System.Random rng, Frame f)
         {
-            OpenShed(parent, layer, f, 22f, 9f, 4.6f, _steelPanelMat, _slateMat);
+            OpenShed(parent, layer, f, 30f, 12f, 5.4f, _steelPanelMat, _slateMat);
             for (int i = 0; i < 3; i++)
-                Snowcat(parent, layer, rng, f.P(-6.5f + i * 6.5f, 0f, -0.2f), f.Yaw + Rand(rng, -5f, 5f));
+                Snowcat(parent, layer, rng, f.P(-9f + i * 9f, 0f, -0.2f), f.Yaw + Rand(rng, -5f, 5f));
         }
 
         private static void RadioMast(Transform parent, int layer, Vector3 at)
@@ -316,7 +326,7 @@ namespace FPSKit.EditorTools
             };
             foreach (var row in rows)
             {
-                var rf = new Frame(f.P(row.Item1.x, 0f, row.Item1.y), f.Yaw + row.Item2);
+                var rf = new Frame(f.P(row.Item1.x * OutK, 0f, row.Item1.y * OutK), f.Yaw + row.Item2);
                 for (int i = 0; i < 2; i++)
                 {
                     var build = new MeshBuild { UVScale = 0.3f };
@@ -360,33 +370,33 @@ namespace FPSKit.EditorTools
             float floor = GroundHeightAt(plan.Centre.x, plan.Centre.y);
             var f = new Frame(new Vector3(plan.Centre.x, floor, plan.Centre.y), plan.Yaw);
 
-            BuildEnterableChalet(lodge, layer, backdrop, rng, new Frame(f.P(4f, 0f, 5f), f.Yaw), 12f, flatRoof: false, wIn: 17f, dIn: 11f, bigLodge: true);
-            BuildEnterableChalet(lodge, layer, backdrop, rng, new Frame(f.P(-10f, 0f, -7f), f.Yaw), 12f, flatRoof: true);
+            BuildEnterableChalet(lodge, layer, backdrop, rng, new Frame(f.P(8f, 0f, 2f), f.Yaw), 18f, flatRoof: false, wIn: 25f, dIn: 17f, bigLodge: true);
+            BuildEnterableChalet(lodge, layer, backdrop, rng, new Frame(f.P(-14f, 0f, -12f), f.Yaw), 18f, flatRoof: true);
 
             // An annexe: a solid two-storey wing against the back of the hall.
             var wing = new MeshBuild { UVScale = 0.3f };
-            wing.SoftBox(f.P(4f, 3.6f, 15.2f), new Vector3(9f, 7.2f, 7f), f.Rot, 91, 0.1f, 3, 0.01f);
+            wing.SoftBox(f.P(9f, 4.2f, 16f), new Vector3(15f, 8.4f, 10f), f.Rot, 91, 0.1f, 3, 0.01f);
             Solid(lodge, "LodgeWing", wing, _logMat, layer, "Wood");
-            SealLocal(lodge, f, 4f, 3.6f, 15.2f, new Vector3(9f, 7.2f, 7f));
+            SealLocal(lodge, f, 9f, 4.2f, 16f, new Vector3(15f, 8.4f, 10f));
             var roof = new MeshBuild { UVScale = 0.4f };
             var snow = new MeshBuild { UVScale = 0.4f };
-            GableRoof(roof, snow, f, 4f, 15.2f, 9f, 7f, 7.2f, 0.6f, 0.7f);
+            GableRoof(roof, snow, f, 9f, 16f, 15f, 10f, 8.4f, 0.6f, 0.7f);
             RoofObjects(lodge, layer, roof, snow, _slateMat);
 
             var stuff = new MeshBuild { UVScale = 0.5f };
-            Sled(stuff, f.P(-2f, 0f, -9f), f.Yaw + 20f);
-            Sled(stuff, f.P(0.2f, 0f, -9.4f), f.Yaw - 10f);
+            Sled(stuff, f.P(-2f, 0f, -17f), f.Yaw + 20f);
+            Sled(stuff, f.P(0.6f, 0f, -17.4f), f.Yaw - 10f);
             for (int i = 0; i < 4; i++)
             {
-                var p = f.P(10f + i * 0.5f, 0.0f, -9f);
+                var p = f.P(14f + i * 0.5f, 0.0f, -17f);
                 stuff.Box(p + Vector3.up * 1.2f, new Vector3(0.12f, 2.4f, 0.12f), Quaternion.identity);   // skis planted upright
                 stuff.Box(p + Vector3.up * 1.2f + f.Axis(Vector3.right) * 0.3f, new Vector3(0.12f, 2.4f, 0.12f), Quaternion.identity);
             }
             Solid(lodge, "LodgeStuff", stuff, _plankMat, layer, "Wood");
-            BuildPickup(lodge, layer, rng, f.P(12f, 0f, -5f), f.Yaw + 70f);
-            Snowcat(lodge, layer, rng, f.P(-4f, 0f, -11f), f.Yaw + 190f);
-            BuildSnowmobile(lodge, layer, rng, f.P(13.5f, 0f, -9.5f), f.Yaw + 30f);
-            BuildSnowmobile(lodge, layer, rng, f.P(15.5f, 0f, -9f), f.Yaw + 55f);
+            BuildPickup(lodge, layer, rng, f.P(17f, 0f, -10f), f.Yaw + 70f);
+            Snowcat(lodge, layer, rng, f.P(0f, 0f, -18f), f.Yaw + 190f);
+            BuildSnowmobile(lodge, layer, rng, f.P(21f, 0f, -16f), f.Yaw + 30f);
+            BuildSnowmobile(lodge, layer, rng, f.P(21.5f, 0f, -13f), f.Yaw + 55f);
         }
     }
 }

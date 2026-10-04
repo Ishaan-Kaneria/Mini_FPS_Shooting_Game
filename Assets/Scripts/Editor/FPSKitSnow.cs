@@ -201,102 +201,6 @@ namespace FPSKit.EditorTools
         // The lake
         // ==================================================================
 
-        private static void BuildLake(Transform root, int layer)
-        {
-            var group = new GameObject("FrozenLake").transform;
-            group.SetParent(root, false);
-
-            // <b>Ask the terrain, do not trust the plan.</b> _lakeY is what the pad was
-            // *asked* for, computed from the natural height before the field existed; the
-            // height the ground actually ends up at is what comes back out of the
-            // relaxation and the smoothing afterwards, and it is a fraction of a metre
-            // higher. Laid at the planned height the sheet was under the snow -- sixty
-            // metres of ice, built, collidable, tagged, and invisible, with only the
-            // shards around its rim showing that anything was there at all. Everything in
-            // this kit that places something on the ground asks GroundHeightAt for
-            // exactly this reason.
-            float surface = GroundHeightAt(_lakeAt.x, _lakeAt.y) + 0.08f;
-
-            // Laid a hair over the flattened ground rather than at it exactly: coplanar
-            // surfaces z-fight, and the one place that shows worst is a large flat sheet
-            // seen at a grazing angle, which is exactly what this is.
-            var sheet = MeshObject(group, "Ice", LakeMesh(), _iceMat,
-                                   new Vector3(_lakeAt.x, surface, _lakeAt.y),
-                                   Quaternion.identity, Vector3.one, layer, IceTag);
-
-            // The map draws what it is given, and a sixty-metre disc of ice is worth
-            // drawing -- it is the one feature a player navigates this arena by.
-            Mark(sheet, new Color(0.62f, 0.80f, 0.95f, 0.75f), 10);
-
-            // Blocks shoved up where the sheet has buckled against the shore. They are
-            // what stops the lake being a perfect circle of nothing, and they are the only
-            // cover on it.
-            var rng = new System.Random(_theme.randomSeed ^ 0x51CE);
-            int shards = 14 + rng.Next(8);
-
-            for (int i = 0; i < shards; i++)
-            {
-                float angle = Rand(rng, 0f, Mathf.PI * 2f);
-                float away = _lakeRadius * Rand(rng, 0.55f, 0.94f);
-
-                float x = _lakeAt.x + Mathf.Cos(angle) * away;
-                float z = _lakeAt.y + Mathf.Sin(angle) * away;
-
-                float w = Rand(rng, 1.6f, 3.4f);
-                float h = Rand(rng, 1.1f, 2.6f);
-
-                var block = CreateBlock(group, new Vector3(x, GroundHeightAt(x, z) + h * 0.32f, z),
-                                        new Vector3(w, h, w * Rand(rng, 0.5f, 0.9f)),
-                                        Rand(rng, 0f, 360f), layer, IceTag,
-                                        Color.white, 0.6f, 0f, $"Shard_{i}", _iceBlockMat);
-
-                // Tilted hard, so it is a slab that heaved rather than a crate, and so
-                // that nothing tries to bake a walkable surface on top of it.
-                block.transform.localRotation = Quaternion.Euler(Rand(rng, 18f, 46f),
-                                                                 Rand(rng, 0f, 360f),
-                                                                 Rand(rng, -14f, 14f));
-                NoStanding(block);
-            }
-        }
-
-        /// <summary>
-        /// The sheet: a fan of triangles with a wobbly rim, so the shoreline is not a
-        /// circle drawn with a compass.
-        /// </summary>
-        private static Mesh LakeMesh() => Pooled($"lake_{_lakeRadius:0.0}", () =>
-        {
-            var build = new MeshBuild { UVScale = 0.08f };
-
-            const int Sides = 72;
-            var rim = new Vector3[Sides];
-
-            for (int i = 0; i < Sides; i++)
-            {
-                float t = i / (float)Sides * Mathf.PI * 2f;
-
-                // Three harmonics of wobble. One is an egg, two is a peanut; three stops
-                // the eye finding the pattern.
-                float r = _lakeRadius * (1f
-                    + 0.055f * Mathf.Sin(t * 3f + 0.7f)
-                    + 0.035f * Mathf.Sin(t * 5f + 2.1f)
-                    + 0.020f * Mathf.Sin(t * 8f + 4.4f));
-
-                rim[i] = new Vector3(Mathf.Cos(t) * r, 0f, Mathf.Sin(t) * r);
-            }
-
-            // <b>Wound clockwise in XZ, which is anticlockwise seen from above.</b>
-            // The rim is generated as (cos t, 0, sin t), and a fan taken round it in that
-            // order has a normal of cross(a, b) -- which points straight *down*. What that
-            // produces is a sixty-metre sheet that is built, collidable, tagged, walkable
-            // and invisible, because every triangle in it is a backface from the only side
-            // anybody ever sees it from. The shards round its rim still drew, so from
-            // above the lake read as an empty ring of ice blocks lying on snow.
-            for (int i = 0; i < Sides; i++)
-                build.Tri(Vector3.zero, rim[(i + 1) % Sides], rim[i]);
-
-            return build.ToMesh("FrozenLake");
-        });
-
         // ==================================================================
         // The camps
         // ==================================================================
@@ -391,8 +295,8 @@ namespace FPSKit.EditorTools
         {
             var build = new MeshBuild { UVScale = 0.55f };
 
-            const int Rings = 10;     // top to base
-            const int Sides = 28;     // around
+            const int Rings = 24;     // top to base (was 10): ice-block courses
+            const int Sides = 60;     // around (was 28)
 
             float inner = IglooRadius - IglooWall;
 
@@ -421,10 +325,14 @@ namespace FPSKit.EditorTools
                     float t0 = s / (float)Sides * Mathf.PI * 2f;
                     float t1 = (s + 1) / (float)Sides * Mathf.PI * 2f;
 
-                    var a = On(p0, t0, IglooRadius);
-                    var b = On(p0, t1, IglooRadius);
-                    var c = On(p1, t1, IglooRadius);
-                    var d = On(p1, t0, IglooRadius);
+                    // Courses of ice blocks: every other course sits a touch proud, and every fourth block in a
+                    // course is a touch sunk, so the dome has seams the way a built one does.
+                    float Rm(int ring, int step) => IglooRadius * (1f + ((ring % 2 == 0) ? -0.012f : 0f)
+                                                    + (((step + ring % 2 * 2) % 4 == 0) ? -0.01f : 0f) + (Hash01(ring * 131 + step, 5) - 0.5f) * 0.012f);
+                    var a = On(p0, t0, Rm(r, s));
+                    var b = On(p0, t1, Rm(r, s + 1));
+                    var c = On(p1, t1, Rm(r + 1, s + 1));
+                    var d = On(p1, t0, Rm(r + 1, s));
 
                     bool cut = InDoor(t0, d.y) || InDoor(t1, c.y);
 
@@ -497,7 +405,8 @@ namespace FPSKit.EditorTools
             const float Length = 3.4f;
             const float Half = 1.25f;      // inner half-width
             const float Height = 2.3f;     // inner height at the crown
-            const int Arc = 12;
+            const int Arc = 26;
+            const int Runs = 6;
 
             float wall = 0.55f;
             float z0 = IglooRadius - 1.2f;
@@ -516,12 +425,18 @@ namespace FPSKit.EditorTools
                 float t0 = i / (float)Arc;
                 float t1 = (i + 1) / (float)Arc;
 
-                // Outside. Same correction the dome needed and for the same reason --
-                // a vault wound inward is a vault with no lit face on it.
-                build.Quad(P(t1, z0, wall), P(t1, z1, wall), P(t0, z1, wall), P(t0, z0, wall));
+                for (int j = 0; j < Runs; j++)
+                {
+                    float za = Mathf.Lerp(z0, z1, j / (float)Runs), zb = Mathf.Lerp(z0, z1, (j + 1) / (float)Runs);
+                    float g0 = wall * (1f + (Hash01(i * 7 + j, 11) - 0.5f) * 0.06f);
 
-                // Inside, which therefore takes the winding the outside gave up.
-                build.Quad(P(t0, z0, 0f), P(t0, z1, 0f), P(t1, z1, 0f), P(t1, z0, 0f));
+                    // Outside. Same correction the dome needed and for the same reason --
+                    // a vault wound inward is a vault with no lit face on it.
+                    build.Quad(P(t1, za, g0), P(t1, zb, g0), P(t0, zb, g0), P(t0, za, g0));
+
+                    // Inside, which therefore takes the winding the outside gave up.
+                    build.Quad(P(t0, za, 0f), P(t0, zb, 0f), P(t1, zb, 0f), P(t1, za, 0f));
+                }
 
                 // The open mouth at the far end, showing the wall's thickness
                 build.Quad(P(t0, z1, 0f), P(t0, z1, wall), P(t1, z1, wall), P(t1, z1, 0f));
@@ -590,30 +505,28 @@ namespace FPSKit.EditorTools
                 var along = new Vector3(Mathf.Cos(heading * Mathf.Deg2Rad), 0f,
                                         Mathf.Sin(heading * Mathf.Deg2Rad));
 
-                int slabs = 6 + rng.Next(7);
-                var start = new Vector3(point.x, 0f, point.y) - along * (slabs * 1.4f);
+                // Twice the slabs of the old run, each a broken block (24 facets) rather than a box (12),
+                // welded into one mesh per run.
+                int slabs = 12 + rng.Next(12);
+                var start = new Vector3(point.x, 0f, point.y) - along * (slabs * 0.7f);
+                var run = new MeshBuild { UVScale = 0.3f };
 
                 for (int i = 0; i < slabs; i++)
                 {
-                    // The run wanders rather than being a drawn line.
-                    var at = start + along * (i * 2.8f)
-                             + new Vector3(Rand(rng, -1.6f, 1.6f), 0f, Rand(rng, -1.6f, 1.6f));
+                    var at = start + along * (i * 1.4f)
+                             + new Vector3(Rand(rng, -1.8f, 1.8f), 0f, Rand(rng, -1.8f, 1.8f));
 
-                    float w = Rand(rng, 2.2f, 4.2f);
-                    float h = Rand(rng, 1.8f, 3.6f);
+                    float w = Rand(rng, 1.8f, 4.2f);
+                    float h = Rand(rng, 1.6f, 3.6f);
 
                     at.y = GroundHeightAt(at.x, at.z) + h * 0.28f;
-
-                    var slab = CreateBlock(group, at, new Vector3(w, h, Rand(rng, 0.6f, 1.2f)),
-                                           0f, layer, IceTag, Color.white, 0.55f, 0f,
-                                           $"Ridge_{r}_{i}", _iceBlockMat);
-
-                    slab.transform.localRotation =
-                        Quaternion.Euler(Rand(rng, 52f, 78f), heading + Rand(rng, -25f, 25f),
-                                         Rand(rng, -18f, 18f));
-
-                    NoStanding(slab);
+                    JaggedBlock(run, at, new Vector3(w, h, Rand(rng, 0.5f, 1.2f)),
+                                Quaternion.Euler(Rand(rng, 52f, 78f), heading + Rand(rng, -25f, 25f), Rand(rng, -18f, 18f)),
+                                rng.Next(1, 99999));
                 }
+
+                NoStanding(MeshObject(group, $"Ridge_{r}", ToMesh(run, DenseKey("ridge")), _iceBlockMat, Vector3.zero,
+                                      Quaternion.identity, Vector3.one, layer, IceTag));
             }
         }
 

@@ -615,12 +615,37 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Splits every triangle of a build in two along its longest edge: exactly twice the triangles, the same
+        /// shape. Honest about what it is: it adds no silhouette, it is the floor under the objects that were not
+        /// individually rebuilt with real detail.
+        /// </summary>
+        private static MeshBuild SnowBisect(MeshBuild src)
+        {
+            var dst = new MeshBuild { UVScale = src.UVScale };
+            var v = src.Vertices;
+            var t = src.Triangles;
+            for (int i = 0; i + 2 < t.Count; i += 3)
+            {
+                Vector3 a = v[t[i]], b = v[t[i + 1]], c = v[t[i + 2]];
+                float ab = (b - a).sqrMagnitude, bc = (c - b).sqrMagnitude, ca = (a - c).sqrMagnitude;
+                if (ab >= bc && ab >= ca) { var m = (a + b) * 0.5f; dst.Tri(a, m, c); dst.Tri(m, b, c); }
+                else if (bc >= ca) { var m = (b + c) * 0.5f; dst.Tri(b, m, a); dst.Tri(m, c, a); }
+                else { var m = (c + a) * 0.5f; dst.Tri(c, m, b); dst.Tri(m, a, b); }
+            }
+            return dst;
+        }
+
+        /// <summary>
         /// Welds an accumulated build into a mesh, reusing one already made for the same
         /// key. Repeated parts -- every catwalk of the same length, every sign of the
         /// same kind -- are one mesh shared, which is the whole reason the pool exists.
         /// </summary>
         private static Mesh ToMesh(MeshBuild build, string key)
         {
+            // Snowbound (2026-10-04, "at least double the triangles of every object"): whatever was not given
+            // real extra detail is at least split in two here. See SnowBisect.
+            if (_theme != null && _theme.snowZone && build.Triangles.Count < 12000) build = SnowBisect(build);
+
             return Pooled(key, () =>
             {
                 var mesh = new Mesh { name = key };

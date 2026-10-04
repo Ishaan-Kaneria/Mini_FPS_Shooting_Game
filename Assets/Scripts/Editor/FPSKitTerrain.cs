@@ -279,7 +279,7 @@ namespace FPSKit.EditorTools
 
             // Snow is built finer (1.5 m): the drifts, the lip of every crevasse and the foot of every wall read
             // at walking pace, and a three-metre grid shows its triangles as facets in low sun.
-            _groundStep = _theme.snowZone ? 1.5f : 3f;
+            _groundStep = _theme.snowZone ? 1f : 3f;
             float reach = half + TerrainOverhang;
             _groundMin = -reach;
 
@@ -545,7 +545,10 @@ namespace FPSKit.EditorTools
             // of the middle of a flattened pad and off the end of its blend. At ten the
             // steepest ground in the arena was still on the lip of a pad, because the
             // relaxation simply had not reached that far before it stopped.
-            int sweeps = Mathf.RoundToInt(30f * 3f / _groundStep);   // a sweep is a cell; the reach in metres stays put
+            float stepRatio = 3f / _groundStep;
+            // A sweep moves sand one cell, so the *distance* it carries is a cell per sweep -- but how far a correction diffuses
+            // goes with the square of the cells, so a finer grid needs the ratio squared to settle as well as the 3 m one did.
+            int sweeps = Mathf.RoundToInt(30f * stepRatio * stepRatio);
 
             // Eight neighbours, not four -- and the diagonals are the whole reason.
             //

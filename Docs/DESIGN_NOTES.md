@@ -2730,3 +2730,30 @@ more triangles ... ground, snow, trees, houses, cars". What changed, and why:
   blue skin, and the cornice carries the `Snow` tag.
 - Reading a render mesh's bake effect: stranded samples after the finer ground are 0.3 % (tiny pockets), under the 2 %
   limit. The scene is now ~160 MB and **Git LFS** (see `.gitattributes`), like the desert's.
+
+### Snowbound: bigger, denser, finer, filled, and a sky (2026-10-04, third pass)
+
+Ishaan, still unhappy after the detail pass: the crevasse area ("slides"), the frozen lake, the glacier ice and the ski
+lift ("rides") were poor; "make all objects' triangles at least double"; houses far too small ("I can run round them in
+under a second"); "fill some spaces ... fencing or objects"; "make the skybox better and accurate".
+
+- **Houses are about 1.7x the footprint** (chalets 11.5-16 m wide, 13-18 m deep, lots 18 m, lanes 4.2 m; church 12x21; clock
+  tower 8 m; lodge hall 25x17; outpost laid out at `OutK` 1.15 with 11.5 x 26 m barracks; cabins 20 m lots). Space is the
+  limit: the village picks the largest radius that fits from 92 m down, and the outpost/lodge/pass/cabin sites were
+  trimmed until all fit (an outpost, lift or pass that "finds no room" is a planning fault, check the log).
+- **Triangles: 1.83 M -> 3.9 M.** Ground 1 m cells (the slope relaxation needs the *square* of the cell ratio in sweeps,
+  not the ratio); boulders and buttes at four times the facets (`IsSnowArena`); a lake of 5,700 triangles with fissures,
+  heaved plates and wind-snow; crevasse walls in 0.8 m by 0.9 m cells narrowing with depth with ledges and icicles; ice
+  caves from a grid of blocks (7,500 each, were 40); icefall curtain 22 by 36 cells; igloos in 24 courses; and everything
+  built with `MeshBuild` and not individually rebuilt is split in two at `ToMesh` (`SnowBisect`, exactly 2x, **no new
+  shape** -- say so when reporting). Butte ledges are spaced in proportion for snow (the desert is unchanged).
+- **Mountains** are ridged-noise massifs (`BuildSnowMountains`, 64 x 64 cells, rock below the snowline, snow above, steep
+  faces stay rock), not pale buttes.
+- **Fill** (`FPSKitSnowFill.cs`): picket fences on three sides of village lots (front open), wire and snow fences,
+  barrels, pallets, tarped crates, hay bales, benches, signposts, trail markers, snowmen, jersey barriers, floodlights,
+  ice-fishing huts. Leave the storehouse lots clear: a prop or fence at a stair foot cut the navmesh again (6 roofs).
+- **Sky** (`FPSKitSnowSky.cs`): a painted 4096 x 2048 equirectangular texture on Unity's Skybox/Panoramic, because the
+  procedural sky at a low sun reddens the whole horizon like a desert sunset. Pale horizon equal to the fog colour, cold blue
+  zenith, wide warm glow, cirrus streaked along the wind, broken altocumulus lit from the sun's side, a 22-degree halo and
+  sundogs. The sun in the picture is placed from the theme's light angle. Regenerated only when the sun, fog or recipe change.
+- Checks on the verified build: VerifyReach 0.1 % stranded, VerifyTerrain clean, all 8 storehouse roofs reachable.

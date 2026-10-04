@@ -557,6 +557,8 @@ namespace FPSKit.EditorTools
             return _palmTips.TryGetValue(seed, out var tip) ? tip : Vector3.up;
         }
 
+        private static bool IsSnowArena() => _theme != null && _theme.snowZone;
+
         private static Mesh Pooled(string key, System.Func<Mesh> make)
         {
             if (_meshPool.TryGetValue(key, out var mesh) && mesh != null) return mesh;
@@ -577,7 +579,7 @@ namespace FPSKit.EditorTools
         /// plane. Cut flat at its base it sits on whatever it is put on, every time.
         /// </summary>
         private static Mesh BoulderMesh(int seed, float lumpiness = 0.34f, float squash = 0.72f)
-            => BoulderMeshAt(seed, lumpiness, squash, IsDesertArena() ? 3 : 2);
+            => BoulderMeshAt(seed, lumpiness, squash, (IsDesertArena() || IsSnowArena()) ? 3 : 2);
 
         /// <summary>
         /// The desert's rocks are a subdivision-3 icosphere (1,280 facets, not 320) with two more octaves of
@@ -647,11 +649,19 @@ namespace FPSKit.EditorTools
                 sides = Mathf.RoundToInt(sides * 1.7f);
                 levels = Mathf.RoundToInt(levels * 1.6f);
             }
-            return ButteMeshCore(seed, sides, levels);
+            else if (IsSnowArena())
+            {
+                // Snowbound (2026-10-04, "at least double ... all objects"): four times the facets.
+                sides = Mathf.RoundToInt(sides * 2.2f);
+                levels = Mathf.RoundToInt(levels * 2.1f);
+            }
+            // A finer butte has more rings, not more ledges: spaced in proportion, snow only (the desert's are as they were).
+            int ledgeEvery = IsSnowArena() ? Mathf.Max(3, Mathf.RoundToInt(levels / 2.4f)) : 3;
+            return ButteMeshCore(seed, sides, levels, ledgeEvery);
         }
 
-        private static Mesh ButteMeshCore(int seed, int sides = 9, int levels = 7)
-            => Pooled($"butte_{seed}_{sides}_{levels}", () =>
+        private static Mesh ButteMeshCore(int seed, int sides = 9, int levels = 7, int ledgeEvery = 3)
+            => Pooled(ledgeEvery == 3 ? $"butte_{seed}_{sides}_{levels}" : $"butte_{seed}_{sides}_{levels}_{ledgeEvery}", () =>
             {
                 var build = new MeshBuild { UVScale = 0.18f };
 
@@ -674,7 +684,7 @@ namespace FPSKit.EditorTools
                     // alcove under it -- the player walks in, the rock closes over them,
                     // and what they are standing in reads as a cave that is not one. The
                     // bands above eye level say everything the bottom one did.
-                    float ledge = (l % 3 == 1 && l > 1) ? 1.12f : 1f;
+                    float ledge = (l % ledgeEvery == 1 && l > 1) ? 1.12f : 1f;
 
                     rings[l] = new Vector3[sides];
 

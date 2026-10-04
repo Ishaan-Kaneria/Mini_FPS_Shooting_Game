@@ -861,6 +861,9 @@ namespace FPSKit.EditorTools
             var group = new GameObject("Backdrop").transform;
             group.SetParent(root, false);
 
+            // Snowbound: real mountain massifs with snow above the line (FPSKitSnowIce).
+            if (_theme.snowZone) { BuildSnowMountains(group, layer, rng); return; }
+
             // The desert gets continuous ranges behind a thinner row of banded mesas; see
             // FPSKitDesertRanges. Every other open arena keeps what it had.
             bool desertSky = _theme.openZone && _theme.floorDetail == "Sand"

@@ -23,7 +23,7 @@ namespace FPSKit.EditorTools
     public static partial class FPSKitSceneBuilder
     {
         private const float AlpStorey = 18 * StairRise;   // a whole number of risers, for the stair
-        private const float AlpVillageR = 74f;
+        private static float _alpR = 100f;   // chosen at plan time: the largest that finds room
 
         private static bool _hasAlpVillage, _hasOutpost, _hasLodge, _hasPass, _hasMine, _hasLift;
         private static Vector2 _alpCentre;
@@ -42,6 +42,8 @@ namespace FPSKit.EditorTools
             _alpCabins.Clear();
             _alpCamps.Clear();
             _liftPylons.Clear();
+            _alpLots.Clear();
+            _outFrameSet = false;
         }
 
         private static void ResolveSnowFullMaterials()
@@ -125,20 +127,24 @@ namespace FPSKit.EditorTools
 
             var rng = new System.Random(_theme.randomSeed * 7919 + 11);
 
-            // ---- the village ----
-            float vr = AlpVillageR;
-            for (int i = 0; i < 300 && !_hasAlpVillage; i++)
+            // ---- the village: the largest circle that fits (the houses are big now), from 106 m down to 80 ----
+            foreach (float vr in new[] { 92f, 88f, 84f, 80f, 76f })
             {
-                float limit = half - vr - 34f;
-                var p = new Vector2(Rand(rng, -limit, limit), Rand(rng, -limit, limit));
-                if (p.magnitude < 115f || !Free(p, vr + 4f)) continue;
+                if (_hasAlpVillage) break;
+                for (int i = 0; i < 600 && !_hasAlpVillage; i++)
+                {
+                    float limit = half - vr - 30f;
+                    var p = new Vector2(Rand(rng, -limit, limit), Rand(rng, -limit, limit));
+                    if (p.magnitude < 125f || !Free(p, vr + 4f)) continue;
 
-                _alpCentre = p;
-                _hasAlpVillage = true;
-                Claim(p.x, p.y, vr + 10f);
-                FlattenPad(p.x, p.y, vr, 32f, SiteHeight(p, vr));
-                _anchors.Add(new Vector3(p.x, 0f, p.y));
-                _snowSites.Add(new Vector3(p.x, p.y, vr + 16f));
+                    _alpR = vr;
+                    _alpCentre = p;
+                    _hasAlpVillage = true;
+                    Claim(p.x, p.y, vr + 10f);
+                    FlattenPad(p.x, p.y, vr, 34f, SiteHeight(p, vr));
+                    _anchors.Add(new Vector3(p.x, 0f, p.y));
+                    _snowSites.Add(new Vector3(p.x, p.y, vr + 16f));
+                }
             }
             if (!_hasAlpVillage) Debug.LogWarning("[FPSKit] snow: no room for the village.");
 
@@ -152,16 +158,16 @@ namespace FPSKit.EditorTools
             var rng = new System.Random(_theme.randomSeed * 6841 + 29);
 
             // ---- the outpost: a walled compound, 76 by 54 ----
-            _hasOutpost = SnowSite(rng, half, 76f, 54f, 400, null, out _outpost, blend: 24f, gap: 6f);
+            _hasOutpost = SnowSite(rng, half, 76f * OutK, 54f * OutK, 2000, null, out _outpost, blend: 24f, gap: 6f);
             if (!_hasOutpost) Debug.LogWarning("[FPSKit] snow: no room for the outpost.");
 
             // ---- the lodge, and a ski lift that climbs away from it ----
-            _hasLodge = SnowSite(rng, half, 32f, 26f, 300, null, out _lodge, blend: 20f);
+            _hasLodge = SnowSite(rng, half, 42f, 40f, 1000, null, out _lodge, blend: 20f);
             if (_hasLodge) PlanSkiLift(rng, half);
 
             // ---- the mine, and the pass ----
             _hasMine = SnowSite(rng, half, 30f, 24f, 300, null, out _mine, blend: 16f);
-            _hasPass = SnowSite(rng, half, 44f, 30f, 300, null, out _pass, blend: 18f);
+            _hasPass = SnowSite(rng, half, 40f, 28f, 800, null, out _pass, blend: 18f);
 
             Debug.Log($"[FPSKit] snow plan: outpost {_hasOutpost}, lodge {_hasLodge}, lift {_hasLift}, mine {_hasMine}, pass {_hasPass}.");
         }
@@ -172,7 +178,7 @@ namespace FPSKit.EditorTools
             if (!_theme.snowZone) return;
             var rng = new System.Random(_theme.randomSeed * 5483 + 17);
             for (int i = 0; i < 8; i++)
-                if (SnowSite(rng, half, 15f, 13f, 160, null, out var cabin, blend: 10f, gap: 4f, spawnClear: 40f))
+                if (SnowSite(rng, half, 21f, 19f, 300, null, out var cabin, blend: 10f, gap: 4f, spawnClear: 40f))
                     _alpCabins.Add(cabin);
             for (int i = 0; i < 6; i++)
                 if (SnowSite(rng, half, 14f, 14f, 160, null, out var camp, blend: 8f, gap: 4f, spawnClear: 36f))
@@ -447,12 +453,12 @@ namespace FPSKit.EditorTools
         private static void BuildSolidChalet(Transform parent, int layer, System.Random rng, Frame f, float lot, bool fenced)
         {
             var paint = _chaletPaints[rng.Next(_chaletPaints.Length)];
-            bool two = rng.NextDouble() < 0.4;
+            bool two = rng.NextDouble() < 0.5;
 
-            float w = Rand(rng, 7f, lot - 2f), d = Rand(rng, 8f, lot - 1.6f);
+            float w = Rand(rng, 11.5f, lot - 2.2f), d = Rand(rng, 13f, lot - 1.6f);
             float cu = Rand(rng, -(lot - w) * 0.35f, (lot - w) * 0.35f);
             float cv = fenced ? lot * 0.5f - 0.6f - d * 0.5f : Rand(rng, -(lot - d) * 0.35f, (lot - d) * 0.35f);
-            float top = AlpStorey + (two ? 2.9f : 0f);
+            float top = AlpStorey + (two ? 3.4f : 0f);
 
             // A core inside the logs (collision, and the inside of the gaps between them), then the logs.
             var shell = new MeshBuild { UVScale = 0.3f };
@@ -534,8 +540,8 @@ namespace FPSKit.EditorTools
             float storey = AlpStorey;
             var paint = _chaletPaints[rng.Next(_chaletPaints.Length)];
 
-            float w = wIn > 0f ? wIn : Rand(rng, 7f, 7.6f);
-            float d = dIn > 0f ? dIn : Rand(rng, 8.8f, lot - 0.6f);
+            float w = wIn > 0f ? wIn : Rand(rng, 11.6f, 12.4f);
+            float d = dIn > 0f ? dIn : Rand(rng, 14.5f, lot - 0.8f);
             float cu = flatRoof || wIn > 0f ? -(lot - w) * 0.5f + 0.25f : Rand(rng, -0.4f, 0.4f);
             if (wIn > 0f) cu = 0f;
             const float cv = 0f;
@@ -719,15 +725,15 @@ namespace FPSKit.EditorTools
 
             var c = _alpCentre;
             float floor = GroundHeightAt(c.x, c.y);
-            float R = AlpVillageR;
+            float R = _alpR;
 
-            const float lot = 11f, lane = 3.1f, pitch = lot + lane;
-            const float mainHalf = 4.5f, crossHalf = 3f;
+            const float lot = 18f, lane = 4.2f, pitch = lot + lane;
+            const float mainHalf = 5.5f, crossHalf = 4f;
             float plazaX = crossHalf + lot, plazaZ = mainHalf + lot;
 
             var lots = new List<Vector2>();
-            for (int j = -7; j <= 7; j++)
-                for (int k = -7; k <= 7; k++)
+            for (int j = -6; j <= 6; j++)
+                for (int k = -6; k <= 6; k++)
                 {
                     if (j == 0 || k == 0) continue;
                     float x = c.x + Mathf.Sign(j) * (crossHalf + lot * 0.5f + (Mathf.Abs(j) - 1) * pitch);
@@ -758,14 +764,16 @@ namespace FPSKit.EditorTools
                 if (p == towerLot && towerLot != churchLot) { BuildClockTower(town, layer, new Frame(at, 0f)); continue; }
 
                 var f = new Frame(at, rng.Next(4) * 90f);
+                int lotIndex = _alpLots.Count;
+                _alpLots.Add(new LotRec { Origin = at, Yaw = f.Yaw, Skip = false });
                 double roll = rng.NextDouble();
-                if (roll < 0.05) { BuildYardLot(town, layer, rng, f, lot); yards++; continue; }
+                if (roll < 0.05) { BuildYardLot(town, layer, rng, f, lot); yards++; _alpLots[lotIndex] = new LotRec { Origin = at, Yaw = f.Yaw, Skip = true }; continue; }
                 if (roll < 0.30) { BuildEnterableChalet(town, layer, backdrop, rng, f, lot, flatRoof: false); enterable++; continue; }
-                if (roll < 0.40) { BuildEnterableChalet(town, layer, backdrop, rng, f, lot, flatRoof: true); stores++; continue; }
+                if (roll < 0.40) { BuildEnterableChalet(town, layer, backdrop, rng, f, lot, flatRoof: true); stores++; _alpLots[lotIndex] = new LotRec { Origin = at, Yaw = f.Yaw, Skip = true }; continue; }
 
                 bool fence = rng.NextDouble() < 0.35;
                 BuildSolidChalet(town, layer, rng, f, lot, fence);
-                if (fence) fenced++;
+                if (fence) { fenced++; _alpLots[lotIndex] = new LotRec { Origin = at, Yaw = f.Yaw, Skip = true }; }
                 solid++;
             }
 
@@ -892,7 +900,7 @@ namespace FPSKit.EditorTools
 
         private static void BuildClockTower(Transform parent, int layer, Frame f)
         {
-            const float w = 6f, h = 13f;
+            const float w = 8f, h = 18f;
             var shell = new MeshBuild { UVScale = 0.3f };
             shell.SoftBox(f.P(0f, h * 0.5f, 0f), new Vector3(w, h, w), f.Rot, 31, 0.1f, 3, 0.01f);
             Solid(parent, "ClockTower", shell, _plasterMat, layer, "Concrete");
@@ -901,8 +909,8 @@ namespace FPSKit.EditorTools
 
             var roof = new MeshBuild { UVScale = 0.4f };
             var snow = new MeshBuild { UVScale = 0.4f };
-            var top = f.P(0f, h + 5.2f, 0f);
-            var inside = f.P(0f, h + 1.5f, 0f);
+            var top = f.P(0f, h + 7f, 0f);
+            var inside = f.P(0f, h + 2f, 0f);
             Vector3 A = f.P(-w * 0.55f, h, -w * 0.55f), B = f.P(-w * 0.55f, h, w * 0.55f), C = f.P(w * 0.55f, h, w * 0.55f), D = f.P(w * 0.55f, h, -w * 0.55f);
             AddOutward(roof, inside, A, top, B); AddOutward(roof, inside, B, top, C);
             AddOutward(roof, inside, C, top, D); AddOutward(roof, inside, D, top, A);
@@ -912,11 +920,11 @@ namespace FPSKit.EditorTools
             var face = new MeshBuild { UVScale = 0.5f };
             foreach (int fc in new[] { 0, 1, 2, 3 })
             {
-                var p = FaceAt(f, fc, 0f, 0f, w, w, 0f, h - 3.2f, 0.06f, out var rot);
-                face.Box(p, new Vector3(2.4f, 2.4f, 0.1f), rot);
-                trim.Box(FaceAt(f, fc, 0f, 0f, w, w, 0f, h - 3.2f, 0.04f, out _), new Vector3(2.8f, 2.8f, 0.1f), rot);
+                var p = FaceAt(f, fc, 0f, 0f, w, w, 0f, h - 4.2f, 0.06f, out var rot);
+                face.Box(p, new Vector3(3.2f, 3.2f, 0.1f), rot);
+                trim.Box(FaceAt(f, fc, 0f, 0f, w, w, 0f, h - 4.2f, 0.04f, out _), new Vector3(3.7f, 3.7f, 0.1f), rot);
                 var q = FaceAt(f, fc, 0f, 0f, w, w, 0f, 2.1f, 0.05f, out _);
-                trim.Box(q, new Vector3(1.9f, 4.2f, 0.1f), rot);
+                trim.Box(q, new Vector3(2.6f, 5.2f, 0.1f), rot);
             }
             foreach (float su in new[] { -1f, 1f })
                 foreach (float sv in new[] { -1f, 1f })
@@ -927,13 +935,13 @@ namespace FPSKit.EditorTools
 
         private static void BuildChurch(Transform parent, int layer, Frame f)
         {
-            const float w = 8.6f, d = 15f, tower = 5.2f, nave = 5.4f;
+            const float w = 12f, d = 21f, tower = 7f, nave = 7.5f, tH = 19f;
             var shell = new MeshBuild { UVScale = 0.3f };
             shell.SoftBox(f.P(0f, nave * 0.5f, 1.8f), new Vector3(w, nave, d), f.Rot, 17, 0.1f, 3, 0.01f);
-            shell.SoftBox(f.P(0f, 14f * 0.5f, -d * 0.5f + 1.8f - tower * 0.5f + 1.6f), new Vector3(tower, 14f, tower), f.Rot, 23, 0.1f, 3, 0.01f);
+            shell.SoftBox(f.P(0f, tH * 0.5f, -d * 0.5f + 1.8f - tower * 0.5f + 1.6f), new Vector3(tower, tH, tower), f.Rot, 23, 0.1f, 3, 0.01f);
             Solid(parent, "Church", shell, _plasterMat, layer, "Concrete");
             SealLocal(parent, f, 0f, nave * 0.5f, 1.8f, new Vector3(w, nave, d));
-            SealLocal(parent, f, 0f, 7f, -d * 0.5f + 1.8f - tower * 0.5f + 1.6f, new Vector3(tower, 14f, tower));
+            SealLocal(parent, f, 0f, tH * 0.5f, -d * 0.5f + 1.8f - tower * 0.5f + 1.6f, new Vector3(tower, tH, tower));
             SnowFooting(parent, layer, f, 0f, 1.8f, w, d);
 
             var roof = new MeshBuild { UVScale = 0.4f };
@@ -942,27 +950,27 @@ namespace FPSKit.EditorTools
 
             // The spire.
             float tz = -d * 0.5f + 1.8f - tower * 0.5f + 1.6f;
-            var apex = f.P(0f, 14f + 7.5f, tz);
-            var inside = f.P(0f, 14f + 2f, tz);
+            var apex = f.P(0f, tH + 10f, tz);
+            var inside = f.P(0f, tH + 2f, tz);
             float sr = tower * 0.5f + 0.35f;
-            Vector3 A = f.P(-sr, 14f, tz - sr), B = f.P(-sr, 14f, tz + sr), C = f.P(sr, 14f, tz + sr), D = f.P(sr, 14f, tz - sr);
+            Vector3 A = f.P(-sr, tH, tz - sr), B = f.P(-sr, tH, tz + sr), C = f.P(sr, tH, tz + sr), D = f.P(sr, tH, tz - sr);
             AddOutward(roof, inside, A, apex, B); AddOutward(roof, inside, B, apex, C);
             AddOutward(roof, inside, C, apex, D); AddOutward(roof, inside, D, apex, A);
             RoofObjects(parent, layer, roof, snow, _slateMat);
 
             var trim = new MeshBuild { UVScale = 0.5f };
             var glass = new MeshBuild { UVScale = 0.5f };
-            trim.Box(f.P(0f, 14f + 8.5f, tz), new Vector3(0.12f, 1.8f, 0.12f), f.Rot);
-            trim.Box(f.P(0f, 14f + 9.0f, tz), new Vector3(0.9f, 0.12f, 0.12f), f.Rot);
+            trim.Box(f.P(0f, tH + 11.5f, tz), new Vector3(0.14f, 2.4f, 0.14f), f.Rot);
+            trim.Box(f.P(0f, tH + 12.2f, tz), new Vector3(1.2f, 0.14f, 0.14f), f.Rot);
             foreach (float s in new[] { -1f, 1f })
                 for (float z = -d * 0.5f + 5.5f; z < d * 0.5f + 1.8f - 1.2f; z += 3.3f)
                 {
-                    glass.Box(f.P(s * (w * 0.5f + 0.05f), 2.6f, z), new Vector3(0.12f, 2.6f, 1.1f), f.Rot);
-                    trim.Box(f.P(s * (w * 0.5f + 0.03f), 2.6f, z), new Vector3(0.1f, 2.9f, 1.4f), f.Rot);
+                    glass.Box(f.P(s * (w * 0.5f + 0.05f), 3.4f, z), new Vector3(0.12f, 3.6f, 1.5f), f.Rot);
+                    trim.Box(f.P(s * (w * 0.5f + 0.03f), 3.4f, z), new Vector3(0.1f, 4.0f, 1.9f), f.Rot);
                 }
             glass.Box(f.P(0f, 1.6f, tz - tower * 0.5f - 0.05f), new Vector3(2.2f, 3.2f, 0.12f), f.Rot);
             foreach (int fc in new[] { 0, 1, 2, 3 })
-                glass.Box(FaceAt(f, fc, 0f, tz, tower, tower, 0f, 11.5f, 0.06f, out _), new Vector3(1.0f, 1.8f, 0.1f),
+                glass.Box(FaceAt(f, fc, 0f, tz, tower, tower, 0f, 15f, 0.06f, out _), new Vector3(1.4f, 2.4f, 0.1f),
                           fc < 2 ? f.Rot : f.Rot * Quaternion.Euler(0f, 90f, 0f));
             Visual(parent, "ChurchGlass", glass, _dullGlassMat, layer);
             Visual(parent, "ChurchTrim", trim, _logDarkMat, layer);

@@ -22,11 +22,11 @@ namespace FPSKit.EditorTools
         private static void PlanSkiLift(System.Random rng, float half)
         {
             var origin = _lodge.Centre;
-            for (int i = 0; i < 300 && !_hasLift; i++)
+            for (int i = 0; i < 1500 && !_hasLift; i++)
             {
-                float a = Rand(rng, 0f, Mathf.PI * 2f), len = Rand(rng, 105f, 160f);
+                float a = Rand(rng, 0f, Mathf.PI * 2f), len = Rand(rng, 90f, 150f);
                 var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-                var start = origin + dir * 42f;
+                var start = origin + dir * 62f;
                 var end = start + dir * len;
                 if (Mathf.Abs(end.x) > half - 42f || Mathf.Abs(end.y) > half - 42f) continue;
                 if (Mathf.Abs(start.x) > half - 42f || Mathf.Abs(start.y) > half - 42f) continue;
@@ -44,12 +44,12 @@ namespace FPSKit.EditorTools
                 if (!ok) continue;
 
                 float yaw = Mathf.Round(Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg / 90f) * 90f;
-                _liftBottom = new SitePlan { Centre = start, Width = 10f, Depth = 8f, Yaw = yaw };
-                _liftTop = new SitePlan { Centre = end, Width = 10f, Depth = 8f, Yaw = yaw + 180f };
+                _liftBottom = new SitePlan { Centre = start, Width = 14f, Depth = 12f, Yaw = yaw };
+                _liftTop = new SitePlan { Centre = end, Width = 14f, Depth = 12f, Yaw = yaw + 180f };
                 foreach (var s in new[] { start, end })
                 {
                     Claim(s.x, s.y, 12f);
-                    FlattenPad(s.x, s.y, 7f, 14f, SiteHeight(s, 7f));
+                    FlattenPad(s.x, s.y, 10f, 14f, SiteHeight(s, 10f));
                     _anchors.Add(new Vector3(s.x, 0f, s.y));
                     _snowSites.Add(new Vector3(s.x, s.y, 16f));
                 }
@@ -72,70 +72,115 @@ namespace FPSKit.EditorTools
             {
                 var f = SiteFrame(plan);
                 var shell = new MeshBuild { UVScale = 0.3f };
-                shell.SoftBox(f.P(0f, 2.6f, 0f), new Vector3(7f, 5.2f, 5.2f), f.Rot, 61, 0.15f, 3, 0.01f);
+                shell.SoftBox(f.P(0f, 3.5f, 0f), new Vector3(11f, 7f, 8f), f.Rot, 61, 0.15f, 4, 0.01f);
                 Solid(lift, "LiftStation", shell, _logDarkMat, layer, "Wood");
-                SealLocal(lift, f, 0f, 2.6f, 0f, new Vector3(7f, 5.2f, 5.2f));
-                SnowFooting(lift, layer, f, 0f, 0f, 7f, 5.2f);
+                SealLocal(lift, f, 0f, 3.5f, 0f, new Vector3(11f, 7f, 8f));
+                SnowFooting(lift, layer, f, 0f, 0f, 11f, 8f);
                 var roof = new MeshBuild { UVScale = 0.4f };
                 var snow = new MeshBuild { UVScale = 0.4f };
-                GableRoof(roof, snow, f, 0f, 0f, 7f, 5.2f, 5.2f, 0.35f, 0.8f);
+                GableRoof(roof, snow, f, 0f, 0f, 11f, 8f, 7f, 0.35f, 0.9f);
                 RoofObjects(lift, layer, roof, snow, _slateMat);
                 var wheel = new MeshBuild { UVScale = 0.5f };
-                wheel.Tube(f.P(0f, 4.4f, -2.7f), f.P(0f, 4.4f, -3.3f), 1.5f, 1.5f, 16);
+                wheel.Tube(f.P(0f, 5.4f, -4.2f), f.P(0f, 5.4f, -5.0f), 2.2f, 2.2f, 24);
                 Solid(lift, "DriveWheel", wheel, _ironMat, layer, "Metal");
-                var at = f.P(0f, 5.9f, 0f);
+                var at = f.P(0f, 8.8f, 0f);
                 points.Add(at);
                 tops.Add(at);
             }
 
-            // Pylons: a tapered mast with a cross-arm turned square to the line.
+            // Pylons: lattice towers -- four tapering legs, a brace and a cross-brace every metre and a half,
+            // and at the top a truss cross-arm carrying two sheave trains (four wheels a side) square to the line.
             var line = _liftTop.Centre - _liftBottom.Centre;
             var across = new Vector3(-line.y, 0f, line.x).normalized;
+            var along3 = new Vector3(line.x, 0f, line.y).normalized;
             var masts = new MeshBuild { UVScale = 0.5f };
+            var wheels = new MeshBuild { UVScale = 0.5f };
             var inner = new List<Vector3>();
             foreach (var q in _liftPylons)
             {
                 float g = GroundHeightAt(q.x, q.y);
-                var foot = new Vector3(q.x, g - 0.4f, q.y);
-                var top = new Vector3(q.x, g + 9.2f, q.y);
-                masts.Tube(foot, top, 0.28f, 0.16f, 8);
-                masts.Box(top + Vector3.down * 0.3f, new Vector3(0.2f, 0.2f, 3.2f), Quaternion.LookRotation(across));
-                inner.Add(top + Vector3.up * 0.1f);
+                const float H = 12f;
+                var baseP = new Vector3(q.x, g - 0.5f, q.y);
+                Vector3 Leg(int k, float y) // k: 0..3 corners; spreads 1.0 at the foot to 0.42 at the top
+                {
+                    float sp = Mathf.Lerp(1.0f, 0.42f, y / H);
+                    float sa = (k & 1) * 2f - 1f, sb = ((k >> 1) & 1) * 2f - 1f;
+                    return baseP + Vector3.up * y + across * sa * sp + along3 * sb * sp;
+                }
+                for (int k = 0; k < 4; k++) masts.Tube(Leg(k, 0f), Leg(k, H), 0.1f, 0.07f, 6);
+                for (float y = 0f; y < H - 0.1f; y += 1.5f)
+                {
+                    float y2 = y + 1.5f;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int k2 = k switch { 0 => 1, 1 => 3, 3 => 2, _ => 0 };
+                        masts.Tube(Leg(k, y2), Leg(k2, y2), 0.045f, 0.045f, 5);        // the ring brace
+                        masts.Tube(Leg(k, y), Leg(k2, y2), 0.035f, 0.035f, 4);         // the diagonal
+                    }
+                }
+                // Cross-arm truss and sheaves.
+                var top = baseP + Vector3.up * H;
+                masts.Box(top + Vector3.down * 0.3f, new Vector3(0.14f, 0.14f, 4.4f), Quaternion.LookRotation(across));
+                masts.Box(top + Vector3.down * 0.85f, new Vector3(0.1f, 0.1f, 4.0f), Quaternion.LookRotation(across));
+                foreach (float sd in new[] { -1.9f, 1.9f })
+                {
+                    masts.Box(top + across * sd + Vector3.down * 0.55f, new Vector3(0.08f, 0.6f, 0.08f), Quaternion.identity);
+                    for (int w = 0; w < 4; w++)
+                    {
+                        var wc = top + across * sd + along3 * (-0.75f + w * 0.5f) + Vector3.up * 0.15f;
+                        wheels.Tube(wc - across * 0.12f, wc + across * 0.12f, 0.2f, 0.2f, 14);
+                    }
+                }
+                inner.Add(top + Vector3.up * 0.4f);
             }
             Solid(lift, "Pylons", masts, _ironMat, layer, "Metal");
+            Visual(lift, "Sheaves", wheels, _moduleRed, layer);
 
-            // The cable: a polyline from station to station over each pylon top, sagging between, and a chair
-            // hung from it every fourteen metres.
+            // The cable: a polyline from station to station over each pylon top, sagging between, and a two-seat
+            // chair hung from it every fourteen metres: hanger, seat, back, footrest, arms and a safety bar.
             var all = new List<Vector3> { tops[0] };
             all.AddRange(inner);
             all.Add(tops[1]);
             var cable = new MeshBuild { UVScale = 0.5f };
             var chairs = new MeshBuild { UVScale = 0.5f };
+            var chairDark = new MeshBuild { UVScale = 0.5f };
             float carry = 0f;
             for (int i = 0; i + 1 < all.Count; i++)
             {
                 var a = all[i];
                 var b = all[i + 1];
-                const int Seg = 6;
-                Vector3 Sag(float t) => Vector3.Lerp(a, b, t) + Vector3.down * Mathf.Sin(t * Mathf.PI) * 0.7f;
+                const int Seg = 12;
+                Vector3 Sag(float t) => Vector3.Lerp(a, b, t) + Vector3.down * Mathf.Sin(t * Mathf.PI) * 0.9f;
                 for (int s = 0; s < Seg; s++)
-                    cable.Tube(Sag(s / (float)Seg), Sag((s + 1) / (float)Seg), 0.035f, 0.035f, 3);
+                {
+                    cable.Tube(Sag(s / (float)Seg), Sag((s + 1) / (float)Seg), 0.05f, 0.05f, 7);
+                    cable.Tube(Sag(s / (float)Seg) + Vector3.up * 0.0f + across * 0.0f, Sag((s + 1) / (float)Seg), 0.02f, 0.02f, 3);
+                }
 
                 float span = (b - a).magnitude;
                 for (float d = carry; d < span; d += 14f)
                 {
                     var p = Sag(d / span);
                     var dir = (b - a).normalized;
-                    var rot = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z) == Vector3.zero ? Vector3.forward : new Vector3(dir.x, 0f, dir.z));
-                    chairs.Tube(p, p + Vector3.down * 2.1f, 0.03f, 0.03f, 3);
-                    chairs.Box(p + Vector3.down * 2.3f + rot * new Vector3(0f, 0f, 0f), new Vector3(1.5f, 0.1f, 0.5f), rot);
-                    chairs.Box(p + Vector3.down * 1.9f + rot * new Vector3(0f, 0f, -0.2f), new Vector3(1.5f, 0.7f, 0.08f), rot);
+                    var fwd = new Vector3(dir.x, 0f, dir.z) == Vector3.zero ? Vector3.forward : new Vector3(dir.x, 0f, dir.z).normalized;
+                    var rot = Quaternion.LookRotation(fwd);
+                    // Grip and hanger rod, a yoke, the seat bench and back (two-seat), arms, footrest, safety bar.
+                    chairDark.Tube(p + Vector3.up * 0.08f, p + Vector3.down * 0.15f, 0.12f, 0.1f, 8);
+                    chairDark.Tube(p + Vector3.down * 0.1f, p + Vector3.down * 2.25f, 0.03f, 0.03f, 6);
+                    chairDark.Box(p + Vector3.down * 2.25f, new Vector3(1.7f, 0.05f, 0.05f), rot);
+                    chairs.Box(p + Vector3.down * 2.45f, new Vector3(1.5f, 0.09f, 0.52f), rot);
+                    chairs.Box(p + Vector3.down * 2.05f + rot * new Vector3(0f, 0f, -0.24f), new Vector3(1.5f, 0.62f, 0.07f), rot * Quaternion.Euler(-10f, 0f, 0f));
+                    foreach (float sd in new[] { -0.78f, 0f, 0.78f })
+                        chairDark.Tube(p + Vector3.down * 2.45f + rot * new Vector3(sd, 0f, 0.1f), p + Vector3.down * 2.45f + rot * new Vector3(sd, 0.45f, 0.1f), 0.022f, 0.022f, 5);
+                    chairDark.Tube(p + Vector3.down * 2.0f + rot * new Vector3(-0.78f, 0f, 0.32f), p + Vector3.down * 2.0f + rot * new Vector3(0.78f, 0f, 0.32f), 0.025f, 0.025f, 6);
+                    chairDark.Tube(p + Vector3.down * 2.7f + rot * new Vector3(-0.7f, 0f, 0.3f), p + Vector3.down * 2.7f + rot * new Vector3(0.7f, 0f, 0.3f), 0.02f, 0.02f, 5);
                     carry = d + 14f - span;
                 }
                 if (carry < 0f) carry = 0f;
             }
             Visual(lift, "LiftCable", cable, _ironMat, layer);
             Visual(lift, "LiftChairs", chairs, _moduleRed, layer);
+            Visual(lift, "LiftChairFrames", chairDark, _ironMat, layer);
         }
 
         /// <summary>
@@ -337,7 +382,7 @@ namespace FPSKit.EditorTools
             Solid(pass, "PassSandbags", bags, _alpCanvas, layer, "Wood");
 
             // A guard hut on the near side.
-            BuildEnterableChalet(pass, layer, backdrop, rng, new Frame(f.P(-12f, 0f, -17f), f.Yaw), 12f, flatRoof: false, wIn: 5.6f, dIn: 6.4f);
+            BuildEnterableChalet(pass, layer, backdrop, rng, new Frame(f.P(-18f, 0f, -16f), f.Yaw), 16f, flatRoof: false, wIn: 9.5f, dIn: 10.5f);
 
             // Fallen rock at the foot of both cliffs.
             for (int i = 0; i < 9; i++)
@@ -355,16 +400,16 @@ namespace FPSKit.EditorTools
         {
             var f = SiteFrame(plan);
             double roll = rng.NextDouble();
-            if (roll < 0.45) BuildEnterableChalet(parent, layer, backdrop, rng, f, 13f, flatRoof: roll < 0.12);
-            else BuildSolidChalet(parent, layer, rng, f, 13f, rng.NextDouble() < 0.4);
+            if (roll < 0.45) BuildEnterableChalet(parent, layer, backdrop, rng, f, 20f, flatRoof: roll < 0.12);
+            else BuildSolidChalet(parent, layer, rng, f, 20f, rng.NextDouble() < 0.4);
 
             var wood = new MeshBuild { UVScale = 0.5f };
-            Woodpile(wood, f.P(-5.5f, 0f, -5f), f.Rot, 3, 2.4f);
-            if (rng.NextDouble() < 0.6) Sled(wood, f.P(5.5f, 0f, -5.5f), f.Yaw + Rand(rng, -30f, 30f));
+            Woodpile(wood, f.P(-8.5f, 0f, -8f), f.Rot, 3, 2.8f);
+            if (rng.NextDouble() < 0.6) Sled(wood, f.P(8.5f, 0f, -8.5f), f.Yaw + Rand(rng, -30f, 30f));
             Solid(parent, "CabinYard", wood, _logMat, layer, "Wood");
             double vroll = rng.NextDouble();
-            if (vroll < 0.35) BuildSnowmobile(parent, layer, rng, f.P(-5.5f, 0f, 5.5f), f.Yaw + Rand(rng, 0f, 360f));
-            else if (vroll < 0.6) BuildPickup(parent, layer, rng, f.P(0f, 0f, -6.4f), f.Yaw + 90f);
+            if (vroll < 0.35) BuildSnowmobile(parent, layer, rng, f.P(-8.5f, 0f, 8.5f), f.Yaw + Rand(rng, 0f, 360f));
+            else if (vroll < 0.6) BuildPickup(parent, layer, rng, f.P(0f, 0f, -9.6f), f.Yaw + 90f);
         }
 
         /// <summary>An A-frame tent, ridge along v: canvas slopes and ends, closed at the back.</summary>
@@ -391,6 +436,25 @@ namespace FPSKit.EditorTools
                 Tent(canvas, f, new Vector2(-4.4f + i * 8.8f, 3f), 3.2f, 4.6f, 2.3f);
                 var go = Solid(camp, "Tent", canvas, _tentPaints[rng.Next(_tentPaints.Length)], layer, "Wood");
                 _ = go;
+                // Ridge pole, end poles, guy lines and pegs, seams in the canvas.
+                var gear = new MeshBuild { UVScale = 0.5f };
+                var tc = new Vector2(-4.4f + i * 8.8f, 3f);
+                gear.Tube(f.P(tc.x, 2.3f, tc.y - 2.3f), f.P(tc.x, 2.3f, tc.y + 2.3f), 0.04f, 0.04f, 6);
+                foreach (float ez in new[] { -2.3f, 2.3f })
+                {
+                    gear.Tube(f.P(tc.x, 0f, tc.y + ez), f.P(tc.x, 2.4f, tc.y + ez), 0.05f, 0.04f, 6);
+                    var peg = f.P(tc.x, 0f, tc.y + ez * 1.9f);
+                    gear.Tube(f.P(tc.x, 2.3f, tc.y + ez), peg, 0.012f, 0.012f, 3);
+                    gear.Tube(peg, peg + Vector3.up * 0.22f, 0.025f, 0.02f, 5);
+                }
+                foreach (float sx in new[] { -1.6f, 1.6f })
+                    for (float z = -1.6f; z <= 1.7f; z += 1.6f)
+                    {
+                        var peg = f.P(tc.x + sx * 1.9f, 0f, tc.y + z);
+                        gear.Tube(f.P(tc.x + sx * 0.8f, 1.1f, tc.y + z), peg, 0.012f, 0.012f, 3);
+                        gear.Tube(peg, peg + Vector3.up * 0.22f, 0.025f, 0.02f, 5);
+                    }
+                Solid(camp, "TentGear", gear, _plankMat, layer, "Wood");
             }
 
             // Fire ring, logs to sit on, an ash bed.
@@ -481,13 +545,21 @@ namespace FPSKit.EditorTools
                     float h = Rand(rng, 4f, 7.5f);
                     var foot = new Vector3(p.x, g - 0.3f, p.y);
                     b.Tube(foot, foot + Vector3.up * h, 0.24f, 0.05f, 6);
-                    int limbs = 4 + rng.Next(3);
+                    int limbs = 9 + rng.Next(6);
                     for (int l = 0; l < limbs; l++)
                     {
                         float y = h * Rand(rng, 0.35f, 0.9f);
                         float a = Rand(rng, 0f, Mathf.PI * 2f), reach = Rand(rng, 1.2f, 2.4f) * (1.2f - y / h * 0.6f);
                         var from = foot + Vector3.up * y;
-                        b.Tube(from, from + new Vector3(Mathf.Cos(a) * reach, reach * 0.6f, Mathf.Sin(a) * reach), 0.07f, 0.025f, 4);
+                        var tip = from + new Vector3(Mathf.Cos(a) * reach, reach * 0.6f, Mathf.Sin(a) * reach);
+                        b.Tube(from, tip, 0.07f, 0.025f, 6);
+                        for (int tw = 0; tw < 3; tw++)
+                        {
+                            float f2 = Rand(rng, 0.3f, 0.85f);
+                            var tb = Vector3.Lerp(from, tip, f2);
+                            float a2 = a + Rand(rng, -1.1f, 1.1f);
+                            b.Tube(tb, tb + new Vector3(Mathf.Cos(a2), 0.5f, Mathf.Sin(a2)) * reach * 0.4f, 0.03f, 0.01f, 4);
+                        }
                     }
                     snags++;
                 }
@@ -572,6 +644,7 @@ namespace FPSKit.EditorTools
             foreach (var cabin in _alpCabins) BuildAlpCabin(group, layer, backdrop, rng, cabin);
             foreach (var camp in _alpCamps) BuildHunterCamp(group, layer, rng, camp);
             BuildSnowWild(group, layer, rng, half);
+            BuildSnowFill(group, layer, rng, half);
         }
     }
 }

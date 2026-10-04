@@ -9,6 +9,9 @@ public class Hitbox : MonoBehaviour
 {
     public Health owner;
     [Min(0f)] public float damageMultiplier = 1f;
+    [Tooltip("Optional. When set, the multiplier comes from here by part, read at the moment " +
+             "of the hit, and the number above is ignored.")]
+    public BodyDamageProfile profile;
     public bool isHeadshot;
 
     [Tooltip("The part of the body this collider stands for. Wounds, limps, a dropped " +
@@ -49,7 +52,7 @@ public class Hitbox : MonoBehaviour
     /// </summary>
     public DamageInfo Receive(DamageInfo info)
     {
-        info.amount *= damageMultiplier;
+        info.amount *= profile != null ? profile.For(Part) : damageMultiplier;
         info.isHeadshot = isHeadshot;
         info.part = Part;
 

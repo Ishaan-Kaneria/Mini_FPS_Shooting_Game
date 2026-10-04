@@ -145,6 +145,8 @@ public class EnemyWounds : MonoBehaviour
     /// </summary>
     public float Severity(BodyPart part)
     {
+        // Asked about a fine part (a forearm, a shin), answered for its limb.
+        part = BodyParts.Limb(part);
         float damage = _damage[(int)part];
 
         switch (part)
@@ -209,6 +211,8 @@ public class EnemyWounds : MonoBehaviour
 
         _burst += info.amount;
 
+        // The wound rules read the limb; a forearm is an arm, a shin is a leg.
+        info.part = BodyParts.Limb(info.part);
         LastHitPart = info.part;
         LastHitTime = Time.time;
 

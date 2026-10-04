@@ -341,6 +341,22 @@ public class EnemyArchetype : ScriptableObject
             bool isSkin = IsSkin(renderer.name);
             Color color = isSkin ? skin : uniform;
 
+            // The rigged soldier's clothes and face are textured already: the colour would
+            // multiply onto a printed camouflage and a painted face and turn both to mud. They
+            // take only a wash of the archetype's shade, and the skin only its darkness.
+            if (renderer is SkinnedMeshRenderer && renderer.name.StartsWith("Outfit_") || renderer.name.StartsWith("Kit_") && renderer is SkinnedMeshRenderer)
+            {
+                if (isSkin)
+                {
+                    float light = (skin.r + skin.g + skin.b) / (0.87f + 0.68f + 0.56f);
+                    color = new Color(light, light * 0.97f, light * 0.95f);
+                }
+                else
+                {
+                    color = Color.Lerp(Color.white, uniform * 1.8f, 0.3f);
+                }
+            }
+
             renderer.GetPropertyBlock(block);
             block.SetColor("_BaseColor", color);
             block.SetColor("_Color", color);

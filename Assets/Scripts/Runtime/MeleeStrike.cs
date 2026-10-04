@@ -430,7 +430,7 @@ public class MeleeStrike : MonoBehaviour
         // chain itself causes would otherwise turn every second punch into a finisher.
         bool ownStagger = Time.time - _lastStrikeTime < 1.2f && _strike != Strike.Kick;
         if (s.takedownWhenStaggered && ai.IsStaggered && !ownStagger) return true;
-        if (s.takedownWhenCrawling && ai.Crawling) return true;
+        if (s.takedownWhenCrawling && (ai.Crawling || ai.Downed)) return true;
         return false;
     }
 

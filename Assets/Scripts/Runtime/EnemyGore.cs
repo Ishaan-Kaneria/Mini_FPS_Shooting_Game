@@ -162,7 +162,7 @@ public class EnemyGore : MonoBehaviour
         // A fist bruises; it does not leave a hole.
         if (!info.fromMelee) AddWound(info, severity);
 
-        Stain(info.part);
+        Stain(BodyParts.Limb(info.part));
     }
 
     void OnDied(Health health)

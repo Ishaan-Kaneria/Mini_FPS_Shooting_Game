@@ -122,7 +122,9 @@ public class RagdollController : MonoBehaviour
             if (bone == null) continue;
 
             bone.isKinematic = !active;
-            bone.detectCollisions = active;
+            // Collisions stay on either way: alive, the kinematic bones are the body the
+            // player bumps into and the rounds hit; dead or thrown, they are the ragdoll.
+            bone.detectCollisions = true;
 
             // Bone colliders stay enabled either way -- they are the hitboxes.
             if (active) bone.WakeUp();

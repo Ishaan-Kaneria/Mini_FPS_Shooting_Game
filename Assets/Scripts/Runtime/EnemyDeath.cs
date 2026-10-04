@@ -149,6 +149,7 @@ public class EnemyDeath : MonoBehaviour
     /// </summary>
     public static Style Classify(DamageInfo info, float burstShare, bool crawling, float heavyShare = 0.55f)
     {
+        info.part = BodyParts.Limb(info.part);
         if (info.isHeadshot || info.part == BodyPart.Head) return Style.Drop;
         if (info.fromBlast) return Style.Thrown;
         if (info.fromMelee) return Style.Spun;

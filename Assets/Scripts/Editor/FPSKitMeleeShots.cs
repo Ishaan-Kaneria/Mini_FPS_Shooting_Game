@@ -26,6 +26,7 @@ namespace FPSKit.EditorTools
         static string _returnTo;
         static int _width = 480, _height = 270;
         static double _started;
+        static double _realMark;
         static int _step;
         static float _mark;
         static int _shot;
@@ -39,13 +40,30 @@ namespace FPSKit.EditorTools
 
         /// <summary>What happened, for whoever started it.</summary>
         public static string Report { get; private set; } = "";
+
+        /// <summary>Forgets a walkthrough that never finished (an editor recompile mid-run, say).</summary>
+        public static void ResetState()
+        {
+            EditorApplication.update -= Tick;
+            Running = false;
+        }
         public static bool Running { get; private set; }
 
         [MenuItem("FPSKit/View Models/Melee Walkthrough", false, 66)]
         static void Menu() => Run("Build/MeleeShots");
 
-        public static void Run(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
+        static bool _enemyScript;
+
+        /// <summary>The enemy's side: hit reactions by part, a kick that throws it, the get-up.</summary>
+        public static void RunEnemy(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
         {
+            _enemyScript = true;
+            Run(folder, scene, width, height, onDone, keepMode: true);
+        }
+
+        public static void Run(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null, bool keepMode = false)
+        {
+            if (!keepMode) _enemyScript = false;
             if (Running) return;
             _folder = string.IsNullOrEmpty(folder) ? "Build/MeleeShots" : folder;
             _width = width;
@@ -86,37 +104,42 @@ namespace FPSKit.EditorTools
         {
             try
             {
-                if (EditorApplication.timeSinceStartup - _started > 180) throw new Exception("melee walkthrough timed out");
+                if (EditorApplication.timeSinceStartup - _started > 900) throw new Exception("melee walkthrough timed out");
 
                 switch (_step)
                 {
                     case 0:
                         if (!EditorApplication.isPlaying) { EditorApplication.EnterPlaymode(); return; }
-                        Time.captureDeltaTime = 1f / 60f;
-                        _mark = Time.time + 1.5f;
+                        _realMark = EditorApplication.timeSinceStartup + 2.0;
                         _step = 1;
                         return;
 
                     case 1:
-                        if (Time.time < _mark) return;
+                        // Waited on the clock on the wall, not game time: a slow editor frame
+                        // rate must not turn a few seconds' wait into minutes.
+                        if (EditorApplication.timeSinceStartup < _realMark) return;
                         // Someone to hit: whoever the level has sent by now, or one made for it.
                         if (Object.FindAnyObjectByType<EnemyAI>() == null)
                         {
-                            if (Time.time < _mark + 6f) return;
+                            if (EditorApplication.timeSinceStartup < _realMark + 6.0) return;
                             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
                             var p = GameObject.FindGameObjectWithTag("Player");
                             if (prefab != null && p != null)
                                 Object.Instantiate(prefab, p.transform.position + p.transform.forward * 2.2f, Quaternion.identity);
                         }
                         Setup();
-                        _script = Script();
+                        // A thirtieth a frame: fine enough to catch a strike at its blow, coarse
+                        // enough that an editor throttled in the background still gets through.
+                        Time.captureDeltaTime = 1f / 30f;
+                        _script = _enemyScript ? EnemyScript() : Script();
                         _next = 0;
                         _mark = Time.time;
                         _step = 2;
                         return;
 
                     case 2:
-                        // Keep the stand-in where it is: frozen bodies drift under a kick otherwise.
+                        // On the enemy's walkthrough the view follows the body, wherever it is thrown.
+                        if (_enemyScript) Face();
                         while (_next < _script.Count && Time.time >= _mark + _script[_next].at)
                         {
                             _script[_next].act();
@@ -176,7 +199,9 @@ namespace FPSKit.EditorTools
         static void Face()
         {
             if (_dummy == null || _motor == null) return;
-            _motor.TurnTowards(_dummy.transform.position + Vector3.up * 1.3f, 1f);
+            var animator = _dummy.GetComponentInChildren<Animator>();
+            var hips = animator != null && animator.isHuman ? animator.GetBoneTransform(HumanBodyBones.Hips) : null;
+            _motor.TurnTowards(hips != null ? hips.position + Vector3.up * 0.55f : _dummy.transform.position + Vector3.up * 1.3f, 1f);
         }
 
         static List<(float, Action)> Script()
@@ -229,6 +254,72 @@ namespace FPSKit.EditorTools
 
         static string Name(Health h) => h != null ? h.name : "nothing";
 
+        /// <summary>A round into one part of the stand-in, as the gun would land it.</summary>
+        static void ShootPart(BodyPart part, float amount)
+        {
+            if (_dummy == null) return;
+            foreach (var hb in _dummy.GetComponentsInChildren<Hitbox>())
+            {
+                if (hb.Part != part) continue;
+                Vector3 from = _weapon.fpsCamera.transform.position;
+                Vector3 at = hb.GetComponent<Collider>().bounds.center;
+                var info = new DamageInfo(amount, at, (from - at).normalized, (at - from).normalized, _player);
+                hb.Receive(info);
+                return;
+            }
+            Note("no hitbox for " + part);
+        }
+
+        static List<(float, Action)> EnemyScript()
+        {
+            var s = MeleeSettings.Active;
+            var list = new List<(float, Action)>();
+            float t = 0f;
+            void At(float dt, Action a) { t += dt; list.Add((t, a)); }
+
+            At(0.1f, () => Face());
+            // Stood off a few metres first, to see the whole soldier and how it holds the rifle.
+            At(0.1f, () =>
+            {
+                var cc = _player.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                _player.transform.position -= _player.transform.forward * 2.5f;
+                if (cc != null) cc.enabled = true;
+            });
+            At(0.5f, () => Shoot("enemy_far"));
+            At(0.1f, () =>
+            {
+                var cc = _player.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                _player.transform.position += _player.transform.forward * 2.5f;
+                if (cc != null) cc.enabled = true;
+            });
+            At(0.6f, () => { Face(); Shoot("enemy_standing"); });
+
+            // Where it is hit is where it moves.
+            At(0.2f, () => ShootPart(BodyPart.LeftArm, 4f));
+            At(0.07f, () => Shoot("hit_left_arm"));
+            At(0.7f, () => ShootPart(BodyPart.Neck, 1f));
+            At(0.07f, () => Shoot("hit_neck"));
+            At(0.7f, () => ShootPart(BodyPart.LowerTorso, 4f));
+            At(0.08f, () => Shoot("hit_belly"));
+            At(0.7f, () => ShootPart(BodyPart.RightShin, 4f));
+            At(0.08f, () => Shoot("hit_shin"));
+
+            // The kick: thrown, down, and back up.
+            At(0.8f, () => { Face(); Note("kick hit " + Name(_melee.TryKick()) + " health " + (_dummy != null ? _dummy.GetComponent<Health>().Current.ToString("0") : "-")); });
+            At(s.kickSeconds * MeleeStrike.ImpactAt(MeleeStrike.Strike.Kick) + 0.05f, () => Shoot("kick_land"));
+            At(0.2f, () => { Face(); Shoot("thrown_0.2s"); });
+            At(0.35f, () => { Face(); Shoot("thrown_0.55s"); });
+            At(0.6f, () => { Face(); Shoot("down"); Note("downed " + (_dummy != null && _dummy.Downed)); });
+            At(1.2f, () => { Face(); Shoot("down_later"); });
+            At(0.8f, () => { Face(); Shoot("getting_up"); });
+            At(0.6f, () => { Face(); Shoot("getting_up_2"); });
+            At(1.0f, () => { Face(); Shoot("back_up"); Note("downed after " + (_dummy != null && _dummy.Downed)); });
+
+            return list;
+        }
+
         static void Finish()
         {
             EditorApplication.update -= Tick;
@@ -240,9 +331,16 @@ namespace FPSKit.EditorTools
 
         static void Restore()
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode) { EditorApplication.delayCall += Restore; return; }
-            if (!string.IsNullOrEmpty(_returnTo)) EditorSceneManager.OpenScene(_returnTo, OpenSceneMode.Single);
+            if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode) { EditorApplication.delayCall += Restore; return; }
             Running = false;
+            try
+            {
+                if (!string.IsNullOrEmpty(_returnTo)) EditorSceneManager.OpenScene(_returnTo, OpenSceneMode.Single);
+            }
+            catch (Exception e)
+            {
+                Note("could not reopen " + _returnTo + ": " + e.Message);
+            }
             Debug.Log("[FPSKit] melee walkthrough done:\n" + Report);
             _onDone?.Invoke();
         }

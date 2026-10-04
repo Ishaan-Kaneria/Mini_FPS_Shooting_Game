@@ -265,6 +265,16 @@ public class EnemyAI : MonoBehaviour
     /// <summary>Which way the round was travelling, in this enemy's own local space.</summary>
     public Vector3 LastReactionLocal { get; private set; }
 
+    /// <summary>Mid-attack: from the wind-up until the blow or the burst is done.</summary>
+    public bool Attacking => _attacking;
+
+    /// <summary>When the current (or last) wind-up began and ends, for a body to draw it.</summary>
+    public float WindupStart => _windupStart;
+    public float WindupEnd => _windupEnd;
+
+    /// <summary>When it last swung at someone in its face, rather than shooting.</summary>
+    public float LastMeleeTime { get; private set; } = -999f;
+
     /// <summary>0 to 1 severity, so a graze and a slug do not throw the body equally.</summary>
     public float LastReactionStrength { get; private set; }
 
@@ -945,6 +955,7 @@ public class EnemyAI : MonoBehaviour
             }
             else
             {
+                LastMeleeTime = Time.time;
                 TryMeleeHit();
             }
         }
@@ -1162,6 +1173,15 @@ public class EnemyAI : MonoBehaviour
         _nextAttackTime = Mathf.Max(_nextAttackTime, _staggerUntil + flinchAttackDelay);
         _chargeUntil = 0f;
     }
+
+    /// <summary>
+    /// On the ground after being thrown, and not yet back up. Set by the body (EnemyBody);
+    /// any strike at it then is a takedown.
+    /// </summary>
+    [System.NonSerialized] public bool Downed;
+
+    /// <summary>Back on its feet: whatever stagger was running ends now.</summary>
+    public void Recover() => _staggerUntil = Mathf.Min(_staggerUntil, Time.time);
 
     /// <summary>Knocked off balance right now: by a heavy hit, a wound or a strike.</summary>
     public bool IsStaggered => CurrentState != State.Dead && Time.time < _staggerUntil;

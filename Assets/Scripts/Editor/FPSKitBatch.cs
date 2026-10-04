@@ -304,6 +304,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void CaptureViewModel() => FPSKitViewModelShots.Capture(ReadArg("-fpskitOut"));
 
+        /// <summary>The rigged Survivalist enemy over Enemy.prefab (FPSKit > Enemy > Build Rigged Soldier).</summary>
+        public static void BuildRiggedSoldier() => Run(FPSKitRiggedSoldier.Build);
+
         /// <summary>The first-person arms, legs and guns (FPSKit > View Models > Build).</summary>
         public static void BuildViewModels() => Run(FPSKitViewModels.Build);
 

@@ -12,12 +12,46 @@ using UnityEngine;
 /// </summary>
 public enum BodyPart
 {
+    /// <summary>The chest and upper back. Also anything with no hitbox.</summary>
     Torso,
     Head,
+    /// <summary>The upper arm (and, on a body without finer parts, the whole arm).</summary>
     LeftArm,
     RightArm,
+    /// <summary>The thigh (and, on a body without finer parts, the whole leg).</summary>
     LeftLeg,
-    RightLeg
+    RightLeg,
+    Neck,
+    /// <summary>The belly and the hips.</summary>
+    LowerTorso,
+    LeftForearm,
+    RightForearm,
+    LeftShin,
+    RightShin,
+}
+
+/// <summary>
+/// What a fine body part counts as for the wound rules: a forearm is an arm, a shin is a
+/// leg, the neck and the belly are the torso. The reactions read the fine part (a shot to
+/// the shin buckles the knee, not the hip); the limp, the crawl and the dropped rifle read
+/// the limb, so a body with twelve hitboxes and one with six play by the same rules.
+/// Generic on purpose: a creature's skeleton maps its own bones onto the same parts.
+/// </summary>
+public static class BodyParts
+{
+    public static BodyPart Limb(BodyPart part) => part switch
+    {
+        BodyPart.Neck => BodyPart.Torso,
+        BodyPart.LowerTorso => BodyPart.Torso,
+        BodyPart.LeftForearm => BodyPart.LeftArm,
+        BodyPart.RightForearm => BodyPart.RightArm,
+        BodyPart.LeftShin => BodyPart.LeftLeg,
+        BodyPart.RightShin => BodyPart.RightLeg,
+        _ => part,
+    };
+
+    public static bool IsLeg(BodyPart part) { var l = Limb(part); return l == BodyPart.LeftLeg || l == BodyPart.RightLeg; }
+    public static bool IsArm(BodyPart part) { var l = Limb(part); return l == BodyPart.LeftArm || l == BodyPart.RightArm; }
 }
 
 /// <summary>

@@ -70,15 +70,26 @@ namespace FPSKit.EditorTools
             float crust = u < 0.05f ? 0.05f : 0.085f, fine = u < 0.05f ? 0.022f : 0.17f;
             V2("_LavaScale", crust / u, crust / u);
             V2("_LavaScaleNormal", fine / u, fine / u);
-            F("_Normal_Strength", 7f);
+            F("_Normal_Strength", 5f);
             // Volatile: a boiling crust that churns, with deeper dark seams and a hotter core.
             F("_NoiseAmount", 1f);
             F("_VoronoiAmount", -0.05f);
             F("_Frenselpower", 1.1f);
-            V2("_LavaSpeed", 0.03f * u * 1.2f, 0.06f * u * 1.2f);
-            V2("_LavaNormalSpeed", 0.0f, 0.05f * u * 1.2f);
-            V2("_VoronoiSpeed", 0f, 0.004f * u * 1.2f);
-            V2("_NoiseSpeed", 0.01f * u * 1.2f, 0.01f * u * 1.2f);
+            // Speeds are in tiles per second, whatever the mesh's UV scale: they were 0.0004 for the river
+            // (u * 1.2 * 0.03), which is a standing pool. Flow runs down the long axis; the fine normal
+            // layer runs faster and the voronoi/noise layers churn, so the surface reads as liquid.
+            V2("_LavaSpeed", 0.02f, 0.14f);
+            V2("_LavaNormalSpeed", 0.04f, 0.32f);
+            V2("_VoronoiSpeed", 0.01f, 0.06f);
+            V2("_NoiseSpeed", 0.08f, 0.12f);
+            F("_Smoke_Int", 0f);
+            F("_BackGround_Strenght", 0f);
+            F("_Smoothness", 0.3f);
+            // No white: the Fresnel and background terms are HDR near-white in the stock asset, and at a grazing
+            // angle under bloom they filled half the screen with cream.
+            mat.SetColor("_FresnelColor", new Color(2.4f, 0.45f, 0.08f));
+            mat.SetColor("_LavaBackground", new Color(2.2f, 0.25f, 0.03f));
+            mat.SetColor("_LavaColor", new Color(4.4f, 1.0f, 0f));
             F("_VoronoiScale", 0.22f / u);
             F("_NoiseScale", 0.55f / u);
 

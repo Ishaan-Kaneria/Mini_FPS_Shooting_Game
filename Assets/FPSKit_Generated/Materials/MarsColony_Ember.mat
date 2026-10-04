@@ -25,6 +25,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - _FADING_ON
   - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords:
   - _FLIPBOOKBLENDING_OFF
@@ -59,9 +60,9 @@ Material:
     - _AlphaToMask: 0
     - _Blend: 2
     - _BlendOp: 0
-    - _CameraFadingEnabled: 0
-    - _CameraFarFadeDistance: 2
-    - _CameraNearFadeDistance: 1
+    - _CameraFadingEnabled: 1
+    - _CameraFarFadeDistance: 22
+    - _CameraNearFadeDistance: 6
     - _ColorMode: 0
     - _Cull: 2
     - _Cutoff: 0.5
@@ -83,7 +84,7 @@ Material:
     - _Surface: 1
     - _ZWrite: 0
     m_Colors:
-    - _BaseColor: {r: 4, g: 1.44, b: 0.24, a: 4}
+    - _BaseColor: {r: 2.2, g: 0.79200006, b: 0.132, a: 2.2}
     - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
     - _CameraFadeParams: {r: 0, g: Infinity, b: 0, a: 0}
     - _Color: {r: 4, g: 1.44, b: 0.23999995, a: 4}

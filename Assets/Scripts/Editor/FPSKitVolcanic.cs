@@ -762,7 +762,7 @@ namespace FPSKit.EditorTools
                                            BasaltTiling * 6f, 0.3f, 0f, 1.4f);
 
             _smokeMat = ParticleMaterial("Smoke", "Puff", additive: false, Color.white);
-            _emberMat = ParticleMaterial("Ember", "Flake", additive: true, MoltenGlow * 4f);
+            _emberMat = ParticleMaterial("Ember", "Flake", additive: true, MoltenGlow * 2.2f);
         }
 
         /// <summary>
@@ -853,6 +853,15 @@ namespace FPSKit.EditorTools
             mat.SetOverrideTag("RenderType", "Transparent");
             mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
             mat.renderQueue = (int)RenderQueue.Transparent;
+
+            // Fade out a puff that drifts up to the camera instead of filling the screen with it.
+            if (mat.HasProperty("_CameraFadingEnabled"))
+            {
+                mat.SetFloat("_CameraFadingEnabled", 1f);
+                mat.SetFloat("_CameraNearFadeDistance", 6f);
+                mat.SetFloat("_CameraFarFadeDistance", 22f);
+                mat.EnableKeyword("_FADING_ON");
+            }
 
             EditorUtility.SetDirty(mat);
             return mat;
@@ -1589,7 +1598,7 @@ namespace FPSKit.EditorTools
 
             var size = system.sizeOverLifetime;
             size.enabled = true;
-            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.6f));
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 1.8f));
 
             var rotation = system.rotationOverLifetime;
             rotation.enabled = true;
@@ -1612,15 +1621,17 @@ namespace FPSKit.EditorTools
                 }
                 : new[]
                 {
-                    new GradientColorKey(new Color(0.95f, 0.46f, 0.24f), 0f),
-                    new GradientColorKey(new Color(0.42f, 0.30f, 0.27f), 0.25f),
-                    new GradientColorKey(new Color(0.24f, 0.21f, 0.21f), 1f)
+                    // Dark, dull red ash. The first version started at (0.95, 0.46, 0.24) and, unlit and under
+                    // bloom, every puff above the river was a cream blob 10-20 m wide: the "white shots".
+                    new GradientColorKey(new Color(0.42f, 0.11f, 0.05f), 0f),
+                    new GradientColorKey(new Color(0.16f, 0.07f, 0.06f), 0.25f),
+                    new GradientColorKey(new Color(0.08f, 0.07f, 0.07f), 1f)
                 },
                 new[]
                 {
                     new GradientAlphaKey(0f, 0f),
-                    new GradientAlphaKey(0.42f, 0.12f),
-                    new GradientAlphaKey(0.28f, 0.6f),
+                    new GradientAlphaKey(0.30f, 0.12f),
+                    new GradientAlphaKey(0.20f, 0.6f),
                     new GradientAlphaKey(0f, 1f)
                 });
             colour.color = gradient;

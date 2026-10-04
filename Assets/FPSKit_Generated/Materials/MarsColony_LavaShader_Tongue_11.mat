@@ -62,27 +62,27 @@ Material:
     - _Metallic: 0
     - _NoiseAmount: 1
     - _NoiseScale: 50
-    - _Normal_Strength: 7
+    - _Normal_Strength: 5
     - _Power: 2
     - _QueueControl: 0
     - _QueueOffset: 0
     - _Smoke_Int: 1
-    - _Smoothness: 0
+    - _Smoothness: 0.3
     - _VoronoiAO: 1
     - _VoronoiAmount: -0.05
     - _VoronoiScale: 20
     m_Colors:
     - _BottomRemap: {r: 0.5, g: 1, b: 0, a: 0}
-    - _FresnelColor: {r: 5.960785, g: 2.6527052, b: 1.46679, a: 0}
-    - _LavaBackground: {r: 7.958114, g: 7.958114, b: 7.958114, a: 0}
-    - _LavaColor: {r: 4.372362, g: 1.1458604, b: 0, a: 1}
-    - _LavaNormalSpeed: {r: 0, g: 0.00066, b: 0, a: 0}
+    - _FresnelColor: {r: 2.4, g: 0.45, b: 0.08, a: 1}
+    - _LavaBackground: {r: 2.2, g: 0.25, b: 0.03, a: 1}
+    - _LavaColor: {r: 4.4, g: 1, b: 0, a: 1}
+    - _LavaNormalSpeed: {r: 0.04, g: 0.32, b: 0, a: 0}
     - _LavaScale: {r: 4.5454545, g: 4.5454545, b: 0, a: 0}
     - _LavaScaleNormal: {r: 2, g: 2, b: 0, a: 0}
-    - _LavaSpeed: {r: 0.00039600002, g: 0.00079200004, b: 0, a: 0}
+    - _LavaSpeed: {r: 0.02, g: 0.14, b: 0, a: 0}
     - _Lavaremap: {r: 0, g: 1.5, b: 0, a: 0}
-    - _NoiseSpeed: {r: 0.000132, g: 0.000132, b: 0, a: 0}
-    - _VoronoiSpeed: {r: 0, g: 0.000052800006, b: 0, a: 0}
+    - _NoiseSpeed: {r: 0.08, g: 0.12, b: 0, a: 0}
+    - _VoronoiSpeed: {r: 0.01, g: 0.06, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &8685586367819605111

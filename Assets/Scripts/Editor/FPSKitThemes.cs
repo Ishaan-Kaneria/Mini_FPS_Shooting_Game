@@ -847,7 +847,7 @@ namespace FPSKit.EditorTools
                     t.accentLightColor = new Color(1f, 0.45f, 0.15f);
 
                     // Bloom is what makes the lava glow rather than merely be orange.
-                    t.bloomIntensity = 1.6f;
+                    t.bloomIntensity = 0.9f;
                     t.saturation = 18f;
                     t.contrast = 16f;
                     t.colorFilter = new Color(1f, 0.80f, 0.72f);

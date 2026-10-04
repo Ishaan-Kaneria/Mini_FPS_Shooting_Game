@@ -283,7 +283,7 @@ namespace FPSKit.EditorTools
             // made the horizon read as smeared streaks.
             var ground = new MeshBuild { UVScale = 1f };
             var bed = new MeshBuild { UVScale = 0.25f };
-            var river = new MeshBuild { UVScale = 0.06f };
+            var river = new MeshBuild { UVScale = _theme.volcanicZone ? 0.01f : 0.06f };
 
             void Strip(MeshBuild build, float from, float to, float z0, float z1, float y)
             {
@@ -343,7 +343,14 @@ namespace FPSKit.EditorTools
         {
             if (build.Triangles.Count == 0) return;
 
-            var go = MeshObject(parent, name, build.ToMesh(name), material, Vector3.zero,
+            var mesh = build.ToMesh(name);
+
+            // The apron's lava sheet runs 1.3 km either way, so its UVs went from -79 to +79, and the lava graph
+            // returns NaN on the negative half: a black streak, and Bloom spread the NaN into a cream blob over
+            // half the screen whenever it was in view. Same fix as every other lava mesh.
+            if (_theme.volcanicZone && material != null && material.name.Contains("LavaShader")) LavaUv(mesh);
+
+            var go = MeshObject(parent, name, mesh, material, Vector3.zero,
                                 Quaternion.identity, Vector3.one, layer, "Untagged", collider: false);
 
             Hide(go);

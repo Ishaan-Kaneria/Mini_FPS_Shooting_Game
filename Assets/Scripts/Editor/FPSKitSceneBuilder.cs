@@ -3051,6 +3051,7 @@ namespace FPSKit.EditorTools
             if (data == null) return;
 
             data.renderPostProcessing = true;
+            data.stopNaN = true;
             data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
             data.antialiasingQuality = AntialiasingQuality.High;
             data.dithering = true;
@@ -3096,6 +3097,10 @@ namespace FPSKit.EditorTools
             bloom.threshold.value = 1.0f;
             bloom.scatter.overrideState = true;
             bloom.scatter.value = 0.65f;
+            // Ceiling on how bright a pixel may feed the blur: an HDR 50+ highlight (lava, sun, a stray Inf) is
+            // what filled the screen with cream.
+            bloom.clamp.overrideState = true;
+            bloom.clamp.value = 8f;
 
             var colorAdjustments = profile.Add<ColorAdjustments>(true);
             colorAdjustments.postExposure.overrideState = true;

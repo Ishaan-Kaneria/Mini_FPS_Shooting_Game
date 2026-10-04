@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -268,6 +269,16 @@ public class PlayerMotor : MonoBehaviour
 
     void Start()
     {
+        // One NaN or infinite pixel out of a shader (the lava graph can produce them) is spread by Bloom into a
+        // cream blob over half the screen, with a black streak where the NaN landed. Scrubbed at the camera,
+        // for every arena and every already-built scene.
+        var camera = GetComponentInChildren<Camera>();
+        if (camera != null)
+        {
+            var cameraData = camera.GetUniversalAdditionalCameraData();
+            if (cameraData != null) cameraData.stopNaN = true;
+        }
+
         if (lockCursor) SetCursorLocked(true);
     }
 

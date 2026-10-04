@@ -52,6 +52,7 @@ namespace FPSKit.EditorTools
             _snowSites.Clear();
             _caveSites.Clear();
             _hasStation = _hasIcefall = false;
+            ResetSnowFull();
         }
 
         /// <summary>
@@ -116,6 +117,10 @@ namespace FPSKit.EditorTools
 
             bool Inside(Vector2 p, float r) => Mathf.Abs(p.x) + r < half - 26f && Mathf.Abs(p.y) + r < half - 26f;
 
+            // The village, outpost, lodge, lift, mine, pass, cabins and camps take their ground first
+            // (FPSKitSnowFull); the station and the ice find room round them.
+            PlanSnowFull(half);
+
             // ---- the station ----
             const float stationR = 44f;
             for (int i = 0; i < 80 && !_hasStation; i++)
@@ -131,11 +136,16 @@ namespace FPSKit.EditorTools
                 _snowSites.Add(new Vector3(p.x, p.y, stationR + 12f));
             }
 
+            // The rest of the new sites, then the igloo camps, now the village and the station are down.
+            PlanSnowRest(half);
+            PlanCamps(new System.Random(_theme.randomSeed * 101 + 9), half);
+            foreach (var camp in _camps) _snowSites.Add(new Vector3(camp.Centre.x, camp.Centre.y, camp.Radius + 10f));
+
             // ---- the frozen waterfall, near an edge ----
-            for (int i = 0; i < 60 && !_hasIcefall; i++)
+            for (int i = 0; i < 400 && !_hasIcefall; i++)
             {
                 float a = Rand(rng, 0f, Mathf.PI * 2f);
-                var p = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Rand(rng, half * 0.6f, half * 0.75f);
+                var p = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Rand(rng, half * 0.55f, half * 0.85f);
                 if (!Inside(p, 22f) || !Free(p, 26f)) continue;
 
                 _icefallSite = p;
@@ -145,10 +155,10 @@ namespace FPSKit.EditorTools
             }
 
             // ---- two crevasses, short, well away from everything ----
-            for (int i = 0; i < 80 && _crevasses.Count < 2; i++)
+            for (int i = 0; i < 500 && _crevasses.Count < 2; i++)
             {
                 var mid = new Vector2(Rand(rng, -half * 0.7f, half * 0.7f), Rand(rng, -half * 0.7f, half * 0.7f));
-                float len = Rand(rng, 45f, 65f), yaw = Rand(rng, 0f, Mathf.PI);
+                float len = Rand(rng, 34f, 52f), yaw = Rand(rng, 0f, Mathf.PI);
                 var dir = new Vector2(Mathf.Cos(yaw), Mathf.Sin(yaw));
                 var a = mid - dir * len * 0.5f;
                 var b = mid + dir * len * 0.5f;
@@ -157,7 +167,7 @@ namespace FPSKit.EditorTools
 
                 bool clear = true;
                 for (float t = 0f; t <= 1f; t += 0.1f)
-                    if (!Free(Vector2.Lerp(a, b, t), 14f)) { clear = false; break; }
+                    if (!Free(Vector2.Lerp(a, b, t), 11f)) { clear = false; break; }
                 if (!clear) continue;
 
                 _crevasses.Add(new Crevasse { A = a, B = b, Half = Rand(rng, 2.4f, 3.2f) });
@@ -176,6 +186,8 @@ namespace FPSKit.EditorTools
                 FlattenPad(p.x, p.y, 13f, 14f);
                 _snowSites.Add(new Vector3(p.x, p.y, 20f));
             }
+
+            PlanSnowSmall(half);
         }
 
         // ==================================================================
@@ -191,6 +203,7 @@ namespace FPSKit.EditorTools
             group.SetParent(root, false);
 
             if (_hasStation) BuildStation(group, layer, backdrop, rng);
+            BuildSnowFull(group, layer, backdrop, half);
             foreach (var c in _crevasses) BuildCrevasse(group, layer, rng, c);
             foreach (var s in _caveSites) BuildIceCave(group, layer, rng, s);
             if (_hasIcefall) BuildIcefall(group, layer, rng);

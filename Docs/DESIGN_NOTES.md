@@ -2683,3 +2683,29 @@ Caveat: `CaptureArena` renders the shipped scene as saved (lights, moon shadows 
 puts the wheel against the glow. Rendered with the same in-memory trick as the Night Citylife card (all lights, Soft moon/sun shadows, every renderer casting, particles on and simulated 14 s), then discarded by opening the Menu scene; the scene file was not saved.
 Landmarks (world): Ferris wheel `(99, 18, -28)` 18x37x35, Big Top `(-20, 8, -136)`, carousel `(0, 0, -24)`, coaster `(-124, 7, -20)`, main gate `(0, 8, 147)`. Tried and dropped: tighter wheel shots (string-light wires cut across the frame),
 a trunk-blocked close view, and a Big Top path view (good, kept as the runner-up: `(-20, 2, -85)` -> `(-20, 9, -136)`, FOV 55). `Shots.asset` for each arena lives in `Assets/UI/Thumbnails/<DisplayName>/`.
+
+
+## Snowbound made full (2026-10-04)
+
+Ishaan: "rebuild it like what you did on Desert". Asked once, he chose all four -- alpine village, research outpost,
+wild arctic detail, mountain pass with cabins -- dense like the desert, keeping the pines, crevasses and ice caves,
+igloo camps and the frozen lake. Code: `FPSKitSnowFull.cs` (kit, planning, village), `FPSKitSnowBase.cs` (outpost,
+lodge), `FPSKitSnowPass.cs` (ski lift, mine, pass, cabins, camps, the wild pass), wired from `PlanSnowLife` /
+`BuildSnowLife`.
+
+- **Planning order matters; the arena is full on paper.** Lake and spawn first, then the village, then the station,
+  then outpost/lodge/lift/mine/pass (`PlanSnowRest`), then the igloo camps, crevasses, caves, and last the small
+  cabins and camps (`PlanSnowSmall`). Planned any other way the station, the icefall or the crevasses lose their room
+  (each was lost once). `PlanCamps` now runs inside `PlanSnowLife`.
+- **Nothing borrows the desert's materials** (they are null outside the desert, and null is magenta).
+- **A stair beside a wall is fragile for the navmesh.** Five roofs were unreachable until three things were found,
+  one by one: (1) windows/sills on the wall the stair climbs close the steps (the bake reads render meshes, collider or
+  not) -- keep that wall blank; (2) a `DriftAgainst` mound with `NoStanding` on the stair marks its steps unwalkable;
+  (3) **`NoStanding` on the storehouse's walls closed the last steps** (measured by disabling the modifier and
+  rebaking in the open editor: 0 of 5 roofs reachable with it, 5 of 5 without). Wall tops are 0.4 m wide, too thin to
+  bake anyway. Stairs are 2.6 m (`AlpStair`), wider than the desert's 1.8. A fast way to bisect a navmesh problem:
+  `NavMeshSurface.BuildNavMesh()` on the scene's `NavMesh` object takes under a second in the editor.
+- Visual-only tops (stall canopies, snow caps over rock) use `SnowCap` (NoStanding) so they do not bake islands.
+- Solid rock masses get `SealLocal` over their footprint (the terrain under a solid box otherwise bakes unreachable).
+- VerifyReach Snowbound: 0.0 % stranded (was 1.9 %); VerifyTerrain clean. VerifyZone's two gorge messages do not
+  apply to a river-less arena.

@@ -108,7 +108,8 @@ namespace FPSKit.EditorTools
             // ---- exists. The Plan and Build passes must stay in the same order as each
             // ---- other, because the second reads the list the first wrote.
             PlanLake(rng, half);
-            PlanCamps(rng, half);
+            // (The igloo camps are planned inside PlanSnowLife, after the village, outpost and
+            // lodge have taken their ground: those need the big clear circles.)
 
             // The station, the crevasses, the caves and the icefall (FPSKitSnowLife).
             PlanSnowLife(half);

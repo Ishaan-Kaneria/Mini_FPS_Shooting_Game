@@ -2757,3 +2757,15 @@ under a second"); "fill some spaces ... fencing or objects"; "make the skybox be
   zenith, wide warm glow, cirrus streaked along the wind, broken altocumulus lit from the sun's side, a 22-degree halo and
   sundogs. The sun in the picture is placed from the theme's light angle. Regenerated only when the sun, fog or recipe change.
 - Checks on the verified build: VerifyReach 0.1 % stranded, VerifyTerrain clean, all 8 storehouse roofs reachable.
+
+### Desert houses made bigger (2026-10-04)
+
+Ishaan, after Snowbound: "make houses bigger for desert also". `BuildSolidHouse` / `BuildEnterableHouse` now scale with their lot
+(the old 11 m lot is the unit, `sc = max(1, lot / 11)`): village lots 16 m (lane 4.5, streets 11 and 8 m), hamlet lots 14 m,
+farm house lots 15 m, with the hamlet, farm and village sites enlarged to match (village radius 96 down to 72, whichever fits).
+
+The same three navmesh faults as Snowbound's storehouses were found, and fixed the same way, in `BuildEnterableHouse`: **every
+roof was cut off from the ground** (the reach test only samples, so it had reported 0 stranded for the village): (1) NoStanding on the
+walls beside the roof stair, (2) open-window frames on the +u wall the stair climbs, (3) a 1.8 m flight. Now: walls left standing,
+windows on faces 0 and 2 only, and `AlpStair` at 2.6 m. Check roof reach directly (`NavMesh.CalculatePath` from the spawn to each
+roof) and do not trust the sampled percentage. Result: 27 of 27 roofs reachable, VerifyReach 0.2 %, VerifyTerrain and VerifyZone clean.

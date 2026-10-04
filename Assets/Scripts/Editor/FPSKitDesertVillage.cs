@@ -56,13 +56,13 @@ namespace FPSKit.EditorTools
             // Flat(town, backdrop, "TownGround", earth, DenseKey("townground"), _earthMat);
 
             // ---- lots on a grid of lanes ----
-            const float lot = 11f, lane = 4f, pitch = lot + lane;
-            const float mainHalf = 4.5f, crossHalf = 3f;
+            const float lot = 16f, lane = 4.5f, pitch = lot + lane;
+            const float mainHalf = 5.5f, crossHalf = 4f;
             float plazaX = crossHalf + lot, plazaZ = mainHalf + lot;
 
             var lots = new List<Vector2>();
-            for (int j = -6; j <= 6; j++)
-                for (int k = -6; k <= 6; k++)
+            for (int j = -5; j <= 5; j++)
+                for (int k = -5; k <= 5; k++)
                 {
                     if (j == 0 || k == 0) continue;
                     float x = c.x + Mathf.Sign(j) * (crossHalf + lot * 0.5f + (Mathf.Abs(j) - 1) * pitch);
@@ -166,18 +166,21 @@ namespace FPSKit.EditorTools
             bool twoStorey = rng.NextDouble() < 0.35;
             var mat = _adobeTints[rng.Next(_adobeTints.Length)];
 
+            // Houses scale with their lot: the original 11 m lot is the unit (Ishaan, 2026-10-04: "make houses
+            // bigger for desert also" -- he could run round them in a second).
+            float sc = Mathf.Max(1f, lot / 11f);
             float w, d, cu, cv;
             if (yard)
             {
                 w = lot - 0.6f;
-                d = Rand(rng, 5.2f, 6.2f);
+                d = Rand(rng, 5.2f * sc, 6.2f * sc);
                 cu = 0f;
                 cv = lot * 0.5f - 0.3f - d * 0.5f;
             }
             else
             {
-                w = Rand(rng, 7.5f, lot - 0.6f);
-                d = Rand(rng, 7.5f, lot - 0.6f);
+                w = Rand(rng, 7.5f * sc, lot - 0.6f);
+                d = Rand(rng, 7.5f * sc, lot - 0.6f);
                 cu = Rand(rng, -(lot - w) * 0.5f, (lot - w) * 0.5f);
                 cv = Rand(rng, -(lot - d) * 0.5f, (lot - d) * 0.5f);
             }
@@ -230,7 +233,8 @@ namespace FPSKit.EditorTools
             const float t = 0.35f;
             var mat = _adobeTints[rng.Next(_adobeTints.Length)];
 
-            float w = Rand(rng, 7f, 7.6f), d = Rand(rng, 8.8f, lot - 0.6f);
+            float sc = Mathf.Max(1f, lot / 11f);
+            float w = Rand(rng, 7f * sc, 7.6f * sc), d = Rand(rng, 8.8f * sc, lot - 0.6f);
             float cu = -(lot - w) * 0.5f + 0.25f, cv = 0f;
             float hw = w * 0.5f, hd = d * 0.5f;
             float gapV = cv + hd - 1.6f;
@@ -267,7 +271,9 @@ namespace FPSKit.EditorTools
 
             var wallGo = MeshObject(parent, "HouseWalls", ToMesh(walls, DenseKey("housewalls")), mat, Vector3.zero,
                                     Quaternion.identity, Vector3.one, layer, "Concrete");
-            NoStanding(wallGo);
+            // Left standing-by-area: NoStanding on a wall the roof stair climbs beside closes the navmesh on the last steps
+            // (measured on Snowbound: every roof unreachable with it). Wall tops are 0.35 m, too thin to bake anyway.
+            _ = wallGo;
 
             // ---- the roof, which is ground ----
             var roof = new MeshBuild { UVScale = 0.28f };
@@ -289,11 +295,17 @@ namespace FPSKit.EditorTools
 
             // ---- outside ----
             var doors = new List<(int face, float at)> { (0, frontDoor), (1, backDoor) };
-            HouseDressing(parent, layer, rng, f, cu, cv, w, d, storey, doors, solidDoors: false, openWindowsOn: new[] { 0, 2, 3 });
+            HouseDressing(parent, layer, rng, f, cu, cv, w, d, storey, doors, solidDoors: false, openWindowsOn: new[] { 0, 2 });   // not the +u wall: the stair climbs it, and a sill or shutter there closes the steps
             RoofDressing(parent, layer, rng, f, cu - 0.6f, cv - 0.8f, w - 2.4f, d - 3.6f, storey, walkable: true);
 
             // The stair: along the +u side, climbing towards +v, landing beside the parapet's gap.
-            StairLocal(parent, layer, mat, f, cu + hw + 0.95f, gapV, Vector3.forward, storey);
+            {
+                // 2.6 m wide: a 1.8 m flight left too little for the bake once the agent radius and the ledge filter had had theirs.
+                const float stairWide = 2.6f;
+                var upAxis = f.Axis(Vector3.forward);
+                AlpStair(parent, layer, mat, f.P(cu + hw + 0.05f + stairWide * 0.5f, 0f, gapV),
+                         new Vector3(Mathf.Round(upAxis.x), 0f, Mathf.Round(upAxis.z)), storey, stairWide);
+            }
         }
 
         /// <summary>

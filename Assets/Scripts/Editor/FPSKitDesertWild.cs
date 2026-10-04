@@ -42,16 +42,16 @@ namespace FPSKit.EditorTools
             {
                 float lo = _hamletPlans.Count == 0 ? 50f : 60f, hi = _hamletPlans.Count == 0 ? 95f : half;
                 var p = new Vector2(Rand(rng, -half + 45f, half - 45f), Rand(rng, -half + 45f, half - 45f));
-                if (p.magnitude < lo || p.magnitude > hi || !ClearOfRiver(p, 29f) || !Free(p, 29f)) continue;
+                if (p.magnitude < lo || p.magnitude > hi || !ClearOfRiver(p, 34f) || !Free(p, 34f)) continue;
                 if ((p - _townCentre).magnitude < _townRadius + 40f) continue;
                 if (_hasFob && _fob.Contains(p, 30f)) continue;
                 bool crowded = false;
-                foreach (var h in _hamletPlans) if ((h.Centre - p).magnitude < 85f) crowded = true;
+                foreach (var h in _hamletPlans) if ((h.Centre - p).magnitude < 95f) crowded = true;
                 if (crowded) continue;
 
-                _hamletPlans.Add(new SitePlan { Centre = p, Width = 26f, Depth = 41f, Yaw = rng.Next(4) * 90f });
-                Claim(p.x, p.y, 29f);
-                FlattenPad(p.x, p.y, 29f, 30f, SiteHeight(p, 29f));
+                _hamletPlans.Add(new SitePlan { Centre = p, Width = 33f, Depth = 51f, Yaw = rng.Next(4) * 90f });
+                Claim(p.x, p.y, 34f);
+                FlattenPad(p.x, p.y, 34f, 30f, SiteHeight(p, 34f));
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
             }
 
@@ -97,14 +97,14 @@ namespace FPSKit.EditorTools
             for (int i = 0; i < 800 && _farmPlans.Count < 18; i++)
             {
                 var p = new Vector2(Rand(rng, -half + 40f, half - 40f), Rand(rng, -half + 40f, half - 40f));
-                if (p.magnitude < 45f || !ClearOfRiver(p, 18f) || !Free(p, 19f)) continue;
+                if (p.magnitude < 45f || !ClearOfRiver(p, 22f) || !Free(p, 23f)) continue;
                 if ((p - _townCentre).magnitude < _townRadius + 28f) continue;
                 if (_hasFob && _fob.Contains(p, 22f)) continue;
 
-                var plan = new SitePlan { Centre = p, Width = 26f, Depth = 22f, Yaw = rng.Next(4) * 90f };
+                var plan = new SitePlan { Centre = p, Width = 34f, Depth = 28f, Yaw = rng.Next(4) * 90f };
                 _farmPlans.Add(plan);
-                Claim(p.x, p.y, 19f);
-                FlattenPad(p.x, p.y, 17.5f, 24f, SiteHeight(p, 17.5f));
+                Claim(p.x, p.y, 23f);
+                FlattenPad(p.x, p.y, 21.5f, 24f, SiteHeight(p, 21.5f));
                 _anchors.Add(new Vector3(p.x, 0f, p.y));
                 PlanFieldFor(rng, plan);
             }
@@ -202,7 +202,7 @@ namespace FPSKit.EditorTools
 
             float floor = GroundHeightAt(plan.Centre.x, plan.Centre.y);
             var f = new Frame(new Vector3(plan.Centre.x, floor, plan.Centre.y), plan.Yaw);
-            const float lot = 11f, lane = 4f;
+            const float lot = 14f, lane = 4.5f;
 
             var ground = new MeshBuild { UVScale = 0.2f };
             float hw = plan.Width * 0.5f + 3f, hd = plan.Depth * 0.5f + 3f;
@@ -286,8 +286,8 @@ namespace FPSKit.EditorTools
             coping.Box(f.P(0f, h + 0.05f, hd), new Vector3(plan.Width + 0.1f, 0.1f, t + 0.1f), f.Rot);
             Visual(farm, "FarmCoping", coping, _plinthMat, layer);
 
-            // The house in the back corner away from the side gate, as an 11 m lot.
-            const float lot = 11f;
+            // The house in the back corner away from the side gate, as a 15 m lot (11 before the houses were enlarged).
+            const float lot = 15f;
             float houseU = -gateSide * (hw - t - lot * 0.5f), houseV = hd - t - lot * 0.5f;
             var hf = new Frame(f.P(houseU, 0f, houseV), plan.Yaw + (gateSide > 0 ? 0f : 0f));
             if (rng.NextDouble() < 0.4) BuildEnterableHouse(farm, layer, backdrop, rng, hf, lot);

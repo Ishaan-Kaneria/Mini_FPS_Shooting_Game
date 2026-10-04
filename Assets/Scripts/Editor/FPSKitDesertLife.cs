@@ -112,18 +112,24 @@ namespace FPSKit.EditorTools
             bool Inside(Vector2 p, float r) => Mathf.Abs(p.x) + r < half - 22f && Mathf.Abs(p.y) + r < half - 22f;
 
             // ---- the village: the spawn side of the river, a walk from the spawn ----
-            _townRadius = 72f;
-            for (int i = 0; i < 160 && !_hasTown; i++)
+            // The houses are bigger (lots of 16 m, was 11), so the village is too: the largest circle that finds room.
+            foreach (float tr in new[] { 96f, 90f, 84f, 78f, 72f })
             {
-                var p = new Vector2(Rand(rng, -half + 70f, 20f), Rand(rng, -half * 0.5f, half * 0.5f));
-                if (p.magnitude < _townRadius + 30f || !ClearOfRiver(p, _townRadius) || !Inside(p, _townRadius)) continue;
-                if (!Free(p, _townRadius + 8f)) continue;
+                if (_hasTown) break;
+                _townRadius = tr;
+                float lim = half - 22f - tr;
+                for (int i = 0; i < 260 && !_hasTown; i++)
+                {
+                    var p = new Vector2(Rand(rng, -lim, Mathf.Min(20f, lim)), Rand(rng, -Mathf.Min(half * 0.5f, lim), Mathf.Min(half * 0.5f, lim)));
+                    if (p.magnitude < _townRadius + 12f || !ClearOfRiver(p, _townRadius) || !Inside(p, _townRadius)) continue;
+                    if (!Free(p, _townRadius + 8f)) continue;
 
-                _townCentre = p;
-                _hasTown = true;
-                Claim(p.x, p.y, _townRadius + 10f);
-                FlattenPad(p.x, p.y, _townRadius, 34f);
-                _anchors.Add(new Vector3(p.x, 0f, p.y));
+                    _townCentre = p;
+                    _hasTown = true;
+                    Claim(p.x, p.y, _townRadius + 10f);
+                    FlattenPad(p.x, p.y, _townRadius, 34f);
+                    _anchors.Add(new Vector3(p.x, 0f, p.y));
+                }
             }
 
             if (!_hasTown) { Debug.LogWarning("[FPSKit] desert: no room for the village."); return; }

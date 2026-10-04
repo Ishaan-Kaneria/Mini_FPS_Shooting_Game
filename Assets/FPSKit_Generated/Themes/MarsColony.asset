@@ -37,9 +37,9 @@ MonoBehaviour:
   fogEnabled: 1
   fogColor: {r: 0.42, g: 0.1, b: 0.055, a: 1}
   fogDensity: 0.0019
-  ambientSky: {r: 0.5, g: 0.13, b: 0.08, a: 1}
-  ambientEquator: {r: 0.46, g: 0.12, b: 0.06, a: 1}
-  ambientGround: {r: 0.62, g: 0.17, b: 0.05, a: 1}
+  ambientSky: {r: 0.72, g: 0.2, b: 0.12, a: 1}
+  ambientEquator: {r: 0.68, g: 0.18, b: 0.09, a: 1}
+  ambientGround: {r: 0.82, g: 0.23, b: 0.08, a: 1}
   arenaSize: 450
   wallHeight: 5
   randomSeed: 66
@@ -126,8 +126,8 @@ MonoBehaviour:
   ambienceLoop: {fileID: 0}
   ambienceVolume: 0.35
   enablePostProcessing: 1
-  bloomIntensity: 1.6
-  postExposure: 0
+  bloomIntensity: 0.9
+  postExposure: 0.4
   saturation: 18
   contrast: 16
   colorFilter: {r: 1, g: 0.8, b: 0.72, a: 1}

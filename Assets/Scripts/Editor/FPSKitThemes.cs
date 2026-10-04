@@ -765,9 +765,11 @@ namespace FPSKit.EditorTools
                     // the river and the vents, and it is what stops every face turned away
                     // from a low sun going black -- the desert records that a face in
                     // shadow dark enough to hide an enemy is a fault, not a mood.
-                    t.ambientSky = new Color(0.50f, 0.13f, 0.08f);
-                    t.ambientEquator = new Color(0.46f, 0.12f, 0.06f);
-                    t.ambientGround = new Color(0.62f, 0.17f, 0.05f);
+                    t.ambientSky = new Color(0.72f, 0.20f, 0.12f);
+                    t.ambientEquator = new Color(0.68f, 0.18f, 0.09f);
+                    t.ambientGround = new Color(0.82f, 0.23f, 0.08f);
+                    // A little brighter overall (his note, 2026-10-04: "slightly brighter to see clearly").
+                    t.postExposure = 0.4f;
 
                     // ---- the ground ----
                     // Cooled basalt: near black, with the glow in its cracks supplied by

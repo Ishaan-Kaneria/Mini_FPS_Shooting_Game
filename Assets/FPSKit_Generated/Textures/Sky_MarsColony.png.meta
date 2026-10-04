@@ -6,7 +6,7 @@ TextureImporter:
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 1
+    enableMipMap: 0
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -140,6 +140,6 @@ TextureImporter:
     nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
-  userData: alien-sky-v2|0.828,0.292,-0.478|6B1A0E
+  userData: alien-sky-v3|0.828,0.292,-0.478|6B1A0E
   assetBundleName: 
   assetBundleVariant: 

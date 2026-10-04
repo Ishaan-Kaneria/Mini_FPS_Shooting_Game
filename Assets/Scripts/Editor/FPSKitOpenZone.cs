@@ -217,6 +217,7 @@ namespace FPSKit.EditorTools
                 BuildSpires(root, layer, rng, half);
                 BuildLavaFieldSurface(root, backdrop, half);
                 BuildLavaGlow(root, half);
+                BuildLavaFountains(root, half);
                 BuildAshfall(root);
             }
             else

@@ -99,6 +99,103 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
+        /// Lava fountains: jets of molten rock thrown 15-40 m up out of the river, falling back in glowing arcs,
+        /// a few at once and never in step (each system has its own seed and a long, uneven cycle). Particles
+        /// only, no colliders and no damage; the camera fade on their material keeps one that falls next to the
+        /// player from filling the screen the way the first smoke did. Orange, never white: the HDR is capped
+        /// under the Bloom clamp.
+        /// </summary>
+        private static void BuildLavaFountains(Transform root, float half)
+        {
+            var group = new GameObject("LavaFountains").transform;
+            group.SetParent(root, false);
+            var rng = new System.Random(_theme.randomSeed ^ 0x70F3);
+            var blob = ParticleMaterial("Fountain", "Puff", additive: false, new Color(2.4f, 0.62f, 0.08f, 1f));
+            int made = 0;
+
+            for (float z = -half - 10f; z <= half + 10f; z += Rand(rng, 38f, 70f))
+            {
+                float x = GorgeCentreAt(z) + Rand(rng, -_theme.hazardWidth * 0.25f, _theme.hazardWidth * 0.25f);
+                made += Fountain(group, new Vector3(x, WaterSurfaceY + 0.4f, z), blob, rng, Rand(rng, 0.85f, 1.15f));
+            }
+
+            Debug.Log($"[FPSKit] lava fountains: {made}.");
+        }
+
+        private static int Fountain(Transform parent, Vector3 at, Material blob, System.Random rng, float power)
+        {
+            var go = new GameObject("Fountain");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = at;
+            go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+
+            var system = go.AddComponent<ParticleSystem>();
+            system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            var main = system.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.prewarm = true;
+            main.duration = 6f;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(3f, 5f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(18f * power, 36f * power);
+            main.startSize = new ParticleSystem.MinMaxCurve(2.5f, 5.5f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.gravityModifier = 1.15f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 500;
+            system.useAutoRandomSeed = false;
+            system.randomSeed = (uint)rng.Next();
+
+            // Eruptions, not a hose: a rolling burst, then a lull, so no two fountains play together.
+            var emission = system.emission;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new[]
+            {
+                new ParticleSystem.Burst(0f, 70, 120, 5, 0.08f),
+                new ParticleSystem.Burst(3f, 45, 100, 4, 0.06f)
+            });
+
+            var shape = system.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 11f;
+            shape.radius = 2.4f;
+
+            var size = system.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(
+                new Keyframe(0f, 0.5f), new Keyframe(0.25f, 1f), new Keyframe(1f, 0.35f)));
+
+            // Yellow-orange at the throat, cooling to dull red and gone as it falls.
+            var colour = system.colorOverLifetime;
+            colour.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(new Color(1f, 0.85f, 0.35f), 0f),
+                    new GradientColorKey(new Color(1f, 0.38f, 0.07f), 0.35f),
+                    new GradientColorKey(new Color(0.45f, 0.08f, 0.03f), 1f)
+                },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.95f, 0.08f), new GradientAlphaKey(0.8f, 0.7f), new GradientAlphaKey(0f, 1f) });
+            colour.color = gradient;
+
+            var noise = system.noise;
+            noise.enabled = true;
+            noise.strength = 1.1f;
+            noise.frequency = 0.35f;
+
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sharedMaterial = blob;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.sortMode = ParticleSystemSortMode.Distance;
+            return 1;
+        }
+
+        /// <summary>
         /// Moves a lava mesh's UVs so the smallest is (1, 1). The graph returns NaN (black) on negative UVs and
         /// loses precision on large ones (a flat white blob across the screen), and pools, tongues and fissures
         /// had both: unit-space UVs centred on zero, and world-metre UVs out to 150. Only the origin moves, so
@@ -672,7 +769,7 @@ namespace FPSKit.EditorTools
         // ==================================================================
         // The sky
         // ==================================================================
-        private const string AlienSkyRecipe = "alien-sky-v2";
+        private const string AlienSkyRecipe = "alien-sky-v3";
 
         /// <summary>
         /// The Unknown Planet's sky, painted: a red giant filling a tenth of the horizon (limb-darkened, grained,
@@ -825,7 +922,9 @@ namespace FPSKit.EditorTools
                 {
                     importer.textureType = TextureImporterType.Default;
                     importer.sRGBTexture = true;
-                    importer.mipmapEnabled = true;
+                    // No mipmaps: Skybox/Panoramic's atan2 seam gives the sampler a huge derivative, which picks the smallest
+                    // mip along the seam and draws a dashed vertical line from horizon to zenith.
+                    importer.mipmapEnabled = false;
                     importer.wrapModeU = TextureWrapMode.Repeat;
                     importer.wrapModeV = TextureWrapMode.Clamp;
                     importer.filterMode = FilterMode.Trilinear;

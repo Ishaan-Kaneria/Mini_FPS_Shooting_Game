@@ -69,6 +69,7 @@ public class EnemyBody : MonoBehaviour
     // ======================================================================
 
     EnemyAI _ai;
+    EnemyBrain _brain;
     Health _health;
     EnemyWounds _wounds;
     RagdollController _ragdoll;
@@ -105,6 +106,7 @@ public class EnemyBody : MonoBehaviour
     void Awake()
     {
         _ai = GetComponent<EnemyAI>();
+        _brain = GetComponent<EnemyBrain>();
         _health = GetComponent<Health>();
         _wounds = GetComponent<EnemyWounds>();
         _ragdoll = GetComponent<RagdollController>();
@@ -424,7 +426,11 @@ public class EnemyBody : MonoBehaviour
     /// <summary>The spine, neck and head turned onto the player, shared down the chain.</summary>
     void Aim(float weight)
     {
-        bool sees = _ai != null && _ai.target != null && _ai.HasSpotted && !_gunDropped;
+        // With a mind (EnemyBrain), the rifle comes up only once it is alert, and the head
+        // turns to whatever it is looking at -- a noise, a scan of the street. Without one,
+        // up the moment it has spotted the player.
+        bool sees = _brain != null ? _brain.WeaponUp && !_gunDropped
+                  : _ai != null && _ai.target != null && _ai.HasSpotted && !_gunDropped;
         float want = sees ? 1f : 0f;
         _aimWeight = Mathf.MoveTowards(_aimWeight, want, Time.deltaTime * 3f) * weight;
 
@@ -432,15 +438,17 @@ public class EnemyBody : MonoBehaviour
         if (_ai != null && _ai.target != null)
         {
             Vector3 eye = transform.TransformPoint(shoulder);
-            Vector3 at = _ai.target.position + Vector3.up * 1.45f;
+            Vector3 at = _brain != null ? _brain.LookPoint : _ai.target.position + Vector3.up * 1.45f;
             Vector3 local = transform.InverseTransformDirection(at - eye);
             float yaw = Mathf.Clamp(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg, -aimLimit, aimLimit);
             float pitch = Mathf.Clamp(-Mathf.Atan2(local.y, new Vector2(local.x, local.z).magnitude) * Mathf.Rad2Deg, -45f, 45f);
             target = Quaternion.Euler(pitch, yaw, 0f);
         }
 
-        Quaternion carried = Quaternion.Euler(lowReady, 0f, 0f);
-        _aim = Quaternion.Slerp(_aim, Quaternion.Slerp(carried, target, _aimWeight), Time.deltaTime * 10f);
+        // Carried low, the head still turns to what it is looking at; aimed, the whole chain does.
+        Quaternion carried = Quaternion.Euler(lowReady, target.eulerAngles.y > 180f ? target.eulerAngles.y - 360f : target.eulerAngles.y, 0f);
+        if (_brain == null) carried = Quaternion.Euler(lowReady, 0f, 0f);
+        _aim = Quaternion.Slerp(_aim, Quaternion.Slerp(carried, target, _aimWeight), Time.deltaTime * 6f);
 
         // Shares of the turn down the chain. The head takes the rest of the pitch so the
         // eyes are on the player whatever the chest manages.
@@ -451,8 +459,12 @@ public class EnemyBody : MonoBehaviour
 
         Turn(_spine, transform.up, yawOnly * 0.25f * _aimWeight);
         Turn(_chest, transform.up, yawOnly * 0.35f * _aimWeight);
-        Turn(_neck, transform.up, yawOnly * 0.15f * _aimWeight);
-        Turn(_head, transform.up, yawOnly * 0.25f * _aimWeight);
+        // The head looks where the mind looks even with the rifle down: a sentry's head
+        // turning to a noise is most of what makes it read as alert.
+        float look = _brain != null ? Mathf.Max(_aimWeight, 0.9f * weight) : _aimWeight;
+        float calm = Mathf.Max(0f, look - _aimWeight);
+        Turn(_neck, transform.up, yawOnly * (0.15f * _aimWeight + 0.35f * calm));
+        Turn(_head, transform.up, yawOnly * (0.25f * _aimWeight + 0.45f * calm));
 
         float pitchOnly = Vector3.Dot(axis, transform.right) * angle;
         Turn(_chest, transform.right, pitchOnly * 0.35f * _aimWeight);

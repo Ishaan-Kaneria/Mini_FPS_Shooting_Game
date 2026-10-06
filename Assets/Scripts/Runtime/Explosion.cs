@@ -194,6 +194,9 @@ public class Explosion : MonoBehaviour
     {
         if (spec.radius <= 0f || spec.damage <= 0f) return 0;
 
+        // Heard across the map: everyone within a long way knows where the fight is.
+        NoiseSystem.Emit(centre, Mathf.Max(60f, spec.radius * 12f), NoiseKind.Blast, attacker);
+
         var hits = Physics.OverlapSphere(centre, spec.radius, mask, QueryTriggerInteraction.Ignore);
         if (hits.Length == 0) return 0;
 

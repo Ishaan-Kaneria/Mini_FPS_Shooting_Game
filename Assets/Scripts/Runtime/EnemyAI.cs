@@ -265,6 +265,68 @@ public class EnemyAI : MonoBehaviour
     /// <summary>Which way the round was travelling, in this enemy's own local space.</summary>
     public Vector3 LastReactionLocal { get; private set; }
 
+    // ======================================================================
+    // Driven by a brain
+    // ======================================================================
+
+    EnemyBrain _brain;
+
+    /// <summary>It has seen the player (or been told of them): the body treats it as engaged.</summary>
+    public void MarkSpotted()
+    {
+        _hasAlerted = true;
+        _lastSeenTime = Time.time;
+    }
+
+    /// <summary>A clear line from the eyes to the player now. Rationed internally.</summary>
+    public bool SeesTarget() => target != null && CanSeeTarget();
+
+    /// <summary>What it is doing, as the rest of the game reads it.</summary>
+    public void ReportState(State state)
+    {
+        if (CurrentState != State.Dead) CurrentState = state;
+    }
+
+    /// <summary>Starts an attack (the wind-up, then the shot or the swing) if it is ready to.</summary>
+    public bool TryAttack()
+    {
+        if (_attacking || target == null || Time.time < _nextAttackTime || CurrentState == State.Dead) return false;
+        CurrentState = State.Attack;
+        _attackRoutine = StartCoroutine(AttackRoutine());
+        return true;
+    }
+
+    /// <summary>Walks or runs to a point, at a share of its full speed, wounds permitting.</summary>
+    public void MoveTo(Vector3 destination, float speedShare)
+    {
+        if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh || _attacking) return;
+
+        _agent.isStopped = false;
+        if ((_agent.destination - destination).sqrMagnitude > 0.36f || !_agent.hasPath) _agent.SetDestination(destination);
+
+        float multiplier = Mathf.Clamp(speedShare, 0.05f, 1.3f);
+        if (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound)
+            multiplier = Mathf.Min(multiplier, 1f) * _wounds.MoveSpeedMultiplier;
+
+        _agent.speed = _baseSpeed * multiplier * WadingZone.SpeedFactorAt(transform.position, false);
+    }
+
+    /// <summary>Stands where it is.</summary>
+    public void Hold() => Stop();
+
+    /// <summary>Has got where it was sent (or has nowhere to go).</summary>
+    public bool Arrived => _agent == null || !_agent.enabled || !_agent.isOnNavMesh
+                           || (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance + 0.4f);
+
+    /// <summary>Turns the body to face a point, at a rate.</summary>
+    public void FaceTowards(Vector3 point, float rate)
+    {
+        Vector3 flat = point - transform.position;
+        flat.y = 0f;
+        if (flat.sqrMagnitude < 0.001f) return;
+        transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(flat), rate * Time.deltaTime);
+    }
+
     /// <summary>Mid-attack: from the wind-up until the blow or the burst is done.</summary>
     public bool Attacking => _attacking;
 
@@ -405,6 +467,7 @@ public class EnemyAI : MonoBehaviour
 
         if (eyes == null) eyes = transform;
         if (animator == null) animator = GetComponentInChildren<Animator>();
+        _brain = GetComponent<EnemyBrain>();
 
         // Scattered rather than aligned. Every enemy in a level is spawned within a
         // frame or two of every other, so a shared interval would land all of their
@@ -482,6 +545,16 @@ public class EnemyAI : MonoBehaviour
             Stop();
             ApplyShove();
             CurrentState = State.Stagger;
+            UpdateAnimator();
+            return;
+        }
+
+        // A thinking enemy (EnemyBrain) decides for itself what to do with the frame; this
+        // body carries it out. The hunt's quarry still runs on the old rules below.
+        if (_brain != null && _brain.isActiveAndEnabled && !forcedFlight)
+        {
+            _brain.Tick();
+            if (_attacking && target != null) FaceTarget();
             UpdateAnimator();
             return;
         }

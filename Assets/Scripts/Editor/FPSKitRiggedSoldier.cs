@@ -168,6 +168,7 @@ namespace FPSKit.EditorTools
                 ragdoll.mainCollider = null;     // the bones are the body; nothing on the root to soak a round
 
                 root.AddComponent<EnemyBrutality>();
+                root.AddComponent<EnemyBrain>();
 
                 var body = root.AddComponent<EnemyBody>();
                 body.animator = animator;

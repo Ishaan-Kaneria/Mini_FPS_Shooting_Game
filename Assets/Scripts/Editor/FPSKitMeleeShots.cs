@@ -54,6 +54,19 @@ namespace FPSKit.EditorTools
 
         static bool _enemyScript;
         static bool _goreScript;
+        static bool _brainScript;
+
+        /// <summary>
+        /// Five soldiers posted round the player, out of the way; a while of calm, then a
+        /// shot. Logs what each one's mind is doing every few seconds, and the player's health.
+        /// </summary>
+        public static void RunBrain(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
+        {
+            _brainScript = true;
+            _goreScript = false;
+            _enemyScript = false;
+            Run(folder, scene, width, height, onDone, keepMode: true);
+        }
         static readonly List<EnemyAI> _row = new List<EnemyAI>();
 
         /// <summary>Four soldiers in a row, each killed a different way: caved, beheaded, a leg off, a leg broken.</summary>
@@ -73,7 +86,7 @@ namespace FPSKit.EditorTools
 
         public static void Run(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null, bool keepMode = false)
         {
-            if (!keepMode) { _enemyScript = false; _goreScript = false; }
+            if (!keepMode) { _enemyScript = false; _goreScript = false; _brainScript = false; }
             if (Running) return;
             _folder = string.IsNullOrEmpty(folder) ? "Build/MeleeShots" : folder;
             _width = width;
@@ -141,7 +154,7 @@ namespace FPSKit.EditorTools
                         // A thirtieth a frame: fine enough to catch a strike at its blow, coarse
                         // enough that an editor throttled in the background still gets through.
                         Time.captureDeltaTime = 1f / 30f;
-                        _script = _goreScript ? GoreScript() : _enemyScript ? EnemyScript() : Script();
+                        _script = _brainScript ? BrainScript() : _goreScript ? GoreScript() : _enemyScript ? EnemyScript() : Script();
                         _next = 0;
                         _mark = Time.time;
                         _step = 2;
@@ -291,6 +304,64 @@ namespace FPSKit.EditorTools
                 hb.Receive(new DamageInfo(amount, at, (from - at).normalized, (at - from).normalized, _player));
                 return;
             }
+        }
+
+        static void LogMinds(string when)
+        {
+            var sb = new System.Text.StringBuilder(when + ":");
+            foreach (var ai in _row)
+            {
+                if (ai == null) { sb.Append(" [gone]"); continue; }
+                var b = ai.GetComponent<EnemyBrain>();
+                float d = Vector3.Distance(ai.transform.position, _player.transform.position);
+                sb.Append($" [{(b != null ? b.Mind.ToString() : "-")}/{(b != null ? b.Doing : ai.CurrentState.ToString())} {d:0}m s{(b != null ? b.Suspicion : 0f):0.0}]");
+            }
+            var h = _player.GetComponent<Health>();
+            sb.Append($" playerHP {h.Current:0} shield {h.Shield:0}");
+            Note(sb.ToString());
+        }
+
+        static List<(float, Action)> BrainScript()
+        {
+            var list = new List<(float, Action)>();
+            float t = 0f;
+            void At(float dt, Action a) { t += dt; list.Add((t, a)); }
+
+            At(0.1f, () =>
+            {
+                foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None)) ai.gameObject.SetActive(false);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+                _row.Clear();
+                // Posted round the player, mostly facing away or across: they have not seen anyone.
+                float[] angles = { 20f, 70f, 160f, 230f, 300f };
+                float[] ranges = { 22f, 30f, 26f, 38f, 34f };
+                for (int i = 0; i < angles.Length; i++)
+                {
+                    Vector3 dir = Quaternion.AngleAxis(angles[i], Vector3.up) * _player.transform.forward;
+                    Vector3 at = _player.transform.position + dir * ranges[i];
+                    if (UnityEngine.AI.NavMesh.SamplePosition(at, out var hit, 8f, UnityEngine.AI.NavMesh.AllAreas)) at = hit.position;
+                    var go = Object.Instantiate(prefab, at, Quaternion.LookRotation(dir));
+                    // Grunts and a Marksman, as a level would send them: riflemen.
+                    var arch = AssetDatabase.LoadAssetAtPath<EnemyArchetype>(i == 3 ? "Assets/FPSKit_Generated/Enemies/Marksman.asset"
+                                                                                     : "Assets/FPSKit_Generated/Enemies/Grunt.asset");
+                    if (arch != null) arch.ApplyTo(go, 1f, 1f, 1f);
+                    _row.Add(go.GetComponent<EnemyAI>());
+                }
+                // The player is a crouched statue: nothing but a shot will give them away.
+                var h = _player.GetComponent<Health>();
+                h.maxHealth = 100000f; h.ResetHealth();
+            });
+            At(1f, () => LogMinds("t1 calm"));
+            At(4f, () => { LogMinds("t5"); Shoot("calm"); });
+            At(4f, () => LogMinds("t9"));
+            At(0.1f, () => { NoiseSystem.Emit(_player.transform.position, 85f, NoiseKind.Gunfire, _player); Note("-- shot fired --"); });
+            At(1.0f, () => LogMinds("shot+1"));
+            At(2.0f, () => { LogMinds("shot+3"); Shoot("alerted"); });
+            At(3.0f, () => LogMinds("shot+6"));
+            At(4.0f, () => { LogMinds("shot+10"); Shoot("fight"); });
+            At(6.0f, () => LogMinds("shot+16"));
+            At(8.0f, () => LogMinds("shot+24"));
+            return list;
         }
 
         static List<(float, Action)> GoreScript()

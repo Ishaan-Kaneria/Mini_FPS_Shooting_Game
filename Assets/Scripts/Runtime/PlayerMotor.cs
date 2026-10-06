@@ -286,6 +286,7 @@ public class PlayerMotor : MonoBehaviour
         // The player's state told without a health bar, and their own noise for the
         // enemies to hear. Added here so every arena already built has them.
         if (GetComponent<PlayerCondition>() == null) gameObject.AddComponent<PlayerCondition>();
+        if (GetComponent<PlayerNoise>() == null) gameObject.AddComponent<PlayerNoise>();
         if (controls == null) controls = ControlSettings.CreateDefault();
         // The player's own keys first, so the actions are bound to them and not to the asset's.
         KeyBindings.Apply(controls);

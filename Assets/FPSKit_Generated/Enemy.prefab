@@ -3494,6 +3494,7 @@ GameObject:
   - component: {fileID: 4290506376759687217}
   - component: {fileID: 2927946828830825345}
   - component: {fileID: 1880353111154081295}
+  - component: {fileID: 5377984926513354841}
   - component: {fileID: 4744877920839733982}
   m_Layer: 9
   m_Name: Enemy
@@ -3848,6 +3849,31 @@ MonoBehaviour:
   bloodied: {r: 0.5, g: 0.12, b: 0.1, a: 1}
   throwSpeed: 4.5
   gushSeconds: 5
+--- !u!114 &5377984926513354841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6852379658114732486}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f463c5a0ea2ff1baebf512a64502236d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyBrain
+  sightRange: 55
+  calmFieldOfView: 120
+  alertFieldOfView: 170
+  closeSense: 2.5
+  noticeSeconds: 1.1
+  hearing: 1
+  reactionSeconds: 0.8
+  searchSeconds: 28
+  patrolRadius: 14
+  fallBackAt: 0.3
+  walkPace: 0.42
+  carefulPace: 0.5
+  runPace: 1
 --- !u!114 &4744877920839733982
 MonoBehaviour:
   m_ObjectHideFlags: 0

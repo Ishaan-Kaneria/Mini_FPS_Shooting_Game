@@ -338,11 +338,11 @@ namespace FPSKit.EditorTools
             var contents = PrefabUtility.LoadPrefabContents(path);
             bool changed = false;
 
-            if (contents.GetComponent<EnemyHealthBar>() == null)
+            // No health bars over enemies (Ishaan's rule): a prefab that still carries one loses it.
+            var oldBar = contents.GetComponent<EnemyHealthBar>();
+            if (oldBar != null)
             {
-                var bar = contents.AddComponent<EnemyHealthBar>();
-                bar.barMaterial = CreateBarMaterial();
-                bar.heightOffset = 2.6f;
+                Object.DestroyImmediate(oldBar);
                 changed = true;
             }
 
@@ -2533,11 +2533,7 @@ namespace FPSKit.EditorTools
             // every archetype shuffle instead of walk.
             limbs.fullSpeed = agent.speed;
 
-            // Floating health bar. The material is assigned from an asset rather than
-            // found at runtime, so the shader survives shader stripping in a build.
-            var bar = enemy.AddComponent<EnemyHealthBar>();
-            bar.barMaterial = CreateBarMaterial();
-            bar.heightOffset = 2.6f;
+            // No floating health bar: enemies are read by their bodies (no health bars anywhere).
 
             string path = AssetFolder + "/Enemy.prefab";
             var prefab = PrefabUtility.SaveAsPrefabAsset(enemy, path);

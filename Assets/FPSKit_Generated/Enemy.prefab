@@ -3492,7 +3492,6 @@ GameObject:
   - component: {fileID: 5918146559981873187}
   - component: {fileID: 2344973558938156951}
   - component: {fileID: 4290506376759687217}
-  - component: {fileID: 6810429267347591616}
   - component: {fileID: 2927946828830825345}
   - component: {fileID: 4744877920839733982}
   m_Layer: 9
@@ -3813,34 +3812,6 @@ MonoBehaviour:
   huntInterval: {x: 9, y: 18}
   huntGap: 3
   hurtShare: 0.3
---- !u!114 &6810429267347591616
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6852379658114732486}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7262153db191269c97f81de380b0e69, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnemyHealthBar
-  heightOffset: 2.15
-  size: {x: 1.1, y: 0.13}
-  hideWhenFull: 1
-  alwaysVisible: 0
-  maxVisibleDistance: 45
-  healthyColor: {r: 0.35, g: 0.85, b: 0.35, a: 1}
-  hurtColor: {r: 0.95, g: 0.75, b: 0.2, a: 1}
-  criticalColor: {r: 0.9, g: 0.25, b: 0.2, a: 1}
-  shieldColor: {r: 0.4, g: 0.75, b: 1, a: 1}
-  backgroundColor: {r: 0.05, g: 0.05, b: 0.06, a: 1}
-  showMarker: 1
-  markerColor: {r: 0.851, g: 0.325, b: 0.31, a: 1}
-  markerSize: 0.2
-  touchMarkerMm: 2.5
-  touchMarkerRange: 70
-  barMaterial: {fileID: 2100000, guid: 918dec61807505bb5bbefe656c32dbda, type: 2}
 --- !u!114 &2927946828830825345
 MonoBehaviour:
   m_ObjectHideFlags: 0

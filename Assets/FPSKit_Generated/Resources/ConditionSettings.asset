@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84ce2c8cbad6b312f9cf24c780885529, type: 3}
+  m_Name: ConditionSettings
+  m_EditorClassIdentifier: Assembly-CSharp::ConditionSettings
+  showFrom: 0.25
+  criticalFrom: 0.6
+  edgeColour: {r: 0.32, g: 0.02, b: 0.02, a: 1}
+  edgeAtWorst: 0.55
+  edgeOnHit: 0.3
+  drainAtWorst: 70
+  dimAtWorst: 0.45
+  splitOnHit: 0.6
+  breathing: {fileID: 8300000, guid: 414127d9defd375f9a89df6b456f367a, type: 3}
+  heartbeat: {fileID: 8300000, guid: 8148cbaa51aab51c78c5f3b92e8c6532, type: 3}
+  breathVolume: 0.55
+  heartVolume: 0.7
+  muffleAtWorst: 1100
+  speedAtWorst: 0.78

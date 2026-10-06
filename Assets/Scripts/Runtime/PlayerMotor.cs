@@ -86,6 +86,21 @@ public class PlayerMotor : MonoBehaviour
     /// </summary>
     [System.NonSerialized] public float SpeedMultiplier = 1f;
 
+    /// <summary>
+    /// The body's own slowing: set by <see cref="PlayerCondition"/> as the player is badly
+    /// hurt. Separate from <see cref="SpeedMultiplier"/>, which a drink assigns outright.
+    /// </summary>
+    [System.NonSerialized] public float ConditionMultiplier = 1f;
+
+    /// <summary>Breath for sprinting, 0 (blown) to 1 (full). See <see cref="MovementSettings"/>.</summary>
+    public float Stamina01 { get; private set; } = 1f;
+
+    /// <summary>
+    /// Firing or aiming with the sprint held: a fast jog with the gun up instead of a sprint.
+    /// <see cref="IsSprinting"/> is false meanwhile, so the gun is never fired from the carry.
+    /// </summary>
+    public bool IsCombatJogging { get; private set; }
+
     public float walkSpeed = 5.6f;
     public float sprintSpeed = 8.2f;
     public float crouchSpeed = 2.8f;
@@ -240,7 +255,9 @@ public class PlayerMotor : MonoBehaviour
     bool _padSprint;
     bool _padCrouch;
     float _nextCursorAttempt;
-    float _bobTimer, _stepAccumulator;
+    float _bobTimer, _stepAccumulator, _stepPhase, _cameraRoll;
+    bool _blown;
+    Weapon _weapon;
     Vector3 _bobOffset;
     float _landDip;
     bool _wasGrounded = true;
@@ -264,6 +281,11 @@ public class PlayerMotor : MonoBehaviour
             cameraHolder = Camera.main.transform.parent;
 
         if (footstepSource == null) footstepSource = GetComponent<AudioSource>();
+        _weapon = GetComponentInChildren<Weapon>();
+
+        // The player's state told without a health bar, and their own noise for the
+        // enemies to hear. Added here so every arena already built has them.
+        if (GetComponent<PlayerCondition>() == null) gameObject.AddComponent<PlayerCondition>();
         if (controls == null) controls = ControlSettings.CreateDefault();
         // The player's own keys first, so the actions are bound to them and not to the asset's.
         KeyBindings.Apply(controls);
@@ -483,7 +505,7 @@ public class PlayerMotor : MonoBehaviour
         cameraHolder.localRotation = Quaternion.Euler(
             _pitch - _recoilPitch + shake.x,
             _recoilYaw + shake.y,
-            shake.z);
+            shake.z + _cameraRoll);
     }
 
     /// <summary>
@@ -797,7 +819,23 @@ public class PlayerMotor : MonoBehaviour
         Vector2 input = ReadMoveInput();
         if (input.sqrMagnitude > 1f) input.Normalize();
 
-        IsSprinting = EvaluateSprint(input) && IsGrounded && !IsCrouching;
+        var move = MovementSettings.Active;
+        bool wantsSprint = EvaluateSprint(input) && IsGrounded && !IsCrouching;
+
+        // Blown: the sprint is gone until enough breath is back to be worth having.
+        if (Stamina01 <= 0.001f) _blown = true;
+        if (_blown && Stamina01 >= move.sprintAgainAt) _blown = false;
+        if (_blown) wantsSprint = false;
+
+        // Run and gun: fire or aim held with the sprint, and the sprint becomes a jog with the
+        // gun up. Not the fire key when it is also the sprint key (the double-tap scheme),
+        // where holding it is how the sprint is held.
+        bool fireIsSprint = controls.sprintKey == controls.fire;
+        bool shooting = (!fireIsSprint && ControlSettings.Held(controls.fire)) || ControlSettings.Held(controls.aim)
+                        || MobileInput.Fire || MobileInput.Aim
+                        || GameInput.PadHeld(GameAction.Fire) || GameInput.PadHeld(GameAction.Aim);
+        IsCombatJogging = wantsSprint && shooting;
+        IsSprinting = wantsSprint && !shooting;
 
         // The sprint key on its own is a run. A direction key always wins -- this only
         // ever fills in for no direction at all -- so nothing a player steers with is
@@ -806,21 +844,61 @@ public class PlayerMotor : MonoBehaviour
         if (IsSprinting && input.sqrMagnitude < 0.01f && SprintDrivesForward)
             input = new Vector2(0f, 1f);
 
-        float targetSpeed = IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed);
-        targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier);
+        // Speeds from the movement asset, not the scene: the feel is tuned in one place.
+        float targetSpeed = IsCrouching ? move.crouchSpeed
+                          : IsSprinting ? move.sprintSpeed
+                          : IsCombatJogging ? move.combatJogSpeed
+                          : move.jogSpeed;
+
+        // Forward is full speed; a sidestep and a backpedal are slower, the way a body
+        // moves; and aiming down the sights is a careful walk.
+        if (input.sqrMagnitude > 0.0001f && !IsSprinting)
+        {
+            Vector2 d = input.normalized;
+            float side = Mathf.Abs(d.x);
+            float facing = d.y >= 0f ? Mathf.Lerp(1f, move.strafe, side) : Mathf.Lerp(move.backpedal, move.strafe, side);
+            targetSpeed *= facing;
+        }
+        if (_weapon != null && _weapon.IsAiming) targetSpeed *= move.aiming;
+
+        targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier) * Mathf.Max(0.05f, ConditionMultiplier);
         targetSpeed *= WadingZone.SpeedFactorAt(transform.position, true, IsSprinting);   // floodwater slows the player
         Vector3 wish = (transform.right * input.x + transform.forward * input.y) * targetSpeed;
 
         Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);
-        float accel = IsGrounded ? groundAcceleration : airAcceleration;
 
-        // Acceleration is metres per second squared, full stop. The old code scaled it
-        // by the target speed as well, which turned "40" into 224 m/s^2 and made every
-        // ramp instantaneous -- the knob existed but could not be felt.
+        // Weight. A jog is reached in a fifth of a second, a sprint builds over strides,
+        // and letting go slides to a stop rather than snapping. Acceleration is metres
+        // per second squared, full stop.
+        float accel = !IsGrounded ? airAcceleration
+                    : planar.magnitude > move.jogSpeed + 0.1f || IsSprinting ? move.sprintAcceleration
+                    : move.acceleration;
+
         if (input.sqrMagnitude > 0.001f)
-            planar = Vector3.MoveTowards(planar, wish, accel * Time.deltaTime);
+        {
+            // At a sprint the direction carries: a turn is carved, not snapped.
+            if (IsSprinting && IsGrounded && planar.sqrMagnitude > 4f && wish.sqrMagnitude > 0.01f)
+            {
+                Vector3 dir = Vector3.RotateTowards(planar.normalized, wish.normalized,
+                                                    move.sprintTurnRate * Mathf.Deg2Rad * Time.deltaTime, 0f);
+                float speed = Mathf.MoveTowards(planar.magnitude, wish.magnitude, accel * Time.deltaTime);
+                planar = dir * speed;
+            }
+            else
+            {
+                planar = Vector3.MoveTowards(planar, wish, accel * Time.deltaTime);
+            }
+        }
         else if (IsGrounded)
-            planar = Vector3.MoveTowards(planar, Vector3.zero, friction * Time.deltaTime);
+        {
+            planar = Vector3.MoveTowards(planar, Vector3.zero, move.stopping * Time.deltaTime);
+        }
+
+        // Breath: spent sprinting, back over a few seconds of anything else.
+        if (IsSprinting && planar.sqrMagnitude > 1f)
+            Stamina01 = Mathf.Max(0f, Stamina01 - Time.deltaTime / Mathf.Max(0.5f, move.sprintSeconds));
+        else
+            Stamina01 = Mathf.Min(1f, Stamina01 + Time.deltaTime / Mathf.Max(0.5f, move.recoverSeconds));
 
         _velocity.x = planar.x;
         _velocity.z = planar.z;
@@ -886,7 +964,7 @@ public class PlayerMotor : MonoBehaviour
         if (IsGrounded && !_wasGrounded) OnLanded(impactSpeed);
         _wasGrounded = IsGrounded;
 
-        PlanarSpeed01 = Mathf.Clamp01(new Vector2(_velocity.x, _velocity.z).magnitude / sprintSpeed);
+        PlanarSpeed01 = Mathf.Clamp01(new Vector2(_velocity.x, _velocity.z).magnitude / Mathf.Max(1f, move.sprintSpeed));
     }
 
     void OnLanded(float impactSpeed)
@@ -908,32 +986,42 @@ public class PlayerMotor : MonoBehaviour
     }
 
     // ======================================================================
+    /// <summary>
+    /// The view rides on the footsteps: it dips with each footfall and sways across over a
+    /// stride, rolls a little with each step, and leans against a sidestep. All of it is
+    /// driven by the distance walked, so the footsteps you hear and the bob you see are the
+    /// same event -- a bob on a timer drifts out of step with the sound and reads as fake.
+    /// </summary>
     void HandleBobAndFootsteps()
     {
         if (cameraHolder == null) return;
+        var move = MovementSettings.Active;
 
         float eyeHeight = _cc.height - eyeOffsetFromTop;
-        float moveAmount = IsGrounded ? PlanarSpeed01 : 0f;
+        Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);
+        float speed = IsGrounded ? planar.magnitude : 0f;
+        float moving = Mathf.Clamp01(speed / Mathf.Max(0.5f, move.jogSpeed));
 
-        _bobTimer += Time.deltaTime * bobFrequency * (0.6f + moveAmount);
+        float stepLength = IsSprinting ? move.sprintStepLength : move.stepLength;
+        float before = _stepPhase;
+        _stepPhase += speed * Time.deltaTime / Mathf.Max(0.2f, stepLength);
+        if (IsGrounded && Mathf.Floor(_stepPhase) > Mathf.Floor(before)) PlayFootstep();
+
+        float scale = (IsSprinting ? move.sprintBob : 1f) * (IsCrouching ? 0.6f : 1f) * moving;
+        if (_weapon != null && _weapon.IsAiming) scale *= 0.35f;
+
+        float dip = move.bobDip * (Mathf.Cos(_stepPhase * Mathf.PI * 2f) - 1f) * 0.5f * scale;
+        float sway = move.bobSway * Mathf.Sin(_stepPhase * Mathf.PI) * scale;
+        Vector3 target = new Vector3(sway, dip, 0f);
+
         _landDip = Mathf.MoveTowards(_landDip, 0f, landDipRecovery * landDipAmount * Time.deltaTime);
-
-        Vector3 target = moveAmount > 0.05f
-            ? new Vector3(Mathf.Cos(_bobTimer * 0.5f) * bobAmplitude * moveAmount,
-                          Mathf.Sin(_bobTimer) * bobAmplitude * moveAmount, 0f)
-            : Vector3.zero;
-
         _bobOffset = Vector3.Lerp(_bobOffset, target, bobLerpSpeed * Time.deltaTime);
-        cameraHolder.localPosition = new Vector3(_bobOffset.x,
-                                                 eyeHeight + _bobOffset.y - _landDip, 0f);
+        cameraHolder.localPosition = new Vector3(_bobOffset.x, eyeHeight + _bobOffset.y - _landDip, 0f);
 
-        if (!IsGrounded) return;
-
-        _stepAccumulator += new Vector2(_velocity.x, _velocity.z).magnitude * Time.deltaTime;
-        if (_stepAccumulator < stepDistance) return;
-
-        _stepAccumulator = 0f;
-        PlayFootstep();
+        // A step's roll, and the lean against a sidestep.
+        float lateral = Vector3.Dot(planar, transform.right) / Mathf.Max(0.5f, move.jogSpeed);
+        float roll = move.stepRoll * Mathf.Sin(_stepPhase * Mathf.PI) * scale - move.strafeLean * Mathf.Clamp(lateral, -1f, 1f);
+        _cameraRoll = Mathf.Lerp(_cameraRoll, IsGrounded ? roll : 0f, Time.deltaTime * 8f);
     }
 
     void PlayFootstep()

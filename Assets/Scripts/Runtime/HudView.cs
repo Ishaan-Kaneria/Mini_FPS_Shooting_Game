@@ -139,7 +139,8 @@ public class HudView : MonoBehaviour
         BuildRun();
         RestyleMinimap();
         BuildFeed();
-        BuildPlayerCard();
+        // No player card: health is told by the body and the screen (PlayerCondition), not
+        // by a bar -- Ishaan's rule, no health bars anywhere.
         BuildAbilities();
         BuildWeapon();
         if (DeviceProfile.Touched) ArrangeForTouch();
@@ -1105,7 +1106,7 @@ public class HudView : MonoBehaviour
 
     void OnHealth(Health h)
     {
-        if (h == null) return;
+        if (h == null || _healthBar == null) return;
         _healthBar.Value = h.Normalized;
         _healthText.text = _t.Tabular(Mathf.CeilToInt(h.Current).ToString());
         bool armour = h.maxShield > 0f;
@@ -1121,7 +1122,7 @@ public class HudView : MonoBehaviour
 
     void OnHealed(Health h, float amount)
     {
-        if (amount >= 0.5f) Pop(_healthPopAnchor, "+" + Mathf.RoundToInt(amount), _t.success);
+        if (amount >= 0.5f && _healthPopAnchor != null) Pop(_healthPopAnchor, "+" + Mathf.RoundToInt(amount), _t.success);
     }
 
     void OnBombs(BombThrower b)

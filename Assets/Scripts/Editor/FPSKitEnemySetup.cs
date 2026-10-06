@@ -192,9 +192,7 @@ namespace FPSKit.EditorTools
             // ---- floating health bar ----
             // Rigged enemies get the same readable health as the greybox capsule, sat
             // above the model's real height rather than a guessed one.
-            var bar = root.AddComponent<EnemyHealthBar>();
-            bar.barMaterial = FPSKitSceneBuilder.GetOrCreateBarMaterial();
-            bar.heightOffset = capsule.height + 0.5f;
+            // No health bar: enemies are read by their bodies.
 
             // ---- ragdoll ----
             int boneCount = 0;

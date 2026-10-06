@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 423a54b078a485bd38b7f9a063dfee7d, type: 3}
+  m_Name: MeleeSettings
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeSettings
+  punchRange: 2
+  kickRange: 2.5
+  coneDegrees: 45
+  lungeRange: 3
+  lungeStopDistance: 1.1
+  lungeMaxStep: 1.4
+  lungeSeconds: 0.14
+  magnetism: 0.5
+  buttSeconds: 0.42
+  buttRecovery: 0.12
+  buttDamage:
+    standard: 0.45
+    elite: 0.18
+    boss: 0.03
+  chainWindow: 1.2
+  holsterSeconds: 0.26
+  drawSeconds: 0.34
+  fistIdleSeconds: 1.8
+  jabSeconds: 0.3
+  crossSeconds: 0.38
+  jabRecovery: 0.18
+  crossRecovery: 0.45
+  jabDamage:
+    standard: 0.6
+    elite: 0.2
+    boss: 0.03
+  crossDamage:
+    standard: 0.75
+    elite: 0.3
+    boss: 0.05
+  jabStagger: 0.35
+  crossStagger: 0.6
+  kickSeconds: 0.78
+  kickRecovery: 1.1
+  kickDamage:
+    standard: 0.35
+    elite: 0.15
+    boss: 0.03
+  kickLaunchSpeed: 7.5
+  kickKnockback: 3.5
+  kickStagger: 1.5
+  eliteKnockbackShare: 0.5
+  takedownHealthShare: 0.35
+  takedownWhenStaggered: 1
+  takedownWhenCrawling: 1
+  takedownDamage:
+    standard: 1.2
+    elite: 1.2
+    boss: 0.12
+  takedownSeconds: 0.55
+  takedownRecovery: 0.35
+  maxStamina: 100
+  jabCost: 16
+  crossCost: 20
+  kickCost: 34
+  takedownCost: 0
+  staminaRegen: 32
+  staminaRegenDelay: 0.7
+  punchHitStop: 0.045
+  kickHitStop: 0.08
+  takedownHitStop: 0.12
+  punchShake: 0.3
+  kickShake: 0.5
+  takedownShake: 0.6

@@ -1607,18 +1607,13 @@ public class HUDController : MonoBehaviour
     }
 
     // ======================================================================
+    /// <summary>
+    /// There is no boss bar any more: a boss is read by its body like anyone else (no
+    /// health bars anywhere). Kept as the one place that makes sure the panel stays down.
+    /// </summary>
     void UpdateBossBar()
     {
-        if (bossPanel == null) return;
-
-        var boss = levelManager != null ? levelManager.ActiveBoss : null;
-        bool show = boss != null && !boss.IsDead && levelManager.BossEngaged;
-
-        if (bossPanel.activeSelf != show) bossPanel.SetActive(show);
-        if (!show) return;
-
-        if (bossNameText != null) bossNameText.text = levelManager.ActiveBossName;
-        if (bossFill != null) bossFill.fillAmount = boss.TotalNormalized;
+        if (bossPanel != null && bossPanel.activeSelf) bossPanel.SetActive(false);
     }
 
     // ======================================================================

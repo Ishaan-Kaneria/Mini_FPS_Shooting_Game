@@ -528,3 +528,40 @@ save(f"{A}/UI/ui_error.wav",
          gain(blip(0.09, 196, 180, 3.0), 0.8)))
 
 random.setstate(_ui2_stream)
+
+
+# ---- the player's body, hurt ------------------------------------------------------
+# What replaces a health bar: the player hears their own condition. Breath is air through
+# a mouth -- noise shaped by two broad resonances -- which is the one human sound noise
+# makes honestly; a heartbeat is two low thumps. Own stream, appended last.
+_body_stream = random.getstate()
+
+def swell(buf, rise, power=1.6):
+    """Rises over `rise` of its length, then falls away: the shape of a breath."""
+    total = len(buf)
+    out = []
+    for i, v in enumerate(buf):
+        x = i / max(1, total)
+        g = (x / rise) ** power if x < rise else (1 - (x - rise) / (1 - rise)) ** power
+        out.append(v * g)
+    return out
+
+def breath(t, rise, loud, cut):
+    air = lowpass(n(secs(t)), cut)
+    shaped = mix(gain(resonator(air, 700, 900), 0.6), gain(resonator(air, 1700, 1400), 0.35))
+    return gain(swell(shaped, rise), loud)
+
+# Laboured breathing: a short hard pull in, a longer push out, a gap. Looped while hurt.
+save(f"{A}/SFX/player_breath.wav",
+     normalize(cat(breath(0.42, 0.55, 0.7, 2600), blank(0.06), breath(0.62, 0.25, 1.0, 2200), blank(0.35))),
+     loop=True)
+
+def thump(t, f0, f1, level):
+    return gain(env(lowpass(tone(t, f0, f1), 160), attack=0.006, power=3.0), level)
+
+# A heartbeat, lub-dub and a rest, at about 100 beats a minute. Looped near death.
+save(f"{A}/SFX/player_heartbeat.wav",
+     normalize(cat(thump(0.13, 62, 44, 1.0), blank(0.05), thump(0.11, 58, 42, 0.7), blank(0.31)), peak=0.8),
+     loop=True)
+
+random.setstate(_body_stream)

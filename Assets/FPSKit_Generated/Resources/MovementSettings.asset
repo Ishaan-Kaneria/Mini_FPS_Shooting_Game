@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a69a2d4d9cf687b6b84b4cdfbe8062e, type: 3}
+  m_Name: MovementSettings
+  m_EditorClassIdentifier: Assembly-CSharp::MovementSettings
+  jogSpeed: 4.6
+  sprintSpeed: 8
+  combatJogSpeed: 5.3
+  crouchSpeed: 2.4
+  backpedal: 0.68
+  strafe: 0.85
+  aiming: 0.55
+  acceleration: 22
+  sprintAcceleration: 9
+  stopping: 17
+  sprintTurnRate: 260
+  sprintSeconds: 7
+  recoverSeconds: 6
+  sprintAgainAt: 0.3
+  bobDip: 0.028
+  bobSway: 0.02
+  sprintBob: 1.7
+  stepRoll: 0.7
+  strafeLean: 2.2
+  stepLength: 0.78
+  sprintStepLength: 1.15

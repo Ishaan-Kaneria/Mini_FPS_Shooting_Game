@@ -151,11 +151,7 @@ namespace FPSKit.EditorTools
                 voice.bank = FPSKitGore.GetOrCreateVoiceBank();
                 voice.source = voiceSource;
 
-                var bar = root.AddComponent<EnemyHealthBar>();
-                var oldBar = old != null ? old.GetComponent<EnemyHealthBar>() : null;
-                if (oldBar != null) EditorUtility.CopySerialized(oldBar, bar);
-                else bar.barMaterial = FPSKitSceneBuilder.GetOrCreateBarMaterial();
-                bar.heightOffset = 2.15f;
+                // No health bar: it is read by its body (no health bars anywhere).
 
                 var ragdoll = root.AddComponent<RagdollController>();
                 ragdoll.animator = animator;

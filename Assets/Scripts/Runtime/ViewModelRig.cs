@@ -166,6 +166,7 @@ public class ViewModelRig : MonoBehaviour
 
         var gun = Instantiate(viewModel, holder, false);
         gun.name = viewModel.name;
+        gun.transform.localScale *= ViewScale;
         _spec = gun.GetComponent<ViewModelSpec>();
         if (_spec == null) { Destroy(gun); return; }
 
@@ -234,6 +235,7 @@ public class ViewModelRig : MonoBehaviour
         _arms = go.transform;
         _arms.localPosition = Vector3.zero;
         _arms.localRotation = Quaternion.identity;
+        _arms.localScale = Vector3.one * ArmsScale;
 
         var animator = go.GetComponent<Animator>();
         if (animator == null || animator.avatar == null || !animator.avatar.isHuman) { Destroy(go); _arms = null; return; }
@@ -242,7 +244,8 @@ public class ViewModelRig : MonoBehaviour
         Transform Bone(HumanBodyBones b) => animator.GetBoneTransform(b);
 
         var head = Bone(HumanBodyBones.Head);
-        _headLocal = head != null ? _arms.InverseTransformPoint(head.position) : new Vector3(0f, 1.65f, 0f);
+        // In the holder's space, scale included: it is what is subtracted to put the head on the eye.
+        _headLocal = head != null ? holder.InverseTransformPoint(head.position) : new Vector3(0f, 1.65f, 0f) * ArmsScale;
 
         _left = MakeArm(Bone, right: false);
         _right = MakeArm(Bone, right: true);
@@ -377,6 +380,13 @@ public class ViewModelRig : MonoBehaviour
 
     /// <summary>Behind the eye and the player's centre, so the camera is never inside the chest.</summary>
     static readonly Vector3 BodyOffset = new Vector3(0f, -0.04f, -0.24f);
+
+    /// <summary>
+    /// The arms and the gun a size up on life. At the camera's wide view a true-size rifle
+    /// and true-size fists read small and far off; every shooter draws its hands larger.
+    /// </summary>
+    const float ArmsScale = 1.14f;
+    const float ViewScale = 1.1f;
     static readonly Vector3 LookDownOffset = new Vector3(0f, -0.12f, -0.32f);
 
     Leg MakeLeg(Animator animator, bool right)
@@ -497,10 +507,12 @@ public class ViewModelRig : MonoBehaviour
 
     // ---- fists, in the view's space --------------------------------------
 
-    static readonly Vector3 LeftGuard = new Vector3(-0.12f, -0.13f, 0.27f);
-    static readonly Vector3 RightGuard = new Vector3(0.11f, -0.15f, 0.22f);
-    static readonly Vector3 JabReach = new Vector3(-0.04f, -0.04f, 0.74f);
-    static readonly Vector3 CrossReach = new Vector3(0.01f, -0.03f, 0.76f);
+    // Close to the eye, so the fists are big in the view the way they are in a real fight:
+    // a guard just under the chin at each side, a punch landing a forearm's length out.
+    static readonly Vector3 LeftGuard = new Vector3(-0.14f, -0.15f, 0.27f);
+    static readonly Vector3 RightGuard = new Vector3(0.13f, -0.17f, 0.24f);
+    static readonly Vector3 JabReach = new Vector3(-0.05f, -0.06f, 0.55f);
+    static readonly Vector3 CrossReach = new Vector3(0.02f, -0.05f, 0.57f);
 
     /// <summary>
     /// Out fast, a beat at full stretch, back slower: the shape of a punch. Before the
@@ -658,7 +670,7 @@ public class ViewModelRig : MonoBehaviour
         _feetZ = offset.z;
 
         _legs.localPosition = offset + Vector3.down * (crouch * 0.85f + bob) + Vector3.forward * (0.3f * drive);
-        _legs.localRotation = Quaternion.Euler(-12f * drive, 0f, 0f);
+        _legs.localRotation = Quaternion.Euler(-16f * drive, 0f, 0f);
 
         PoseLeg(_leftLeg, s, 0f, dir, stride, moving, kicking: false);
         PoseLeg(_rightLeg, s, 0.5f, dir, stride, moving, kicking);
@@ -679,8 +691,10 @@ public class ViewModelRig : MonoBehaviour
             float impact = MeleeStrike.ImpactAt(MeleeStrike.Strike.Kick);
             float chamberEnd = impact * 0.55f;
 
-            Vector3 chambered = new Vector3(rest.x - 0.02f, 0.85f, 0.3f);
-            Vector3 struck = new Vector3(0.05f, 1.42f, 0.66f);
+            // High and close: the knee comes up into the bottom of the view and the boot is
+            // driven out in front of the chest, sole first, big in the frame.
+            Vector3 chambered = new Vector3(rest.x - 0.02f, 1.05f, 0.28f);
+            Vector3 struck = new Vector3(0.04f, 1.5f, 0.5f);
 
             if (k < chamberEnd) target = Vector3.Lerp(rest, chambered, UITheme.EaseOut(k / chamberEnd));
             else if (k < impact) { float t = (k - chamberEnd) / (impact - chamberEnd); target = Vector3.Lerp(chambered, struck, t * t); }
@@ -714,6 +728,6 @@ public class ViewModelRig : MonoBehaviour
         Vector3 knee = leg.thigh.position + player.TransformDirection(new Vector3(leg.rest.x * 0.6f, 0.2f, 1f));
         LimbIK.Solve(leg.thigh, leg.calf, leg.foot, world, knee);
 
-        leg.foot.rotation = Quaternion.AngleAxis(-70f * toeUp, player.right) * (player.rotation * leg.footToBody);
+        leg.foot.rotation = Quaternion.AngleAxis(-85f * toeUp, player.right) * (player.rotation * leg.footToBody);
     }
 }

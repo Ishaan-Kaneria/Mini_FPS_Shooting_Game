@@ -33,7 +33,7 @@ MonoBehaviour:
   jabSeconds: 0.22
   crossSeconds: 0.26
   jabRecovery: 0.12
-  crossRecovery: 0.2
+  crossRecovery: 0.15
   jabDamage:
     standard: 0.6
     elite: 0.2
@@ -44,8 +44,8 @@ MonoBehaviour:
     boss: 0.05
   jabStagger: 0.35
   crossStagger: 0.6
-  kickSeconds: 0.46
-  kickRecovery: 0.5
+  kickSeconds: 0.42
+  kickRecovery: 0.3
   kickDamage:
     standard: 0.35
     elite: 0.15

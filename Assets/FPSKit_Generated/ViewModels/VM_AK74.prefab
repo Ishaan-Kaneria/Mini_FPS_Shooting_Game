@@ -332,8 +332,8 @@ MonoBehaviour:
   bolt: {fileID: 3593014610887957223}
   buttLength: 0.37276572
   boltTravel: {x: 0, y: 0, z: -0.07}
-  hipPosition: {x: 0.15, y: -0.13, z: 0.3}
-  hipTurn: {x: 6, y: -2, z: -10}
+  hipPosition: {x: 0.16, y: -0.095, z: 0.3}
+  hipTurn: {x: 3, y: -3, z: -7}
   aimPosition: {x: 0, y: 0, z: 0.22}
   armsPrefab: {fileID: 1704116841025237427, guid: 855c1fdba4bdeb6c0a4d1afce89c22ac, type: 3}
   legsPrefab: {fileID: 998453660942267102, guid: 037e87019012a394a864824fa5440729, type: 3}

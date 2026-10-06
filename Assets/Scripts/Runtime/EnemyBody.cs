@@ -223,6 +223,20 @@ public class EnemyBody : MonoBehaviour
         return -1;
     }
 
+    /// <summary>
+    /// The thrown body and the player who kicked it pass through each other: it starts the
+    /// throw a boot's length from them, and a body overlapping the player is shoved out of
+    /// it at speed -- that is what sent kicked enemies up into the sky.
+    /// </summary>
+    void IgnorePlayer(bool ignore)
+    {
+        if (_ai == null || _ai.target == null) return;
+        var player = _ai.target.GetComponentsInChildren<Collider>();
+        foreach (var bone in GetComponentsInChildren<Collider>())
+            foreach (var p in player)
+                if (bone != null && p != null && bone.enabled && p.enabled) Physics.IgnoreCollision(bone, p, ignore);
+    }
+
     // ======================================================================
     // Hits
     // ======================================================================
@@ -349,6 +363,7 @@ public class EnemyBody : MonoBehaviour
 
         _kicks.Clear();
         _ragdoll.SetRagdollActive(true);
+        IgnorePlayer(true);
         if (_agent != null) _agent.enabled = false;
 
         if (gun != null && !_gunDropped && _rHand != null) gun.SetParent(_rHand, true);
@@ -416,6 +431,7 @@ public class EnemyBody : MonoBehaviour
         if (face.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(face);
 
         _ragdoll.SetRagdollActive(false);
+        IgnorePlayer(false);
         if (_agent != null)
         {
             _agent.enabled = true;

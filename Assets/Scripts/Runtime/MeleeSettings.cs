@@ -91,7 +91,7 @@ public class MeleeSettings : ScriptableObject
              "can follow it at once.")]
     [Range(0.05f, 1f)] public float jabRecovery = 0.12f;
     [Tooltip("Seconds after the cross before the next strike: the combo's end.")]
-    [Range(0.1f, 1.5f)] public float crossRecovery = 0.2f;
+    [Range(0.1f, 1.5f)] public float crossRecovery = 0.15f;
     [Tooltip("Share of the target's pool the jab takes.")]
     public Shares jabDamage = new Shares(0.6f, 0.2f, 0.03f);
     [Tooltip("Share the cross takes. The butt and one punch put an ordinary enemy down.")]
@@ -103,9 +103,9 @@ public class MeleeSettings : ScriptableObject
 
     [Header("Kick")]
     [Tooltip("Seconds the kick takes, chamber to foot down.")]
-    [Range(0.3f, 1.4f)] public float kickSeconds = 0.46f;
+    [Range(0.3f, 1.4f)] public float kickSeconds = 0.42f;
     [Tooltip("Seconds after a kick before any strike can start. Longer than a punch's.")]
-    [Range(0.2f, 3f)] public float kickRecovery = 0.5f;
+    [Range(0.2f, 3f)] public float kickRecovery = 0.3f;
     [Tooltip("Share of the target's pool the kick takes.")]
     public Shares kickDamage = new Shares(0.35f, 0.15f, 0.03f);
     [Tooltip("Speed, in metres a second, an ordinary enemy is thrown back at. It flies, lands " +

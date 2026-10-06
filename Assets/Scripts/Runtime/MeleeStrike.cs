@@ -172,6 +172,8 @@ public class MeleeStrike : MonoBehaviour
     float _strikeStart = -99f;
     float _strikeLength;
     float _nextStrike;
+    Strike _queued;
+    float _queuedAt;
     float _chainUntil = -99f;
     bool _fists;
     float _fistsUntil;
@@ -258,8 +260,25 @@ public class MeleeStrike : MonoBehaviour
         bool kick = ControlSettings.Pressed(keys.kick) | ControlSettings.Pressed(keys.altKick)
                     | MobileInput.ConsumeKick() | GameInput.PadPressed(GameAction.Kick);
 
-        if (able && punch) TryPunch();
+        // A press made while the last strike is still recovering is kept for a moment and
+        // thrown the instant it can be, not dropped: mashing must never feel ignored.
+        if (able && (punch || kick) && Time.time < _nextStrike)
+        {
+            _queued = kick && !punch ? Strike.Kick : Strike.Jab;
+            _queuedAt = Time.time;
+        }
+        else if (able && punch) TryPunch();
         else if (able && kick) TryKick();
+        else if (able && _queued != Strike.None && Time.time >= _nextStrike)
+        {
+            var queued = _queued;
+            _queued = Strike.None;
+            if (Time.time - _queuedAt < 0.4f)
+            {
+                if (queued == Strike.Kick) TryKick();
+                else TryPunch();
+            }
+        }
 
         UpdateFists(keys);
         RegenStamina();
@@ -352,9 +371,9 @@ public class MeleeStrike : MonoBehaviour
             _ => s.takedownCost,
         };
 
-        if (Stamina < cost) return null;
-
-        Stamina -= cost;
+        // Winded is slower and weaker, never refused: a key that does nothing reads as a bug.
+        _tired = Stamina < cost;
+        Stamina = Mathf.Max(0f, Stamina - cost);
         _lastStrikeTime = Time.time;
 
         float length = strike switch
@@ -365,6 +384,8 @@ public class MeleeStrike : MonoBehaviour
             Strike.Butt => s.buttSeconds,
             _ => s.takedownSeconds,
         };
+
+        if (_tired) length *= 1.2f;
 
         float recovery = strike switch
         {
@@ -457,6 +478,7 @@ public class MeleeStrike : MonoBehaviour
             _motor.TurnTowards(point, s.magnetism);
     }
 
+    bool _tired;
     Health _pendingTarget;
     Strike _pendingStrike;
     float _pendingRange;
@@ -482,7 +504,7 @@ public class MeleeStrike : MonoBehaviour
 
         // A hair over what is left when the share would finish it, so the
         // shield-then-health split cannot leave it standing on a rounding error.
-        float amount = Mathf.Max(1f, full * share);
+        float amount = Mathf.Max(1f, full * share * (_tired ? 0.7f : 1f));
         if (amount >= pool) amount = pool + 1f;
 
         // Where the blow lands decides where the body answers it: the head snaps back from
@@ -519,7 +541,7 @@ public class MeleeStrike : MonoBehaviour
                 }
 
                 float push = role == EnemyArchetype.Role.Elite ? s.eliteKnockbackShare : 1f;
-                ai.Knock((away + Vector3.up * 0.35f) * s.kickLaunchSpeed * push, s.kickStagger);
+                ai.Knock((away + Vector3.up * 0.25f) * s.kickLaunchSpeed * push, s.kickStagger);
                 break;
             }
         }
@@ -784,11 +806,12 @@ public class MeleeStrike : MonoBehaviour
         weapon.HandsOffset = offset;
         weapon.HandsRotation = turn;
 
-        if (swinging && !_lunged && k >= ImpactAt(_strike) * 0.7f)
+        // Into a punch the view leans forward at the blow; on a kick it dips as the knee
+        // comes up, so the leg is seen rising and the boot going in, not just the boot.
+        if (swinging && !_lunged && k >= (_strike == Strike.Kick ? 0f : ImpactAt(_strike) * 0.7f))
         {
             _lunged = true;
-            // Into a punch the view leans forward; on a kick it dips, so the foot is seen.
-            if (_motor != null) _motor.AddRecoil(_strike == Strike.Kick ? -6f : -0.9f, 0f, 5f);
+            if (_motor != null) _motor.AddRecoil(_strike == Strike.Kick ? -9f : -1.2f, 0f, _strike == Strike.Kick ? 3.5f : 5f);
         }
     }
 

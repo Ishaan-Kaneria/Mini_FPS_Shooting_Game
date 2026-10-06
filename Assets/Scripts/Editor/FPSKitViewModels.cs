@@ -49,7 +49,7 @@ namespace FPSKit.EditorTools
             public string magazine;           // child that drops on a reload
             public string bolt;               // child that runs on each shot
             public Vector3 boltTravel = new Vector3(0f, 0f, -0.04f);
-            public Vector3 hip = new Vector3(0.15f, -0.13f, 0.3f);
+            public Vector3 hip = new Vector3(0.16f, -0.095f, 0.3f);
             public Vector3 aim = new Vector3(0f, 0f, 0.22f);
         }
 
@@ -66,7 +66,7 @@ namespace FPSKit.EditorTools
             new Gun { pack = "Uzi", weaponData = "Assets/FPSKit_Generated/Store/Gun_SMG.asset",
                       sightY = 0.06f, rearZ = -0.03f, trigger = new Vector3(0f, -0.001f, 0.017f),
                       handguard = new Vector3(0f, 0.011f, 0.11f), magazine = "Magazin", bolt = "Bolt",
-                      boltTravel = new Vector3(0f, 0f, -0.05f), hip = new Vector3(0.14f, -0.11f, 0.26f) },
+                      boltTravel = new Vector3(0f, 0f, -0.05f), hip = new Vector3(0.15f, -0.085f, 0.26f) },
             new Gun { pack = "Bennelli_M4", weaponData = "Assets/FPSKit_Generated/Store/Gun_Shotgun.asset",
                       sightY = 0.036f, rearZ = -0.15f, trigger = new Vector3(0f, -0.046f, -0.137f),
                       handguard = new Vector3(0f, -0.05f, 0.09f), magazine = null, bolt = "Pump",
@@ -529,9 +529,12 @@ namespace FPSKit.EditorTools
             {
                 if (!smr.enabled || !smr.gameObject.activeInHierarchy) continue;
                 var mesh = new Mesh();
-                smr.BakeMesh(mesh, true);
+                // Baked unscaled and the scale put on the copy: baking a scaled rig (the arms
+                // are drawn a size up) with the scale in came out shifted.
+                smr.BakeMesh(mesh, false);
                 var copy = new GameObject(smr.name + "_Baked");
                 copy.transform.SetPositionAndRotation(smr.transform.position, smr.transform.rotation);
+
                 copy.AddComponent<MeshFilter>().sharedMesh = mesh;
                 copy.AddComponent<MeshRenderer>().sharedMaterials = smr.sharedMaterials;
                 smr.enabled = false;

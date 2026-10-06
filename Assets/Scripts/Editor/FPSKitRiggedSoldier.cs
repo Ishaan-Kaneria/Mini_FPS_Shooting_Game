@@ -33,6 +33,7 @@ namespace FPSKit.EditorTools
         const string PrefabPath = "Assets/FPSKit_Generated/Enemy.prefab";
         const string Folder = "Assets/FPSKit_Generated/Soldier/Rig";
         const string Source = "Assets/Survivalist/Prefab/Survivalist (1).prefab";
+        const string ModelFile = "Assets/Survivalist/Basemesh/SK_Military_Survivalist.fbx";
         const string PackMaterials = "Assets/Survivalist/Materials URP";
         const string Clips = "Assets/Survivalist/StarterAssets/ThirdPersonController/Character/Animations";
         const string GunPrefab = "Assets/FPSKit_Generated/ViewModels/VM_AK74.prefab";
@@ -63,6 +64,15 @@ namespace FPSKit.EditorTools
         {
             FPSKitSceneBuilder.EnsureProjectTagsAndLayers();
             EnsureFolder(Folder);
+
+            // Read/Write on for the body's meshes: cutting a severed limb out of them reads
+            // their bone weights at runtime (EnemyBrutality), which a build only allows on a
+            // readable mesh. The one change made to the pack's import settings.
+            if (AssetImporter.GetAtPath(ModelFile) is ModelImporter importer && !importer.isReadable)
+            {
+                importer.isReadable = true;
+                importer.SaveAndReimport();
+            }
 
             var source = AssetDatabase.LoadAssetAtPath<GameObject>(Source);
             if (source == null) { Debug.LogError("[FPSKit] Rigged soldier: " + Source + " is missing"); return; }
@@ -156,6 +166,8 @@ namespace FPSKit.EditorTools
                 var ragdoll = root.AddComponent<RagdollController>();
                 ragdoll.animator = animator;
                 ragdoll.mainCollider = null;     // the bones are the body; nothing on the root to soak a round
+
+                root.AddComponent<EnemyBrutality>();
 
                 var body = root.AddComponent<EnemyBody>();
                 body.animator = animator;

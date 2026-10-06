@@ -53,6 +53,16 @@ namespace FPSKit.EditorTools
         static void Menu() => Run("Build/MeleeShots");
 
         static bool _enemyScript;
+        static bool _goreScript;
+        static readonly List<EnemyAI> _row = new List<EnemyAI>();
+
+        /// <summary>Four soldiers in a row, each killed a different way: caved, beheaded, a leg off, a leg broken.</summary>
+        public static void RunGore(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
+        {
+            _goreScript = true;
+            _enemyScript = false;
+            Run(folder, scene, width, height, onDone, keepMode: true);
+        }
 
         /// <summary>The enemy's side: hit reactions by part, a kick that throws it, the get-up.</summary>
         public static void RunEnemy(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
@@ -63,7 +73,7 @@ namespace FPSKit.EditorTools
 
         public static void Run(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null, bool keepMode = false)
         {
-            if (!keepMode) _enemyScript = false;
+            if (!keepMode) { _enemyScript = false; _goreScript = false; }
             if (Running) return;
             _folder = string.IsNullOrEmpty(folder) ? "Build/MeleeShots" : folder;
             _width = width;
@@ -131,7 +141,7 @@ namespace FPSKit.EditorTools
                         // A thirtieth a frame: fine enough to catch a strike at its blow, coarse
                         // enough that an editor throttled in the background still gets through.
                         Time.captureDeltaTime = 1f / 30f;
-                        _script = _enemyScript ? EnemyScript() : Script();
+                        _script = _goreScript ? GoreScript() : _enemyScript ? EnemyScript() : Script();
                         _next = 0;
                         _mark = Time.time;
                         _step = 2;
@@ -268,6 +278,70 @@ namespace FPSKit.EditorTools
                 return;
             }
             Note("no hitbox for " + part);
+        }
+
+        static void HitRow(int index, BodyPart part, float amount)
+        {
+            if (index >= _row.Count || _row[index] == null) return;
+            foreach (var hb in _row[index].GetComponentsInChildren<Hitbox>())
+            {
+                if (hb.Part != part) continue;
+                Vector3 from = _weapon.fpsCamera.transform.position;
+                Vector3 at = hb.GetComponent<Collider>().bounds.center;
+                hb.Receive(new DamageInfo(amount, at, (from - at).normalized, (at - from).normalized, _player));
+                return;
+            }
+        }
+
+        static List<(float, Action)> GoreScript()
+        {
+            var list = new List<(float, Action)>();
+            float t = 0f;
+            void At(float dt, Action a) { t += dt; list.Add((t, a)); }
+
+            At(0.1f, () =>
+            {
+                // Four in a row, five metres off, side on to the player so the damage shows.
+                foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None)) ai.gameObject.SetActive(false);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+                _row.Clear();
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector3 at = _player.transform.position + _player.transform.forward * 5f + _player.transform.right * (i - 1.5f) * 1.5f;
+                    var go = Object.Instantiate(prefab, at, Quaternion.LookRotation(-_player.transform.forward));
+                    var ai = go.GetComponent<EnemyAI>();
+                    ai.attackDamage = 0f;
+                    ai.rangedDamageMultiplier = 0f;
+                    var agent = go.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                    if (agent != null) agent.speed = 0f;
+                    _row.Add(ai);
+                }
+            });
+            At(1.5f, () => Shoot("row_standing"));
+
+            // 0: killed through the head, an ordinary round: caved in.
+            At(0.2f, () => HitRow(0, BodyPart.Head, 40f));
+            // 1: a huge round through the head: taken off.
+            At(0.1f, () => HitRow(1, BodyPart.Head, 400f));
+            // 2: a huge round through the shin: the leg off below the knee.
+            At(0.1f, () => HitRow(2, BodyPart.RightShin, 400f));
+            // 3: the leg shot to pieces while alive (it buckles and stays bent), then killed in the chest.
+            At(0.1f, () => { HitRow(3, BodyPart.LeftShin, 30f); HitRow(3, BodyPart.LeftShin, 30f); });
+            At(0.2f, () => Shoot("row_hits"));
+            At(0.6f, () => Shoot("row_falling"));
+            At(0.5f, () => HitRow(3, BodyPart.Torso, 400f));
+            At(1.6f, () => Shoot("row_dead"));
+            At(1.5f, () =>
+            {
+                // Closer, looking down at them.
+                var cc = _player.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                _player.transform.position += _player.transform.forward * 3f;
+                if (cc != null) cc.enabled = true;
+                _motor.TurnBy(new Vector2(0f, -45f));
+            });
+            At(0.4f, () => Shoot("row_close"));
+            return list;
         }
 
         static List<(float, Action)> EnemyScript()

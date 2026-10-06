@@ -202,6 +202,8 @@ public class EnemyBody : MonoBehaviour
         // The axis that tips a bone away from the blow, the way the hit is travelling.
         Vector3 away = Vector3.Cross(Vector3.up, flat);
 
+        BreakLimbs(info.part);
+
         float share = info.amount / Mathf.Max(1f, _health.maxHealth + _health.maxShield);
         float strength = Mathf.Clamp(share * 4f, 0.3f, 1f) * (info.fromMelee ? 1.4f : 1f) * reactionScale;
 
@@ -235,6 +237,39 @@ public class EnemyBody : MonoBehaviour
                 Add(_head, -away, 6f * strength, 0.55f);
                 break;
         }
+    }
+
+    readonly Dictionary<Transform, float> _broken = new Dictionary<Transform, float>();
+
+    /// <summary>
+    /// A limb shot past the point of holding together stays bent: the knee or the elbow
+    /// is kinked out sideways for the rest of its life, on top of whatever it is doing.
+    /// Brutal on purpose (deform and dismember was the call); off with the blood.
+    /// </summary>
+    void BreakLimbs(BodyPart part)
+    {
+        if (_wounds == null || !BloodFX.Enabled) return;
+        var limb = BodyParts.Limb(part);
+        if (_wounds.Severity(limb) < 0.6f) return;
+
+        Transform bone = limb switch
+        {
+            BodyPart.LeftLeg => _lCalf,
+            BodyPart.RightLeg => _rCalf,
+            BodyPart.LeftArm => _lLower,
+            BodyPart.RightArm => _rLower,
+            _ => null,
+        };
+        if (bone == null || _broken.ContainsKey(bone)) return;
+
+        float side = limb == BodyPart.LeftLeg || limb == BodyPart.LeftArm ? 1f : -1f;
+        _broken[bone] = side * (BodyParts.IsLeg(limb) ? 28f : 40f);
+    }
+
+    void ApplyBroken()
+    {
+        foreach (var pair in _broken)
+            if (pair.Key != null) pair.Key.rotation = Quaternion.AngleAxis(pair.Value, transform.forward) * pair.Key.rotation;
     }
 
     void Add(Transform bone, Vector3 axis, float degrees, float length)
@@ -381,6 +416,7 @@ public class EnemyBody : MonoBehaviour
         Aim(up);
         HoldGun(up);
         React();
+        ApplyBroken();
 
         if (_down == Down.GettingUp) BlendFromFallen(up);
     }

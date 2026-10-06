@@ -3493,6 +3493,7 @@ GameObject:
   - component: {fileID: 2344973558938156951}
   - component: {fileID: 4290506376759687217}
   - component: {fileID: 2927946828830825345}
+  - component: {fileID: 1880353111154081295}
   - component: {fileID: 4744877920839733982}
   m_Layer: 9
   m_Name: Enemy
@@ -3827,6 +3828,26 @@ MonoBehaviour:
   animator: {fileID: 3987893882976663574}
   mainCollider: {fileID: 0}
   deathImpulse: 6
+--- !u!114 &1880353111154081295
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6852379658114732486}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff873077140ae5be3aca06e15d1c4468, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyBrutality
+  severShare: 0.55
+  decapitateShare: 0.9
+  breakAt: 0.6
+  blastSevers: 2
+  cavedScale: {x: 0.9, y: 0.76, z: 0.86}
+  bloodied: {r: 0.5, g: 0.12, b: 0.1, a: 1}
+  throwSpeed: 4.5
+  gushSeconds: 5
 --- !u!114 &4744877920839733982
 MonoBehaviour:
   m_ObjectHideFlags: 0

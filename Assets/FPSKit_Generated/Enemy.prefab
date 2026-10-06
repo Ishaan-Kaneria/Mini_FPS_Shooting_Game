@@ -1662,8 +1662,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4054828198841853828}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.13885656, y: 0.085727364, z: 0.9719365, w: 0.1694374}
-  m_LocalPosition: {x: -0.02, y: -0.106000006, z: 0.105000004}
+  m_LocalRotation: {x: 0.15772137, y: 0.11459987, z: 0.9564245, w: 0.2173549}
+  m_LocalPosition: {x: -0.02, y: -0.111, z: 0.10000001}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3871,6 +3871,7 @@ MonoBehaviour:
   searchSeconds: 28
   patrolRadius: 20
   fallBackAt: 0.3
+  closeQuarters: 3.5
   walkPace: 0.55
   carefulPace: 0.75
   runPace: 1.25
@@ -3926,9 +3927,9 @@ MonoBehaviour:
   lowReady: 28
   aimLimit: 70
   reactionScale: 1
-  lieSeconds: 0.7
-  maxDownSeconds: 3.2
-  getUpSeconds: 0.75
+  lieSeconds: 1.5
+  maxDownSeconds: 4.5
+  getUpSeconds: 1.6
   rageSeconds: 7
   rageMoveSeconds: 1.25
 --- !u!1 &6997618155838552525

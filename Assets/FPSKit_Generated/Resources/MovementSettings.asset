@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6a69a2d4d9cf687b6b84b4cdfbe8062e, type: 3}
-  m_Name: MovementSettings
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MovementSettings
   jogSpeed: 6
   sprintSpeed: 9.5
@@ -27,12 +27,12 @@ MonoBehaviour:
   sprintSeconds: 7
   recoverSeconds: 6
   sprintAgainAt: 0.3
-  bobDip: 0.008
-  bobSway: 0.005
-  sprintBob: 1.2
-  stepRoll: 0
-  strafeLean: 0.4
+  bobDip: 0.017
+  bobSway: 0.011
+  sprintBob: 1.5
+  stepRoll: 0.3
+  strafeLean: 1
   stepLength: 0.78
   sprintStepLength: 1.15
   reloadTimeScale: 0.6
-  gunBob: 0.35
+  gunBob: 0.55

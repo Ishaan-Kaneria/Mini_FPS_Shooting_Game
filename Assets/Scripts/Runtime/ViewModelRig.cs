@@ -304,7 +304,7 @@ public class ViewModelRig : MonoBehaviour
 
         _right.hold = Curl(handler, ref pose, _right, thumb: -0.3f, index: 0.1f, others: -0.6f, spread: 0f);
         _right.fist = Curl(handler, ref pose, _right, thumb: -0.7f, index: -1f, others: -1f, spread: -0.4f);
-        _left.hold = Curl(handler, ref pose, _left, thumb: -0.25f, index: -0.15f, others: -0.25f, spread: -0.6f);
+        _left.hold = Curl(handler, ref pose, _left, thumb: -0.1f, index: -0.35f, others: -0.45f, spread: -0.7f);
         _left.fist = Curl(handler, ref pose, _left, thumb: -0.7f, index: -1f, others: -1f, spread: -0.4f);
 
         handler.Dispose();
@@ -497,10 +497,10 @@ public class ViewModelRig : MonoBehaviour
 
     // ---- fists, in the view's space --------------------------------------
 
-    static readonly Vector3 LeftGuard = new Vector3(-0.13f, -0.15f, 0.3f);
-    static readonly Vector3 RightGuard = new Vector3(0.12f, -0.17f, 0.24f);
-    static readonly Vector3 JabReach = new Vector3(-0.05f, -0.05f, 0.64f);
-    static readonly Vector3 CrossReach = new Vector3(0.0f, -0.04f, 0.66f);
+    static readonly Vector3 LeftGuard = new Vector3(-0.12f, -0.13f, 0.27f);
+    static readonly Vector3 RightGuard = new Vector3(0.11f, -0.15f, 0.22f);
+    static readonly Vector3 JabReach = new Vector3(-0.04f, -0.04f, 0.74f);
+    static readonly Vector3 CrossReach = new Vector3(0.01f, -0.03f, 0.76f);
 
     /// <summary>
     /// Out fast, a beat at full stretch, back slower: the shape of a punch. Before the
@@ -525,9 +525,13 @@ public class ViewModelRig : MonoBehaviour
     {
         if (_arms == null || _left == null || _right == null) return;
 
-        // Head on the eye, body facing where the view faces.
+        // Head on the eye, body facing where the view faces -- and the shoulders driving into
+        // a punch, which is what carries a fist the last ten centimetres to a real target.
         _arms.localRotation = Quaternion.identity;
-        _arms.localPosition = _spec.armsOffset - _headLocal;
+        float drive = 0f;
+        if (s.strike == MeleeStrike.Strike.Jab || s.strike == MeleeStrike.Strike.Cross || (s.strike == MeleeStrike.Strike.Takedown && s.takedownWithFists))
+            drive = Mathf.Clamp01(Extension(s.strikeProgress, MeleeStrike.ImpactAt(s.strike)));
+        _arms.localPosition = _spec.armsOffset - _headLocal + new Vector3(0f, -0.02f, 0.14f) * drive * Mathf.Clamp01(s.fistsUp);
 
         Reset(_left);
         Reset(_right);

@@ -55,6 +55,17 @@ namespace FPSKit.EditorTools
         static bool _enemyScript;
         static bool _goreScript;
         static bool _brainScript;
+        static bool _painScript;
+
+        /// <summary>Three soldiers side on at five metres, shot in the leg, the gun arm and the gut.</summary>
+        public static void RunPain(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
+        {
+            _painScript = true;
+            _brainScript = false;
+            _goreScript = false;
+            _enemyScript = false;
+            Run(folder, scene, width, height, onDone, keepMode: true);
+        }
 
         /// <summary>
         /// Five soldiers posted round the player, out of the way; a while of calm, then a
@@ -63,6 +74,7 @@ namespace FPSKit.EditorTools
         public static void RunBrain(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
         {
             _brainScript = true;
+            _painScript = false;
             _goreScript = false;
             _enemyScript = false;
             Run(folder, scene, width, height, onDone, keepMode: true);
@@ -74,6 +86,8 @@ namespace FPSKit.EditorTools
         {
             _goreScript = true;
             _enemyScript = false;
+            _brainScript = false;
+            _painScript = false;
             Run(folder, scene, width, height, onDone, keepMode: true);
         }
 
@@ -81,12 +95,15 @@ namespace FPSKit.EditorTools
         public static void RunEnemy(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null)
         {
             _enemyScript = true;
+            _goreScript = false;
+            _brainScript = false;
+            _painScript = false;
             Run(folder, scene, width, height, onDone, keepMode: true);
         }
 
         public static void Run(string folder, string scene = null, int width = 480, int height = 270, Action onDone = null, bool keepMode = false)
         {
-            if (!keepMode) { _enemyScript = false; _goreScript = false; _brainScript = false; }
+            if (!keepMode) { _enemyScript = false; _goreScript = false; _brainScript = false; _painScript = false; }
             if (Running) return;
             _folder = string.IsNullOrEmpty(folder) ? "Build/MeleeShots" : folder;
             _width = width;
@@ -154,7 +171,7 @@ namespace FPSKit.EditorTools
                         // A thirtieth a frame: fine enough to catch a strike at its blow, coarse
                         // enough that an editor throttled in the background still gets through.
                         Time.captureDeltaTime = 1f / 30f;
-                        _script = _brainScript ? BrainScript() : _goreScript ? GoreScript() : _enemyScript ? EnemyScript() : Script();
+                        _script = _painScript ? PainScript() : _brainScript ? BrainScript() : _goreScript ? GoreScript() : _enemyScript ? EnemyScript() : Script();
                         _next = 0;
                         _mark = Time.time;
                         _step = 2;
@@ -368,6 +385,65 @@ namespace FPSKit.EditorTools
             At(4.0f, () => { LogMinds("shot+10"); Shoot("fight"); });
             At(6.0f, () => LogMinds("shot+16"));
             At(8.0f, () => LogMinds("shot+24"));
+
+            // A near miss past the first, a bomb on the second, the third walked up close.
+            At(0.1f, () =>
+            {
+                if (_row[0] == null) return;
+                Vector3 from = _weapon.fpsCamera.transform.position;
+                Vector3 past = _row[0].transform.position + Vector3.up * 1.2f + _row[0].transform.right * 1.2f;
+                EnemySquad.BulletPassed(from, past + (past - from).normalized * 20f, null);
+                Note("-- near miss past 0 --");
+            });
+            At(0.5f, () => LogMinds("miss+0.5"));
+            At(0.1f, () =>
+            {
+                if (_row[1] == null) return;
+                EnemySquad.BombIncoming(_row[1].transform.position, 6f, 1.6f);
+                Note("-- bomb at 1 --");
+            });
+            At(0.8f, () => LogMinds("bomb+0.8 / miss+1.4"));
+            At(0.1f, () =>
+            {
+                if (_row[2] == null) return;
+                var agent = _row[2].GetComponent<UnityEngine.AI.NavMeshAgent>();
+                agent.Warp(_player.transform.position + _player.transform.forward * 2.6f);
+                Note("-- 2 warped to 2.6 m --");
+            });
+            At(1.2f, () => { LogMinds("close+1.2"); Shoot("hand_to_hand"); });
+            At(2.0f, () => LogMinds("close+3.2"));
+            return list;
+        }
+
+        static List<(float, Action)> PainScript()
+        {
+            var list = new List<(float, Action)>();
+            float t = 0f;
+            void At(float dt, Action a) { t += dt; list.Add((t, a)); }
+
+            At(0.1f, () =>
+            {
+                foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None)) ai.gameObject.SetActive(false);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+                _row.Clear();
+                for (int i = 0; i < 3; i++)
+                {
+                    Vector3 at = _player.transform.position + _player.transform.forward * 5f + _player.transform.right * (i - 1f) * 1.8f;
+                    var go = Object.Instantiate(prefab, at, Quaternion.LookRotation(-_player.transform.forward));
+                    var ai = go.GetComponent<EnemyAI>();
+                    ai.attackDamage = 0f;
+                    ai.rangedDamageMultiplier = 0f;
+                    var h = go.GetComponent<Health>();
+                    h.maxHealth = 100000f; h.ResetHealth();
+                    _row.Add(ai);
+                }
+            });
+            At(1.5f, () => Shoot("pain_before"));
+            At(0.1f, () => { HitRow(0, BodyPart.RightLeg, 30000f); HitRow(1, BodyPart.RightArm, 30000f); HitRow(2, BodyPart.LowerTorso, 30000f); });
+            At(0.25f, () => { LogMinds("pain+0.25"); Shoot("pain_shock"); });
+            At(0.6f, () => { LogMinds("pain+0.85"); Shoot("pain_hold"); });
+            At(1.0f, () => { LogMinds("pain+1.85"); Shoot("pain_late"); });
+            At(1.5f, () => { LogMinds("pain+3.35"); Shoot("pain_over"); });
             return list;
         }
 

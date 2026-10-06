@@ -33,7 +33,7 @@ public class ViewModelSpec : MonoBehaviour
     [Tooltip("Where the rear sight sits held at the hip.")]
     public Vector3 hipPosition = new Vector3(0.13f, -0.15f, 0.12f);
     [Tooltip("The gun's turn at the hip, in degrees: a little inward and canted.")]
-    public Vector3 hipTurn = new Vector3(0f, -4f, -8f);
+    public Vector3 hipTurn = new Vector3(6f, -2f, -10f);
     [Tooltip("Where the rear sight sits aimed: on the eye's axis, this far ahead.")]
     public Vector3 aimPosition = new Vector3(0f, 0f, 0.11f);
 

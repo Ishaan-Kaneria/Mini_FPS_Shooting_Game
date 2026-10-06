@@ -247,6 +247,7 @@ public class Weapon : MonoBehaviour
     const float DrawSeconds = 0.45f;
     float _drawStart = -99f;
     float _sprintPose;
+    bool _raiseFast;
 
     public event Action<Weapon> Fired;
     public event Action<Weapon> AmmoChanged;
@@ -459,6 +460,17 @@ public class Weapon : MonoBehaviour
 
         if (Time.time < _nextFireTime || IsReloading || _burstInProgress) return;
 
+        // Out of a sprint, the rifle comes up before it fires: the first rounds used to leave
+        // a gun still carried across the chest, and their tracers started from wherever the
+        // muzzle was pointing -- out of the scenery, not the barrel. A snap of a few
+        // hundredths of a second, then the shot.
+        bool wantsFire = ControlSettings.Held(controls.fire) || touchHeld || GameInput.PadHeld(GameAction.Fire);
+        if (wantsFire && _sprintPose > 0.05f)
+        {
+            _raiseFast = true;
+            return;
+        }
+
         switch (data.fireMode)
         {
             case FireMode.Auto:
@@ -578,10 +590,12 @@ public class Weapon : MonoBehaviour
                 data.impacts.Spawn(hit.collider.tag, hit.point, hit.normal);
 
             SpawnTracer(hit.point);
+            EnemySquad.BulletPassed(origin, hit.point, hit.collider.gameObject);
         }
         else
         {
             SpawnTracer(origin + direction * data.maxRange);
+            EnemySquad.BulletPassed(origin, origin + direction * data.maxRange, null);
         }
     }
 
@@ -827,7 +841,9 @@ public class Weapon : MonoBehaviour
         // below the frame and swung up while being drawn. Both only ever add to the pose.
         bool runningPose = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f
                            && !IsReloading && !IsLowered;
-        _sprintPose = Mathf.MoveTowards(_sprintPose, runningPose ? 1f : 0f, Time.deltaTime * 5f);
+        if (_raiseFast) runningPose = false;
+        _sprintPose = Mathf.MoveTowards(_sprintPose, runningPose ? 1f : 0f, Time.deltaTime * (_raiseFast ? 16f : 5f));
+        if (_sprintPose <= 0f) _raiseFast = false;
         float sprint = UITheme.EaseOut(_sprintPose) * (1f - AimProgress);
 
         float drawn = Mathf.Clamp01((Time.time - _drawStart) / DrawSeconds);
@@ -860,7 +876,10 @@ public class Weapon : MonoBehaviour
         // Both corrected for a screen wider than 16:9, so a phone sees what a monitor sees.
         float aspect = fpsCamera.aspect;
         float baseFov = GameSettings.VerticalFovFor(GameSettings.FieldOfView, aspect);
-        float sprintFov = running ? baseFov * 1.05f : baseFov;
+        // Sprinting widens the view a touch; firing on the move narrows it a touch -- the eye
+        // fixing on what it is shooting at.
+        bool focused = _motor != null && (_motor.IsCombatJogging || (Time.time - LastShotTime < 0.4f && _motor.PlanarSpeed01 > 0.3f));
+        float sprintFov = running ? baseFov * 1.06f : focused ? baseFov * 0.95f : baseFov;
         float targetFov = Mathf.Lerp(sprintFov, GameSettings.VerticalFovFor(data.adsFieldOfView, aspect), AimProgress);
 
         fpsCamera.fieldOfView = Mathf.Lerp(fpsCamera.fieldOfView, targetFov,

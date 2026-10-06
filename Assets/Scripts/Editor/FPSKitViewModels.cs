@@ -49,7 +49,7 @@ namespace FPSKit.EditorTools
             public string magazine;           // child that drops on a reload
             public string bolt;               // child that runs on each shot
             public Vector3 boltTravel = new Vector3(0f, 0f, -0.04f);
-            public Vector3 hip = new Vector3(0.16f, -0.095f, 0.24f);
+            public Vector3 hip = new Vector3(0.15f, -0.13f, 0.3f);
             public Vector3 aim = new Vector3(0f, 0f, 0.22f);
         }
 
@@ -89,9 +89,9 @@ namespace FPSKit.EditorTools
         static readonly Vector3 RightWristFromTrigger = new Vector3(0.03f, -0.015f, -0.12f);
         static readonly Vector3 RightFingers = new Vector3(-0.3f, -0.2f, 0.93f);
         static readonly Vector3 RightBack = new Vector3(0.95f, 0.15f, 0.25f);
-        static readonly Vector3 LeftWristFromHandguard = new Vector3(-0.02f, -0.05f, -0.075f);
-        static readonly Vector3 LeftFingers = new Vector3(0.3f, 0.12f, 0.95f);
-        static readonly Vector3 LeftBack = new Vector3(-0.35f, -0.93f, 0.05f);
+        static readonly Vector3 LeftWristFromHandguard = new Vector3(-0.02f, -0.055f, -0.08f);
+        static readonly Vector3 LeftFingers = new Vector3(0.35f, 0.15f, 0.92f);
+        static readonly Vector3 LeftBack = new Vector3(-0.45f, -0.88f, 0.05f);
 
         /// <summary>
         /// Where the shoulders sit, from head-on-the-eye: down, so the stock is in the

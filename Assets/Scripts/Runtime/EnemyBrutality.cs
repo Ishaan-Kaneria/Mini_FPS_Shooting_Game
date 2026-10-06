@@ -243,6 +243,11 @@ public class EnemyBrutality : MonoBehaviour
         }
         root.localScale = Vector3.one * 0.001f;
 
+        // A raw end over the cut, on the body and on the piece, so what shows is a wound and
+        // not the skin stretched to a point.
+        Cap(root.parent != null ? root.parent : root, root.position, along);
+        Cap(piece.transform, root.position, -along);
+
         // Blood: a burst at the cut, then the stump pumps, and the piece bleeds too.
         if (_gore != null && _gore.library != null)
         {
@@ -348,6 +353,21 @@ public class EnemyBrutality : MonoBehaviour
         smr.GetPropertyBlock(block);
         renderer.SetPropertyBlock(block);
         return go;
+    }
+
+    void Cap(Transform parent, Vector3 at, Vector3 facing)
+    {
+        if (_gore == null || _gore.library == null || _gore.library.woundMaterial == null) return;
+        var cap = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(cap.GetComponent<Collider>());
+        cap.name = "Stump";
+        cap.transform.position = at;
+        cap.transform.localScale = new Vector3(0.1f, 0.06f, 0.1f) * transform.lossyScale.x;
+        cap.transform.rotation = Quaternion.FromToRotation(Vector3.up, facing.sqrMagnitude > 0.001f ? facing : Vector3.up);
+        cap.transform.SetParent(parent, true);
+        var r = cap.GetComponent<Renderer>();
+        r.sharedMaterial = _gore.library.woundMaterial;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     }
 
     static Vector3 Inverse(Vector3 s) => new Vector3(1f / Mathf.Max(1e-5f, s.x), 1f / Mathf.Max(1e-5f, s.y), 1f / Mathf.Max(1e-5f, s.z));

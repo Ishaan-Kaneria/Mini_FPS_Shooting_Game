@@ -155,11 +155,11 @@ public class MeleeStrike : MonoBehaviour
     /// <summary>Share of each strike at which the blow lands.</summary>
     public static float ImpactAt(Strike s) => s switch
     {
-        Strike.Jab => 0.34f,
-        Strike.Cross => 0.38f,
-        Strike.Kick => 0.45f,
-        Strike.Takedown => 0.38f,
-        Strike.Butt => 0.38f,
+        Strike.Jab => 0.3f,
+        Strike.Cross => 0.32f,
+        Strike.Kick => 0.36f,
+        Strike.Takedown => 0.34f,
+        Strike.Butt => 0.32f,
         _ => 0.4f,
     };
 

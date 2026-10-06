@@ -60,11 +60,11 @@ public class EnemyBody : MonoBehaviour
 
     [Header("Thrown")]
     [Tooltip("Seconds it lies at least, once it has stopped moving.")]
-    [Range(0f, 3f)] public float lieSeconds = 0.7f;
+    [Range(0f, 3f)] public float lieSeconds = 1.5f;
     [Tooltip("The longest it can be down before it gets up, settled or not.")]
-    [Range(1f, 8f)] public float maxDownSeconds = 3.2f;
+    [Range(1f, 8f)] public float maxDownSeconds = 4.5f;
     [Tooltip("Seconds the get-up takes, from where it lies to standing.")]
-    [Range(0.3f, 2f)] public float getUpSeconds = 0.75f;
+    [Range(0.3f, 3f)] public float getUpSeconds = 1.6f;
 
     [Header("Rage")]
     [Tooltip("Seconds it fights in a rage after getting up from a kick: rifle slung, fists up, " +
@@ -84,7 +84,7 @@ public class EnemyBody : MonoBehaviour
 
     Transform _hips, _spine, _chest, _neck, _head;
     Transform _lUpper, _lLower, _lHand, _rUpper, _rLower, _rHand;
-    Transform _lThigh, _rThigh, _lCalf, _rCalf;
+    Transform _lThigh, _rThigh, _lCalf, _rCalf, _lFoot, _rFoot;
     LimbIK.HandFrame _lFrame, _rFrame;
     Transform[] _poseBones;
 
@@ -110,6 +110,9 @@ public class EnemyBody : MonoBehaviour
 
     /// <summary>Up from a kick and out for blood: fists up, the rifle slung, straight at the player.</summary>
     public bool Raging => Time.time < _rageUntil && (_health == null || !_health.IsDead);
+
+    /// <summary>Set by the mind: close enough that it fights with its fists, rifle slung.</summary>
+    [System.NonSerialized] public bool HandToHand;
 
     /// <summary>Still roaring and squaring up, before the charge.</summary>
     public bool Squaring => Time.time < _rageMoveUntil;
@@ -144,6 +147,7 @@ public class EnemyBody : MonoBehaviour
             _rUpper = B(HumanBodyBones.RightUpperArm); _rLower = B(HumanBodyBones.RightLowerArm); _rHand = B(HumanBodyBones.RightHand);
             _lThigh = B(HumanBodyBones.LeftUpperLeg); _rThigh = B(HumanBodyBones.RightUpperLeg);
             _lCalf = B(HumanBodyBones.LeftLowerLeg); _rCalf = B(HumanBodyBones.RightLowerLeg);
+            _lFoot = B(HumanBodyBones.LeftFoot); _rFoot = B(HumanBodyBones.RightFoot);
 
             _lFrame = LimbIK.HandFrame.Measure(_lHand, B(HumanBodyBones.LeftMiddleProximal), B(HumanBodyBones.LeftIndexProximal), B(HumanBodyBones.LeftLittleProximal), right: false);
             _rFrame = LimbIK.HandFrame.Measure(_rHand, B(HumanBodyBones.RightMiddleProximal), B(HumanBodyBones.RightIndexProximal), B(HumanBodyBones.RightLittleProximal), right: true);
@@ -198,13 +202,25 @@ public class EnemyBody : MonoBehaviour
         foreach (var g in garments) if (g != null && g.skins != null) most = Mathf.Max(most, g.skins.Length);
         if (most == 0) return;
 
-        int pick = Random.Range(0, most);
+        // Dressed for where it is fighting, most of the time: tan in the sand, grey in the
+        // snow, dark at night and on Mars, olive elsewhere. Outfits are 0 olive, 1 tan, 2 grey/black.
+        int local = ArenaOutfit();
+        int pick = local >= 0 && Random.value < 0.75f ? Mathf.Min(local, most - 1) : Random.Range(0, most);
         foreach (var g in garments)
         {
             if (g == null || g.renderer == null || g.skins == null || g.skins.Length == 0) continue;
             var m = g.skins[Mathf.Min(pick, g.skins.Length - 1)];
             if (m != null) g.renderer.sharedMaterial = m;
         }
+    }
+
+    static int ArenaOutfit()
+    {
+        string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (scene.Contains("Desert")) return 1;
+        if (scene.Contains("Snow") || scene.Contains("Night") || scene.Contains("Mars") || scene.Contains("Auger")) return 2;
+        if (scene.Contains("Industrial") || scene.Contains("Fairground")) return 0;
+        return -1;
     }
 
     // ======================================================================
@@ -227,6 +243,8 @@ public class EnemyBody : MonoBehaviour
 
         float share = info.amount / Mathf.Max(1f, _health.maxHealth + _health.maxShield);
         float strength = Mathf.Clamp(share * 4f, 0.3f, 1f) * (info.fromMelee ? 1.4f : 1f) * reactionScale;
+
+        Hurt(info.part, strength);
 
         switch (info.part)
         {
@@ -284,7 +302,8 @@ public class EnemyBody : MonoBehaviour
         if (bone == null || _broken.ContainsKey(bone)) return;
 
         float side = limb == BodyPart.LeftLeg || limb == BodyPart.LeftArm ? 1f : -1f;
-        _broken[bone] = side * (BodyParts.IsLeg(limb) ? 28f : 40f);
+        // A kink, not a fold: enough to read as broken, not so much the limb looks detached.
+        _broken[bone] = side * (BodyParts.IsLeg(limb) ? 14f : 20f);
     }
 
     void ApplyBroken()
@@ -403,14 +422,7 @@ public class EnemyBody : MonoBehaviour
             _agent.Warp(landed);
         }
 
-        if (gun != null && !_gunDropped)
-        {
-            gun.SetParent(transform, false);
-            gun.localPosition = _gunLocal;
-            gun.localRotation = _gunLocalRot;
-            gun.localScale = _gunLocalScale;
-        }
-
+        // The rifle stays in the hand while it gets up; the rage slings it after.
         _down = Down.GettingUp;
         _getUpStart = Time.time;
     }
@@ -455,13 +467,16 @@ public class EnemyBody : MonoBehaviour
 
         // In a rage, every blow the brain lands is thrown as a fighter's strike, timed so the
         // blow lands as the wind-up ends.
-        if (Raging && _ai != null && _ai.Attacking && _ai.WindupStart > _lastStrikeWindup)
+        bool fists = Raging || HandToHand;
+        if (_ai != null) _ai.HandsOnly = fists;
+        if (fists && !_slung) Sling(true);
+        if (fists && _ai != null && _ai.Attacking && _ai.WindupStart > _lastStrikeWindup)
         {
             _lastStrikeWindup = _ai.WindupStart;
             PlayAction(Random.value < 0.5f ? "Strike" : "StrikeB", 0.8f);
         }
 
-        if (!Raging && _slung) Sling(false);
+        if (!fists && _slung) Sling(false);
     }
 
     /// <summary>The rifle across the back, or back in the hands.</summary>
@@ -506,18 +521,22 @@ public class EnemyBody : MonoBehaviour
         float up = 1f;
         if (_down == Down.GettingUp)
         {
+            // Hands and gun stay out of it until the body is nearly upright.
             float t = Mathf.Clamp01((Time.time - _getUpStart) / Mathf.Max(0.1f, getUpSeconds));
-            up = t * t * (3f - 2f * t);
+            up = Mathf.Clamp01((t - 0.75f) / 0.25f);
         }
 
         // A fighting move owns the body while it plays; the rifle is slung during the rage.
         float free = up * (1f - _actionWeight);
-        Aim(free);
+        float pain = PainWeight();
+        PainPose(pain * free);
+        Aim(free * (1f - 0.7f * _gunDip));
         if (!_slung) HoldGun(free);
+        Clutch(pain * free);
         React();
         ApplyBroken();
 
-        if (_down == Down.GettingUp) BlendFromFallen(up);
+        if (_down == Down.GettingUp) BlendFromFallen(Mathf.Clamp01((Time.time - _getUpStart) / Mathf.Max(0.1f, getUpSeconds)));
     }
 
     /// <summary>The spine, neck and head turned onto the player, shared down the chain.</summary>
@@ -633,6 +652,10 @@ public class EnemyBody : MonoBehaviour
             }
         }
 
+        // In pain: the rifle sags off the target, and comes down with the body when it buckles.
+        if (_gunDip > 0.001f) turn = Quaternion.Euler(40f * _gunDip, -15f * _gunDip, 0f) * turn;
+        extra += Vector3.down * _bodyDrop;
+
         Vector3 local = pivot + turn * (rest - pivot) + extra;
         gun.position = transform.TransformPoint(local);
         gun.rotation = transform.rotation * turn;
@@ -644,6 +667,8 @@ public class EnemyBody : MonoBehaviour
         {
             if (_wounds.Severity(BodyPart.LeftArm) > 0.85f) leftHold = 0f;
         }
+        // The off hand leaves the rifle to clutch the wound, or because it is the wound.
+        leftHold *= 1f - _leftOff;
 
         if (rightHold > 0.01f && rightGrip != null) Reach(_rUpper, _rLower, _rHand, _rFrame, rightGrip, transform.TransformDirection(new Vector3(0.6f, -0.7f, -0.3f)), rightHold);
         if (leftHold > 0.01f && leftGrip != null) Reach(_lUpper, _lLower, _lHand, _lFrame, leftGrip, transform.TransformDirection(new Vector3(-0.5f, -0.8f, 0f)), leftHold);
@@ -724,23 +749,50 @@ public class EnemyBody : MonoBehaviour
     }
 
     /// <summary>The get-up: every bone from where it fell towards its animated pose.</summary>
-    void BlendFromFallen(float w)
+    void BlendFromFallen(float t)
     {
         if (_snapshot == null) return;
 
-        Vector3 animatedPos = _hips.position;
-        Quaternion animatedRot = _hips.rotation;
+        // The standing pose the animation wants.
+        _animated ??= new Quaternion[_poseBones.Length];
+        for (int i = 0; i < _poseBones.Length; i++) _animated[i] = _poseBones[i].localRotation;
+        Vector3 standPos = _hips.position;
+        Quaternion standRot = _hips.rotation;
+
+        // The pose in between: down on one knee, the weight on a hand -- the animated body
+        // lowered and bent over, its legs and a hand put on the ground by IK.
+        Kneel(standPos, standRot);
+        _kneel ??= new Quaternion[_poseBones.Length];
+        for (int i = 0; i < _poseBones.Length; i++) _kneel[i] = _poseBones[i].localRotation;
+        Vector3 kneelPos = _hips.position;
+        Quaternion kneelRot = _hips.rotation;
+
+        // Off the ground onto the knee and the hand first, a beat there, then up.
+        const float onKnee = 0.5f, rising = 0.62f;
+        Quaternion[] from, to;
+        Vector3 fromPos, toPos;
+        Quaternion fromRot, toRot;
+        float w;
+        if (t < rising)
+        {
+            from = _snapshot; to = _kneel; fromPos = _snapHipsPos; toPos = kneelPos; fromRot = _snapHipsRot; toRot = kneelRot;
+            w = Smooth(Mathf.Clamp01(t / onKnee));
+        }
+        else
+        {
+            from = _kneel; to = _animated; fromPos = kneelPos; toPos = standPos; fromRot = kneelRot; toRot = standRot;
+            w = Smooth((t - rising) / (1f - rising));
+        }
 
         for (int i = 0; i < _poseBones.Length; i++)
         {
             if (_poseBones[i] == _hips) continue;
-            _poseBones[i].localRotation = Quaternion.Slerp(_snapshot[i], _poseBones[i].localRotation, w);
+            _poseBones[i].localRotation = Quaternion.Slerp(from[i], to[i], w);
         }
+        _hips.position = Vector3.Lerp(fromPos, toPos, w);
+        _hips.rotation = Quaternion.Slerp(fromRot, toRot, w);
 
-        _hips.position = Vector3.Lerp(_snapHipsPos, animatedPos, w);
-        _hips.rotation = Quaternion.Slerp(_snapHipsRot, animatedRot, w);
-
-        if (w >= 1f)
+        if (t >= 1f)
         {
             _down = Down.Up;
             if (_ai != null)
@@ -748,7 +800,251 @@ public class EnemyBody : MonoBehaviour
                 _ai.Downed = false;
                 _ai.Recover();
             }
-            StartRage();
+            if (rageSeconds > 0f) StartRage();
+            else Sling(false);
+        }
+    }
+
+    static float Smooth(float x) { x = Mathf.Clamp01(x); return x * x * (3f - 2f * x); }
+
+    Quaternion[] _animated, _kneel;
+
+    // ======================================================================
+    // Pain: where it was hit decides what the body does about it
+    // ======================================================================
+
+    enum Pain { None, Leg, Arm, OffArm, Gut, Chest, Head }
+    Pain _pain;
+    BodyPart _painPart;
+    float _painStart, _painLength = 1f, _painStrength;
+    float _gunDip, _bodyDrop, _leftOff;
+
+    /// <summary>Doubled up, buckled or clutching a wound: the mind waits on the body.</summary>
+    public bool InPain => _pain != Pain.None && Time.time < _painStart + _painLength;
+
+    /// <summary>
+    /// Whether it can shoot through it: from the knee once the first shock has passed, yes;
+    /// with a shot arm or a round in the gut, not until it is over.
+    /// </summary>
+    public bool CanFireInPain => _pain == Pain.Leg && Time.time - _painStart > 0.55f
+                                 || _pain == Pain.Chest && Time.time - _painStart > 0.3f;
+
+    /// <summary>What the pain looks like, for the debug line.</summary>
+    public string PainDoing => _pain switch
+    {
+        Pain.Leg => Time.time - _painStart > 0.55f ? "firing from one knee" : "leg buckled",
+        Pain.Arm => "clutching its arm",
+        Pain.OffArm => "arm hanging",
+        Pain.Gut => "doubled over",
+        Pain.Head => "reeling",
+        _ => "staggered",
+    };
+
+    /// <summary>
+    /// A round lands somewhere: the body answers for that part. A leg buckles and drops it
+    /// onto that knee, the other foot planted; an arm jerks off the rifle and the other hand
+    /// grabs at it; the gut folds it over; the chest knocks it back a step; the head snaps it
+    /// and it reels. A heavier hit hurts for longer. A worse pain is never cut short by a
+    /// lighter one.
+    /// </summary>
+    void Hurt(BodyPart part, float strength)
+    {
+        if (_ai != null && (_ai.Crawling || _ai.Downed)) return;
+        var limb = BodyParts.Limb(part);
+        Pain kind = limb switch
+        {
+            BodyPart.LeftLeg or BodyPart.RightLeg => Pain.Leg,
+            BodyPart.RightArm => Pain.Arm,
+            BodyPart.LeftArm => Pain.OffArm,
+            BodyPart.LowerTorso => Pain.Gut,
+            BodyPart.Head or BodyPart.Neck => Pain.Head,
+            _ => Pain.Chest,
+        };
+        if (part == BodyPart.LowerTorso) kind = Pain.Gut;
+        // A boss shrugs most of it: only the big hits register, and briefly.
+        bool boss = _ai != null && _ai.archetype != null && _ai.archetype.role == EnemyArchetype.Role.Boss;
+        if (boss) { if (strength < 0.7f) return; strength *= 0.5f; }
+
+        float length = kind switch
+        {
+            Pain.Leg => 1.1f + 1.0f * strength,
+            Pain.Arm or Pain.OffArm => 0.8f + 0.6f * strength,
+            Pain.Gut => 0.9f + 0.7f * strength,
+            Pain.Head => 0.7f + 0.5f * strength,
+            _ => 0.35f + 0.35f * strength,
+        };
+        if (InPain && Rank(kind) < Rank(_pain)) { _painLength = Mathf.Max(_painLength, Time.time - _painStart + 0.3f); return; }
+        if (InPain && kind == _pain) { _painLength = Mathf.Max(_painLength, Time.time - _painStart + length * 0.7f); _painStrength = Mathf.Max(_painStrength, strength); return; }
+
+        _pain = kind;
+        _painPart = limb;
+        _painStart = Time.time;
+        _painLength = length;
+        _painStrength = strength;
+    }
+
+    static int Rank(Pain p) => p switch { Pain.Leg => 5, Pain.Gut => 4, Pain.Head => 3, Pain.Arm => 2, Pain.OffArm => 2, Pain.Chest => 1, _ => 0 };
+
+    /// <summary>In fast, held, out slower: a wound grabs at once and lets go reluctantly.</summary>
+    float PainWeight()
+    {
+        if (!InPain) { _pain = Pain.None; _gunDip = 0f; _bodyDrop = 0f; _leftOff = 0f; return 0f; }
+        float t = Time.time - _painStart;
+        float rise = Mathf.Clamp01(t / 0.12f);
+        rise = rise * (2f - rise);
+        float fall = Mathf.Clamp01((_painStart + _painLength - Time.time) / 0.45f);
+        return Mathf.Min(rise, Smooth(fall));
+    }
+
+    /// <summary>The body's half of the pain, posed over the animation before the aim.</summary>
+    void PainPose(float w)
+    {
+        _gunDip = 0f; _bodyDrop = 0f; _leftOff = 0f;
+        if (w <= 0.001f || _hips == null) return;
+        float t = Time.time - _painStart;
+        float shock = Mathf.Clamp01(1f - t / 0.5f);   // the first half second, worst
+        bool right = _painPart == BodyPart.RightLeg;
+
+        switch (_pain)
+        {
+            case Pain.Leg:
+            {
+                // Down onto the shot leg's knee, the good foot planted ahead, upright enough
+                // to bring the rifle back up once the shock passes.
+                float drop = 0.42f + 0.06f * _painStrength;
+                BlendKneel(w, right, drop, 10f + 14f * shock);
+                _bodyDrop = drop * w;
+                _gunDip = w * (0.25f + 0.6f * shock);
+                _leftOff = w * shock;   // a grab at the leg, then back on the rifle
+                Turn(_head, transform.right, 20f * shock * w);
+                break;
+            }
+            case Pain.Arm:
+                // The gun arm: the rifle sags away, the other hand grabs the arm.
+                _gunDip = w * 0.85f;
+                _leftOff = w;
+                Turn(_spine, transform.up, -14f * w);
+                Turn(_chest, transform.right, 10f * w);
+                Turn(_head, transform.right, 15f * w * shock);
+                break;
+            case Pain.OffArm:
+                // The support arm: it drops off the rifle and hangs; the rifle held one-handed, low.
+                _gunDip = w * 0.55f;
+                _leftOff = w;
+                Turn(_spine, transform.up, 12f * w);
+                Turn(_lUpper, transform.right, -20f * w * shock);
+                break;
+            case Pain.Gut:
+                // Folded over the wound, knees giving, a hand pressed to it.
+                Turn(_spine, transform.right, 28f * w);
+                Turn(_chest, transform.right, 12f * w);
+                Turn(_head, transform.right, 10f * w);
+                _hips.position += (Vector3.down * 0.12f - transform.forward * 0.06f) * w * transform.lossyScale.y;
+                _bodyDrop = 0.12f * w;
+                _gunDip = w * 0.9f;
+                _leftOff = w;
+                break;
+            case Pain.Head:
+                // Snapped back and reeling: the knees dip, the head lolls, the aim wanders off.
+                Turn(_head, transform.right, -22f * w * shock);
+                Turn(_neck, transform.forward, 14f * w * Mathf.Sin(t * 7f));
+                Turn(_spine, transform.forward, 6f * w * Mathf.Sin(t * 5f));
+                _hips.position += Vector3.down * 0.08f * w * transform.lossyScale.y;
+                _bodyDrop = 0.08f * w;
+                _gunDip = w * 0.7f;
+                break;
+            case Pain.Chest:
+                Turn(_chest, transform.right, -10f * w * shock);
+                _gunDip = w * 0.35f;
+                break;
+        }
+    }
+
+    /// <summary>The kneel at a share: the animated pose bent part of the way towards it.</summary>
+    void BlendKneel(float w, bool rightKneeDown, float drop, float tip)
+    {
+        int n = _poseBones.Length;
+        _animated ??= new Quaternion[n];
+        for (int i = 0; i < n; i++) _animated[i] = _poseBones[i].localRotation;
+        Vector3 pos = _hips.position;
+        Quaternion rot = _hips.rotation;
+
+        Kneel(pos, rot, rightKneeDown, handDown: false, drop, tip);
+
+        for (int i = 0; i < n; i++)
+            if (_poseBones[i] != _hips) _poseBones[i].localRotation = Quaternion.Slerp(_animated[i], _poseBones[i].localRotation, w);
+        _hips.position = Vector3.Lerp(pos, _hips.position, w);
+        _hips.rotation = Quaternion.Slerp(rot, _hips.rotation, w);
+    }
+
+    /// <summary>The off hand on the wound: the thigh, the arm, the belly; or hanging if it is the wound.</summary>
+    void Clutch(float w)
+    {
+        if (_leftOff <= 0.001f || _lUpper == null || _lLower == null || _lHand == null) return;
+        float scale = transform.lossyScale.y;
+        Vector3 at;
+        switch (_pain)
+        {
+            case Pain.Leg:
+            {
+                Transform thigh = _painPart == BodyPart.RightLeg ? _rThigh : _lThigh;
+                Transform knee = _painPart == BodyPart.RightLeg ? _rCalf : _lCalf;
+                if (thigh == null || knee == null) return;
+                at = Vector3.Lerp(thigh.position, knee.position, 0.55f) + transform.forward * 0.08f * scale;
+                break;
+            }
+            case Pain.Arm:
+                if (_rUpper == null || _rLower == null) return;
+                at = Vector3.Lerp(_rUpper.position, _rLower.position, 0.5f) + transform.forward * 0.05f * scale;
+                break;
+            case Pain.Gut:
+                at = _hips.position + transform.forward * 0.18f * scale + Vector3.up * 0.12f * scale;
+                break;
+            case Pain.OffArm:
+                at = _hips.position - transform.right * 0.28f * scale - Vector3.up * 0.05f * scale;
+                break;
+            default: return;
+        }
+        Vector3 to = Vector3.Lerp(_lHand.position, at, _leftOff);
+        LimbIK.Solve(_lUpper, _lLower, _lHand, to, _lUpper.position + transform.TransformDirection(new Vector3(-0.6f, -0.6f, 0.1f)));
+    }
+
+    /// <summary>
+    /// Bends the animated pose into a kneel: the hips down most of the way to the ground and
+    /// tipped forward, the left foot planted ahead with the knee up, the right knee on the
+    /// ground behind, the right hand flat on the ground ahead taking the weight.
+    /// </summary>
+    void Kneel(Vector3 hipsPos, Quaternion hipsRot, bool rightKneeDown = true, bool handDown = true, float drop = 0.5f, float tip = 28f)
+    {
+        float scale = transform.lossyScale.y;
+        float ground = transform.position.y;
+
+        _hips.position = hipsPos - Vector3.up * drop * scale;
+        _hips.rotation = Quaternion.AngleAxis(tip, transform.right) * hipsRot;
+        Turn(_spine, transform.right, handDown ? 12f : -tip * 0.6f);
+        Turn(_head, transform.right, handDown ? -25f : -tip * 0.3f);
+
+        // One foot planted ahead with the knee up, the other knee on the ground behind.
+        Transform fThigh = rightKneeDown ? _lThigh : _rThigh, fCalf = rightKneeDown ? _lCalf : _rCalf, fFoot = rightKneeDown ? _lFoot : _rFoot;
+        Transform bThigh = rightKneeDown ? _rThigh : _lThigh, bCalf = rightKneeDown ? _rCalf : _lCalf, bFoot = rightKneeDown ? _rFoot : _lFoot;
+        float fSide = rightKneeDown ? -1f : 1f;
+        if (fThigh != null && fCalf != null && fFoot != null)
+        {
+            Vector3 front = transform.position + transform.forward * 0.35f * scale + transform.right * fSide * 0.12f * scale;
+            front.y = ground + 0.08f * scale;
+            LimbIK.Solve(fThigh, fCalf, fFoot, front, fThigh.position + transform.forward + Vector3.up);
+        }
+        if (bThigh != null && bCalf != null && bFoot != null)
+        {
+            Vector3 back = transform.position - transform.forward * 0.45f * scale - transform.right * fSide * 0.12f * scale;
+            back.y = ground + 0.06f * scale;
+            LimbIK.Solve(bThigh, bCalf, bFoot, back, bThigh.position + transform.forward - Vector3.up);
+        }
+        if (handDown && _rUpper != null && _rLower != null && _rHand != null)
+        {
+            Vector3 palm = transform.position + transform.forward * 0.5f * scale + transform.right * 0.28f * scale;
+            palm.y = ground + 0.05f * scale;
+            LimbIK.Solve(_rUpper, _rLower, _rHand, palm, _rUpper.position + transform.right - Vector3.up * 0.3f);
         }
     }
 }

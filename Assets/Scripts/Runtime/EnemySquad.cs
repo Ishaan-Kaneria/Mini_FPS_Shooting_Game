@@ -21,6 +21,7 @@ public static class EnemySquad
     static readonly Dictionary<EnemyBrain, float> _turns = new Dictionary<EnemyBrain, float>();
     static int _tickedFrame = -1;
     static float _nextRadio;
+    static readonly List<(Vector3 at, float time)> _losses = new List<(Vector3, float)>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
@@ -29,9 +30,69 @@ public static class EnemySquad
         _turns.Clear();
         _tickedFrame = -1;
         _nextRadio = 0f;
+        _losses.Clear();
+    }
+
+    /// <summary>A comrade went down here.</summary>
+    public static void ReportLoss(Vector3 at)
+    {
+        if (_losses.Count > 32) _losses.RemoveAt(0);
+        _losses.Add((at, Time.time));
+    }
+
+    /// <summary>How many went down within a radius in the last few seconds: a reason for care.</summary>
+    public static float LossesNear(Vector3 at, float radius, float seconds)
+    {
+        float n = 0f;
+        for (int i = _losses.Count - 1; i >= 0; i--)
+        {
+            if (Time.time - _losses[i].time > seconds) break;
+            if ((_losses[i].at - at).sqrMagnitude < radius * radius) n += 1f;
+        }
+        return n;
     }
 
     public static IReadOnlyList<EnemyBrain> All => _all;
+
+    // ======================================================================
+    // Danger
+    // ======================================================================
+
+    /// <summary>
+    /// A bullet went from <paramref name="from"/> to <paramref name="to"/>. Anyone it passed
+    /// close by (and did not hit) hears the crack and goes for cover: a near miss is what
+    /// makes a soldier move, not the shot that lands.
+    /// </summary>
+    public static void BulletPassed(Vector3 from, Vector3 to, GameObject hitObject)
+    {
+        Vector3 line = to - from;
+        float length = line.magnitude;
+        if (length < 0.01f) return;
+        Vector3 dir = line / length;
+        for (int i = _all.Count - 1; i >= 0; i--)
+        {
+            var brain = _all[i];
+            if (brain == null) continue;
+            if (hitObject != null && hitObject.transform.IsChildOf(brain.transform)) continue;
+            Vector3 chest = brain.transform.position + Vector3.up * 1.2f;
+            float along = Vector3.Dot(chest - from, dir);
+            if (along < 0f || along > length + 2f) continue;
+            float miss = Vector3.Distance(chest, from + dir * Mathf.Min(along, length));
+            if (miss < 3f) brain.NearMiss(from, miss);
+        }
+    }
+
+    /// <summary>A bomb is coming down at a point: anyone inside its reach runs out of it.</summary>
+    public static void BombIncoming(Vector3 at, float radius, float seconds)
+    {
+        for (int i = _all.Count - 1; i >= 0; i--)
+        {
+            var brain = _all[i];
+            if (brain == null) continue;
+            if ((brain.transform.position - at).sqrMagnitude < radius * radius * 1.3f)
+                brain.Danger(at, radius, seconds);
+        }
+    }
 
     public static void Join(EnemyBrain brain)
     {

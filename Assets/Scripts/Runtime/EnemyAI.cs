@@ -271,6 +271,9 @@ public class EnemyAI : MonoBehaviour
 
     EnemyBrain _brain;
 
+    /// <summary>The rifle is slung (a fist fight, a rage): an attack is a blow, never a shot.</summary>
+    [System.NonSerialized] public bool HandsOnly;
+
     /// <summary>It has seen the player (or been told of them): the body treats it as engaged.</summary>
     public void MarkSpotted()
     {
@@ -1015,7 +1018,7 @@ public class EnemyAI : MonoBehaviour
             // attack was committed on: closing during the telegraph should change what
             // lands, and a rifleman firing from the eyes at something standing inside
             // its own muzzle misses every time.
-            bool shoot = ranged &&
+            bool shoot = ranged && !HandsOnly &&
                          Vector3.Distance(transform.position, target.position) > meleeRange;
 
             if (shoot)
@@ -1076,12 +1079,20 @@ public class EnemyAI : MonoBehaviour
             (target.position - transform.position).normalized, gameObject));
     }
 
+    /// <summary>
+    /// Set by the brain to fire at a place rather than the player: suppressing the corner the
+    /// player went behind. Shots then hit the cover, which is the point.
+    /// </summary>
+    public bool HasAimPoint { get; set; }
+    public Vector3 AimPoint { get; set; }
+
     void FireRangedShot()
     {
         if (target == null) return;
 
         Vector3 origin = eyes.position;
-        Vector3 direction = ((target.position + Vector3.up * 1.2f) - origin).normalized;
+        Vector3 aimAt = HasAimPoint ? AimPoint : target.position + Vector3.up * 1.2f;
+        Vector3 direction = (aimAt - origin).normalized;
 
         // A hurt arm shakes the aim. Wider, never tighter: a wound only ever helps you.
         float spread = rangedSpread * (_wounds != null ? _wounds.AimSpreadMultiplier : 1f);

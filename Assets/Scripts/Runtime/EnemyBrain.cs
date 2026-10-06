@@ -58,6 +58,9 @@ public class EnemyBrain : MonoBehaviour
     [Tooltip("Share of its health below which it falls back to cover.")]
     [Range(0f, 1f)] public float fallBackAt = 0.3f;
 
+    [Tooltip("Metres inside which it stops shooting and fights hand to hand.")]
+    [Range(0f, 8f)] public float closeQuarters = 3.5f;
+
     [Header("Moving, as shares of its full speed")]
     [Range(0.1f, 1f)] public float walkPace = 0.55f;
     [Range(0.1f, 1f)] public float carefulPace = 0.75f;
@@ -142,6 +145,7 @@ public class EnemyBrain : MonoBehaviour
     void OnDied(Health h)
     {
         EnemySquad.ReleaseTurn(this);
+        EnemySquad.ReportLoss(transform.position);
         NoiseSystem.Emit(transform.position, 25f, NoiseKind.Violence, gameObject);
     }
 
@@ -183,6 +187,7 @@ public class EnemyBrain : MonoBehaviour
         Vector3 from = info.source != null ? info.source.transform.position : _ai.target.position;
         Learn(from, Awareness.Combat);
         _sees = true;
+        _lastThreat = Time.time;
     }
 
     /// <summary>A comrade calling the player out. Believed after a beat.</summary>
@@ -250,6 +255,9 @@ public class EnemyBrain : MonoBehaviour
             Decide();
         }
 
+        if (!_ai.Attacking) _ai.HasAimPoint = false;
+        if (Hurting()) return;
+        if (Evade()) return;
         Act();
     }
 
@@ -532,6 +540,21 @@ public class EnemyBrain : MonoBehaviour
             return;
         }
 
+        // Close quarters: nobody fires a rifle into a man's chest at arm's length. Inside a
+        // few metres it slings the gun and fights with its fists; back off and it unslings.
+        bool handToHand = _ai.ranged && !_ai.Crawling && distance <= closeQuarters
+                          || (_body != null && _body.HandToHand && distance <= closeQuarters + 1.5f);
+        if (_body != null) _body.HandToHand = handToHand;
+        if (handToHand)
+        {
+            _ai.ReportState(EnemyAI.State.Chase);
+            Doing = "fighting hand to hand";
+            _ai.FaceTowards(target.position, 12f);
+            if (distance <= _ai.meleeRange && Time.time >= _reactAt && _ai.TryAttack()) return;
+            if (!_ai.Attacking) _ai.MoveTo(target.position, runPace);
+            return;
+        }
+
         // Hands only: in it goes, as fast as its legs allow.
         if (!_ai.ranged)
         {
@@ -551,6 +574,43 @@ public class EnemyBrain : MonoBehaviour
             return;
         }
 
+        // Pinned: a bullet cracked past. Break for cover hard, and keep the head down there
+        // until the fire lets up -- then come up and fight again.
+        if (Time.time < _suppressedUntil)
+        {
+            _ai.ReportState(EnemyAI.State.Chase);
+            if (_hasGoal && !Reached(_goal))
+            {
+                Doing = _hasCover ? "breaking for cover" : "diving clear";
+                _ai.MoveTo(Zigzag(_goal), runPace * 1.1f);
+                return;
+            }
+            _hasGoal = false;
+            if (_hasCover)
+            {
+                Doing = "keeping its head down";
+                _ai.Hold();
+                LookPoint = _lastKnown + Vector3.up * 1.4f;
+                return;
+            }
+        }
+
+        // Being aimed at in the open: a sidestep dash spoils the shot.
+        if (_sees && !_hasGoal && distance > 6f && AimedAt(distance) && Time.time >= _nextDodge && !_ai.Attacking)
+        {
+            _nextDodge = Time.time + Random.Range(2.5f, 5f) * Mathf.Lerp(1.4f, 0.8f, Aggression);
+            if (Random.value < 0.7f && SideStep(target.position, out _goal))
+            {
+                _hasGoal = true;
+                _hasCover = false;
+                Doing = "dodging";
+                _ai.MoveTo(_goal, runPace * 1.1f);
+                return;
+            }
+        }
+
+        Think(distance);
+
         // Badly hurt: back to cover once, and fight from there.
         float health = _health != null ? _health.Normalized : 1f;
         if (!_fellBack && health <= fallBackAt)
@@ -563,8 +623,6 @@ public class EnemyBrain : MonoBehaviour
         // run to the next. Never standing in the open for long, never still for the sake of it.
         bool turn = _sees && Time.time >= _reactAt && EnemySquad.RequestTurn(this, Aggression);
 
-        // Somebody in its face: no time for turns, it fights back.
-        if (_sees && distance <= _ai.meleeRange + 0.5f && Time.time >= _reactAt) turn = true;
 
         if (_hasGoal && Reached(_goal)) _hasGoal = false;
         bool atSpot = !_hasGoal;
@@ -581,7 +639,7 @@ public class EnemyBrain : MonoBehaviour
             if (_shotsHere >= _burstsPerSpot && !_ai.Attacking)
             {
                 _shotsHere = 0;
-                _burstsPerSpot = Random.Range(1, 3);
+                _burstsPerSpot = _tactic == Tactic.Hold ? Random.Range(2, 5) : _tactic == Tactic.Bound ? Random.Range(1, 3) : 1;
                 _hasGoal = PickFiringSpot(target.position, distance, out _goal);
                 if (_hasGoal) _ai.MoveTo(_goal, runPace);
             }
@@ -611,7 +669,8 @@ public class EnemyBrain : MonoBehaviour
         {
             if (Time.time >= _nextMove)
             {
-                _nextMove = Time.time + Random.Range(2.5f, 4f);
+                _nextMove = Time.time + (_tactic == Tactic.Hold || _tactic == Tactic.Retreat && _retreated ? Random.Range(6f, 9f)
+                                       : _tactic == Tactic.Assault ? Random.Range(1.2f, 2.2f) : Random.Range(2.5f, 4f));
                 _hasGoal = PickFiringSpot(target.position, distance, out _goal);
                 if (_hasGoal) { _ai.MoveTo(_goal, runPace); return; }
             }
@@ -621,9 +680,34 @@ public class EnemyBrain : MonoBehaviour
             return;
         }
 
-        // Out of sight: the role decides how it gets a line again.
+        // Just lost sight of the player: whoever has a turn puts rounds into where they went,
+        // to keep them pinned while the others move.
+        if (Time.time - _lastSeen < 3f && Part != Role.Flanker && EnemySquad.RequestTurn(this, Aggression)
+            && Vector3.Distance(transform.position, _lastKnown) > closeQuarters + 2f)
+        {
+            Doing = "suppressing";
+            _ai.ReportState(EnemyAI.State.Attack);
+            _ai.Hold();
+            _ai.FaceTowards(_lastKnown, 10f);
+            _ai.HasAimPoint = true;
+            _ai.AimPoint = _lastKnown + Vector3.up * Random.Range(0.6f, 1.6f) + Random.insideUnitSphere * 0.6f;
+            _ai.TryAttack();
+            return;
+        }
+
+        // Out of sight. Dug in or falling back: it watches the corner and lets the player come.
+        if ((_tactic == Tactic.Hold || _tactic == Tactic.Retreat) && Time.time - _lastSeen < 6f)
+        {
+            Doing = "watching the corner";
+            _ai.Hold();
+            _ai.FaceTowards(_lastKnown, 6f);
+            return;
+        }
+
+        // Otherwise the plan (or the role) decides how it gets a line again.
         _hasCover = false;
-        switch (Part)
+        Role way = _tactic == Tactic.Flank ? Role.Flanker : _tactic == Tactic.Assault ? Role.Pusher : Part;
+        switch (way)
         {
             case Role.Flanker:
             {
@@ -646,7 +730,7 @@ public class EnemyBrain : MonoBehaviour
     }
 
     /// <summary>The fight's bookkeeping, for a debug panel and the behaviour test.</summary>
-    public string FightState => $"bursts {_shotsHere}/{_burstsPerSpot} goal {(_hasGoal ? Vector3.Distance(transform.position, _goal).ToString("0.0") + "m" : "none")}";
+    public string FightState => $"{_tactic} bursts {_shotsHere}/{_burstsPerSpot} goal {(_hasGoal ? Vector3.Distance(transform.position, _goal).ToString("0.0") + "m" : "none")}";
 
     /// <summary>Close enough to a spot to count as there, by its own position, not the agent's last path.</summary>
     bool Reached(Vector3 spot)
@@ -654,6 +738,277 @@ public class EnemyBrain : MonoBehaviour
         Vector3 d = spot - transform.position;
         d.y = 0f;
         return d.sqrMagnitude < 1.5f * 1.5f;
+    }
+
+    // ---- the body in pain ----------------------------------------------------------
+
+    /// <summary>
+    /// While the body is buckled, clutching or doubled over, the mind waits on it: it stays
+    /// put and turns to the threat, and fires only where the body can (from one knee).
+    /// </summary>
+    bool Hurting()
+    {
+        if (_body == null || !_body.InPain) return false;
+        Doing = _body.PainDoing;
+        _ai.Hold();
+        _hasGoal = false;
+        if (Mind >= Awareness.Alert) _ai.FaceTowards(_lastKnown, 4f);
+        if (_body.CanFireInPain && _sees && Mind >= Awareness.Combat && Time.time >= _reactAt && _ai.ranged)
+        {
+            _ai.ReportState(EnemyAI.State.Attack);
+            _ai.TryAttack();
+        }
+        return true;
+    }
+
+    // ---- the plan -------------------------------------------------------------------
+
+    /// <summary>
+    /// What it is trying to do in the fight, re-weighed about once a second:
+    /// <b>Bound</b> (fire and move), <b>Assault</b> (close the gap), <b>Flank</b> (go round),
+    /// <b>Hold</b> (dig into cover and shoot from it), <b>Retreat</b> (back out to far cover).
+    /// </summary>
+    public enum Tactic { Bound, Assault, Flank, Hold, Retreat }
+    public Tactic Plan => _tactic;
+    Tactic _tactic = Tactic.Bound;
+    float _nextPlan;
+    float _lastThreat = -99f;
+    bool _retreated;
+    Weapon[] _playerWeapons;
+    Health _playerHealth;
+
+    // What it reads off the fight, each 0..1:
+    //  0 own health, 1 legs hurt, 2 arms hurt, 3 under fire, 4 player reloading,
+    //  5 comrades fighting near, 6 range (far = 1), 7 being watched, 8 sees the player,
+    //  9 comrades lost near lately, 10 player hurt, 11 bias.
+    const int Inputs = 12;
+    static readonly float[,] s_weights =
+    {
+        //  hp    legs  arms  fire  rld   mates range watch sees  loss  pHurt bias
+        {  0.5f, -0.6f,  0f,  -0.2f, 0.3f, 0.3f,  0f,   0.2f, 0.6f,  0f,   0f,   0.3f }, // Bound
+        {  1.2f, -1.6f, -0.5f, -1.0f, 2.6f, 0.8f,  0.3f, -0.8f, 0.2f, -0.8f, 1.5f, -1.3f }, // Assault
+        {  0.6f, -1.6f,  0f,  -0.3f, 0.5f, 1.0f,  0.2f, -1.0f,-0.2f,  0f,   0.3f, -0.7f }, // Flank
+        { -0.2f,  1.2f,  0.4f,  0.8f,-1.0f, 0f,  -0.3f,  0.4f, 0.3f,  0.4f, -0.5f,  0f  }, // Hold
+        { -2.6f,  0.6f,  0.6f,  0.8f,-1.5f,-0.8f, -0.5f,  0.3f, 0f,   1.0f, -0.8f,  1.6f }, // Retreat
+    };
+    float[,] _weights;
+    readonly float[] _x = new float[Inputs];
+
+    /// <summary>
+    /// Weighs the fight and picks a plan: a small hand-wired network, the inputs above times
+    /// a weight per plan, summed. Each soldier's weights are the table above with its own
+    /// temperament mixed in (a fifth either way), so two soldiers in the same spot can
+    /// choose differently. The plan it already has gets a bonus, so it does not dither.
+    /// </summary>
+    void Think(float distance)
+    {
+        if (Time.time < _nextPlan) return;
+        _nextPlan = Time.time + Random.Range(0.8f, 1.2f);
+
+        if (_weights == null)
+        {
+            _weights = new float[5, Inputs];
+            for (int o = 0; o < 5; o++)
+                for (int i = 0; i < Inputs; i++)
+                    _weights[o, i] = s_weights[o, i] * Random.Range(0.8f, 1.2f);
+            // The role leans it: pushers push, flankers go round, riflemen dig in.
+            _weights[(int)Tactic.Assault, Inputs - 1] += Part == Role.Pusher ? 0.7f : 0f;
+            _weights[(int)Tactic.Flank, Inputs - 1] += Part == Role.Flanker ? 0.9f : 0f;
+            _weights[(int)Tactic.Hold, Inputs - 1] += Part == Role.Rifleman ? 0.3f : 0f;
+            _weights[(int)Tactic.Assault, Inputs - 1] += Aggression * 1.0f;
+            _weights[(int)Tactic.Retreat, Inputs - 1] -= Aggression * 0.8f;
+        }
+
+        var target = _ai.target;
+        _playerWeapons ??= target.GetComponentsInChildren<Weapon>(true);
+        if (_playerHealth == null) _playerHealth = target.GetComponent<Health>();
+        bool reloading = false;
+        foreach (var w in _playerWeapons)
+            if (w != null && w.isActiveAndEnabled && (w.IsReloading || w.CurrentAmmo == 0)) reloading = true;
+
+        float mates = 0f, losses = 0f;
+        foreach (var other in EnemySquad.All)
+            if (other != null && other != this && other.Mind == Awareness.Combat
+                && (other.transform.position - transform.position).sqrMagnitude < 35f * 35f) mates += 1f;
+        losses = EnemySquad.LossesNear(transform.position, 25f, 12f);
+
+        float want = _ai.preferredRangedDistance > 0f ? _ai.preferredRangedDistance : 14f;
+        _x[0] = _health != null ? _health.Normalized : 1f;
+        _x[1] = _wounds != null ? Mathf.Clamp01(Mathf.Max(_wounds.Severity(BodyPart.LeftLeg), _wounds.Severity(BodyPart.RightLeg)) * 2f) : 0f;
+        _x[2] = _wounds != null ? Mathf.Clamp01(Mathf.Max(_wounds.Severity(BodyPart.LeftArm), _wounds.Severity(BodyPart.RightArm)) * 2f) : 0f;
+        _x[3] = Mathf.Exp(-(Time.time - _lastThreat) / 3f);
+        _x[4] = reloading ? 1f : 0f;
+        _x[5] = Mathf.Clamp01(mates / 3f);
+        _x[6] = Mathf.Clamp01(distance / (want * 2f));
+        _x[7] = Watched() ? 1f : 0f;
+        _x[8] = _sees ? 1f : 0f;
+        _x[9] = Mathf.Clamp01(losses / 2f);
+        _x[10] = _playerHealth != null ? 1f - _playerHealth.Normalized : 0f;
+        _x[11] = 1f;
+
+        int best = (int)_tactic;
+        float bestScore = float.MinValue;
+        for (int o = 0; o < 5; o++)
+        {
+            float s = 0f;
+            for (int i = 0; i < Inputs; i++) s += _weights[o, i] * _x[i];
+            if (o == (int)_tactic) s += 0.25f;
+            if (s > bestScore) { bestScore = s; best = o; }
+        }
+
+        var next = (Tactic)best;
+        if (next == _tactic) return;
+        // A new plan: what it was doing for the old one no longer applies (unless it is
+        // in the middle of getting out of fire).
+        if (_tactic == Tactic.Retreat) _retreated = false;
+        _tactic = next;
+        if (Time.time >= _suppressedUntil) { _hasGoal = false; _nextMove = 0f; _shotsHere = 0; }
+    }
+
+    /// <summary>The player facing it, roughly: within fifteen degrees of the view.</summary>
+    bool Watched()
+    {
+        var cam = Camera.main;
+        if (cam == null) return false;
+        Vector3 to = transform.position + Vector3.up * 1.2f - cam.transform.position;
+        return Vector3.Angle(cam.transform.forward, to) < 15f;
+    }
+
+    // ---- danger ---------------------------------------------------------------
+
+    float _suppressedUntil = -1f;
+    float _nextDodge;
+    float _aimedSince = -1f;
+    float _evadeUntil = -1f;
+    Vector3 _evadeGoal;
+    Vector3 _evadeFrom;
+    float _zigAt;
+    float _zigSide = 1f;
+
+    /// <summary>A bullet cracked past it from <paramref name="from"/>.</summary>
+    public void NearMiss(Vector3 from, float miss)
+    {
+        if (_ai == null || _ai.target == null || _health == null || _health.IsDead) return;
+
+        // A shot that close gives away roughly where it came from.
+        Learn(_ai.target.position, Awareness.Combat);
+        _lastThreat = Time.time;
+        _sees = _sees || miss < 1.5f;
+        if (_body != null && (_body.Raging || _body.HandToHand)) return;
+        if (_ai.Crawling || !_ai.ranged) return;
+
+        bool already = Time.time < _suppressedUntil;
+        _suppressedUntil = Mathf.Max(_suppressedUntil, Time.time + Random.Range(1.8f, 3.2f));
+        if (already && (_hasGoal || _hasCover)) return;
+
+        if (FindCover(from, 4f, 80f, out _cover))
+        {
+            _hasCover = true;
+            _goal = _cover;
+            _hasGoal = true;
+        }
+        else
+        {
+            _hasCover = false;
+            _hasGoal = SideStep(from, out _goal);
+        }
+        _shotsHere = 0;
+        if (_hasGoal) _ai.MoveTo(_goal, runPace * 1.1f);
+    }
+
+    /// <summary>A bomb coming down near it: out of the blast, now.</summary>
+    public void Danger(Vector3 at, float radius, float seconds)
+    {
+        if (_health == null || _health.IsDead) return;
+        Learn(_ai != null && _ai.target != null ? _ai.target.position : at, Awareness.Combat);
+
+        Vector3 away = transform.position - at;
+        away.y = 0f;
+        if (away.sqrMagnitude < 0.01f) away = Random.insideUnitSphere;
+        away.y = 0f;
+        away.Normalize();
+        for (int i = 0; i < 5; i++)
+        {
+            Vector3 dir = Quaternion.AngleAxis(Random.Range(-60f, 60f) * i * 0.5f, Vector3.up) * away;
+            if (NavMesh.SamplePosition(at + dir * (radius + 3f), out var hit, 3f, NavMesh.AllAreas))
+            {
+                _evadeGoal = hit.position;
+                _evadeFrom = at;
+                // It reacts on sight of the throw: a beat, then runs until well after it goes off.
+                _evadeUntil = Time.time + seconds + 0.6f;
+                _hasGoal = false;
+                return;
+            }
+        }
+    }
+
+    /// <summary>Running from a bomb. Overrides anything else it was doing.</summary>
+    bool Evade()
+    {
+        if (Time.time >= _evadeUntil) return false;
+        if (Reached(_evadeGoal)) { _evadeUntil = -1f; return false; }
+        Doing = "running from a grenade";
+        _ai.ReportState(EnemyAI.State.Chase);
+        LookPoint = _evadeFrom + Vector3.up * 0.3f;
+        _ai.MoveTo(_evadeGoal, 1.3f);
+        return true;
+    }
+
+    /// <summary>
+    /// Whether the player's sights are on it, held a moment: the crosshair within a body's
+    /// width of its chest for a third of a second.
+    /// </summary>
+    bool AimedAt(float distance)
+    {
+        var cam = Camera.main;
+        if (cam == null) { _aimedSince = -1f; return false; }
+        Vector3 chest = transform.position + Vector3.up * 1.2f;
+        Vector3 to = chest - cam.transform.position;
+        float off = Vector3.Cross(cam.transform.forward, to).magnitude;
+        bool on = Vector3.Dot(cam.transform.forward, to) > 0f && off < 0.9f;
+        if (!on) { _aimedSince = -1f; return false; }
+        if (_aimedSince < 0f) _aimedSince = Time.time;
+        return Time.time - _aimedSince > 0.35f;
+    }
+
+    /// <summary>A short dash square to the threat's line, three to five metres.</summary>
+    bool SideStep(Vector3 threat, out Vector3 spot)
+    {
+        Vector3 from = transform.position - threat;
+        from.y = 0f;
+        if (from.sqrMagnitude < 0.01f) from = -transform.forward;
+        Vector3 side = Vector3.Cross(Vector3.up, from.normalized) * (Random.value < 0.5f ? -1f : 1f);
+        for (int i = 0; i < 2; i++)
+        {
+            if (NavMesh.SamplePosition(transform.position + side * Random.Range(3f, 5f), out var hit, 2f, NavMesh.AllAreas)
+                && (hit.position - transform.position).sqrMagnitude > 2f * 2f)
+            {
+                spot = hit.position;
+                return true;
+            }
+            side = -side;
+        }
+        spot = transform.position;
+        return false;
+    }
+
+    /// <summary>
+    /// Running under fire, not in a straight line: the target point is pushed a little to
+    /// one side, then the other, every half second or so, while it is still a way off.
+    /// </summary>
+    Vector3 Zigzag(Vector3 goal)
+    {
+        Vector3 to = goal - transform.position;
+        to.y = 0f;
+        if (to.sqrMagnitude < 5f * 5f) return goal;
+        if (Time.time >= _zigAt)
+        {
+            _zigAt = Time.time + Random.Range(0.4f, 0.7f);
+            _zigSide = -_zigSide;
+        }
+        Vector3 side = Vector3.Cross(Vector3.up, to.normalized) * _zigSide * 1.6f;
+        Vector3 near = transform.position + to.normalized * 4f + side;
+        return NavMesh.SamplePosition(near, out var hit, 1.5f, NavMesh.AllAreas) ? hit.position : goal;
     }
 
     float _stuckSince = -1f;
@@ -668,6 +1023,38 @@ public class EnemyBrain : MonoBehaviour
     /// </summary>
     bool PickFiringSpot(Vector3 threat, float distance, out Vector3 spot)
     {
+        switch (_tactic)
+        {
+            case Tactic.Assault:
+            {
+                // Straight in while the player is busy: half the gap, never into their arms.
+                Vector3 toward = threat - transform.position;
+                toward.y = 0f;
+                float step = Mathf.Clamp(distance * 0.5f, 3f, Mathf.Max(3f, distance - closeQuarters - 1f));
+                Vector3 goal = transform.position + toward.normalized * step + Vector3.Cross(Vector3.up, toward.normalized) * Random.Range(-2f, 2f);
+                _hasCover = false;
+                if (NavMesh.SamplePosition(goal, out var hit, 3f, NavMesh.AllAreas)) { spot = hit.position; return true; }
+                break;
+            }
+            case Tactic.Flank:
+            {
+                // Round the player's side, keeping the range: across their aim, to their flank.
+                Vector3 off = transform.position - threat;
+                off.y = 0f;
+                float r = Mathf.Clamp(off.magnitude, 8f, _ai.attackRange * 0.8f);
+                Vector3 round = Quaternion.AngleAxis(_flankSide * Random.Range(35f, 55f), Vector3.up) * off.normalized * r;
+                _hasCover = false;
+                if (NavMesh.SamplePosition(threat + round, out var hit, 4f, NavMesh.AllAreas)) { spot = hit.position; return true; }
+                break;
+            }
+            case Tactic.Retreat:
+                if (!_retreated && FindCover(threat, 14f, _ai.attackRange * 0.95f, out spot)) { _hasCover = true; _retreated = true; return true; }
+                goto case Tactic.Hold;
+            case Tactic.Hold:
+                if (FindCover(threat, 6f, _ai.attackRange * 0.95f, out spot) && (spot - transform.position).sqrMagnitude < 10f * 10f) { _hasCover = true; return true; }
+                break;
+        }
+
         float want = Mathf.Clamp(_ai.preferredRangedDistance > 0f ? _ai.preferredRangedDistance : 14f, 6f, _ai.attackRange * 0.9f);
         if (Random.value < 0.35f && FindCover(threat, 6f, _ai.attackRange * 0.95f, out spot)
             && (spot - transform.position).sqrMagnitude < 9f * 9f)

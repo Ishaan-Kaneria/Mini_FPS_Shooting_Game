@@ -51,15 +51,15 @@ public class MovementSettings : ScriptableObject
 
     [Header("The view")]
     [Tooltip("Metres the view dips each footfall at a jog.")]
-    [Range(0f, 0.1f)] public float bobDip = 0.008f;
+    [Range(0f, 0.1f)] public float bobDip = 0.017f;
     [Tooltip("Metres the view sways side to side over a stride.")]
-    [Range(0f, 0.1f)] public float bobSway = 0.005f;
+    [Range(0f, 0.1f)] public float bobSway = 0.011f;
     [Tooltip("Bob at a sprint, as a multiple of the jog's.")]
-    [Range(1f, 3f)] public float sprintBob = 1.2f;
+    [Range(1f, 3f)] public float sprintBob = 1.5f;
     [Tooltip("Degrees the view rolls each step.")]
-    [Range(0f, 3f)] public float stepRoll = 0f;
+    [Range(0f, 3f)] public float stepRoll = 0.3f;
     [Tooltip("Degrees the view leans against a sidestep.")]
-    [Range(0f, 6f)] public float strafeLean = 0.4f;
+    [Range(0f, 6f)] public float strafeLean = 1.0f;
     [Tooltip("Metres a step covers at a jog; the footsteps and the bob both follow it.")]
     [Range(0.4f, 1.5f)] public float stepLength = 0.78f;
     [Tooltip("Metres a step covers at a sprint.")]
@@ -69,7 +69,7 @@ public class MovementSettings : ScriptableObject
     [Tooltip("Reload time as a share of the gun's own. Under 1 is quicker.")]
     [Range(0.2f, 1.5f)] public float reloadTimeScale = 0.6f;
     [Tooltip("How much the gun bobs and swings with the steps, as a share of the scene's sway.")]
-    [Range(0f, 1f)] public float gunBob = 0.35f;
+    [Range(0f, 1f)] public float gunBob = 0.55f;
 
     // ======================================================================
 

@@ -179,8 +179,8 @@ MonoBehaviour:
   bolt: {fileID: 7490201263956338101}
   buttLength: 0.23598768
   boltTravel: {x: 0, y: 0, z: -0.06}
-  hipPosition: {x: 0.16, y: -0.095, z: 0.24}
-  hipTurn: {x: 0, y: -4, z: -8}
+  hipPosition: {x: 0.15, y: -0.13, z: 0.3}
+  hipTurn: {x: 6, y: -2, z: -10}
   aimPosition: {x: 0, y: 0, z: 0.22}
   armsPrefab: {fileID: 1704116841025237427, guid: 855c1fdba4bdeb6c0a4d1afce89c22ac, type: 3}
   legsPrefab: {fileID: 998453660942267102, guid: 037e87019012a394a864824fa5440729, type: 3}
@@ -665,8 +665,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8778268712310417977}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.13885656, y: 0.085727364, z: 0.9719365, w: 0.1694374}
-  m_LocalPosition: {x: -0.02, y: -0.16700001, z: 0.265}
+  m_LocalRotation: {x: 0.15772137, y: 0.11459987, z: 0.9564245, w: 0.2173549}
+  m_LocalPosition: {x: -0.02, y: -0.172, z: 0.26}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

@@ -96,6 +96,10 @@ public class BombProjectile : MonoBehaviour
         _armed = true;
         _detonated = false;
 
+        // Thrown by the player: the enemies under it see it coming and get clear.
+        if (attacker != null && attacker.GetComponentInParent<EnemyAI>() == null)
+            EnemySquad.BombIncoming(target, spec.radius > 0f ? spec.radius : 6f, _flightTime);
+
         if (fuseLight != null)
         {
             fuseLight.enabled = true;

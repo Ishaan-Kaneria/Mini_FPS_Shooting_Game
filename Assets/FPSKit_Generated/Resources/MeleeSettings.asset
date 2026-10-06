@@ -10,30 +10,30 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 423a54b078a485bd38b7f9a063dfee7d, type: 3}
-  m_Name: MeleeSettings
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MeleeSettings
   punchRange: 2
   kickRange: 2.5
   coneDegrees: 45
-  lungeRange: 3
-  lungeStopDistance: 1.1
-  lungeMaxStep: 1.4
-  lungeSeconds: 0.14
+  lungeRange: 3.6
+  lungeStopDistance: 0.75
+  lungeMaxStep: 2.2
+  lungeSeconds: 0.11
   magnetism: 0.5
-  buttSeconds: 0.38
+  buttSeconds: 0.32
   buttRecovery: 0.12
   buttDamage:
     standard: 0.45
     elite: 0.18
     boss: 0.03
   chainWindow: 1.2
-  holsterSeconds: 0.2
+  holsterSeconds: 0.16
   drawSeconds: 0.34
   fistIdleSeconds: 1.8
-  jabSeconds: 0.26
-  crossSeconds: 0.32
-  jabRecovery: 0.18
-  crossRecovery: 0.3
+  jabSeconds: 0.22
+  crossSeconds: 0.26
+  jabRecovery: 0.12
+  crossRecovery: 0.2
   jabDamage:
     standard: 0.6
     elite: 0.2
@@ -44,8 +44,8 @@ MonoBehaviour:
     boss: 0.05
   jabStagger: 0.35
   crossStagger: 0.6
-  kickSeconds: 0.56
-  kickRecovery: 0.7
+  kickSeconds: 0.46
+  kickRecovery: 0.5
   kickDamage:
     standard: 0.35
     elite: 0.15
@@ -61,7 +61,7 @@ MonoBehaviour:
     standard: 1.2
     elite: 1.2
     boss: 0.12
-  takedownSeconds: 0.48
+  takedownSeconds: 0.4
   takedownRecovery: 0.35
   maxStamina: 100
   jabCost: 16

@@ -64,7 +64,14 @@ public class EnemyBody : MonoBehaviour
     [Tooltip("The longest it can be down before it gets up, settled or not.")]
     [Range(1f, 8f)] public float maxDownSeconds = 3.2f;
     [Tooltip("Seconds the get-up takes, from where it lies to standing.")]
-    [Range(0.3f, 2f)] public float getUpSeconds = 0.95f;
+    [Range(0.3f, 2f)] public float getUpSeconds = 0.75f;
+
+    [Header("Rage")]
+    [Tooltip("Seconds it fights in a rage after getting up from a kick: rifle slung, fists up, " +
+             "straight at the player.")]
+    [Range(0f, 20f)] public float rageSeconds = 7f;
+    [Tooltip("Seconds of the rage move (the fighter's 'charge fist') before it charges.")]
+    [Range(0f, 3f)] public float rageMoveSeconds = 1.25f;
 
     // ======================================================================
 
@@ -100,6 +107,18 @@ public class EnemyBody : MonoBehaviour
 
     /// <summary>On the ground or getting up from it.</summary>
     public bool IsDown => _down != Down.Up;
+
+    /// <summary>Up from a kick and out for blood: fists up, the rifle slung, straight at the player.</summary>
+    public bool Raging => Time.time < _rageUntil && (_health == null || !_health.IsDead);
+
+    /// <summary>Still roaring and squaring up, before the charge.</summary>
+    public bool Squaring => Time.time < _rageMoveUntil;
+
+    float _rageUntil = -1f, _rageMoveUntil = -1f, _actionUntil = -1f;
+    float _actionWeight;
+    int _actionLayer = -1;
+    float _lastStrikeWindup = -1f;
+    bool _slung;
 
     // ======================================================================
 
@@ -315,12 +334,19 @@ public class EnemyBody : MonoBehaviour
 
         if (gun != null && !_gunDropped && _rHand != null) gun.SetParent(_rHand, true);
 
+        // Thrown, not dropped: the chest takes the boot and the rest follows it, the body
+        // turning over as it goes.
         foreach (var body in GetComponentsInChildren<Rigidbody>())
         {
             if (body == null || body.isKinematic) continue;
-            body.linearVelocity = velocity * Random.Range(0.85f, 1.05f);
-            body.angularVelocity = Random.insideUnitSphere * 2f;
+            bool core = body.transform == _chest || body.transform == _spine || body.transform == _hips;
+            body.linearVelocity = velocity * (core ? Random.Range(1.05f, 1.2f) : Random.Range(0.75f, 0.95f));
+            body.angularVelocity = Random.insideUnitSphere * 4f + transform.right * Random.Range(3f, 6f);
         }
+
+        var gore = GetComponent<EnemyGore>();
+        if (gore != null && gore.library != null && _chest != null)
+            BloodFX.Burst(gore.library, _chest.position, velocity, 0.7f);
 
         _down = Down.Flying;
         _downStart = Time.time;
@@ -393,6 +419,76 @@ public class EnemyBody : MonoBehaviour
     }
 
     // ======================================================================
+    // The rage
+    // ======================================================================
+
+    /// <summary>
+    /// Back on its feet after a kick, it is angry: it slings the rifle, squares up with a
+    /// fighter's roar, and comes at the player with its fists for a while.
+    /// </summary>
+    void StartRage()
+    {
+        if (rageSeconds <= 0f || animator == null || _health == null || _health.IsDead) return;
+
+        _rageUntil = Time.time + rageSeconds;
+        _rageMoveUntil = Time.time + rageMoveSeconds;
+        PlayAction("Rage", rageMoveSeconds);
+        Sling(true);
+
+        var voice = GetComponent<EnemyVoice>();
+        if (voice != null) voice.OnAttack(false);
+    }
+
+    /// <summary>Plays one of the fighting moves over the body for a time.</summary>
+    void PlayAction(string trigger, float seconds)
+    {
+        if (animator == null) return;
+        if (_actionLayer < 0) _actionLayer = animator.GetLayerIndex("Action");
+        if (_actionLayer < 0) return;
+        animator.SetTrigger(trigger);
+        _actionUntil = Time.time + seconds;
+    }
+
+    void UpdateAction()
+    {
+        if (_actionLayer < 0 || animator == null) return;
+        float want = Time.time < _actionUntil ? 1f : 0f;
+        _actionWeight = Mathf.MoveTowards(_actionWeight, want, Time.deltaTime * 7f);
+        animator.SetLayerWeight(_actionLayer, _actionWeight);
+
+        // In a rage, every blow the brain lands is thrown as a fighter's strike, timed so the
+        // blow lands as the wind-up ends.
+        if (Raging && _ai != null && _ai.Attacking && _ai.WindupStart > _lastStrikeWindup)
+        {
+            _lastStrikeWindup = _ai.WindupStart;
+            PlayAction(Random.value < 0.5f ? "Strike" : "StrikeB", 0.8f);
+        }
+
+        if (!Raging && _slung) Sling(false);
+    }
+
+    /// <summary>The rifle across the back, or back in the hands.</summary>
+    void Sling(bool onBack)
+    {
+        if (gun == null || _gunDropped || _chest == null) return;
+        _slung = onBack;
+
+        if (onBack)
+        {
+            gun.SetParent(_chest, true);
+            gun.position = _chest.position - transform.forward * 0.2f + transform.up * 0.05f;
+            gun.rotation = Quaternion.LookRotation(Quaternion.AngleAxis(40f, transform.forward) * transform.up, -transform.forward);
+        }
+        else
+        {
+            gun.SetParent(transform, false);
+            gun.localPosition = _gunLocal;
+            gun.localRotation = _gunLocalRot;
+            gun.localScale = _gunLocalScale;
+        }
+    }
+
+    // ======================================================================
     // Posing, after the animation
     // ======================================================================
 
@@ -403,6 +499,8 @@ public class EnemyBody : MonoBehaviour
 
         bool alive = _health == null || !_health.IsDead;
         if (!alive) return;
+
+        UpdateAction();
 
         bool crawling = _ai != null && _ai.Crawling;
         if (crawling) Crawl();
@@ -415,8 +513,10 @@ public class EnemyBody : MonoBehaviour
             up = t * t * (3f - 2f * t);
         }
 
-        Aim(up);
-        HoldGun(up);
+        // A fighting move owns the body while it plays; the rifle is slung during the rage.
+        float free = up * (1f - _actionWeight);
+        Aim(free);
+        if (!_slung) HoldGun(free);
         React();
         ApplyBroken();
 
@@ -651,6 +751,7 @@ public class EnemyBody : MonoBehaviour
                 _ai.Downed = false;
                 _ai.Recover();
             }
+            StartRage();
         }
     }
 }

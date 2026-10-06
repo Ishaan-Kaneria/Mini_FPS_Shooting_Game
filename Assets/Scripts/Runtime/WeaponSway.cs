@@ -58,7 +58,8 @@ public class WeaponSway : MonoBehaviour
         float py = Mathf.Clamp(-mouseY * positionSway, -maxPositionSway, maxPositionSway);
 
         // --- bob from moving ----------------------------------------------
-        float speed01 = _motor != null && _motor.IsGrounded ? _motor.PlanarSpeed01 : 0f;
+        // Toned down by the movement asset: a steady gun while moving, not a swinging one.
+        float speed01 = (_motor != null && _motor.IsGrounded ? _motor.PlanarSpeed01 : 0f) * MovementSettings.Active.gunBob;
         _bobTimer += Time.deltaTime * bobFrequency * (0.5f + speed01);
 
         float bobX = Mathf.Cos(_bobTimer * 0.5f) * bobAmount * speed01;

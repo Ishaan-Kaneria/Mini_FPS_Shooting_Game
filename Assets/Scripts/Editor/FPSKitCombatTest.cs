@@ -347,14 +347,15 @@ namespace FPSKit.EditorTools
                             Notes.Append("\n  punch: game time never reached the cross");
                         }
 
+                        // The first blow has landed by now (a blow lands when the fist arrives).
+                        if (_punchTarget != null) _punchPoolAfter = _punchTarget.Current + _punchTarget.Shield;
+                        Notes.Append($"\n  after the butt: pool {_punchPoolAfter:0.0}");
+
                         if (melee != null && _punchTarget != null && !_punchTarget.IsDead)
                         {
                             var hit = melee.TryPunch();
-                            _punchPoolAfter = _punchTarget.Current + _punchTarget.Shield;
-                            Notes.Append($"\n  cross hit {(hit != null ? hit.name : "nothing")}: pool now {_punchPoolAfter:0.0}");
+                            Notes.Append($"\n  punch thrown at {(hit != null ? hit.name : "nothing")}");
                         }
-
-                        _punchKilled = _punchTarget != null && _punchTarget.IsDead;
                         _punchAt = Time.time;
                         Wait(30.0, Phase.PunchMiss);
                         return;
@@ -377,6 +378,13 @@ namespace FPSKit.EditorTools
                         {
                             if (Waiting()) return;
                             Notes.Append("\n  punch: game time never passed the cooldown");
+                        }
+
+                        // The punch has landed (or missed) by now: judge the pair.
+                        if (_punchTarget != null)
+                        {
+                            _punchPoolAfter = _punchTarget.Current + _punchTarget.Shield;
+                            _punchKilled = _punchTarget.IsDead;
                         }
 
                         var nearest = Nearest(player);

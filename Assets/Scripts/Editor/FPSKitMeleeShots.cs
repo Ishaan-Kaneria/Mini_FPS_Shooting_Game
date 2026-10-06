@@ -211,9 +211,13 @@ namespace FPSKit.EditorTools
 
                 // It stands and takes it: no attacks back, no walking off. Its body still
                 // reacts, which is the point.
+                var grunt = AssetDatabase.LoadAssetAtPath<EnemyArchetype>("Assets/FPSKit_Generated/Enemies/Grunt.asset");
+                if (grunt != null && _dummy.archetype == null) grunt.ApplyTo(_dummy.gameObject, 1f, 1f, 1f);
                 _dummy.attackDamage = 0f;
                 _dummy.rangedDamageMultiplier = 0f;
-                if (agent != null) agent.speed = 0f;
+                // Standing still to be photographed, except in the enemy walkthrough, where
+                // what it does once it is back up is the point.
+                if (agent != null && !_enemyScript) agent.speed = 0f;
             }
 
             Note($"player {(_player != null)} weapon {(_weapon != null)} arms {(_weapon != null && _weapon.HasArms)} melee {(_melee != null)} enemy {(_dummy != null)}");
@@ -441,18 +445,8 @@ namespace FPSKit.EditorTools
             });
             At(0.6f, () => { Face(); Shoot("enemy_standing"); });
 
-            // Where it is hit is where it moves.
-            At(0.2f, () => ShootPart(BodyPart.LeftArm, 4f));
-            At(0.07f, () => Shoot("hit_left_arm"));
-            At(0.7f, () => ShootPart(BodyPart.Neck, 1f));
-            At(0.07f, () => Shoot("hit_neck"));
-            At(0.7f, () => ShootPart(BodyPart.LowerTorso, 4f));
-            At(0.08f, () => Shoot("hit_belly"));
-            At(0.7f, () => ShootPart(BodyPart.RightShin, 4f));
-            At(0.08f, () => Shoot("hit_shin"));
-
             // The kick: thrown, down, and back up.
-            At(0.8f, () => { Face(); Note("kick hit " + Name(_melee.TryKick()) + " health " + (_dummy != null ? _dummy.GetComponent<Health>().Current.ToString("0") : "-")); });
+            At(0.2f, () => { Face(); Note("kick hit " + Name(_melee.TryKick()) + " health " + (_dummy != null ? _dummy.GetComponent<Health>().Current.ToString("0") : "-")); });
             At(s.kickSeconds * MeleeStrike.ImpactAt(MeleeStrike.Strike.Kick) + 0.05f, () => Shoot("kick_land"));
             At(0.2f, () => { Face(); Shoot("thrown_0.2s"); });
             At(0.35f, () => { Face(); Shoot("thrown_0.55s"); });
@@ -460,7 +454,20 @@ namespace FPSKit.EditorTools
             At(1.2f, () => { Face(); Shoot("down_later"); });
             At(0.8f, () => { Face(); Shoot("getting_up"); });
             At(0.6f, () => { Face(); Shoot("getting_up_2"); });
-            At(1.0f, () => { Face(); Shoot("back_up"); Note("downed after " + (_dummy != null && _dummy.Downed)); });
+            At(0.5f, () => { Face(); Shoot("back_up"); Note("downed after " + (_dummy != null && _dummy.Downed)); });
+            for (int i = 0; i < 6; i++)
+            {
+                int n = i;
+                At(0.5f, () =>
+                {
+                    Face();
+                    if (n % 2 == 0) Shoot("rage_" + n);
+                    var body = _dummy != null ? _dummy.GetComponent<EnemyBody>() : null;
+                    var brain = _dummy != null ? _dummy.GetComponent<EnemyBrain>() : null;
+                    float d = _dummy != null ? Vector3.Distance(_dummy.transform.position, _player.transform.position) : -1f;
+                    Note($"rage t{n}: raging {(body != null && body.Raging)} squaring {(body != null && body.Squaring)} doing '{(brain != null ? brain.Doing : "-")}' {d:0.0}m");
+                });
+            }
 
             return list;
         }

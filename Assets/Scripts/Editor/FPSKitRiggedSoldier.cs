@@ -322,10 +322,58 @@ namespace FPSKit.EditorTools
             var state = layer.stateMachine.AddState("Locomotion");
             state.motion = tree;
             layer.stateMachine.defaultState = state;
-            controller.layers = new[] { layer };
+
+            // The fighting moves, over everything: the rage after being kicked down and the
+            // blows it then throws. From the EEJANAI fighter set (Humanoid, so they play on
+            // this body). The layer's weight is EnemyBody's to raise and drop around each one,
+            // so between moves it is not there at all.
+            controller.AddParameter("Rage", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("Strike", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("StrikeB", AnimatorControllerParameterType.Trigger);
+
+            var actionMachine = new AnimatorStateMachine { name = "Action" };
+            AssetDatabase.AddObjectToAsset(actionMachine, controller);
+            var idle = actionMachine.AddState("Idle");
+            idle.motion = Clip("Stand--Idle");
+            actionMachine.defaultState = idle;
+
+            void Move(string name, string clip, string trigger, float speed)
+            {
+                var st = actionMachine.AddState(name);
+                st.motion = Fighter(clip);
+                st.speed = speed;
+                var into = actionMachine.AddAnyStateTransition(st);
+                into.AddCondition(AnimatorConditionMode.If, 0f, trigger);
+                into.duration = 0.08f;
+                into.canTransitionToSelf = false;
+                var back = st.AddTransition(idle);
+                back.hasExitTime = true;
+                back.exitTime = 0.92f;
+                back.duration = 0.1f;
+            }
+
+            Move("Rage", "charge fist", "Rage", 1.5f);
+            Move("Strike", "elbow chop", "Strike", 1.15f);
+            Move("StrikeB", "knee strike", "StrikeB", 1.1f);
+
+            var action = new AnimatorControllerLayer
+            {
+                name = "Action",
+                stateMachine = actionMachine,
+                defaultWeight = 0f,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+            };
+            controller.layers = new[] { layer, action };
 
             EditorUtility.SetDirty(controller);
             return controller;
+        }
+
+        static AnimationClip Fighter(string name)
+        {
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>($"Assets/EEJANAI_Team/FreeFighterAnimations/Animations/{name}.anim");
+            if (clip == null) Debug.LogWarning("[FPSKit] Rigged soldier: no fighter clip " + name);
+            return clip;
         }
 
         static AnimationClip Clip(string file)

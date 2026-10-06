@@ -22,9 +22,9 @@ using UnityEngine;
 ///   fists up.
 ///
 /// Damage is a share of the target's own pool by role (see <see cref="MeleeSettings"/>),
-/// dealt on the press so a strike counts as quickly as it is thrown, and booked to the
-/// body part the blow lands on, so the enemy's own reaction is in the right place. The
-/// sound, the shake and the hit-stop wait for the frame the blow lands on.
+/// dealt on the frame the fist or the boot actually arrives -- with the sound, the shake
+/// and the hit-stop -- so what is seen and what is felt are one moment, and booked to the
+/// body part the blow lands on. A target that has got away by then is missed.
 ///
 /// Reach is found, not aimed: whoever is closest to the crosshair within reach and a cone
 /// in front gets hit, as long as nothing solid is in between. A target just outside reach
@@ -179,8 +179,6 @@ public class MeleeStrike : MonoBehaviour
     float _lastStrikeTime = -99f;
     float _nextScan;
     bool _lunged;
-    bool _impactPending;
-    Strike _impactStrike;
 
     float _hitStopUntil;
     float _hitStopScale;
@@ -229,7 +227,7 @@ public class MeleeStrike : MonoBehaviour
         }
 
         if (supportHand != null) supportHand.SetActive(true);
-        _impactPending = false;
+        _pendingTarget = null;
         _strike = Strike.None;
         _fists = false;
         GunAway = 0f;
@@ -398,10 +396,15 @@ public class MeleeStrike : MonoBehaviour
 
         PlayClip(swingClip, strike == Strike.Kick ? 0.95f : 0.8f);
 
+        // The step in and the pull of the view happen now; the blow lands when the fist or
+        // the boot gets there (Animate), so what the eye sees and what the body feels are
+        // the same moment. A target that has got away by then is missed.
         if (target != null)
         {
             Close(target, range);
-            Hit(target, strike);
+            _pendingTarget = target;
+            _pendingStrike = strike;
+            _pendingRange = range;
         }
 
         if (strike != Strike.Kick) Punched?.Invoke(this, target);
@@ -454,7 +457,12 @@ public class MeleeStrike : MonoBehaviour
             _motor.TurnTowards(point, s.magnetism);
     }
 
-    void Hit(Health target, Strike strike)
+    Health _pendingTarget;
+    Strike _pendingStrike;
+    float _pendingRange;
+
+    /// <summary>Deals the blow. Returns whether it landed.</summary>
+    bool Hit(Health target, Strike strike)
     {
         var s = Settings;
         Transform cam = fpsCamera.transform;
@@ -487,16 +495,14 @@ public class MeleeStrike : MonoBehaviour
         };
 
         info.amount = target.ApplyDamage(info);
-        if (info.amount <= 0f) return;
+        if (info.amount <= 0f) return false;
 
-        _impactPending = true;
-        _impactStrike = strike;
         if (weapon != null) weapon.ReportHit(info);
 
-        if (target.IsDead) return;
+        if (target.IsDead) return true;
 
         var ai = target.GetComponent<EnemyAI>();
-        if (ai == null) return;
+        if (ai == null) return true;
 
         switch (strike)
         {
@@ -517,6 +523,7 @@ public class MeleeStrike : MonoBehaviour
                 break;
             }
         }
+        return true;
     }
 
     static EnemyArchetype.Role RoleOf(Health target)
@@ -698,6 +705,38 @@ public class MeleeStrike : MonoBehaviour
     // Drawing
     // ======================================================================
 
+    /// <summary>The landing: the thud, the jolt and the freeze -- longer on a blow that kills.</summary>
+    void Feel(Strike strike, bool killed)
+    {
+        var s = Settings;
+        float extra = killed ? 0.04f : 0f;
+        switch (strike)
+        {
+            case Strike.Kick:
+                PlayClip(hitClip, 1f);
+                if (_motor != null) _motor.AddShake(s.kickShake);
+                StartHitStop(s.kickHitStop + extra);
+                break;
+            case Strike.Takedown:
+                PlayClip(hitClip, 1f);
+                if (_motor != null) _motor.AddShake(s.takedownShake);
+                StartHitStop(s.takedownHitStop + extra);
+                break;
+            default:
+                PlayClip(hitClip, 0.9f);
+                if (_motor != null) _motor.AddShake(s.punchShake);
+                StartHitStop(s.punchHitStop + extra);
+                break;
+        }
+    }
+
+    /// <summary>Whether the target is still within a blow's reach of the eye.</summary>
+    bool Reaches(Health target, float reach)
+    {
+        Vector3 eye = fpsCamera.transform.position;
+        return (ClosestPoint(target, eye, out _) - eye).sqrMagnitude <= reach * reach;
+    }
+
     /// <summary>
     /// The impact beat (sound, shake, hit-stop) and the gun's part in each strike. Driven
     /// from timestamps rather than coroutines, so a domain reload mid-swing cannot leave
@@ -708,29 +747,14 @@ public class MeleeStrike : MonoBehaviour
         float k = StrikeProgress;
         bool swinging = k >= 0f;
 
-        if (_impactPending && (!swinging && Time.time >= _strikeStart || k >= ImpactAt(_impactStrike)))
+        if (_pendingTarget != null && (!swinging && Time.time >= _strikeStart || k >= ImpactAt(_pendingStrike)))
         {
-            _impactPending = false;
-            var s = Settings;
+            var target = _pendingTarget;
+            var strike = _pendingStrike;
+            _pendingTarget = null;
 
-            switch (_impactStrike)
-            {
-                case Strike.Kick:
-                    PlayClip(hitClip, 1f);
-                    if (_motor != null) _motor.AddShake(s.kickShake);
-                    StartHitStop(s.kickHitStop);
-                    break;
-                case Strike.Takedown:
-                    PlayClip(hitClip, 1f);
-                    if (_motor != null) _motor.AddShake(s.takedownShake);
-                    StartHitStop(s.takedownHitStop);
-                    break;
-                default:
-                    PlayClip(hitClip, 0.9f);
-                    if (_motor != null) _motor.AddShake(s.punchShake);
-                    StartHitStop(s.punchHitStop);
-                    break;
-            }
+            bool landed = !target.IsDead && Reaches(target, _pendingRange + 1.2f) && Hit(target, strike);
+            if (landed) Feel(strike, target.IsDead);
         }
 
         if (weapon == null) return;

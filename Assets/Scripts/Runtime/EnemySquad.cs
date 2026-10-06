@@ -49,7 +49,7 @@ public static class EnemySquad
     // ======================================================================
 
     /// <summary>How many may shoot at once, by how aggressive the level has made them.</summary>
-    public static int Shooters(float aggression) => Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(2f, 4f, aggression)), 1, 6);
+    public static int Shooters(float aggression) => Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(3f, 5f, aggression)), 1, 6);
 
     /// <summary>
     /// Asks for a turn to shoot. A turn lasts a few seconds, then must be asked for again,
@@ -62,7 +62,9 @@ public static class EnemySquad
         {
             if (Time.time < until) return true;
             _turns.Remove(brain);
-            return false;        // a breather before asking again
+            if (_turns.Count >= Shooters(aggression)) return false;
+            _turns[brain] = Time.time + Random.Range(2.5f, 4.5f);
+            return true;
         }
 
         if (_turns.Count >= Shooters(aggression)) return false;
@@ -104,9 +106,9 @@ public static class EnemySquad
         _tickedFrame = Time.frameCount;
         if (player == null || _all.Count == 0) return;
 
-        if (_nextRadio <= 0f) _nextRadio = Time.time + Random.Range(10f, 16f);
+        if (_nextRadio <= 0f) _nextRadio = Time.time + Random.Range(6f, 10f);
         if (Time.time < _nextRadio) return;
-        _nextRadio = Time.time + Random.Range(14f, 24f);
+        _nextRadio = Time.time + Random.Range(8f, 14f);
 
         // Somebody is already on it: the radio stays quiet.
         foreach (var b in _all)
@@ -124,7 +126,7 @@ public static class EnemySquad
         {
             Vector2 off = Random.insideUnitCircle * Random.Range(10f, 22f);
             b.HearReport(player.position + new Vector3(off.x, 0f, off.y));
-            if (++sent >= 2) break;
+            if (++sent >= 3) break;
         }
     }
 

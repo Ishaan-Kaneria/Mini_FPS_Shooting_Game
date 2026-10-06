@@ -148,7 +148,8 @@ public class Weapon : MonoBehaviour
     /// <summary>The reload the gun actually takes right now, in seconds.</summary>
     public float ReloadTime => data == null
         ? 0f
-        : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier * Mathf.Max(0.05f, BoostReloadTimeMultiplier));
+        : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier * Mathf.Max(0.05f, BoostReloadTimeMultiplier)
+                           * MovementSettings.Active.reloadTimeScale);
 
     /// <summary>
     /// Seconds between shots, with both fire rate multipliers folded in. This is the
@@ -412,13 +413,8 @@ public class Weapon : MonoBehaviour
         if (inputAllowed && (ControlSettings.Pressed(controls.reload) || MobileInput.ConsumeReload() || GameInput.PadPressed(GameAction.Reload)))
             TryReload();
 
-        // Breaking into a sprint drops the reload, the way it does in every shooter: the
-        // hands go to running. Only the moment the sprint starts -- a reload begun while
-        // already running carries on, or a touch player whose stick sits at the edge
-        // could never reload on the move at all.
-        bool sprinting = _motor != null && _motor.IsSprinting && _motor.PlanarSpeed01 > 0.1f;
-        if (sprinting && !_wasSprinting && IsReloading) CancelReload();
-        _wasSprinting = sprinting;
+        // Reloading on the run is allowed and is never cancelled by the sprint: changing a
+        // magazine while running is something a soldier does.
 
         UpdateSpread();
         UpdateAimAndKick();
@@ -497,8 +493,6 @@ public class Weapon : MonoBehaviour
     }
 
     // ======================================================================
-    bool _wasSprinting;
-
     void FireOnce()
     {
         if (IsReloading) return;

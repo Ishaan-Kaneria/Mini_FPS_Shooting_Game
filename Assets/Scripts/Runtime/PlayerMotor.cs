@@ -900,7 +900,7 @@ public class PlayerMotor : MonoBehaviour
         }
 
         // Breath: spent sprinting, back over a few seconds of anything else.
-        if (IsSprinting && planar.sqrMagnitude > 1f)
+        if (IsSprinting && planar.sqrMagnitude > 1f && !move.infiniteSprint)
             Stamina01 = Mathf.Max(0f, Stamina01 - Time.deltaTime / Mathf.Max(0.5f, move.sprintSeconds));
         else
             Stamina01 = Mathf.Min(1f, Stamina01 + Time.deltaTime / Mathf.Max(0.5f, move.recoverSeconds));

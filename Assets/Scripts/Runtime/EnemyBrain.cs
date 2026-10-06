@@ -50,18 +50,18 @@ public class EnemyBrain : MonoBehaviour
 
     [Header("Mind")]
     [Tooltip("Seconds between seeing the player and the first shot, at the easiest. A harder level shortens it.")]
-    [Range(0.1f, 2f)] public float reactionSeconds = 0.8f;
+    [Range(0.1f, 2f)] public float reactionSeconds = 0.5f;
     [Tooltip("Seconds it searches for a player it has lost before it settles down.")]
     [Range(5f, 90f)] public float searchSeconds = 28f;
     [Tooltip("Metres round its post it walks on a calm beat.")]
-    [Range(0f, 40f)] public float patrolRadius = 14f;
+    [Range(0f, 40f)] public float patrolRadius = 20f;
     [Tooltip("Share of its health below which it falls back to cover.")]
     [Range(0f, 1f)] public float fallBackAt = 0.3f;
 
     [Header("Moving, as shares of its full speed")]
-    [Range(0.1f, 1f)] public float walkPace = 0.42f;
-    [Range(0.1f, 1f)] public float carefulPace = 0.5f;
-    [Range(0.3f, 1.3f)] public float runPace = 1f;
+    [Range(0.1f, 1f)] public float walkPace = 0.55f;
+    [Range(0.1f, 1f)] public float carefulPace = 0.75f;
+    [Range(0.3f, 1.3f)] public float runPace = 1.25f;
 
     // ======================================================================
 
@@ -83,6 +83,7 @@ public class EnemyBrain : MonoBehaviour
     public Role Part { get; private set; }
 
     EnemyAI _ai;
+    EnemyBody _body;
     Health _health;
     EnemyWounds _wounds;
     NavMeshAgent _agent;
@@ -123,6 +124,7 @@ public class EnemyBrain : MonoBehaviour
         _health = GetComponent<Health>();
         _wounds = GetComponent<EnemyWounds>();
         _agent = GetComponent<NavMeshAgent>();
+        _body = GetComponent<EnemyBody>();
     }
 
     void OnEnable()
@@ -423,7 +425,7 @@ public class EnemyBrain : MonoBehaviour
             if (_ai.Arrived)
             {
                 _hasGoal = false;
-                _holdUntil = Time.time + Random.Range(3f, 9f);
+                _holdUntil = Time.time + Random.Range(1.5f, 4f);
             }
             return;
         }
@@ -431,8 +433,8 @@ public class EnemyBrain : MonoBehaviour
         _ai.Hold();
         if (Time.time < _holdUntil) { Doing = "standing watch"; return; }
 
-        if (patrolRadius > 0f && Random.value < 0.6f && RandomPoint(_post, patrolRadius, out _goal)) _hasGoal = true;
-        else _holdUntil = Time.time + Random.Range(2f, 6f);
+        if (patrolRadius > 0f && Random.value < 0.85f && RandomPoint(_post, patrolRadius, out _goal)) _hasGoal = true;
+        else _holdUntil = Time.time + Random.Range(1.5f, 3.5f);
     }
 
     /// <summary>Stops and looks at it, thinks, then goes to see -- carefully.</summary>
@@ -495,6 +497,24 @@ public class EnemyBrain : MonoBehaviour
 
         float distance = Vector3.Distance(transform.position, target.position);
 
+        // Up from a kick and angry: square up, then straight at the player with the fists.
+        if (_body != null && _body.Raging)
+        {
+            _ai.ReportState(EnemyAI.State.Chase);
+            if (_body.Squaring)
+            {
+                Doing = "squaring up";
+                _ai.Hold();
+                _ai.FaceTowards(target.position, 10f);
+                return;
+            }
+
+            Doing = "charging in a rage";
+            if (distance <= _ai.meleeRange && _ai.TryAttack()) return;
+            if (!_ai.Attacking) _ai.MoveTo(target.position, 1.3f);
+            return;
+        }
+
         // Hands only: in it goes, as fast as its legs allow.
         if (!_ai.ranged)
         {
@@ -519,49 +539,61 @@ public class EnemyBrain : MonoBehaviour
         if (!_fellBack && health <= fallBackAt)
         {
             _fellBack = true;
-            if (FindCover(target.position, 10f, 30f, out _cover)) { _hasCover = true; _hasGoal = false; }
+            if (FindCover(target.position, 10f, 30f, out _cover)) { _hasCover = true; _goal = _cover; _hasGoal = true; }
         }
 
+        // Bounding, the way infantry fight: run to a firing spot, stop, put a burst down,
+        // run to the next. Never standing in the open for long, never still for the sake of it.
         bool turn = _sees && Time.time >= _reactAt && EnemySquad.RequestTurn(this, Aggression);
 
         // Somebody in its face: no time for turns, it fights back.
         if (_sees && distance <= _ai.meleeRange + 0.5f && Time.time >= _reactAt) turn = true;
 
-        if (turn)
+        bool atSpot = !_hasGoal || _ai.Arrived;
+
+        if (turn && atSpot)
         {
             Doing = "firing";
             _ai.ReportState(EnemyAI.State.Attack);
             _ai.Hold();
-            _ai.FaceTowards(target.position, 10f);
-            _ai.TryAttack();
+            _ai.FaceTowards(target.position, 12f);
+            if (_ai.TryAttack()) _shotsHere++;
+
+            // A burst or two from one spot, then move: a shooter that stays put is a target.
+            if (_shotsHere >= _burstsPerSpot && !_ai.Attacking)
+            {
+                _shotsHere = 0;
+                _burstsPerSpot = Random.Range(1, 3);
+                _hasGoal = PickFiringSpot(target.position, distance, out _goal);
+            }
             return;
         }
 
         _ai.ReportState(EnemyAI.State.Chase);
 
-        // Can see but must wait: stay in cover, or get into some.
-        if (_hasCover && !_ai.Arrived)
+        // On its way somewhere: keep going, fast.
+        if (_hasGoal && !_ai.Arrived)
         {
-            Doing = "moving to cover";
-            _ai.MoveTo(_cover, runPace);
+            Doing = _hasCover ? "running to cover" : "repositioning";
+            _ai.MoveTo(_goal, runPace);
             return;
         }
 
+        // Waiting for a turn, or the player is out of sight: never more than a moment's pause.
         if (_sees)
         {
-            if (Time.time >= _nextCoverPick && !_hasCover)
+            if (Time.time >= _nextMove)
             {
-                _nextCoverPick = Time.time + 2.5f;
-                if (FindCover(target.position, 6f, _ai.attackRange, out _cover)) { _hasCover = true; return; }
+                _nextMove = Time.time + Random.Range(1.2f, 2.6f);
+                _hasGoal = PickFiringSpot(target.position, distance, out _goal);
             }
-
-            Doing = _hasCover ? "in cover" : "holding";
+            Doing = "covering";
             _ai.Hold();
-            _ai.FaceTowards(target.position, 6f);
+            _ai.FaceTowards(target.position, 8f);
             return;
         }
 
-        // Cannot see the player: the role decides.
+        // Out of sight: the role decides how it gets a line again.
         _hasCover = false;
         switch (Part)
         {
@@ -579,11 +611,42 @@ public class EnemyBrain : MonoBehaviour
                 _ai.MoveTo(_lastKnown, runPace);
                 break;
             default:
-                // A rifleman edges up to where it last had a line, and waits for it.
-                Doing = "edging up";
-                _ai.MoveTo(Vector3.Lerp(transform.position, _lastKnown, 0.5f), carefulPace);
+                Doing = "moving up";
+                _ai.MoveTo(Vector3.Lerp(transform.position, _lastKnown, 0.7f), runPace * 0.85f);
                 break;
         }
+    }
+
+    int _shotsHere;
+    int _burstsPerSpot = 1;
+    float _nextMove;
+
+    /// <summary>
+    /// Where to fire from next: cover if there is some near, otherwise a spot a few metres
+    /// off to one side or the other at a fighting distance -- moving across the player's
+    /// aim rather than along it, and keeping the range it fights best at.
+    /// </summary>
+    bool PickFiringSpot(Vector3 threat, float distance, out Vector3 spot)
+    {
+        float want = Mathf.Clamp(_ai.preferredRangedDistance > 0f ? _ai.preferredRangedDistance : 14f, 6f, _ai.attackRange * 0.9f);
+        if (Random.value < 0.45f && FindCover(threat, 6f, _ai.attackRange * 0.95f, out spot))
+        {
+            _hasCover = true;
+            return true;
+        }
+        _hasCover = false;
+
+        Vector3 from = (transform.position - threat);
+        from.y = 0f;
+        if (from.sqrMagnitude < 0.01f) from = -transform.forward;
+        from.Normalize();
+
+        // Across: a sidestep of four to nine metres, and in or out towards the range it wants.
+        Vector3 side = Vector3.Cross(Vector3.up, from) * (Random.value < 0.5f ? -1f : 1f);
+        Vector3 goal = threat + from * want + side * Random.Range(4f, 9f);
+        if (NavMesh.SamplePosition(goal, out var hit, 4f, NavMesh.AllAreas)) { spot = hit.position; return true; }
+        spot = transform.position;
+        return false;
     }
 
     // ---- helpers ----------------------------------------------------------------

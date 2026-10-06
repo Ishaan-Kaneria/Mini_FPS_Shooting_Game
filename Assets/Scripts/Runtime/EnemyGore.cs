@@ -155,7 +155,8 @@ public class EnemyGore : MonoBehaviour
             return;
         }
 
-        BloodFX.Hit(library, info.point, info.normal, info.direction, info.fromMelee ? severity * 0.4f : severity);
+        // A blow bleeds too: a split lip, a broken nose. Not a round's exit wound, but plenty.
+        BloodFX.Hit(library, info.point, info.normal, info.direction, info.fromMelee ? Mathf.Max(0.5f, severity * 0.8f) : severity);
 
         if (!BloodFX.Enabled) return;
 
@@ -168,6 +169,11 @@ public class EnemyGore : MonoBehaviour
     void OnDied(Health health)
     {
         if (library == null || !isActiveAndEnabled) return;
+
+        // The death blow: the big spray, at the wound, along the blow.
+        var blow = health.LastDamage;
+        BloodFX.Burst(library, blow.point.sqrMagnitude > 0.01f ? blow.point : transform.position + Vector3.up * 1.2f,
+                      blow.direction, blow.fromBlast ? 1.4f : 1f);
         StartCoroutine(PoolWhenSettled());
     }
 

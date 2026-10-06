@@ -66,7 +66,7 @@ public class MeleeSettings : ScriptableObject
 
     [Header("The chain: rifle butt, then the gun goes on the back and the fists come up")]
     [Tooltip("Seconds the rifle-butt strike takes: the first press, with the gun still in the hands.")]
-    [Range(0.2f, 1f)] public float buttSeconds = 0.42f;
+    [Range(0.2f, 1f)] public float buttSeconds = 0.38f;
     [Tooltip("Seconds after the butt strike before the next press can start.")]
     [Range(0.05f, 1f)] public float buttRecovery = 0.12f;
     [Tooltip("Share of the target's pool the rifle butt takes.")]
@@ -75,7 +75,7 @@ public class MeleeSettings : ScriptableObject
              "fight on: after the butt it puts the gun on the back and throws fists.")]
     [Range(0.2f, 3f)] public float chainWindow = 1.2f;
     [Tooltip("Seconds to swing the gun onto the back. The first punch lands as it goes.")]
-    [Range(0.1f, 0.8f)] public float holsterSeconds = 0.26f;
+    [Range(0.1f, 0.8f)] public float holsterSeconds = 0.2f;
     [Tooltip("Seconds to bring the gun back off the back into the hands.")]
     [Range(0.1f, 0.8f)] public float drawSeconds = 0.34f;
     [Tooltip("With the fists up and no strike for this long, the gun comes back. Firing, " +
@@ -84,14 +84,14 @@ public class MeleeSettings : ScriptableObject
 
     [Header("Punch: jab and cross, alternating")]
     [Tooltip("Seconds the jab takes, out and back.")]
-    [Range(0.15f, 0.8f)] public float jabSeconds = 0.3f;
+    [Range(0.15f, 0.8f)] public float jabSeconds = 0.26f;
     [Tooltip("Seconds the cross takes. A little longer: the whole body turns into it.")]
-    [Range(0.15f, 0.8f)] public float crossSeconds = 0.38f;
+    [Range(0.15f, 0.8f)] public float crossSeconds = 0.32f;
     [Tooltip("Seconds after a jab before another strike can start. Short, so the cross " +
              "can follow it at once.")]
     [Range(0.05f, 1f)] public float jabRecovery = 0.18f;
     [Tooltip("Seconds after the cross before the next strike: the combo's end.")]
-    [Range(0.1f, 1.5f)] public float crossRecovery = 0.45f;
+    [Range(0.1f, 1.5f)] public float crossRecovery = 0.3f;
     [Tooltip("Share of the target's pool the jab takes.")]
     public Shares jabDamage = new Shares(0.6f, 0.2f, 0.03f);
     [Tooltip("Share the cross takes. The butt and one punch put an ordinary enemy down.")]
@@ -103,9 +103,9 @@ public class MeleeSettings : ScriptableObject
 
     [Header("Kick")]
     [Tooltip("Seconds the kick takes, chamber to foot down.")]
-    [Range(0.3f, 1.4f)] public float kickSeconds = 0.78f;
+    [Range(0.3f, 1.4f)] public float kickSeconds = 0.56f;
     [Tooltip("Seconds after a kick before any strike can start. Longer than a punch's.")]
-    [Range(0.2f, 3f)] public float kickRecovery = 1.1f;
+    [Range(0.2f, 3f)] public float kickRecovery = 0.7f;
     [Tooltip("Share of the target's pool the kick takes.")]
     public Shares kickDamage = new Shares(0.35f, 0.15f, 0.03f);
     [Tooltip("Speed, in metres a second, an ordinary enemy is thrown back at. It flies, lands " +
@@ -128,7 +128,7 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Share of the target's pool the takedown takes. Over 1 for anything it should end.")]
     public Shares takedownDamage = new Shares(1.2f, 1.2f, 0.12f);
     [Tooltip("Seconds the finishing blow takes.")]
-    [Range(0.3f, 1.2f)] public float takedownSeconds = 0.55f;
+    [Range(0.3f, 1.2f)] public float takedownSeconds = 0.48f;
     [Tooltip("Seconds after a takedown before the next strike.")]
     [Range(0.1f, 2f)] public float takedownRecovery = 0.35f;
 

@@ -147,7 +147,7 @@ public static class BloodFX
 
         // Droplets out of the far side, along the round. Most of what the eye reads as
         // "that went through him".
-        int drops = Mathf.Max(3, Mathf.RoundToInt(library.dropsPerHit * (0.35f + 0.65f * severity) * DropScale));
+        int drops = Mathf.Max(6, Mathf.RoundToInt(library.dropsPerHit * (0.6f + 1.4f * severity) * DropScale));
         Spray(point, direction, 2.2f + 4.5f * severity, drops, library.dropColor);
 
         // A few back toward the shooter, slower.
@@ -162,9 +162,33 @@ public static class BloodFX
             Splat(wall.point, wall.normal, Random.Range(0.3f, 0.55f) + 0.7f * severity, direction);
         }
 
-        // And the floor under the wound.
-        if (Random.value < 0.4f + 0.5f * severity)
-            Drip(point + Random.insideUnitSphere * 0.35f, Random.Range(0.14f, 0.26f) + 0.25f * severity);
+        // And the floor under the wound: a heavy hit throws several, out along the round.
+        int floorDrops = 1 + Mathf.RoundToInt(3f * severity);
+        for (int i = 0; i < floorDrops; i++)
+            Drip(point + direction * Random.Range(0f, 1.2f * severity) + Random.insideUnitSphere * 0.4f,
+                 Random.Range(0.16f, 0.3f) + 0.3f * severity);
+    }
+
+    /// <summary>
+    /// A body taking its death blow, or being kicked off its feet: the big one. Two heavy
+    /// sprays along the blow, a thick mist, and the ground spattered out to a metre or two.
+    /// </summary>
+    public static void Burst(BloodLibrary library, Vector3 point, Vector3 direction, float strength = 1f)
+    {
+        if (!Ensure(library) || !Enabled) return;
+        if (direction.sqrMagnitude < 0.0001f) direction = Vector3.forward;
+        direction.Normalize();
+
+        Hit(library, point, -direction, direction, 1f);
+        Hit(library, point + Random.insideUnitSphere * 0.15f, Vector3.up, (direction + Vector3.up * 0.5f).normalized, strength);
+        Mist(point, Vector3.up * 0.6f + direction * 0.8f, 0.6f * strength, library.mistColor, 6);
+
+        int spots = 3 + Mathf.RoundToInt(4f * strength);
+        for (int i = 0; i < spots; i++)
+        {
+            Vector2 r = Random.insideUnitCircle * 1.6f * strength;
+            Drip(point + direction * Random.Range(0.2f, 1.8f) * strength + new Vector3(r.x, 0f, r.y), Random.Range(0.2f, 0.45f));
+        }
     }
 
     /// <summary>A drop or two falling from a wounded body onto the floor under it.</summary>
@@ -244,8 +268,9 @@ public static class BloodFX
 
             emit.position = at + Random.insideUnitSphere * 0.04f;
             emit.velocity = v;
-            emit.startSize = Random.Range(0.018f, 0.05f);
-            emit.startLifetime = Random.Range(0.35f, 0.8f);
+            // Big enough to read as blood at fighting range: a few were drops, most were dust.
+            emit.startSize = Random.Range(0.03f, 0.09f);
+            emit.startLifetime = Random.Range(0.45f, 0.95f);
             emit.startColor = color;
 
             s_spray.Emit(emit, 1);

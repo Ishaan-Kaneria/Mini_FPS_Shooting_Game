@@ -3867,13 +3867,13 @@ MonoBehaviour:
   closeSense: 2.5
   noticeSeconds: 1.1
   hearing: 1
-  reactionSeconds: 0.8
+  reactionSeconds: 0.5
   searchSeconds: 28
-  patrolRadius: 14
+  patrolRadius: 20
   fallBackAt: 0.3
-  walkPace: 0.42
-  carefulPace: 0.5
-  runPace: 1
+  walkPace: 0.55
+  carefulPace: 0.75
+  runPace: 1.25
 --- !u!114 &4744877920839733982
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3928,7 +3928,9 @@ MonoBehaviour:
   reactionScale: 1
   lieSeconds: 0.7
   maxDownSeconds: 3.2
-  getUpSeconds: 0.95
+  getUpSeconds: 0.75
+  rageSeconds: 7
+  rageMoveSeconds: 1.25
 --- !u!1 &6997618155838552525
 GameObject:
   m_ObjectHideFlags: 0

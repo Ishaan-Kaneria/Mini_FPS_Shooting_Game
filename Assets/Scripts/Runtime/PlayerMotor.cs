@@ -92,6 +92,10 @@ public class PlayerMotor : MonoBehaviour
     /// </summary>
     [System.NonSerialized] public float ConditionMultiplier = 1f;
 
+    /// <summary>The speeds actually in use (MovementSettings), not the ones the scene was built with.</summary>
+    public float JogSpeedNow => MovementSettings.Active.jogSpeed;
+    public float SprintSpeedNow => MovementSettings.Active.sprintSpeed;
+
     /// <summary>Breath for sprinting, 0 (blown) to 1 (full). See <see cref="MovementSettings"/>.</summary>
     public float Stamina01 { get; private set; } = 1f;
 

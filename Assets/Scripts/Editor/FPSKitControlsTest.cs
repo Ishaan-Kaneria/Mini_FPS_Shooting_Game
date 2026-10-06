@@ -414,7 +414,7 @@ namespace FPSKit.EditorTools
 
         static void EndBurst(PlayerMotor motor, Weapon weapon)
         {
-            float speed = _peak * motor.sprintSpeed;
+            float speed = _peak * motor.SprintSpeedNow;
 
             Notes.Append($"\n    step {_step}: peak {speed:0.00} m/s  grounded={motor.IsGrounded} " +
                          $"sprinting={motor.IsSprinting} crouching={motor.IsCrouching} " +
@@ -435,7 +435,7 @@ namespace FPSKit.EditorTools
                 // still moving two thirds of a second after the only key down was
                 // sprint.
                 case 4:
-                    _sprintAlone = motor.PlanarSpeed01 * motor.sprintSpeed;
+                    _sprintAlone = motor.PlanarSpeed01 * motor.SprintSpeedNow;
                     _drivesForward = motor.controls == null || motor.controls.sprintDrivesForward;
                     break;
 

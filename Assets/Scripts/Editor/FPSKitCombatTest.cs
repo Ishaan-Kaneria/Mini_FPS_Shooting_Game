@@ -422,7 +422,7 @@ namespace FPSKit.EditorTools
         static void Inspect()
         {
             var motor = UnityEngine.Object.FindAnyObjectByType<PlayerMotor>();
-            _playerWalkSpeed = motor != null ? motor.walkSpeed : 0f;
+            _playerWalkSpeed = motor != null ? motor.JogSpeedNow : 0f;
 
             foreach (var ai in Enemies())
             {

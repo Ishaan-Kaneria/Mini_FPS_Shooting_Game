@@ -344,9 +344,6 @@ public class EnemyBody : MonoBehaviour
             body.angularVelocity = Random.insideUnitSphere * 4f + transform.right * Random.Range(3f, 6f);
         }
 
-        var gore = GetComponent<EnemyGore>();
-        if (gore != null && gore.library != null && _chest != null)
-            BloodFX.Burst(gore.library, _chest.position, velocity, 0.7f);
 
         _down = Down.Flying;
         _downStart = Time.time;

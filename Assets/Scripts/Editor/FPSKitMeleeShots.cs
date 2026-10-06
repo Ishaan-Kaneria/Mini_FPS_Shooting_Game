@@ -318,7 +318,10 @@ namespace FPSKit.EditorTools
                 if (ai == null) { sb.Append(" [gone]"); continue; }
                 var b = ai.GetComponent<EnemyBrain>();
                 float d = Vector3.Distance(ai.transform.position, _player.transform.position);
-                sb.Append($" [{(b != null ? b.Mind.ToString() : "-")}/{(b != null ? b.Doing : ai.CurrentState.ToString())} {d:0}m s{(b != null ? b.Suspicion : 0f):0.0}]");
+                var ag = ai.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                sb.Append($" [{(b != null ? b.Mind.ToString() : "-")}/{(b != null ? b.Doing : ai.CurrentState.ToString())} {d:0}m" +
+                          $" shot{Time.time - ai.LastShotTime:0.0}s ago atk {ai.Attacking} v{(ag != null && ag.enabled ? ag.velocity.magnitude : 0f):0.0}" +
+                          $" {(b != null ? b.FightState : "")}]");
             }
             var h = _player.GetComponent<Health>();
             sb.Append($" playerHP {h.Current:0} shield {h.Shield:0}");

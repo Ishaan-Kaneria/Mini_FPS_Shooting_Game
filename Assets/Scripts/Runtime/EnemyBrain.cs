@@ -206,10 +206,14 @@ public class EnemyBrain : MonoBehaviour
     {
         _lastKnown = where;
         _lastKnownTime = Time.time;
+        // A plan is dropped only when the mind changes up a level; being told again what it
+        // already knows (every glance at a player in plain sight) must not wipe the move it
+        // is making -- that kept every rifleman rooted to its first firing spot.
         if (at > Mind)
         {
             if (at >= Awareness.Combat && Mind < Awareness.Combat) _reactAt = Time.time + ReactionTime;
             Mind = at;
+            _hasGoal = false;
         }
         if (Mind >= Awareness.Alert)
         {
@@ -222,7 +226,6 @@ public class EnemyBrain : MonoBehaviour
             Suspicion = Mathf.Max(Suspicion, 0.5f);
             _searchUntil = Time.time + searchSeconds * 0.5f;
         }
-        _hasGoal = false;
     }
 
     float Aggression => _ai != null ? _ai.Aggression : 0.5f;
@@ -422,7 +425,7 @@ public class EnemyBrain : MonoBehaviour
         {
             Doing = "on a walk";
             _ai.MoveTo(_goal, walkPace);
-            if (_ai.Arrived)
+            if (Reached(_goal))
             {
                 _hasGoal = false;
                 _holdUntil = Time.time + Random.Range(1.5f, 4f);
@@ -453,7 +456,7 @@ public class EnemyBrain : MonoBehaviour
         Doing = "going to look";
         _ai.ReportState(EnemyAI.State.Chase);
         _ai.MoveTo(_lastKnown, carefulPace);
-        if (_ai.Arrived)
+        if (Reached(_lastKnown) || _ai.Arrived && Time.time - _lastKnownTime > 4f)
         {
             // Nothing there: a look round, and the suspicion fades.
             _ai.Hold();
@@ -471,9 +474,21 @@ public class EnemyBrain : MonoBehaviour
         if (!_hasGoal)
         {
             Vector3 centre = _lastKnown;
-            if (_searchLeg == 0 || !RandomPoint(centre, 9f, out _goal)) _goal = centre;
+            if (_searchLeg == 0 || !RandomPoint(centre, 9f, out _goal))
+                _goal = NavMesh.SamplePosition(centre, out var onMesh, 6f, NavMesh.AllAreas) ? onMesh.position : centre;
             _searchLeg++;
             _hasGoal = true;
+            _legStart = Time.time;
+            _legFrom = Vector3.Distance(transform.position, _goal);
+        }
+
+        // A route that has taken it further away than it started, for a while, is the wrong
+        // one: a wall between, the way round too long. Try a point nearer instead.
+        if (Time.time - _legStart > 5f && Vector3.Distance(transform.position, _goal) > _legFrom + 4f)
+        {
+            _hasGoal = RandomPoint(Vector3.Lerp(transform.position, _lastKnown, 0.5f), 6f, out _goal);
+            _legStart = Time.time;
+            _legFrom = Vector3.Distance(transform.position, _goal);
         }
 
         Doing = Mind == Awareness.Alert ? "moving on the player" : "searching";
@@ -481,12 +496,14 @@ public class EnemyBrain : MonoBehaviour
         LookPoint = _goal + Vector3.up * 1.5f;
         Scan(1.5f);
 
-        if (_ai.Arrived)
+        if (_hasGoal && Reached(_goal))
         {
             _hasGoal = false;
             _ai.Hold();
         }
     }
+
+    float _legStart, _legFrom;
 
     /// <summary>The fight: shoot on a turn, otherwise cover, flank or push; fall back when hurt.</summary>
     void Fight()
@@ -549,7 +566,8 @@ public class EnemyBrain : MonoBehaviour
         // Somebody in its face: no time for turns, it fights back.
         if (_sees && distance <= _ai.meleeRange + 0.5f && Time.time >= _reactAt) turn = true;
 
-        bool atSpot = !_hasGoal || _ai.Arrived;
+        if (_hasGoal && Reached(_goal)) _hasGoal = false;
+        bool atSpot = !_hasGoal;
 
         if (turn && atSpot)
         {
@@ -565,15 +583,24 @@ public class EnemyBrain : MonoBehaviour
                 _shotsHere = 0;
                 _burstsPerSpot = Random.Range(1, 3);
                 _hasGoal = PickFiringSpot(target.position, distance, out _goal);
+                if (_hasGoal) _ai.MoveTo(_goal, runPace);
             }
             return;
         }
 
         _ai.ReportState(EnemyAI.State.Chase);
 
-        // On its way somewhere: keep going, fast.
-        if (_hasGoal && !_ai.Arrived)
+        // On its way somewhere: keep going, fast -- unless it has stopped getting anywhere,
+        // a spot it cannot reach; then it gives up on it.
+        if (_hasGoal)
         {
+            if (_agent != null && _agent.enabled && _agent.velocity.sqrMagnitude < 0.04f)
+            {
+                if (_stuckSince < 0f) _stuckSince = Time.time;
+                else if (Time.time - _stuckSince > 1.5f) { _hasGoal = false; _stuckSince = -1f; return; }
+            }
+            else _stuckSince = -1f;
+
             Doing = _hasCover ? "running to cover" : "repositioning";
             _ai.MoveTo(_goal, runPace);
             return;
@@ -584,8 +611,9 @@ public class EnemyBrain : MonoBehaviour
         {
             if (Time.time >= _nextMove)
             {
-                _nextMove = Time.time + Random.Range(1.2f, 2.6f);
+                _nextMove = Time.time + Random.Range(2.5f, 4f);
                 _hasGoal = PickFiringSpot(target.position, distance, out _goal);
+                if (_hasGoal) { _ai.MoveTo(_goal, runPace); return; }
             }
             Doing = "covering";
             _ai.Hold();
@@ -617,6 +645,18 @@ public class EnemyBrain : MonoBehaviour
         }
     }
 
+    /// <summary>The fight's bookkeeping, for a debug panel and the behaviour test.</summary>
+    public string FightState => $"bursts {_shotsHere}/{_burstsPerSpot} goal {(_hasGoal ? Vector3.Distance(transform.position, _goal).ToString("0.0") + "m" : "none")}";
+
+    /// <summary>Close enough to a spot to count as there, by its own position, not the agent's last path.</summary>
+    bool Reached(Vector3 spot)
+    {
+        Vector3 d = spot - transform.position;
+        d.y = 0f;
+        return d.sqrMagnitude < 1.5f * 1.5f;
+    }
+
+    float _stuckSince = -1f;
     int _shotsHere;
     int _burstsPerSpot = 1;
     float _nextMove;
@@ -629,7 +669,8 @@ public class EnemyBrain : MonoBehaviour
     bool PickFiringSpot(Vector3 threat, float distance, out Vector3 spot)
     {
         float want = Mathf.Clamp(_ai.preferredRangedDistance > 0f ? _ai.preferredRangedDistance : 14f, 6f, _ai.attackRange * 0.9f);
-        if (Random.value < 0.45f && FindCover(threat, 6f, _ai.attackRange * 0.95f, out spot))
+        if (Random.value < 0.35f && FindCover(threat, 6f, _ai.attackRange * 0.95f, out spot)
+            && (spot - transform.position).sqrMagnitude < 9f * 9f)
         {
             _hasCover = true;
             return true;
@@ -643,8 +684,19 @@ public class EnemyBrain : MonoBehaviour
 
         // Across: a sidestep of four to nine metres, and in or out towards the range it wants.
         Vector3 side = Vector3.Cross(Vector3.up, from) * (Random.value < 0.5f ? -1f : 1f);
-        Vector3 goal = threat + from * want + side * Random.Range(4f, 9f);
-        if (NavMesh.SamplePosition(goal, out var hit, 4f, NavMesh.AllAreas)) { spot = hit.position; return true; }
+        // Only part of the way to the range it likes in one move: a dash, not a relocation.
+        want = Mathf.Lerp(distance, want, 0.35f);
+        for (int i = 0; i < 3; i++)
+        {
+            Vector3 goal = threat + from * want + side * Random.Range(3f, 6f);
+            if (NavMesh.SamplePosition(goal, out var hit, 4f, NavMesh.AllAreas)
+                && (hit.position - transform.position).sqrMagnitude >= 3f * 3f)
+            {
+                spot = hit.position;
+                return true;
+            }
+            side = -side;
+        }
         spot = transform.position;
         return false;
     }
@@ -695,6 +747,9 @@ public class EnemyBrain : MonoBehaviour
 
             float range = Vector3.Distance(hit.position, threat);
             if (range < minRange || range > maxRange) continue;
+
+            // A move worth making: a step to the side of where it stands is not cover-seeking.
+            if ((hit.position - transform.position).sqrMagnitude < 3f * 3f) continue;
 
             bool hidden = Physics.Linecast(threatEye, hit.position + Vector3.up * 1.2f, _ai.sightBlockers, QueryTriggerInteraction.Ignore);
             if (!hidden) continue;

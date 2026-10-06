@@ -155,8 +155,9 @@ public class EnemyGore : MonoBehaviour
             return;
         }
 
-        // A blow bleeds too: a split lip, a broken nose. Not a round's exit wound, but plenty.
-        BloodFX.Hit(library, info.point, info.normal, info.direction, info.fromMelee ? Mathf.Max(0.5f, severity * 0.8f) : severity);
+        // A blow draws a little blood -- a split lip, a broken nose -- never a round's spray:
+        // a kick that sprays blood reads as fake (his note).
+        BloodFX.Hit(library, info.point, info.normal, info.direction, info.fromMelee ? Mathf.Min(0.15f, severity * 0.25f) : severity);
 
         if (!BloodFX.Enabled) return;
 
@@ -172,8 +173,10 @@ public class EnemyGore : MonoBehaviour
 
         // The death blow: the big spray, at the wound, along the blow.
         var blow = health.LastDamage;
-        BloodFX.Burst(library, blow.point.sqrMagnitude > 0.01f ? blow.point : transform.position + Vector3.up * 1.2f,
-                      blow.direction, blow.fromBlast ? 1.4f : 1f);
+        // Not for a beating: a body killed by fists or boots does not burst.
+        if (!blow.fromMelee)
+            BloodFX.Burst(library, blow.point.sqrMagnitude > 0.01f ? blow.point : transform.position + Vector3.up * 1.2f,
+                          blow.direction, blow.fromBlast ? 1.4f : 1f);
         StartCoroutine(PoolWhenSettled());
     }
 

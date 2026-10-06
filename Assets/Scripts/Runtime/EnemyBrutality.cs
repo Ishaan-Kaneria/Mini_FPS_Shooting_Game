@@ -172,15 +172,17 @@ public class EnemyBrutality : MonoBehaviour
         var joint = t.GetComponent<CharacterJoint>();
         if (joint != null)
         {
-            joint.lowTwistLimit = new SoftJointLimit { limit = -170f };
-            joint.highTwistLimit = new SoftJointLimit { limit = 170f };
-            joint.swing1Limit = new SoftJointLimit { limit = 150f };
-            joint.swing2Limit = new SoftJointLimit { limit = 150f };
+            // Loose, but inside what a CharacterJoint solves steadily: near 180 degrees it
+            // flips between limits every step and the limb buzzes.
+            joint.lowTwistLimit = new SoftJointLimit { limit = -100f };
+            joint.highTwistLimit = new SoftJointLimit { limit = 100f };
+            joint.swing1Limit = new SoftJointLimit { limit = 100f };
+            joint.swing2Limit = new SoftJointLimit { limit = 90f };
         }
 
         var body = t.GetComponent<Rigidbody>();
         if (body != null && !body.isKinematic)
-            body.angularVelocity += Random.onUnitSphere * 9f;
+            body.angularVelocity += Random.onUnitSphere * 5f;
     }
 
     // ======================================================================
@@ -235,12 +237,18 @@ public class EnemyBrutality : MonoBehaviour
         try { piece.tag = "Flesh"; } catch (UnityException) { }
 
         // The part on the corpse folds into the joint it came off at, and stops being a body.
+        // The joint goes first: a frozen bone still jointed to a moving body tugs it back
+        // every step, and the corpse shivers where the limb was.
         foreach (var t in cut)
         {
+            foreach (var j in t.GetComponents<Joint>()) Destroy(j);
             var rb = t.GetComponent<Rigidbody>();
             if (rb != null) { rb.isKinematic = true; rb.detectCollisions = false; }
             foreach (var c in t.GetComponents<Collider>()) c.enabled = false;
         }
+        // The piece starts inside the body it came off: it must not fight its way out of it.
+        foreach (var c in GetComponentsInChildren<Collider>())
+            if (c != null && c.enabled) Physics.IgnoreCollision(box, c);
         root.localScale = Vector3.one * 0.001f;
 
         // A raw end over the cut, on the body and on the piece, so what shows is a wound and

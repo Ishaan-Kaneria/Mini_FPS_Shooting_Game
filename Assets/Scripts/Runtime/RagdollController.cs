@@ -16,6 +16,12 @@ public class RagdollController : MonoBehaviour
     [Tooltip("Push applied at the point that landed the killing blow.")]
     public float deathImpulse = 6f;
 
+    [Tooltip("Seconds a corpse must lie nearly still before it is frozen where it lies.")]
+    [Min(0.1f)] public float settleSeconds = 0.6f;
+
+    [Tooltip("Seconds after which a corpse is frozen however it is moving.")]
+    [Min(1f)] public float maxSettleSeconds = 7f;
+
     public bool IsRagdolled { get; private set; }
 
     Rigidbody[] _bones;
@@ -60,6 +66,9 @@ public class RagdollController : MonoBehaviour
     /// <summary>Drops the character into physics, pushed by whatever killed it.</summary>
     public void Collapse()
     {
+        // Killed while already thrown (a kick, say): it only has to be let come to rest.
+        if (_settle != null) StopCoroutine(_settle);
+        _settle = StartCoroutine(Settle());
         if (IsRagdolled) return;
 
         SetRagdollActive(true);
@@ -116,12 +125,22 @@ public class RagdollController : MonoBehaviour
 
         if (animator != null) animator.enabled = !active;
         if (mainCollider != null) mainCollider.enabled = !active;
+        if (active && !_ignoringSelf) { IgnoreSelf(); _ignoringSelf = true; }
 
         foreach (var bone in _bones)
         {
             if (bone == null) continue;
 
             bone.isKinematic = !active;
+            if (active)
+            {
+                // Steadier joints, and no explosive push-out: Unity's default lets two
+                // overlapping parts shove apart at any speed, which reads as a shiver.
+                bone.solverIterations = 12;
+                bone.solverVelocityIterations = 4;
+                bone.maxDepenetrationVelocity = 1.5f;
+                bone.sleepThreshold = 0.05f;
+            }
             // Collisions stay on either way: alive, the kinematic bones are the body the
             // player bumps into and the rounds hit; dead or thrown, they are the ragdoll.
             bone.detectCollisions = true;
@@ -129,5 +148,54 @@ public class RagdollController : MonoBehaviour
             // Bone colliders stay enabled either way -- they are the hitboxes.
             if (active) bone.WakeUp();
         }
+    }
+
+    Coroutine _settle;
+    bool _ignoringSelf;
+
+    /// <summary>
+    /// The body's parts never collide with each other: only jointed pairs are kept apart by
+    /// the joints, and the rest (thigh on thigh, head on chest) sit close enough to overlap
+    /// and push at each other for ever.
+    /// </summary>
+    void IgnoreSelf()
+    {
+        var own = GetComponentsInChildren<Collider>();
+        for (int i = 0; i < own.Length; i++)
+            for (int j = i + 1; j < own.Length; j++)
+                if (own[i] != null && own[j] != null) Physics.IgnoreCollision(own[i], own[j]);
+    }
+
+    /// <summary>
+    /// Once it has come to rest, the corpse is frozen where it lies: no solver left running
+    /// to twitch it, and nothing to pay for a body that will not move again. A body thrown
+    /// by a kick is not dead and is left alone (that is EnemyBody's).
+    /// </summary>
+    System.Collections.IEnumerator Settle()
+    {
+        float start = Time.time, stillSince = -1f;
+        yield return new WaitForSeconds(0.8f);
+        while (IsRagdolled && Time.time - start < maxSettleSeconds)
+        {
+            bool still = true;
+            foreach (var bone in _bones)
+            {
+                if (bone == null || bone.isKinematic) continue;
+                if (bone.linearVelocity.sqrMagnitude > 0.2f * 0.2f || bone.angularVelocity.sqrMagnitude > 0.8f * 0.8f) { still = false; break; }
+            }
+            if (!still) stillSince = -1f;
+            else if (stillSince < 0f) stillSince = Time.time;
+            else if (Time.time - stillSince >= settleSeconds) break;
+            yield return new WaitForSeconds(0.1f);
+        }
+        if (!IsRagdolled || (_health != null && !_health.IsDead)) yield break;
+        foreach (var bone in _bones)
+        {
+            if (bone == null || bone.isKinematic) continue;
+            bone.linearVelocity = Vector3.zero;
+            bone.angularVelocity = Vector3.zero;
+            bone.isKinematic = true;
+        }
+        _settle = null;
     }
 }

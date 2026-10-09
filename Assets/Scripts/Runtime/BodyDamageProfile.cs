@@ -95,6 +95,47 @@ public class BodyDamageProfile : ScriptableObject
     [Tooltip("Time between bursts with a crippled arm, as a multiple.")]
     [Range(1f, 4f)] public float crippledArmFireInterval = 1.8f;
 
+    [Header("Knockdown and getting up")]
+    [Tooltip("Seconds it lies after a kick or a fall, once it has come to rest, for a healthy body: " +
+             "picked between these each time.")]
+    public Vector2 groundSeconds = new Vector2(1f, 2.5f);
+    [Tooltip("Extra seconds on the ground at full pain.")]
+    [Range(0f, 5f)] public float groundPainExtra = 1f;
+    [Tooltip("Extra seconds on the ground with any limb wounded or worse.")]
+    [Range(0f, 5f)] public float groundWoundedExtra = 0.5f;
+    [Tooltip("Seconds from the first push off the ground to standing: picked between these each time. " +
+             "Each get-up clip is played at whatever speed fits, within the limits below.")]
+    public Vector2 riseSeconds = new Vector2(1.5f, 2.5f);
+    [Tooltip("Extra rise seconds at full pain: it gets up heavier.")]
+    [Range(0f, 3f)] public float painRiseExtra = 0.5f;
+    [Tooltip("Pain at or above which it uses the slow, hurt get-ups.")]
+    [Range(0f, 1f)] public float slowRisePain = 0.5f;
+    [Tooltip("Slowest and fastest a get-up clip may be played to fit the rise time.")]
+    public Vector2 riseSpeedLimits = new Vector2(0.85f, 1.8f);
+    [Tooltip("Seconds the ragdoll's pose is blended into the get-up clip: picked between these.")]
+    public Vector2 riseBlendSeconds = new Vector2(0.3f, 0.5f);
+    [Tooltip("Seconds of recovery once standing -- a brief stagger, a hand to the knee, a look at the " +
+             "player -- before the weapon comes back up.")]
+    public Vector2 recoverSeconds = new Vector2(0.2f, 0.4f);
+    [Tooltip("Seconds to bring the rifle from the sling (or from the hand after a pick-up) back to the ready.")]
+    [Range(0.2f, 1.5f)] public float weaponRecoverSeconds = 0.5f;
+    [Tooltip("Seconds after it is fully up before it may shoot, at middling aggression: picked between " +
+             "these. A more aggressive (harder) enemy shortens it, a calmer one lengthens it.")]
+    public Vector2 holdFireAfterUp = new Vector2(0.4f, 0.8f);
+
+    [Header("The rifle in a fall")]
+    [Tooltip("Mass of the rifle, kilograms, when it is on the sling or on the ground.")]
+    [Range(1f, 10f)] public float rifleMass = 3.5f;
+    [Tooltip("Speed (m/s) of the fall below which the rifle always stays on the sling.")]
+    [Range(0f, 15f)] public float slingBelowSpeed = 4f;
+    [Tooltip("Speed (m/s) of the fall above which the rifle is always knocked out of the hands. In " +
+             "between, the chance of dropping it rises with the speed (a full kick is about 7.7).")]
+    [Range(0f, 20f)] public float dropAboveSpeed = 10f;
+    [Tooltip("Metres within which a dropped rifle is worth going back for.")]
+    [Range(0f, 15f)] public float pickUpReach = 5f;
+    [Tooltip("It will not go for a dropped rifle with the player nearer than this, metres.")]
+    [Range(0f, 30f)] public float pickUpPlayerDistance = 8f;
+
     public float For(BodyPart part) => part switch
     {
         BodyPart.Head => head,

@@ -257,6 +257,15 @@ public class EnemyWounds : MonoBehaviour
     float _burst;
     float _burstStart = -999f;
 
+    /// <summary>The body's rules and timings in force: this type's profile, or the fallback.</summary>
+    public BodyDamageProfile Body => Profile;
+
+    /// <summary>Any limb at Wounded or worse.</summary>
+    public bool AnyLimbHurt
+    {
+        get { foreach (var l in Limbs) if (State(l) >= LimbState.Wounded) return true; return false; }
+    }
+
     BodyDamageProfile Profile
     {
         get

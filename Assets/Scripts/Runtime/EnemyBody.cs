@@ -63,23 +63,15 @@ public class EnemyBody : MonoBehaviour
     [Tooltip("Scales every hit reaction. 0 turns them off.")]
     [Range(0f, 2f)] public float reactionScale = 1f;
 
-    [Header("Thrown")]
-    [Tooltip("Seconds it lies at least, once it has stopped moving. Each fall picks a time between this and the most.")]
-    [Range(0f, 3f)] public float lieSeconds = 1.5f;
-    [Tooltip("Seconds it lies at most, once it has stopped moving, before pain is added.")]
-    [Range(0.5f, 8f)] public float lieSecondsMax = 4f;
-    [Tooltip("Extra seconds on the ground at full pain.")]
-    [Range(0f, 6f)] public float painLieSeconds = 2.5f;
+    [Header("Thrown (the timings are the type's body profile: BodyDamageProfile, Knockdown)")]
     [Tooltip("The longest it can be in the air or rolling before it is treated as landed.")]
     [Range(1f, 8f)] public float maxDownSeconds = 4.5f;
     [Tooltip("Seconds the get-up takes without get-up clips (the old procedural kneel and stand).")]
     [Range(0.3f, 3f)] public float getUpSeconds = 1.6f;
-    [Tooltip("Seconds the ragdoll's pose is blended into the get-up clip's first frame: picked between these each time.")]
-    public Vector2 riseBlend = new Vector2(0.3f, 0.6f);
-    [Tooltip("How fast the long, even get-ups play when it is not hurt. The quick ones and the slow, hurt ones play as made.")]
-    [Range(0.8f, 2f)] public float quickRiseSpeed = 1.3f;
-    [Tooltip("Pain above which it gets up slowly.")]
-    [Range(0f, 1f)] public float slowRisePain = 0.5f;
+    [Tooltip("Newtons pulling a hand to the wound while it lies hurt.")]
+    [Range(0f, 80f)] public float groundClutchForce = 22f;
+    [Tooltip("Turn (N m s) of the small roll it makes on the ground now and then.")]
+    [Range(0f, 20f)] public float groundRollImpulse = 3.5f;
 
     [Header("Legs going")]
     [Tooltip("Metres a second it is thrown down at when both legs go: a fall, not a launch.")]
@@ -96,30 +88,30 @@ public class EnemyBody : MonoBehaviour
 
     /// <summary>
     /// The get-up clips (Assets/Animations/Mixamo/GetUp, states of the same name on the
-    /// "Injured" layer). Which way up it starts, when in the clip the body begins to move
-    /// (everything before is lying still), when it is up, and whether it is the slow, hurt one.
-    /// Measured on this body; see FPSKitRiggedSoldier.Injured. "Hurry" marks the long, even
-    /// get-ups that can be played faster (quickRiseSpeed) when it is not hurt; the quick ones
-    /// already have sharp moments in them, and sped up those read as a jolt.
+    /// "Injured" layer), trimmed to the getting up: which way up each starts, the clip time
+    /// the head first moves (everything before is lying still) and the time it is 90% of the
+    /// way up (the rest is standing about), and whether it is the slow, hurt one. Measured on
+    /// this body (head height through the clip). Each is played at whatever speed fits the
+    /// profile's rise time, within its limits.
     /// </summary>
     public struct RiseClip
     {
         public string state;
         public bool faceUp;
-        public float rise, upright;
-        public bool slow, hurry;
-        public RiseClip(string state, bool faceUp, float rise, float upright, bool slow, bool hurry)
-        { this.state = state; this.faceUp = faceUp; this.rise = rise; this.upright = upright; this.slow = slow; this.hurry = hurry; }
+        public float start, end;
+        public bool slow;
+        public RiseClip(string state, bool faceUp, float start, float end, bool slow)
+        { this.state = state; this.faceUp = faceUp; this.start = start; this.end = end; this.slow = slow; }
     }
 
     public static readonly RiseClip[] GetUps =
     {
-        new RiseClip("GetUp_KnockedDown", true, 0.6f, 1.6f, false, false),
-        new RiseClip("GetUp_Back", true, 2.4f, 5.7f, false, true),
-        new RiseClip("GetUp_Back_B", true, 1.4f, 5.7f, true, false),
-        new RiseClip("GetUp_Stomach", false, 1.6f, 5.6f, false, true),
-        new RiseClip("GetUp_Stomach_Zombie", false, 0.5f, 5.0f, false, false),
-        new RiseClip("GetUp_Stomach_B", false, 3.1f, 7.8f, true, false),
+        new RiseClip("GetUp_KnockedDown", true, 0.2f, 1.52f, false),
+        new RiseClip("GetUp_Back", true, 2.5f, 5.54f, false),
+        new RiseClip("GetUp_Back_B", true, 1.45f, 5.68f, true),
+        new RiseClip("GetUp_Stomach", false, 1.72f, 5.42f, false),
+        new RiseClip("GetUp_Stomach_Zombie", false, 0.5f, 2.68f, false),
+        new RiseClip("GetUp_Stomach_B", false, 3.35f, 7.96f, true),
     };
 
     // ======================================================================
@@ -166,8 +158,16 @@ public class EnemyBody : MonoBehaviour
     bool _hasHandPose;
     // After a get-up: when the rifle started back from the hand to the ready position.
     float _regripStart = -1f;
-    const float RegripSeconds = 0.6f;
-    bool GunFromHand => _hasHandPose && (_down != Down.Up || (_regripStart > 0f && Time.time - _regripStart < RegripSeconds));
+    float RegripSeconds => Profile != null ? Profile.weaponRecoverSeconds : 0.5f;
+    bool GunFromHand => _hasHandPose && (_down != Down.Up || Recovering || (_regripStart > 0f && Time.time - _regripStart < RegripSeconds));
+    // After standing: a brief recovery (stagger, hand to the knee, a look) before the regrip.
+    float _recoverStart = -1f, _recoverEnd = -1f;
+    bool _rageAfterRecover;
+    float _nextLife;
+    float _clutchUntil;
+    /// <summary>Standing again and getting itself together: no weapon yet.</summary>
+    public bool Recovering => _recoverEnd > 0f && Time.time < _recoverEnd;
+    BodyDamageProfile Profile => _wounds != null ? _wounds.Body : null;
     Quaternion[] _snapshot;
     Vector3 _snapHipsPos;
     Quaternion _snapHipsRot;
@@ -478,7 +478,7 @@ public class EnemyBody : MonoBehaviour
         {
             _ai.Downed = true;
             // Held until it is up again (Rise ends it with Recover).
-            _ai.ForceStagger(maxDownSeconds + lieSecondsMax + painLieSeconds + 10f);
+            _ai.ForceStagger(maxDownSeconds + 30f);
         }
         return true;
     }
@@ -505,10 +505,16 @@ public class EnemyBody : MonoBehaviour
         if (!landed) return;
         if (_lieFor < 0f)
         {
+            var p = Profile;
             float pain = _wounds != null ? _wounds.Pain : 0f;
-            _lieFor = Random.Range(lieSeconds, Mathf.Max(lieSeconds, lieSecondsMax)) + pain * painLieSeconds;
+            _lieFor = p != null
+                ? Random.Range(p.groundSeconds.x, Mathf.Max(p.groundSeconds.x, p.groundSeconds.y)) + pain * p.groundPainExtra
+                  + (_wounds.AnyLimbHurt ? p.groundWoundedExtra : 0f)
+                : Random.Range(1f, 2.5f);
             _stillSince = Time.time;
+            _nextLife = Time.time + Random.Range(0.3f, 0.8f);
         }
+        GroundLife();
         if (Time.time - _stillSince >= _lieFor || down > maxDownSeconds + _lieFor) Rise();
     }
 
@@ -588,17 +594,103 @@ public class EnemyBody : MonoBehaviour
 
         _down = Down.Up;
         _clipRise = false;
-        _regripStart = Time.time;
+
+        // Up, but not yet back in it: a moment to get itself together (and look for the player),
+        // then the weapon comes back to the ready, then a beat before the first shot.
+        var p = Profile;
+        float recover = crawl ? 0f : (p != null ? Random.Range(p.recoverSeconds.x, Mathf.Max(p.recoverSeconds.x, p.recoverSeconds.y)) : 0.3f);
+        _recoverStart = Time.time;
+        _recoverEnd = Time.time + recover;
+        _regripStart = _recoverEnd;
+        float weapon = RegripSeconds;
+        Vector2 hold = p != null ? p.holdFireAfterUp : new Vector2(0.4f, 0.8f);
+        float aggression = _ai != null ? _ai.Aggression : 0.5f;
+        float beat = Random.Range(hold.x, Mathf.Max(hold.x, hold.y)) * Mathf.Lerp(1.3f, 0.7f, aggression);
         if (_ai != null)
         {
             _ai.Downed = false;
             _ai.Recover();
+            _ai.ForceStagger(recover + weapon * 0.5f);
+            _ai.HoldFire(recover + weapon + beat);
         }
         // Up on two good legs it is angry; on a bad one it is not charging anybody.
         bool sound = _wounds == null || _wounds.Legs == EnemyWounds.LegState.Sound;
-        if (!crawl && sound && rageSeconds > 0f) StartRage();
-        else _wantSlung = false;
+        _rageAfterRecover = !crawl && sound && rageSeconds > 0f;
+        if (!_rageAfterRecover) _wantSlung = false;
     }
+
+    /// <summary>The recovery once standing: a stagger forward over the knees, a hand to the left knee, eased in and out.</summary>
+    void RecoverPose()
+    {
+        if (_recoverEnd <= 0f) return;
+        if (Time.time >= _recoverEnd)
+        {
+            _recoverEnd = -1f;
+            if (_rageAfterRecover) { _rageAfterRecover = false; StartRage(); }
+            return;
+        }
+        float span = Mathf.Max(0.05f, _recoverEnd - _recoverStart);
+        float t = (Time.time - _recoverStart) / span;
+        float w = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);   // in and out
+        if (_hips == null) return;
+        Turn(_spine, transform.right, 16f * w);
+        Turn(_chest, transform.right, 8f * w);
+        if (_lThigh != null && _lCalf != null)
+        {
+            Vector3 knee = _lCalf.position + transform.forward * 0.06f * transform.lossyScale.y;
+            SolveWeighted(_lUpper, _lLower, _lHand, knee, _lUpper.position + transform.TransformDirection(new Vector3(-0.6f, -0.3f, -0.2f)), w * 0.8f);
+        }
+    }
+
+    /// <summary>
+    /// Lying hurt is not lying still: now and then it groans, a hand goes to where it was hit,
+    /// or it rolls a little. Small pushes on the ragdoll, so every one is different.
+    /// </summary>
+    void GroundLife()
+    {
+        if (Time.time >= _nextLife)
+        {
+            _nextLife = Time.time + Random.Range(0.7f, 1.5f);
+            float r = Random.value;
+            if (r < 0.35f) { var voice = GetComponent<EnemyVoice>(); if (voice != null) voice.Groan(); }
+            else if (r < 0.75f) _clutchUntil = Time.time + Random.Range(0.5f, 0.9f);
+            else
+            {
+                // A little roll about the body's long axis, one way or the other.
+                Vector3 axis = (_head != null ? _head.position - _hips.position : transform.forward).normalized;
+                float push = groundRollImpulse * (Random.value < 0.5f ? -1f : 1f);
+                foreach (var t in new[] { _hips, _chest })
+                {
+                    var rb = t != null ? t.GetComponent<Rigidbody>() : null;
+                    if (rb != null && !rb.isKinematic) rb.AddTorque(axis * push, ForceMode.Impulse);
+                }
+            }
+        }
+
+        if (Time.time < _clutchUntil)
+        {
+            // The hand that is not hurt goes to the wound.
+            bool leftHurt = _wounds != null && _wounds.AtLeast(BodyPart.LeftArm, EnemyWounds.LimbState.Crippled);
+            var forearm = leftHurt ? _rLower : _lLower;
+            var rb = forearm != null ? forearm.GetComponent<Rigidbody>() : null;
+            Transform wound = WoundBone(_wounds != null ? _wounds.LastHitPart : BodyPart.Torso);
+            if (rb != null && !rb.isKinematic && wound != null)
+            {
+                Vector3 to = wound.position - forearm.position;
+                if (to.sqrMagnitude > 0.01f) rb.AddForce(to.normalized * groundClutchForce, ForceMode.Force);
+            }
+        }
+    }
+
+    Transform WoundBone(BodyPart part) => BodyParts.Limb(part) switch
+    {
+        BodyPart.LeftLeg => _lThigh,
+        BodyPart.RightLeg => _rThigh,
+        BodyPart.LeftArm => _lUpper,
+        BodyPart.RightArm => _rUpper,
+        BodyPart.Head => _neck != null ? _neck : _head,
+        _ => _hips,
+    };
 
     /// <summary>
     /// Off the ground, the way it landed. Face up or face down picks the clip; the root is
@@ -620,7 +712,8 @@ public class EnemyBody : MonoBehaviour
         LastFallFaceUp = faceUp;
         bool crawl = _ai != null && _ai.Crawling;
         float pain = _wounds != null ? _wounds.Pain : 0f;
-        bool slow = pain >= slowRisePain || (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound);
+        var prof = Profile;
+        bool slow = pain >= (prof != null ? prof.slowRisePain : 0.5f) || (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound);
 
         float start = 0f;
         if (crawl)
@@ -634,9 +727,13 @@ public class EnemyBody : MonoBehaviour
         {
             var pick = Pick(faceUp, slow);
             _riseState = pick.state;
-            _riseSpeed = (pick.hurry ? quickRiseSpeed : 1f) * Random.Range(0.94f, 1.06f);
-            start = Mathf.Max(0f, pick.rise - 0.2f);
-            _riseLength = (pick.upright - start) / _riseSpeed;
+            // Played at whatever speed fits the rise time, within the limits.
+            Vector2 seconds = prof != null ? prof.riseSeconds : new Vector2(1.5f, 2.5f);
+            Vector2 limits = prof != null ? prof.riseSpeedLimits : new Vector2(0.85f, 1.8f);
+            float want = Random.Range(seconds.x, Mathf.Max(seconds.x, seconds.y)) + pain * (prof != null ? prof.painRiseExtra : 0.5f);
+            _riseSpeed = Mathf.Clamp((pick.end - pick.start) / Mathf.Max(0.1f, want), limits.x, Mathf.Max(limits.x, limits.y));
+            start = pick.start;
+            _riseLength = (pick.end - start) / _riseSpeed;
         }
 
         // The root under the pelvis, on walkable ground.
@@ -665,7 +762,8 @@ public class EnemyBody : MonoBehaviour
         }
         if (_motor != null) _motor.SetRootMotion(true, crawl ? (faceUp ? EnemyMotor.Gait.CrawlUp : EnemyMotor.Gait.CrawlDown) : EnemyMotor.Gait.Still);
 
-        _riseBlendSeconds = Random.Range(Mathf.Min(riseBlend.x, riseBlend.y), Mathf.Max(riseBlend.x, riseBlend.y));
+        Vector2 blend = prof != null ? prof.riseBlendSeconds : new Vector2(0.3f, 0.5f);
+        _riseBlendSeconds = Random.Range(Mathf.Min(blend.x, blend.y), Mathf.Max(blend.x, blend.y));
         _clipRise = true;
         _down = Down.GettingUp;
         _getUpStart = Time.time;
@@ -888,6 +986,7 @@ public class EnemyBody : MonoBehaviour
         float free = up * (1f - _actionWeight);
         float pain = PainWeight();
         PainPose(pain * free);
+        RecoverPose();
         Aim(free * (1f - 0.7f * _gunDip));
         // The hands let go before the rifle goes over the shoulder, and take it again after it
         // comes back: the arms are never yanked off the grips in a frame.

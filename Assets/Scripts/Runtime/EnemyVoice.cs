@@ -143,6 +143,14 @@ public class EnemyVoice : MonoBehaviour
         Say(clip, huntVolume);
     }
 
+    /// <summary>A groan from someone lying hurt. Quiet, and never over a scream.</summary>
+    public void Groan()
+    {
+        if (_health == null || _health.IsDead || Time.time < _nextPain) return;
+        _nextPain = Time.time + painCooldown;
+        Say(VoiceBank.Pick(Voice?.pain), painVolume * 0.55f);
+    }
+
     /// <summary>The effort of an attack. Only on a swing: a rifle does the talking for a shot.</summary>
     public void OnAttack(bool shooting)
     {

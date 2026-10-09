@@ -1274,6 +1274,12 @@ public class EnemyAI : MonoBehaviour
     /// </summary>
     [System.NonSerialized] public bool Downed;
 
+    /// <summary>Not before this many seconds from now may it start an attack (getting its weapon back after a fall).</summary>
+    public void HoldFire(float seconds)
+    {
+        if (seconds > 0f) _nextAttackTime = Mathf.Max(_nextAttackTime, Time.time + seconds);
+    }
+
     /// <summary>Back on its feet: whatever stagger was running ends now.</summary>
     public void Recover() => _staggerUntil = Mathf.Min(_staggerUntil, Time.time);
 

@@ -158,6 +158,8 @@ namespace FPSKit.EditorTools
                 _d = null;
                 _a = Spawn("A_Alert", -2f);
                 _c = Spawn("C_Walker", 6f);
+                _b = Spawn("B_GunArmGone", 2f);
+                _e = Spawn("E_OffArmGone", -6f);
                 var camGo0 = new GameObject("TestCam");
                 _cam = camGo0.AddComponent<Camera>();
                 _cam.fieldOfView = 45f;
@@ -210,14 +212,19 @@ namespace FPSKit.EditorTools
                 s.Add((3.0f, () => { PictureFrom(_a, "P_alert_front", 0f, 2.6f); PictureFrom(_a, "P_alert_side", 90f, 2.4f); }));
                 s.Add((4.0f, () => { PictureFrom(_c, "P_walk_side", 90f, 3.2f); PictureFrom(_c, "P_walk_front", 20f, 3.2f); }));
                 for (int i = 1; i <= 11; i++) s.Add((0.5f * i + 0.6f, LogWalker));
+                for (int i = 0; i < 20; i++) { s.Add((0.6f + i * 0.05f, () => Hit(_b, BodyPart.RightArm))); s.Add((0.6f + i * 0.05f, () => Hit(_e, BodyPart.LeftArm))); }
+                s.Add((5.0f, () => { PictureFrom(_b, "P_pistol_left_hand", 30f, 2.4f); PictureFrom(_e, "P_pistol_right_hand", -30f, 2.4f); }));
+                s.Add((5.2f, CheckSidearms));
                 s.Add((6.0f, CheckPose));
                 s.Add((6.3f, () => PictureFrom(_a, "P_alert_front_late", 0f, 2.6f)));
+                s.Sort((x, y) => x.Item1.CompareTo(y.Item1));
                 return s;
             }
             if (_fallsOnly)
             {
                 s.Add((1f, () => Kick(_d)));
                 s.Add((45f, CheckFalls));
+                s.Sort((x, y) => x.Item1.CompareTo(y.Item1));
                 return s;
             }
             // A: twenty rounds through the left thigh, a tenth of a second apart.
@@ -473,6 +480,17 @@ namespace FPSKit.EditorTools
             Note($"    t={Time.time - _t0:0.0}: {v:0.00} m/s, MoveX {anim.GetFloat("MoveX"):0.00} MoveZ {anim.GetFloat("MoveZ"):0.00}, base state {(st.IsName("Move") ? "Move" : st.IsName("TurnLeft") ? "TurnLeft" : st.IsName("TurnRight") ? "TurnRight" : st.IsName("RunStart") ? "RunStart" : st.IsName("RunStop") ? "RunStop" : "other")}, remaining {agent.remainingDistance:0.0} m, stopped {agent.isStopped}, path {agent.hasPath}, animator speed {anim.speed:0.00}");
         }
 
+        static void CheckSidearms()
+        {
+            var b = _b.GetComponent<EnemyBody>();
+            var e = _e.GetComponent<EnemyBody>();
+            Note($"  gun arm gone (B): pistol hand {b.PistolHand}, rifle {_b.GetComponent<EnemyRifle>().State}, still ranged {_b.GetComponent<EnemyAI>().ranged}, spread x{_b.GetComponent<EnemyWounds>().AimSpreadMultiplier:0.0}");
+            Note($"  off arm gone (E): pistol hand {e.PistolHand}, rifle {_e.GetComponent<EnemyRifle>().State}, still ranged {_e.GetComponent<EnemyAI>().ranged}");
+            Require(b.PistolHand == -1, "a crippled gun arm puts the pistol in the left hand");
+            Require(e.PistolHand == 1, "a crippled off arm puts the pistol in the right hand");
+            Require(_b.GetComponent<EnemyRifle>().Stowed && _e.GetComponent<EnemyRifle>().Stowed, "the rifle goes on the back for the pistol");
+        }
+
         static void CheckPose()
         {
             var agent = _c.GetComponent<UnityEngine.AI.NavMeshAgent>();
@@ -483,7 +501,7 @@ namespace FPSKit.EditorTools
             Require(moved > 2f, "the walker walked (root motion moves the body)");
             Require(apart < 0.3f, "the agent follows the body");
             var rifle = _a.GetComponent<EnemyRifle>();
-            Note($"  A's rifle: {rifle.State}, left hand {rifle.LeftHandWant:0.00}, hand rig {_a.GetComponent<EnemyBody>().handRig.weight:0.00}");
+            Note($"  A's rifle: {rifle.State}, left hand {rifle.LeftHandWant:0.00}, left hand on the rifle {_a.GetComponent<EnemyBody>().LeftHandWeight:0.00}; B (pistol out) {_b.GetComponent<EnemyBody>().LeftHandWeight:0.00}");
             Require(rifle.State == EnemyRifle.Hold.Held, "A holds its rifle");
             Note("  " + Facings(_a, "with the aim rig"));
             

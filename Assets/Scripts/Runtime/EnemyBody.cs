@@ -56,9 +56,16 @@ public class EnemyBody : MonoBehaviour
     public Transform rifleSway;
     [Tooltip("On the handguard: where the left hand goes (the hand rig's target).")]
     public Transform leftHandTarget;
-    [Tooltip("Look targets for the head, chest and spine aim constraints. The head's leads.")]
-    public Transform lookHead, lookChest, lookSpine;
-    public UnityEngine.Animations.Rigging.Rig aimRig, handRig;
+    [Tooltip("Where the left elbow points while that hand is on the handguard.")]
+    public Transform leftElbowHint;
+
+    [Header("Sidearm (built by FPSKitRiggedSoldier)")]
+    [Tooltip("The pistol, in its holster until drawn.")]
+    public Transform pistol;
+    [Tooltip("Where the pistol sits drawn, in each hand; the holster on the thigh; its muzzle.")]
+    public Transform pistolSocketRight, pistolSocketLeft, pistolHolster, pistolMuzzle;
+    [Tooltip("Seconds to draw the pistol once the rifle is on the back.")]
+    [Range(0.1f, 1.5f)] public float drawSeconds = 0.4f;
 
     [Header("Holding")]
     [Tooltip("Where the rifle's pivot sits held at the ready, in the body's space (metres).")]
@@ -147,15 +154,14 @@ public class EnemyBody : MonoBehaviour
     Quaternion _aim = Quaternion.identity;
     bool _gunDropped;
     EnemyRifle _rifle;
-    int _carryLayer = -1;
+    int _carryLayer = -1, _sidearmLayer = -1;
+    float _handWeight = 1f;
+    float _sidearmWeight;
     float _carryWeight;
     string _carryState = "Low";
-    UnityEngine.Animations.Rigging.MultiAimConstraint _aimHead, _aimChest, _aimSpine;
-    Vector3 _lookHeadAt, _lookChestAt, _lookSpineAt;
-    bool _looking;
 
     /// <summary>The rifle and the rig that holds it: the hold of Stage 2. Without them, the old procedural hold.</summary>
-    bool Rigged => _rifle != null && _rifle.enabled && handRig != null;
+    bool Rigged => _rifle != null && _rifle.enabled && leftHandTarget != null;
 
     /// <summary>How far the rifle sags in pain, 0 to 1 (EnemyRifle lays it on its spring).</summary>
     public float GunDip => _gunDip;
@@ -242,19 +248,15 @@ public class EnemyBody : MonoBehaviour
         _agent = GetComponent<UnityEngine.AI.NavMeshAgent>();
         _motor = GetComponent<EnemyMotor>();
         _rifle = GetComponent<EnemyRifle>();
+        _breathPhase = Random.value * 6.28f;
         if (animator == null) animator = GetComponentInChildren<Animator>();
         if (animator != null)
         {
             _injuredLayer = animator.GetLayerIndex("Injured");
             _carryLayer = animator.GetLayerIndex("Carry");
+            _sidearmLayer = animator.GetLayerIndex("Sidearm");
         }
-        if (aimRig != null)
-            foreach (var c in aimRig.GetComponentsInChildren<UnityEngine.Animations.Rigging.MultiAimConstraint>())
-            {
-                if (c.name == "AimHead") _aimHead = c;
-                else if (c.name == "AimChest") _aimChest = c;
-                else if (c.name == "AimSpine") _aimSpine = c;
-            }
+
 
         if (animator != null && animator.avatar != null && animator.avatar.isHuman)
         {
@@ -382,6 +384,14 @@ public class EnemyBody : MonoBehaviour
         float strength = Mathf.Clamp(share * 4f, 0.3f, 1f) * (info.fromMelee ? 1.4f : 1f) * reactionScale;
 
         Hurt(info.part, strength);
+
+        // Everything below the neck is a physical reaction: the round's push on springs in the
+        // upper body (HitImpulse). The head keeps its own snap.
+        if (info.part != BodyPart.Head && info.part != BodyPart.Neck)
+        {
+            HitImpulse(info.point, dir, strength);
+            return;
+        }
 
         switch (info.part)
         {
@@ -512,7 +522,7 @@ public class EnemyBody : MonoBehaviour
 
         // The rifle goes with the fall: onto the sling, or out of the hands.
         if (Rigged) _rifle.OnFall(velocity);
-        if (handRig != null) handRig.weight = 0f;
+        _handWeight = 0f;
 
         _down = Down.Flying;
         _downStart = Time.time;
@@ -534,6 +544,7 @@ public class EnemyBody : MonoBehaviour
 
         LegsGoing();
         UpdateInjured();
+        UpdateSidearm();
         UpdateCarry();
         if (_down == Down.GettingUp && _clipRise) RiseProgress();
 
@@ -1038,12 +1049,20 @@ public class EnemyBody : MonoBehaviour
             float hurt = PainWeight();
             PainPose(hurt * arms);
             RecoverPose();
+            _rifle.Follow();
+            HoldPistol();
             RigAim(arms, crawling);
             RigHands(arms);
             Clutch(hurt * arms);
             HoldWoundedArms(arms);
             React();
             ApplyBroken();
+            if (crawling && _down == Down.Up) Breathe();
+            // The weapons onto where they are carried, after everything that moved the bones,
+            // then the left hand onto the handguard.
+            _rifle.Follow();
+            HoldPistol();
+            LeftHandOnRifle();
             if (_down == Down.GettingUp)
             {
                 if (_clipRise) BlendFromRagdoll(Smooth((Time.time - _getUpStart) / Mathf.Max(0.05f, _riseBlendSeconds)));
@@ -1085,7 +1104,7 @@ public class EnemyBody : MonoBehaviour
     /// </summary>
     void RigAim(float weight, bool crawling)
     {
-        bool armed = _rifle.InHands || _rifle.State == EnemyRifle.Hold.Recovering;
+        bool armed = _rifle.InHands || _rifle.State == EnemyRifle.Hold.Recovering || (_pistolHand != 0 && _drawn);
         bool sees = _brain != null ? _brain.WeaponUp && armed : _ai != null && _ai.target != null && _ai.HasSpotted && armed;
         float dt = Time.deltaTime;
         _aimWeight = Mathf.MoveTowards(_aimWeight, sees && !crawling ? 1f : 0f, dt * 3f);
@@ -1097,10 +1116,11 @@ public class EnemyBody : MonoBehaviour
 
         // The rifle's error from the target, measured on the clip's pose.
         float yawWant = 0f, pitchWant = 0f;
-        if (_aimWeight > 0.001f && gun != null)
+        Transform barrel = _pistolHand != 0 && _drawn && pistolMuzzle != null ? pistolMuzzle : gun;
+        if (_aimWeight > 0.001f && barrel != null)
         {
-            Vector3 bore = gun.forward;
-            Vector3 want = look - gun.position;
+            Vector3 bore = barrel.forward;
+            Vector3 want = look - barrel.position;
             yawWant = Mathf.Clamp(Vector3.SignedAngle(Flat(bore), Flat(want), Vector3.up), -aimLimit, aimLimit);
             pitchWant = Mathf.Clamp(Elevation(bore) - Elevation(want), -45f, 45f);
         }
@@ -1129,7 +1149,32 @@ public class EnemyBody : MonoBehaviour
 
     float _aimYaw, _aimPitch, _headYaw, _headPitch;
 
+    /// <summary>On the ground, alive: the chest rises and falls, faster and deeper in pain.</summary>
+    void Breathe()
+    {
+        float pain = _wounds != null ? _wounds.Pain : 0f;
+        float rate = Mathf.Lerp(0.25f, 0.55f, pain);
+        float depth = Mathf.Lerp(2f, 4.5f, pain);
+        float b = Mathf.Sin(Time.time * rate * Mathf.PI * 2f + _breathPhase) * depth;
+        Turn(_chest, transform.right, -b);
+        Turn(_neck, transform.right, b * 0.4f);
+    }
+
+    float _breathPhase;
+
     static float Elevation(Vector3 v) => Mathf.Asin(Mathf.Clamp(v.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+
+    /// <summary>The left hand onto the rifle's handguard, at the eased weight; the elbow out to its hint.</summary>
+    void LeftHandOnRifle()
+    {
+        if (_handWeight <= 0.001f || leftHandTarget == null || _lUpper == null || _lLower == null || _lHand == null) return;
+        Vector3 pole = leftElbowHint != null ? leftElbowHint.position : _lUpper.position + transform.TransformDirection(new Vector3(-0.5f, -0.8f, 0f));
+        SolveWeighted(_lUpper, _lLower, _lHand, leftHandTarget.position, pole, _handWeight);
+        _lHand.rotation = Quaternion.Slerp(_lHand.rotation, leftHandTarget.rotation, _handWeight);
+    }
+
+    /// <summary>The left hand's weight on the handguard, 0 to 1 (for the debug overlay and tests).</summary>
+    public float LeftHandWeight => _handWeight;
 
     /// <summary>
     /// The left hand on the handguard, eased on and off: never yanked. For a fist fight the hand
@@ -1141,14 +1186,83 @@ public class EnemyBody : MonoBehaviour
 
         float want = _rifle.LeftHandWant * arms * (1f - _leftOff);
         if (_wantSlung) want = 0f;
-        if (handRig != null) handRig.weight = Mathf.MoveTowards(handRig.weight, want, Time.deltaTime * 5f);
+        _handWeight = Mathf.MoveTowards(_handWeight, want, Time.deltaTime * 5f);
 
-        if (_wantSlung && _rifle.InHands && (handRig == null || handRig.weight < 0.05f)) _rifle.SetOnBack(true);
-        else if (!_wantSlung && _rifle.State == EnemyRifle.Hold.OnBack && _down == Down.Up && !Recovering) _rifle.SetOnBack(false);
+        if (_wantSlung && _rifle.InHands && _handWeight < 0.05f) _rifle.SetOnBack(true);
+        else if (!_wantSlung && !_needSidearm && _pistolHand == 0 && _rifle.State == EnemyRifle.Hold.OnBack && _down == Down.Up && !Recovering) _rifle.SetOnBack(false);
         _slung = _rifle.State == EnemyRifle.Hold.OnBack;
 
-        // Its rifle gone for good: it fights with its hands.
-        if (_rifle.Lost && _ai != null && _ai.ranged) _ai.Disarm();
+        // Its rifle gone for good and no sidearm to draw: it fights with its hands.
+        if (_rifle.Lost && pistol == null && _ai != null && _ai.ranged) _ai.Disarm();
+    }
+
+    // ======================================================================
+    // The sidearm
+    // ======================================================================
+
+    int _pistolHand;          // 0 holstered, 1 right hand, -1 left hand
+    bool _needSidearm;
+
+    /// <summary>The pistol: 0 holstered, 1 drawn in the right hand, -1 in the left (for the debug overlay and tests).</summary>
+    public int PistolHand => _drawn ? _pistolHand : 0;
+    bool _drawn;
+    float _drawStart = -1f;
+    Vector3 _drawFrom;
+    Quaternion _drawFromRot;
+
+    /// <summary>
+    /// One arm crippled, or the rifle gone for good: the rifle goes over the shoulder and the
+    /// pistol comes out into the good hand -- the left, if it is the gun arm that has gone.
+    /// Its muzzle becomes the one the shots and the flash come from.
+    /// </summary>
+    void UpdateSidearm()
+    {
+        _needSidearm = false;
+        if (!Rigged || pistol == null || _wounds == null || _pistolHand != 0) return;
+        bool rightGone = _wounds.AtLeast(BodyPart.RightArm, EnemyWounds.LimbState.Crippled);
+        bool leftGone = _wounds.AtLeast(BodyPart.LeftArm, EnemyWounds.LimbState.Crippled);
+        if (_wounds.Disarmed || (rightGone && leftGone)) return;
+        if (!(rightGone || leftGone || _rifle.Lost)) return;
+        _needSidearm = true;
+        if (_down != Down.Up || Recovering || _wantSlung) return;
+
+        // The rifle off the hands first (it is carried onto the back), then the draw.
+        if (_rifle.InHands) { _rifle.SetOnBack(true); return; }
+        if (_rifle.State == EnemyRifle.Hold.Stowing || _rifle.Busy) return;
+
+        _pistolHand = rightGone ? -1 : 1;
+        _drawStart = Time.time;
+        _drawFrom = transform.InverseTransformPoint(pistol.position);
+        _drawFromRot = Quaternion.Inverse(transform.rotation) * pistol.rotation;
+        if (_motor != null) _motor.PistolHand = _pistolHand;
+        _wounds.Sidearm = true;
+        if (_ai != null)
+        {
+            _ai.muzzlePoint = pistolMuzzle;
+            _ai.HoldFire(drawSeconds + 0.3f);
+            if (!_ai.ranged) _ai.Disarm();   // never: a disarmed body has no good hand
+        }
+    }
+
+    /// <summary>
+    /// The pistol where it is: in the holster, coming up into the hand, or in it. A child of the
+    /// root, laid on the holster or the hand's socket each frame (never parented into the skeleton).
+    /// </summary>
+    void HoldPistol()
+    {
+        if (pistol == null) return;
+        if (_pistolHand == 0)
+        {
+            if (pistolHolster != null) pistol.SetPositionAndRotation(pistolHolster.position, pistolHolster.rotation);
+            return;
+        }
+        var socket = _pistolHand > 0 ? pistolSocketRight : pistolSocketLeft;
+        if (socket == null) return;
+        float t = _drawn ? 1f : Smooth((Time.time - _drawStart) / Mathf.Max(0.05f, drawSeconds));
+        Vector3 from = pistolHolster != null ? pistolHolster.position : transform.TransformPoint(_drawFrom);
+        Quaternion fromRot = pistolHolster != null ? pistolHolster.rotation : transform.rotation * _drawFromRot;
+        pistol.SetPositionAndRotation(Vector3.Lerp(from, socket.position, t), Quaternion.Slerp(fromRot, socket.rotation, t));
+        if (t >= 1f) _drawn = true;
     }
 
     /// <summary>
@@ -1162,11 +1276,22 @@ public class EnemyBody : MonoBehaviour
         bool limping = !crawling && _wounds != null && _wounds.Legs == EnemyWounds.LegState.Limping;
         bool calm = _brain != null && !_brain.WeaponUp;
         bool held = _rifle.InHands;
-        float want = held && _down == Down.Up && !crawling && !Recovering && _actionWeight < 0.5f && (limping || calm) ? 1f : 0f;
+        bool sidearm = _pistolHand != 0;
+        bool free = _down == Down.Up && !crawling && !Recovering && _actionWeight < 0.5f;
+        float want = free && !sidearm && held && (limping || calm) ? 1f : 0f;
         string state = limping && !calm ? "Aim" : "Low";
         if (state != _carryState) { animator.CrossFadeInFixedTime(state, 0.3f, _carryLayer); _carryState = state; }
         _carryWeight = Mathf.MoveTowards(_carryWeight, want, Time.deltaTime * 3f);
         animator.SetLayerWeight(_carryLayer, Smooth(_carryWeight));
+
+        // The pistol held out: its own upper body, eased in as it is drawn.
+        if (_sidearmLayer >= 0)
+        {
+            if (sidearm && _sidearmWeight <= 0.001f)
+                animator.Play(_pistolHand > 0 ? "Pistol" : "PistolLeft", _sidearmLayer, Random.value);
+            _sidearmWeight = Mathf.MoveTowards(_sidearmWeight, sidearm && free ? 1f : 0f, Time.deltaTime / Mathf.Max(0.1f, drawSeconds));
+            animator.SetLayerWeight(_sidearmLayer, Smooth(_sidearmWeight));
+        }
     }
 
     /// <summary>The spine, neck and head turned onto the player, shared down the chain.</summary>
@@ -1375,9 +1500,81 @@ public class EnemyBody : MonoBehaviour
         body.angularVelocity = Random.insideUnitSphere * 3f;
     }
 
+    // ======================================================================
+    // Physical hit reactions
+    // ======================================================================
+
+    [Header("Hit reactions (physical)")]
+    [Tooltip("How hard the upper body springs back after a hit (per second squared). Lower is looser.")]
+    [Range(20f, 600f)] public float hitStiffness = 150f;
+    [Tooltip("How quickly the sway dies. About twice the square root of the stiffness stops without overshoot; less rocks back once.")]
+    [Range(1f, 60f)] public float hitDamping = 15f;
+    [Tooltip("Degrees a second a full-strength hit starts a bone turning at, next to where it lands.")]
+    [Range(0f, 2000f)] public float hitKick = 700f;
+    [Tooltip("Metres over which a hit's push fades with distance from where it lands.")]
+    [Range(0.05f, 1.5f)] public float hitReach = 0.35f;
+    [Tooltip("The most any bone is turned by hits, degrees.")]
+    [Range(5f, 80f)] public float hitLimit = 35f;
+
+    struct Spring { public Transform bone; public Vector3 angle, velocity; public float give; }
+    Spring[] _springs;
+
+    void BuildSprings()
+    {
+        var bones = new List<(Transform, float)>
+        {
+            (_spine, 0.6f), (_chestLow, 0.8f), (_chest, 1f), (_neck, 0.5f),
+            (_lUpper, 1.2f), (_lLower, 1.3f), (_rUpper, 1.2f), (_rLower, 1.3f),
+        };
+        var list = new List<Spring>();
+        foreach (var (bone, give) in bones) if (bone != null) list.Add(new Spring { bone = bone, give = give });
+        _springs = list.ToArray();
+    }
+
+    /// <summary>
+    /// A round's push on the upper body: every sprung bone is set turning about the axis the
+    /// push makes round it (lever from the bone to where it landed, crossed with the way the
+    /// round is going), harder the nearer it landed. A leg hit pushes the hips and the trunk
+    /// over the leg; the legs themselves stay the clip's. No two hits are the same, and they add up.
+    /// </summary>
+    void HitImpulse(Vector3 point, Vector3 dir, float strength)
+    {
+        if (_springs == null) BuildSprings();
+        if (point == Vector3.zero) point = _chest != null ? _chest.position : transform.position + Vector3.up;
+        float jitter = Random.Range(0.85f, 1.15f);
+        for (int i = 0; i < _springs.Length; i++)
+        {
+            var sp = _springs[i];
+            Vector3 lever = point - sp.bone.position;
+            Vector3 axis = Vector3.Cross(lever, dir);
+            if (axis.sqrMagnitude < 1e-6f) axis = Vector3.Cross(Vector3.up, dir);
+            float near = Mathf.Exp(-lever.magnitude / Mathf.Max(0.05f, hitReach));
+            sp.velocity += axis.normalized * (hitKick * strength * near * sp.give * jitter);
+            _springs[i] = sp;
+        }
+    }
+
+    /// <summary>The springs, stepped and laid onto the bones over the animation.</summary>
+    void StepSprings()
+    {
+        if (_springs == null) return;
+        float dt = Mathf.Min(Time.deltaTime, 0.05f);
+        for (int i = 0; i < _springs.Length; i++)
+        {
+            var sp = _springs[i];
+            if (sp.bone == null) continue;
+            sp.velocity += (-hitStiffness * sp.angle - hitDamping * sp.velocity) * dt;
+            sp.angle = Vector3.ClampMagnitude(sp.angle + sp.velocity * dt, hitLimit);
+            _springs[i] = sp;
+            float a = sp.angle.magnitude;
+            if (a > 0.05f) sp.bone.rotation = Quaternion.AngleAxis(a, sp.angle / a) * sp.bone.rotation;
+        }
+    }
+
     /// <summary>The hit reactions: each a turn about its own axis, fading on its own envelope.</summary>
     void React()
     {
+        StepSprings();
         for (int i = _kicks.Count - 1; i >= 0; i--)
         {
             var k = _kicks[i];

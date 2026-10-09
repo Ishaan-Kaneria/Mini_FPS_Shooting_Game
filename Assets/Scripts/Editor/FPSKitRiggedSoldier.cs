@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.Animations.Rigging;
 using Object = UnityEngine.Object;
 
 namespace FPSKit.EditorTools
@@ -183,6 +182,7 @@ namespace FPSKit.EditorTools
 
                 // ---- the rifle in the right hand, the left hand on it, the aim ----
                 if (gun != null) HoldRifle(animator, root.transform, gun, rightGrip, leftGrip, body);
+                HolsterPistol(animator, root.transform, body);
                 model.AddComponent<EnemyFootIK>();
 
                 // Held at the shoulder: the rear sight a hand in front of the eye and a little
@@ -405,7 +405,7 @@ namespace FPSKit.EditorTools
                     var v = c.averageSpeed;
                     t.AddChild(c, new Vector2(v.x, v.z));
                 }
-                Centre(t, Mixamo("Pistol/Pistol_Idle" + suffix), 0.8f);
+                Centre(t, Mixamo("Rifle/Rifle_Idle_Low"), 0.8f);
                 Add("Pistol_Walk"); Add("Pistol_Run"); Add("Pistol_Walk_Back");
                 // Mirrored, left and right swap over: a mirrored strafe left goes right.
                 Add("Pistol_Strafe_Left"); Add("Pistol_Strafe_Right");
@@ -431,8 +431,6 @@ namespace FPSKit.EditorTools
             move.speedParameterActive = true;
             State("Pistol", Pistol("PistolMove", ""));
             State("PistolLeft", Pistol("PistolMoveLeft", "_Mirror"));
-            State("PistolIdle", Mixamo("Pistol/Pistol_Idle"));
-            State("PistolIdleLeft", Mixamo("Pistol/Pistol_Idle_Mirror"));
             State("TurnLeft", Mixamo("Rifle/Rifle_Turn90_Left"));
             State("TurnRight", Mixamo("Rifle/Rifle_Turn90_Right"));
             State("CrouchTurnLeft", Mixamo("Rifle/Rifle_CrouchTurn90_Left"));
@@ -497,7 +495,14 @@ namespace FPSKit.EditorTools
                 defaultWeight = 0f,
                 blendingMode = AnimatorLayerBlendingMode.Override,
             };
-            controller.layers = new[] { layer, Injured(controller), Carry(controller), action };
+            controller.layers = new[] { layer, Injured(controller), Carry(controller), Sidearm(controller), action };
+
+            // Write Defaults off everywhere: a state that writes defaults puts every property the
+            // Animator has bound back to its value at the last bind, every frame -- the rig's
+            // weights among them, which froze the left hand on a rifle that had gone on the back.
+            foreach (var l in controller.layers)
+                foreach (var cs in l.stateMachine.states)
+                    cs.state.writeDefaultValues = false;
 
             EditorUtility.SetDirty(controller);
             return controller;
@@ -553,8 +558,15 @@ namespace FPSKit.EditorTools
             // 0.1 m/s as made; played faster so cover is reachable in a fight.
             State("CrawlDown", Tree("CrawlDown", ("Crawl/Crawl_Back_Stomach", -1f), ("Crawl/Prone_Idle_Rifle", 0f),
                                     ("Crawl/Crawl_Drag", 1f)), 1.5f);
-            // Face up: propped on its hands and pushing itself away, facing the threat.
-            State("CrawlUp", Tree("CrawlUp", ("Deaths/Death_OnGround", 0f), ("Crawl/Crawl_Back_Fear", 1f)));
+            // Face up: propped on its hands and pushing itself away, facing the threat. Still, the
+            // same clip barely moving (CrawlRate): shifting, struggling, never a corpse.
+            controller.AddParameter(new AnimatorControllerParameter { name = "CrawlRate", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
+            State("CrawlUp", Mixamo("Crawl/Crawl_Back_Fear"));
+            {
+                var up = System.Array.Find(machine.states, c => c.state.name == "CrawlUp").state;
+                up.speedParameter = "CrawlRate";
+                up.speedParameterActive = true;
+            }
 
             foreach (var g in EnemyBody.GetUps)
             {
@@ -602,12 +614,48 @@ namespace FPSKit.EditorTools
             }
             machine.defaultState = Add("Low", Mixamo("Rifle/Rifle_Idle_Low"));
             Add("Aim", Mixamo("Rifle/Rifle_Idle_Aim"));
-            Add("Pistol", Mixamo("Pistol/Pistol_Idle"));
-            Add("PistolLeft", Mixamo("Pistol/Pistol_Idle_Mirror"));
 
             return new AnimatorControllerLayer
             {
                 name = "Carry",
+                stateMachine = machine,
+                avatarMask = mask,
+                defaultWeight = 0f,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+            };
+        }
+
+        /// <summary>
+        /// A pistol held out: the whole upper body (torso, head, arms) of the aimed pistol walk,
+        /// over whatever the legs are doing. The pistol's arms only point ahead with that clip's
+        /// own twist of the torso; over the rifle stance's torso they pointed well off to the side.
+        /// (Mixamo's pistol idle kicks and shakes its legs about, so the walk's upper body serves
+        /// standing too.) PistolLeft is the mirror, for a left hand. EnemyBody sets the weight.
+        /// </summary>
+        static AnimatorControllerLayer Sidearm(AnimatorController controller)
+        {
+            var maskPath = Folder + "/UpperBody.mask";
+            if (AssetDatabase.LoadAssetAtPath<AvatarMask>(maskPath) != null) AssetDatabase.DeleteAsset(maskPath);
+            var mask = new AvatarMask();
+            for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++) mask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, false);
+            foreach (var part in new[] { AvatarMaskBodyPart.Body, AvatarMaskBodyPart.Head,
+                                         AvatarMaskBodyPart.LeftArm, AvatarMaskBodyPart.RightArm,
+                                         AvatarMaskBodyPart.LeftFingers, AvatarMaskBodyPart.RightFingers,
+                                         AvatarMaskBodyPart.LeftHandIK, AvatarMaskBodyPart.RightHandIK })
+                mask.SetHumanoidBodyPartActive(part, true);
+            AssetDatabase.CreateAsset(mask, maskPath);
+
+            var machine = new AnimatorStateMachine { name = "Sidearm" };
+            AssetDatabase.AddObjectToAsset(machine, controller);
+            var right = machine.AddState("Pistol");
+            right.motion = Mixamo("Pistol/Pistol_Walk");
+            machine.defaultState = right;
+            var left = machine.AddState("PistolLeft");
+            left.motion = Mixamo("Pistol/Pistol_Walk_Mirror");
+
+            return new AnimatorControllerLayer
+            {
+                name = "Sidearm",
                 stateMachine = machine,
                 avatarMask = mask,
                 defaultWeight = 0f,
@@ -816,18 +864,12 @@ namespace FPSKit.EditorTools
         // ==================================================================
 
         /// <summary>
-        /// The AK from the view-model set, which already looks down +Z from its rear sight
-        /// with its hand sockets and muzzle placed; its own spec stripped, its parts tagged
-        /// as metal so the archetype never paints it and the damage flash never lights it.
-        /// </summary>
-        /// <summary>
-        /// The rifle goes into the right hand: a socket under the hand bone where the rifle sits
-        /// in the "rifle idle, aiming" clip -- the hand at the grip, the bore along the line
-        /// from the right hand to the left -- and a "sway" child the rifle hangs from, which
-        /// EnemyBody springs a little behind the hand so it has weight. The left hand is reached
-        /// onto the handguard by a two-bone IK constraint; the head, chest and spine turn to
-        /// their look targets by aim constraints (Animation Rigging), the head furthest.
-        /// The pose is sampled on this body and put back.
+        /// The rifle's hold: a socket under the right hand bone where the rifle sits in the
+        /// "rifle idle, aiming" clip -- the grip in the hand, the bore straight ahead and level --
+        /// and a "sway" under it that EnemyRifle springs a little behind the hand so the rifle
+        /// has weight. The rifle itself stays a child of the root and is laid on the sway each
+        /// frame. A target for the left hand on the handguard and a hint for its elbow; EnemyBody
+        /// does that arm's IK and the aim. The pose is sampled on this body and put back.
         /// </summary>
         static void HoldRifle(Animator animator, Transform root, Transform gun, Transform rightGrip, Transform leftGrip, EnemyBody body)
         {
@@ -856,54 +898,41 @@ namespace FPSKit.EditorTools
                 gun.rotation = Quaternion.LookRotation(root.forward, root.up);
                 gun.position += R - rightGrip.position;
 
+                // The rifle itself is never a child of the skeleton: reparenting anything into an
+                // Animator's hierarchy in play makes it rebind, and a rebind takes every value of
+                // the moment for a default and writes it back each frame (it froze the hand rig).
+                // So the socket and its sway are in the skeleton from the start, and the rifle,
+                // a child of the root, is laid on the sway each frame (EnemyRifle.Follow).
                 var socket = new GameObject("RifleSocket").transform;
                 socket.SetParent(rHand, false);
                 socket.SetPositionAndRotation(gun.position, gun.rotation);
                 var sway = new GameObject("RifleSway").transform;
                 sway.SetParent(socket, false);
-                gun.SetParent(sway, true);
 
-                // The left hand's target: on the handguard, turned the way that hand's frame
-                // wants to hold it (LimbIK.HandFrame, as the old grip did).
+                // The left hand's target: where the handguard is, turned the way that hand's frame
+                // wants to hold it (LimbIK.HandFrame, as the old grip did), on the sway so the rig
+                // sees it move with the hand in the same frame.
                 var frame = LimbIK.HandFrame.Measure(lHand, B(HumanBodyBones.LeftMiddleProximal), B(HumanBodyBones.LeftIndexProximal),
                                                      B(HumanBodyBones.LeftLittleProximal), right: false);
                 var target = new GameObject("LeftHandTarget").transform;
-                target.SetParent(leftGrip, false);
-                if (frame.valid) target.rotation = frame.World(leftGrip.forward, leftGrip.up);
+                target.SetParent(sway, false);
+                target.position = leftGrip.position;
+                target.rotation = frame.valid ? frame.World(leftGrip.forward, leftGrip.up) : leftGrip.rotation;
 
                 var hint = new GameObject("LeftElbowHint").transform;
                 hint.SetParent(chest, false);
                 var lElbow = B(HumanBodyBones.LeftLowerArm);
                 hint.position = lElbow.position - root.right * 0.25f + Vector3.down * 0.25f;
 
-                // The aim is EnemyBody's additive turn down the spine, head first: an aim
-                // constraint sets a bone's rotation outright and straightens the bladed rifle
-                // stance the clips are made in. The rig does the left hand.
-                var rigs = new GameObject("Rigs").transform;
-                rigs.SetParent(animator.transform, false);
-
-                var handRig = new GameObject("HandRig").AddComponent<Rig>();
-                handRig.transform.SetParent(rigs, false);
-                var ik = new GameObject("LeftHandIK").AddComponent<TwoBoneIKConstraint>();
-                ik.transform.SetParent(handRig.transform, false);
-                var d = ik.data;
-                d.root = B(HumanBodyBones.LeftUpperArm);
-                d.mid = B(HumanBodyBones.LeftLowerArm);
-                d.tip = lHand;
-                d.target = target;
-                d.hint = hint;
-                d.targetPositionWeight = 1f;
-                d.targetRotationWeight = 1f;
-                d.hintWeight = 1f;
-                ik.data = d;
-
-                var builder = animator.gameObject.AddComponent<RigBuilder>();
-                builder.layers.Add(new RigLayer(handRig, true));
-
+                // The aim is EnemyBody's additive turn down the spine, head first, and the left
+                // hand is its weighted two-bone IK onto this target. Animation Rigging was tried for
+                // both: an aim constraint sets a bone's rotation outright and straightened the
+                // bladed stance the clips are made in, and a rig's weight could not be eased from
+                // script (the rig's own pass put it back every frame).
                 body.rifleSocket = socket;
                 body.rifleSway = sway;
                 body.leftHandTarget = target;
-                body.handRig = handRig;
+                body.leftElbowHint = hint;
             }
             finally
             {
@@ -911,33 +940,91 @@ namespace FPSKit.EditorTools
             }
         }
 
-        /// <summary>An aim constraint turning a bone's forward (as the body's forward, in the aiming pose) to a target.</summary>
-        static void Aim(Transform parent, string name, Transform bone, Transform target, Transform root, float limit)
+        const string PistolPrefab = "Assets/Low Poly Weapons VOL.1/Prefabs/M1911.prefab";
+
+        /// <summary>
+        /// The sidearm: an M1911 in a holster on the right thigh, with a socket under each hand
+        /// where it sits when drawn (from the aimed pistol walk, and its mirror for the left hand).
+        /// EnemyBody draws it when an arm is crippled or the rifle is lost. The pack's model
+        /// faces -Z; its muzzle child faces the way it shoots.
+        /// </summary>
+        static void HolsterPistol(Animator animator, Transform root, EnemyBody body)
         {
-            if (bone == null) return;
-            var c = new GameObject(name).AddComponent<MultiAimConstraint>();
-            c.transform.SetParent(parent, false);
-            var d = c.data;
-            d.constrainedObject = bone;
-            var sources = new WeightedTransformArray(0);
-            sources.Add(new WeightedTransform(target, 1f));
-            d.sourceObjects = sources;
-            d.aimAxis = AxisOf(bone.InverseTransformDirection(root.forward));
-            d.upAxis = AxisOf(bone.InverseTransformDirection(root.up));
-            d.limits = new Vector2(-limit, limit);
-            d.maintainOffset = false;
-            d.constrainedXAxis = d.constrainedYAxis = d.constrainedZAxis = true;
-            c.data = d;
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PistolPrefab);
+            var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/FPSKit_Generated/ViewModels/Gun_URP.mat");
+            var thigh = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+            var rHand = animator.GetBoneTransform(HumanBodyBones.RightHand);
+            var lHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            if (prefab == null || thigh == null || rHand == null || lHand == null) return;
+
+            var pistol = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            PrefabUtility.UnpackPrefabInstance(pistol, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            pistol.name = "Pistol";
+            foreach (Transform c in pistol.GetComponentsInChildren<Transform>(true))
+                if (c != null && c.name == "CINEMA_4D_Editor") Object.DestroyImmediate(c.gameObject);
+            foreach (var r in pistol.GetComponentsInChildren<Renderer>(true))
+            {
+                if (mat != null) r.sharedMaterial = mat;
+                r.tag = "Metal";
+            }
+
+            var muzzle = new GameObject("Muzzle").transform;
+            muzzle.SetParent(pistol.transform, false);
+            muzzle.localPosition = new Vector3(0f, 0.012f, -0.17f);
+            muzzle.localRotation = Quaternion.Euler(0f, 180f, 0f);
+
+            // The grip, in the model's space: the magazine well, a little up from its foot.
+            Vector3 grip = new Vector3(0f, -0.045f, 0.05f);
+
+            Transform Socket(Transform hand, string clipPath, string name)
+            {
+                var clip = Mixamo(clipPath);
+                var socket = new GameObject(name).transform;
+                socket.SetParent(hand, false);
+                if (clip == null) return socket;
+                var bones = animator.GetComponentsInChildren<Transform>();
+                var pos = new Vector3[bones.Length];
+                var rot = new Quaternion[bones.Length];
+                for (int i = 0; i < bones.Length; i++) { pos[i] = bones[i].localPosition; rot[i] = bones[i].localRotation; }
+                Vector3 mp = animator.transform.position; Quaternion mr = animator.transform.rotation;
+                try
+                {
+                    clip.SampleAnimation(animator.gameObject, 0.4f);
+                    animator.transform.SetPositionAndRotation(mp, mr);
+                    Quaternion q = Quaternion.LookRotation(-root.forward, root.up);   // the model's -Z ahead
+                    Vector3 at = hand.position + root.forward * 0.05f;
+                    socket.SetPositionAndRotation(at - q * grip, q);
+                }
+                finally
+                {
+                    for (int i = 0; i < bones.Length; i++) { bones[i].localPosition = pos[i]; bones[i].localRotation = rot[i]; }
+                }
+                return socket;
+            }
+            body.pistolSocketRight = Socket(rHand, "Pistol/Pistol_Walk", "PistolSocketRight");
+            body.pistolSocketLeft = Socket(lHand, "Pistol/Pistol_Walk_Mirror", "PistolSocketLeft");
+
+            // Holstered on the outside of the right thigh, muzzle down. The pistol is a child of
+            // the root (never of the skeleton: see HoldRifle) and is laid on the holster or the
+            // hand's socket each frame by EnemyBody.
+            var holster = new GameObject("PistolHolster").transform;
+            holster.SetParent(thigh, false);
+            holster.position = thigh.position + root.right * 0.11f + Vector3.down * 0.16f;
+            holster.rotation = Quaternion.LookRotation(Vector3.up, root.right);
+            pistol.transform.SetParent(root, false);
+            pistol.transform.SetPositionAndRotation(holster.position, holster.rotation);
+            pistol.transform.localScale = Vector3.one / Scale;   // a real-size pistol on a scaled body
+
+            body.pistol = pistol.transform;
+            body.pistolHolster = holster;
+            body.pistolMuzzle = muzzle;
         }
 
-        static MultiAimConstraintData.Axis AxisOf(Vector3 v)
-        {
-            Vector3 a = new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
-            if (a.x >= a.y && a.x >= a.z) return v.x >= 0f ? MultiAimConstraintData.Axis.X : MultiAimConstraintData.Axis.X_NEG;
-            if (a.y >= a.z) return v.y >= 0f ? MultiAimConstraintData.Axis.Y : MultiAimConstraintData.Axis.Y_NEG;
-            return v.z >= 0f ? MultiAimConstraintData.Axis.Z : MultiAimConstraintData.Axis.Z_NEG;
-        }
-
+        /// <summary>
+        /// The AK from the view-model set, which already looks down +Z from its rear sight
+        /// with its hand sockets and muzzle placed; its own spec stripped, its parts tagged
+        /// as metal so the archetype never paints it and the damage flash never lights it.
+        /// </summary>
         static Transform Gun(Transform root, Transform head, out Transform rightGrip, out Transform leftGrip, out Transform muzzle)
         {
             rightGrip = leftGrip = muzzle = null;

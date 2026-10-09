@@ -26,7 +26,7 @@ using UnityEngine;
 [DefaultExecutionOrder(60)]
 public class EnemyRifle : MonoBehaviour
 {
-    public enum Hold { Held, Slung, Dropped, OnBack, Recovering, PickingUp, Lost }
+    public enum Hold { Held, Slung, Dropped, OnBack, Recovering, PickingUp, Lost, Stowing }
 
     [Header("Weight in the hands")]
     [Tooltip("How hard the rifle is pulled back to the hand's hold (a spring, per second squared).")]
@@ -58,7 +58,10 @@ public class EnemyRifle : MonoBehaviour
     public bool Lost => State == Hold.Lost;
 
     /// <summary>Walking to it, crouching for it or bringing it up: the mind waits.</summary>
-    public bool Busy => State == Hold.PickingUp || State == Hold.Recovering;
+    public bool Busy => State == Hold.PickingUp || State == Hold.Recovering || State == Hold.Stowing;
+
+    /// <summary>Across the back and done moving (for a fist fight, or a sidearm).</summary>
+    public bool Stowed => State == Hold.OnBack;
 
     EnemyBody _body;
     EnemyAI _ai;
@@ -114,6 +117,22 @@ public class EnemyRifle : MonoBehaviour
     // ======================================================================
     // Held: the spring that gives it weight
     // ======================================================================
+
+    /// <summary>
+    /// Lays the rifle where it is carried: on the hand's sway when held, across the chest's back
+    /// when slung there. It is never a child of the skeleton (a reparent makes the Animator
+    /// rebind). EnemyBody calls this before it aims (to read the bore) and after its overlays.
+    /// </summary>
+    public void Follow()
+    {
+        if (!enabled) return;
+        if (State == Hold.Held) _gun.SetPositionAndRotation(_sway.position, _sway.rotation);
+        else if (State == Hold.OnBack && _chest != null)
+        {
+            BackPose(out Vector3 pos, out Quaternion rot);
+            _gun.SetPositionAndRotation(_chest.TransformPoint(pos), _chest.rotation * rot);
+        }
+    }
 
     void Update()
     {
@@ -400,9 +419,8 @@ public class EnemyRifle : MonoBehaviour
         if (_motor != null) _motor.ForceCrouch = false;
         if (held)
         {
-            _gun.SetParent(_sway, true);
-            _gun.localPosition = Vector3.zero;
-            _gun.localRotation = Quaternion.identity;
+            if (_gun.parent != transform) _gun.SetParent(transform, true);
+            _gun.SetPositionAndRotation(_sway.position, _sway.rotation);
             _off = _offVel = _turn = _turnVel = Vector3.zero;
             _hasLast = false;
             State = Hold.Held;
@@ -412,6 +430,7 @@ public class EnemyRifle : MonoBehaviour
 
     void LateUpdate()
     {
+        if (State == Hold.Stowing) { Stow(); return; }
         if (State == Hold.PickingUp && _phase == 1)
         {
             // Crouched: the right hand reaches down to the grip.
@@ -461,23 +480,47 @@ public class EnemyRifle : MonoBehaviour
         _rHand.rotation = Quaternion.Slerp(h, _rHand.rotation, weight);
     }
 
-    /// <summary>For a fist fight: the hands let go, then it goes across the back; or back off the back into the hands.</summary>
+    /// <summary>
+    /// For a fist fight or the sidearm: the rifle goes over the shoulder onto the back, carried
+    /// there by the right hand over a moment; or back off the back into the hands.
+    /// </summary>
     public void SetOnBack(bool onBack)
     {
         if (!enabled) return;
         if (onBack)
         {
             if (State != Hold.Held || _chest == null) return;
-            _gun.SetParent(_chest, true);
-            _gun.position = _chest.position - transform.forward * 0.2f * transform.lossyScale.y + transform.up * 0.05f;
-            _gun.rotation = Quaternion.LookRotation(Quaternion.AngleAxis(40f, transform.forward) * transform.up, -transform.forward);
-            State = Hold.OnBack;
+            _fromPos = _chest.InverseTransformPoint(_gun.position);
+            _fromRot = Quaternion.Inverse(_chest.rotation) * _gun.rotation;
+            _phaseStart = Time.time;
+            State = Hold.Stowing;
             LeftHandWant = 0f;
         }
         else if (State == Hold.OnBack)
         {
             StartBringUp();
         }
+    }
+
+    const float StowSeconds = 0.45f;
+
+    /// <summary>Where it rides on the back, in the chest's space: diagonal, muzzle down over the left shoulder.</summary>
+    void BackPose(out Vector3 pos, out Quaternion rot)
+    {
+        Vector3 world = _chest.position - transform.forward * 0.2f * transform.lossyScale.y + transform.up * 0.05f;
+        Quaternion worldRot = Quaternion.LookRotation(Quaternion.AngleAxis(40f, transform.forward) * transform.up, -transform.forward);
+        pos = _chest.InverseTransformPoint(world);
+        rot = Quaternion.Inverse(_chest.rotation) * worldRot;
+    }
+
+    void Stow()
+    {
+        float t = Smooth((Time.time - _phaseStart) / StowSeconds);
+        BackPose(out Vector3 pos, out Quaternion rot);
+        _gun.SetPositionAndRotation(_chest.TransformPoint(Vector3.Lerp(_fromPos, pos, t)), _chest.rotation * Quaternion.Slerp(_fromRot, rot, t));
+        // The right hand carries it most of the way, then lets it go.
+        ReachFor(_rightGrip.position, 1f - Smooth((Time.time - _phaseStart) / (StowSeconds * 0.7f)));
+        if (t >= 1f) State = Hold.OnBack;
     }
 
     static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }

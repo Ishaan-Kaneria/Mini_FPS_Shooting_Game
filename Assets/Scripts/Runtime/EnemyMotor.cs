@@ -94,6 +94,7 @@ public class EnemyMotor : MonoBehaviour
     static readonly int IdleVariant = Animator.StringToHash("IdleVariant");
     static readonly int AimId = Animator.StringToHash("Aim");
     static readonly int MoveRate = Animator.StringToHash("MoveRate");
+    static readonly int CrawlRate = Animator.StringToHash("CrawlRate");
 
     void Awake()
     {
@@ -251,7 +252,8 @@ public class EnemyMotor : MonoBehaviour
     }
 
     string Base() => PistolHand == 0 ? "Move" : PistolHand > 0 ? "Pistol" : "PistolLeft";
-    string Idle() => PistolHand == 0 ? "Idle" : PistolHand > 0 ? "PistolIdle" : "PistolIdleLeft";
+    // Standing still is the same state with any weapon: the Carry layer gives the arms.
+    string Idle() => "Idle";
 
     /// <summary>Crossfades the base layer into a state; a special one for this many seconds.</summary>
     void Play(string state, float seconds)
@@ -314,6 +316,9 @@ public class EnemyMotor : MonoBehaviour
         }
 
         _animator.SetFloat(Pace, pace, paceDamping, dt);
+        // On its back the crawl is one clip at a rate: barely moving when still, so it shifts
+        // and struggles rather than lying like a corpse.
+        _animator.SetFloat(CrawlRate, Mathf.Max(0.15f, Mathf.Abs(pace)), paceDamping, dt);
         // The base layer under the hurt one stands still, so the blend between them never walks.
         _animator.SetFloat(MoveX, 0f, moveDamping, dt);
         _animator.SetFloat(MoveZ, 0f, moveDamping, dt);
@@ -339,6 +344,8 @@ public class EnemyMotor : MonoBehaviour
 
         Vector3 delta = _animator.deltaPosition;
         delta.y = 0f;
+        // Still on the ground, the slow shifting clip must not creep the body along.
+        if ((Current == Gait.CrawlUp || Current == Gait.CrawlDown) && Mathf.Abs(_animator.GetFloat(Pace)) < 0.2f) delta = Vector3.zero;
 
         if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
         {

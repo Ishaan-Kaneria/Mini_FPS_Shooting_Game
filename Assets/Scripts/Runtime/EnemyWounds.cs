@@ -56,6 +56,9 @@ public class EnemyWounds : MonoBehaviour
     /// <summary>The rifle is on the floor. It fights by hand, or runs, from here on.</summary>
     public bool Disarmed { get; private set; }
 
+    /// <summary>A pistol in a good hand (EnemyBody): one hand is enough for it, so a crippled arm does not ruin the aim.</summary>
+    [System.NonSerialized] public bool Sidearm;
+
     /// <summary>One arm is crippled and the other is not: the rifle is held low in one hand.</summary>
     public bool OneHanded => !Disarmed && (AtLeast(BodyPart.LeftArm, LimbState.Crippled) != AtLeast(BodyPart.RightArm, LimbState.Crippled));
 
@@ -138,7 +141,7 @@ public class EnemyWounds : MonoBehaviour
             foreach (var arm in Arms)
             {
                 var s = State(arm);
-                if (s >= LimbState.Crippled) arms = Mathf.Max(arms, p.crippledArmSpread);
+                if (s >= LimbState.Crippled) arms = Mathf.Max(arms, Sidearm ? p.woundedArmSpread : p.crippledArmSpread);
                 else if (s == LimbState.Wounded) arms = Mathf.Max(arms, p.woundedArmSpread);
             }
             return arms * Mathf.Lerp(1f, p.painSpread, Mathf.Clamp01(Pain));

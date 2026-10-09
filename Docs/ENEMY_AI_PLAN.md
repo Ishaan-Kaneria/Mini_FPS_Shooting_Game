@@ -250,3 +250,42 @@ should go through Git LFS with the other packs (open decision below).
 - The play-mode checks have to stay short (the editor runs at ~2 fps unfocused).
 - The 13 local commits still cannot be pushed until the packs go through LFS. Mixamo clips
   add to that.
+
+## 10. Progress
+
+**Stage 1 (bugs 1-3, sections 1-2), 2026-10-09.**
+
+- Baseline, before any change (FPSKit > Enemy AI > Measure 20 Enemies, AbandonedFairground,
+  Medium, editor play mode): player loop 15.8 ms mean / 13.5 median / 25.2 p95 per frame;
+  physics 4.2 ms; scripts (Update + LateUpdate) 3.2 ms; animator < 0.3 ms. The editor ran at
+  about 1 fps unfocused, so only CPU times mean anything. `Build/Perf/enemies_baseline.txt`.
+- Built: limb-capped core damage (`DamageInfo.coreCapped`, `EnemyWounds.CoreCapFor`); limb
+  states and pain (`EnemyWounds`); per-type `BodyDamageProfile` (21 in
+  `FPSKit_Generated/Soldier/BodyProfiles`); the "Injured" animator layer (limp L/R,
+  crawl face down/up, six get-ups, stumble); `EnemyMotor` + `EnemyRootMotion` (root motion with
+  the agent following); clip get-ups matched to how the body landed; crawl-to-cover, cover on a
+  new limp, flee when both arms go; groans in high pain; the AI test scene and the limb test.
+- Not in Stage 1, moved on: one-handed **pistol** for a crippled gun arm (needs the Stage 2
+  animator; for now the rifle is held low in the good hand); shooting from the ground after a
+  knockdown and the face-up crawl idle (it reads as a corpse when still); partial-ragdoll hit
+  reactions (Stage 2).
+- Limb test (FPSKit > Enemy AI > Run Limb Test, final run 21:38): **all pass**. 20 thigh rounds
+  leave a Grunt at exactly 15%, left leg crippled, limping on the left, firing; both legs
+  crippled crawl and stay down after a kick (pelvis never above 0.12 m); one crippled arm keeps
+  the rifle (spread x6.1, bursts x1.8 apart), two drop it; torso and head still kill. Three
+  kicks: lay 3.4 / 2.2 / 2.6 s, rose with Stomach_Zombie / Stomach / Back to match how each
+  landed; worst sudden change during a get-up 4.4 cm/frame (pelvis) and 19.4 deg/frame (a bone),
+  under the clips' own sharpest (6.9 cm, 23.5 deg). The limp moved at 1.64 m/s (walk and
+  hobbling run mixed). Report and pictures: `Build/LimbTest`.
+- Fixed on the way, found by the test: a floating rifle during get-ups (it now rides in the
+  hand and eases up over 0.6 s once standing); elbows flipping when the hands reached for the
+  rifle while still bent over (no arm IK until standing; IK is now blended per bone, not by
+  target); a pop when the rifle was slung for the rage (hands let go first); a velocity jump
+  when the agent took back over from the clip (its velocity is zeroed).
+- `VerifyCombat` now exits only in batch mode (`FPSKitBatch.Exit`). Run in the open editor it
+  got 14 frames in its 14 s (the unfocused editor runs at ~1 fps) and reported a meaningless
+  failure; it also still expects a jab as the first punch (the rework made it a rifle butt).
+  It needs a batch run with Unity closed before the next push. `VerifyWounds` is stale (see
+  DESIGN_NOTES).
+- Still to download before Stage 5: Mixamo "Reload" x3 (run, crouch, walk variants) and
+  "Injured Stumble Idle" (Firefox dropped them).

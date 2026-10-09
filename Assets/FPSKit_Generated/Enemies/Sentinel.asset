@@ -45,6 +45,7 @@ MonoBehaviour:
   suppressionDamage: 45
   voice: 0
   woundResistance: 0.45
+  bodyProfile: {fileID: 11400000, guid: 849f4ab60e43985f6a41fd9253063f16, type: 2}
   scoreValue: 450
   healthDropChance: 0.3
   shieldDropChance: 0.35

@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1899af4500370c0cb6ae9469e43ffb6, type: 3}
+  m_Name: Stalker
+  m_EditorClassIdentifier: Assembly-CSharp::BodyDamageProfile
+  head: 3
+  neck: 2
+  upperTorso: 1
+  lowerTorso: 0.9
+  upperArm: 0.7
+  forearm: 0.6
+  thigh: 0.8
+  shin: 0.7
+  headHealth: 0.35
+  neckHealth: 0.3
+  upperTorsoHealth: 0.8
+  lowerTorsoHealth: 0.6
+  upperArmHealth: 0.3
+  forearmHealth: 0.25
+  thighHealth: 0.4
+  lowerLegHealth: 0.3
+  resistanceStretch: 2.5
+  woundedAt: 0.2
+  crippledAt: 1
+  limbCoreShare: 0.3
+  limbCoreFloor: 0.15
+  headPain: 0.6
+  torsoPain: 0.35
+  armPain: 0.3
+  legPain: 0.4
+  painFade: 0.12
+  crippledPainFloor: 0.15
+  highPain: 0.55
+  painSpread: 1.8
+  woundedLegSpeed: 0.9
+  limpSpeed: 0.55
+  crawlSpeed: 0.25
+  woundedArmSpread: 1.5
+  crippledArmSpread: 3.5
+  woundedArmFireInterval: 1.25
+  crippledArmFireInterval: 1.8

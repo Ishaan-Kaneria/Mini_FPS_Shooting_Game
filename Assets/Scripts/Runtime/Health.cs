@@ -88,6 +88,18 @@ public struct DamageInfo
     /// <summary>Where it landed, from the hitbox. <see cref="BodyPart.Torso"/> when no hitbox was involved.</summary>
     public BodyPart part;
 
+    /// <summary>
+    /// Set by a hitbox on an arm or a leg: the hit lands in full on the limb (wounds, pain,
+    /// blood, the hit marker all see <see cref="amount"/>), but only <see cref="coreCap"/>
+    /// of it comes off the shield and health. That is how a limb shot hurts without ever
+    /// killing (EnemyWounds.CoreCapFor). Off for everything else, so a hit made anywhere
+    /// with no hitbox is whole.
+    /// </summary>
+    public bool coreCapped;
+
+    /// <summary>The most this hit may take off shield and health together, when <see cref="coreCapped"/>.</summary>
+    public float coreCap;
+
     public DamageInfo(float amount, Vector3 point, Vector3 normal, Vector3 direction, GameObject source)
     {
         this.amount = amount;
@@ -99,6 +111,8 @@ public struct DamageInfo
         this.fromBlast = false;
         this.fromMelee = false;
         this.part = BodyPart.Torso;
+        this.coreCapped = false;
+        this.coreCap = 0f;
     }
 }
 
@@ -208,13 +222,15 @@ public class Health : MonoBehaviour
     /// <summary>
     /// Applies a hit across shield then health. Returns the damage dealt -- the full
     /// amount when it lands (a shield absorbs damage, it does not reduce it) and zero
-    /// when immunity or death swallowed the hit entirely.
+    /// when immunity or death swallowed the hit entirely. A capped hit (a limb shot, see
+    /// <see cref="DamageInfo.coreCapped"/>) still reports and raises Damaged with its full
+    /// amount; only the share it is allowed comes off the pools.
     /// </summary>
     public float ApplyDamage(DamageInfo info)
     {
         if (IsDead || info.amount <= 0f || IsInvulnerable) return 0f;
 
-        float remaining = info.amount;
+        float remaining = info.coreCapped ? Mathf.Clamp(info.coreCap, 0f, info.amount) : info.amount;
         bool hadShield = Shield > 0f;
 
         if (Shield > 0f)

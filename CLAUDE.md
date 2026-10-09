@@ -110,8 +110,14 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Reserve ammo is per level (`LevelSet.Level.reserveMagazines`), a runtime flag on `Weapon`.
 - Wounds (`EnemyWounds`) only slow or loosen an enemy; thresholds stretch by archetype
   `woundResistance`; bosses never crawl, disarm or die to one headshot. Lethal headshots are
-  raised damage in `Hitbox.Receive`, never a side-channel kill. Enemy body changes:
-  `FPSKitBatch.RebuildEnemy`, then `VerifyWounds` and `CaptureEnemies` (UNITY_GRAPHICS=1).
+  raised damage in `Hitbox.Receive`, never a side-channel kill. **A limb hit never kills**:
+  `Hitbox.Receive` caps its core share (`DamageInfo.coreCapped`, floor
+  `BodyDamageProfile.limbCoreFloor`); only head/neck/torso, blasts and melee finish a body.
+  Limb states (Healthy, Wounded, Crippled, Severed) never improve: one crippled leg limps for
+  life, two (or a severed one) crawl for life, and nothing stands a crawler up. Tuning is one
+  `BodyDamageProfile` per type (`EnemyArchetype.bodyProfile`, `FPSKitBodyProfiles`). A hurt
+  body moves by its clip's root motion with the agent following (`EnemyMotor`). Enemy body changes:
+  FPSKit > Enemy > Build Rigged Soldier, then FPSKit > Enemy AI > Run Limb Test (open editor).
   Blood materials: `_BlendModePreserveSpecular` 0, low smoothness. Blood obeys `GameSettings.Blood`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via

@@ -140,7 +140,7 @@ namespace FPSKit.EditorTools
             catch (Exception e)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: {e}");
-                EditorApplication.Exit(1);
+                FPSKitBatch.Exit(1);
             }
         }
 
@@ -420,7 +420,7 @@ namespace FPSKit.EditorTools
             {
                 Detach();
                 Debug.LogError($"[FPSKitBatch] FAILED: {e}{Notes}");
-                EditorApplication.Exit(1);
+                FPSKitBatch.Exit(1);
             }
         }
 
@@ -745,7 +745,7 @@ namespace FPSKit.EditorTools
             if (problems.Length > 0)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: level one does not fight:{problems}\n{Notes}");
-                EditorApplication.Exit(1);
+                FPSKitBatch.Exit(1);
                 return;
             }
 
@@ -754,7 +754,7 @@ namespace FPSKit.EditorTools
                       $"m/s walk, they shot the player from {_poolAtEngage:0.0} to {_poolAfterRanged:0.0} " +
                       $"and hit them again at point-blank range for {_poolBeforeClose - _poolAtEnd:0.0} " +
                       $"more.{Notes}");
-            EditorApplication.Exit(0);
+            FPSKitBatch.Exit(0);
         }
     }
 }

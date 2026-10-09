@@ -2784,3 +2784,64 @@ Unknown Planet, third pass (2026-10-04): the big cream blobs while playing were 
 Unknown Planet, fourth pass (2026-10-04): the cream blobs with a black streak were NaN pixels. `ApronWater`, the lava sheet beyond the arena (112 x 2650 m), had UVs from -79 to +79 and the lava graph returns NaN on negative UVs; Bloom spread each NaN across half the screen. Fixed by shifting the sheet's UVs positive (`LavaUv` in `Backdrop`) and giving it the river's 0.01 mapping. Belt and braces for every arena: `PlayerMotor.Start` sets the camera's `stopNaN`, the builder sets it too, and every Bloom now has `clamp` 8. When a screenshot shows a blob with a black streak, look for a mesh with negative UVs on a lava or shader-graph material before touching bloom.
 
 Unknown Planet, fifth pass (2026-10-04): the dashed red vertical line in the sky was the Skybox/Panoramic atan2 seam: with mipmaps on, the huge derivative there selects the smallest mip along the seam. The sky texture is now imported without mipmaps (`alien-sky-v3`). Environment brighter (ambient ~+40 %, postExposure 0.4; run `FPSKitThemes.ResetAll()` after editing a theme). Lava fountains (`BuildLavaFountains`): nine particle jets along the river, 18-36 m/s, bursts every 3 s, camera-faded so none fills the screen; the camera fade is 6-22 m, so look at them from further than that.
+
+## A limb shot cripples, it does not kill (2026-10-09, enemy AI Stage 1)
+
+Ishaan's play-test: the enemies "behave like machines", and shooting legs killed them. Plan
+and stages: `Docs/ENEMY_AI_PLAN.md`.
+
+**Why legs killed.** A limb hit went into the one health pool at 0.6-0.8 of the round. A Grunt
+has 100 HP and the Service Rifle does 24, so six thigh rounds killed it. `EnemyWounds` only
+read the damage after `Health` had taken it.
+
+**The rule now.** `Hitbox.Receive` marks a hit on an arm or a leg `coreCapped`: the hit lands
+in full (wounds, pain, blood, the hit marker and `Damaged` all see the whole amount), but only
+`limbCoreShare` (0.3) of it comes off shield and health, and never below `limbCoreFloor`
+(15% of max). Blasts and melee are not capped, and neither are the head, neck or torso. A
+headshot is still raised to lethal by the same method. A capped hit at the floor is still a
+hit: `Health.ApplyDamage` returns and reports the full amount, so nothing that listens to
+`Damaged` goes quiet when the core stops moving. Do not "fix" that by returning the core share.
+
+**Limb states.** Each limb has its own health (`BodyDamageProfile`, as shares of max health,
+stretched by `woundResistance`). The states are Healthy, Wounded (20% of the limb gone),
+Crippled (all of it gone) and Severed (Stage 3). They only ever get worse. One crippled leg
+means a limp for life, on the right side. Two crippled legs, or one severed, put it on the
+ground for good. One crippled arm means the rifle is held low in the other hand
+(`OneHanded`, spread x3.5, bursts x1.8 apart). Two mean it drops the rifle and runs (or rushes
+in when the player is within 6 m). A boss limps at worst and never drops its weapon.
+
+**Why crawlers used to stand.** Two causes. The leg-pain pose was a kneel lasting 1-2 s that
+let go, which read as "went down, stood up". And the crawl was three bones tilted over the
+standing walk clip, so anything that owned the pose for a moment (a kick's get-up, the rage
+clip on the Action layer) drew a standing body over it. Now the leg pain is a short buckle on
+a sound leg only. The crawl is a state on the Injured animator layer that nothing leaves.
+A kick on a crawler throws it and it lands back in the crawl, the same way up it fell. The
+rage after a get-up needs two sound legs.
+
+**Moving by the clip.** Once it limps, crawls or gets up, `EnemyMotor` moves the body by the
+clip's root motion laid onto the navmesh through `NavMeshAgent.nextPosition`, and sets the
+agent's speed to what the clip covered. The limp is exactly as fast as the limp animation
+(walk 1.13 m/s as made, x1.1 for the body's size; run 1.93) and the feet never slide. The
+mind only picks the gait (`EnemyAI.RequestedPace`). The Animator's `OnAnimatorMove` reaches
+the motor through `EnemyRootMotion` on the body; with that component there, the Animator never
+moves the body by itself.
+
+**Knockdowns.** A kick or a fall is a ragdoll. Once it lands, it picks how long to lie
+(1.5-4 s, plus up to 2.5 s more at full pain), so no two are alike. Then `EnemyBody.Rise`
+reads which way up it lies (the chest's front against the sky), picks a get-up clip that
+starts that way (`EnemyBody.GetUps`; slow ones in pain), plays the clip's first moving frame,
+turns and moves the root until that frame's head-from-pelvis line and pelvis match the
+ragdoll's, and blends the ragdoll's pose into the clip over 0.3-0.6 s, last of everything in
+`LateUpdate`. Each Mixamo get-up starts with seconds of lying still: the table holds where the
+rise starts, and the clip is played from just before it.
+
+**The limp's side.** Mixamo's "Injured Walk"/"Run"/"Hurting Idle" favour the right leg and
+"Injured Walk Backwards" the left. That was measured from the clips, not guessed: the stiff
+knee (smallest bend range) and the foot that bears less weight. Mirrored copies (`_Mirror`,
+`FPSKitMixamoImport`) are the other side.
+
+Checks: FPSKit > Enemy AI > Run Limb Test (in the open editor; report and pictures in
+`Build/LimbTest`). Performance: FPSKit > Enemy AI > Measure 20 Enemies (`Build/Perf`).
+`VerifyWounds` still expects the old thresholds (a limp after one round, a crawl after three,
+a disarm from one arm) and the old built soldier's `EnemyDeath`. It is stale and needs
+rewriting against these rules before it is trusted again.

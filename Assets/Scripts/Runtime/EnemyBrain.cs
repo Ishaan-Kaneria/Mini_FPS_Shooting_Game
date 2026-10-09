@@ -111,6 +111,9 @@ public class EnemyBrain : MonoBehaviour
     float _nextCoverPick;
     float _flankSide;
     bool _fellBack;
+    bool _crawlCoverTried, _limpCoverTried;
+    bool _hasCrawlGoal;
+    Vector3 _crawlGoal;
     float _callAt = -1f;
     Vector3 _callAtPoint;
     float _scanAngle;
@@ -479,6 +482,16 @@ public class EnemyBrain : MonoBehaviour
     {
         _ai.ReportState(EnemyAI.State.Chase);
 
+        // On the ground for good, it does not go looking: it watches where the player was,
+        // from cover if it can drag itself to some.
+        if (_ai.Crawling)
+        {
+            LookPoint = _lastKnown + Vector3.up;
+            if (_hasCrawlGoal && !Reached(_crawlGoal)) { Doing = "crawling to cover"; _ai.MoveTo(_crawlGoal, 1f); }
+            else { Doing = "watching from the ground"; _ai.Hold(); }
+            return;
+        }
+
         if (!_hasGoal)
         {
             Vector3 centre = _lastKnown;
@@ -555,6 +568,25 @@ public class EnemyBrain : MonoBehaviour
             return;
         }
 
+        // Both arms gone, and the rifle with them: nothing to fight with at range. Close in,
+        // it goes for the player with what it has; further off, it runs.
+        var wounds = _wounds;
+        if (!_ai.ranged && wounds != null && wounds.Disarmed && distance > 6f)
+        {
+            Doing = "fleeing";
+            _ai.ReportState(EnemyAI.State.Retreat);
+            if (!_hasGoal || Reached(_goal))
+            {
+                Vector3 away = transform.position - target.position;
+                away.y = 0f;
+                Vector3 run = transform.position + (away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward) * 18f;
+                if (FindCover(target.position, 15f, 45f, out _cover)) { _goal = _cover; _hasGoal = true; }
+                else if (NavMesh.SamplePosition(run, out var far, 6f, NavMesh.AllAreas)) { _goal = far.position; _hasGoal = true; }
+            }
+            if (_hasGoal) _ai.MoveTo(_goal, runPace);
+            return;
+        }
+
         // Hands only: in it goes, as fast as its legs allow.
         if (!_ai.ranged)
         {
@@ -565,13 +597,39 @@ public class EnemyBrain : MonoBehaviour
             return;
         }
 
-        // On the floor: it stays and shoots from where it lies.
+        // On the floor for good: it drags itself to cover if there is some close by, and
+        // shoots from the ground -- on the way when it has a shot, and from there after.
         if (_ai.Crawling)
         {
+            if (!_crawlCoverTried)
+            {
+                _crawlCoverTried = true;
+                _hasCrawlGoal = FindCover(target.position, 3f, 60f, out _crawlGoal)
+                                && (_crawlGoal - transform.position).sqrMagnitude < 8f * 8f;
+            }
+            if (_hasCrawlGoal && Reached(_crawlGoal)) _hasCrawlGoal = false;
+
+            if (_sees && Time.time >= _reactAt && (!_hasCrawlGoal || Random.value < 0.02f) && _ai.TryAttack())
+            {
+                Doing = "firing from the ground";
+                return;
+            }
+            if (_hasCrawlGoal && !_ai.Attacking)
+            {
+                Doing = "crawling to cover";
+                _ai.MoveTo(_crawlGoal, 1f);
+                return;
+            }
             Doing = "fighting from the ground";
             _ai.Hold();
-            if (_sees && Time.time >= _reactAt) _ai.TryAttack();
             return;
+        }
+
+        // A leg just went: it gets to cover first, and fights from there.
+        if (!_limpCoverTried && wounds != null && wounds.Legs == EnemyWounds.LegState.Limping)
+        {
+            _limpCoverTried = true;
+            if (FindCover(target.position, 8f, 40f, out _cover)) { _hasCover = true; _goal = _cover; _hasGoal = true; }
         }
 
         // Pinned: a bullet cracked past. Break for cover hard, and keep the head down there

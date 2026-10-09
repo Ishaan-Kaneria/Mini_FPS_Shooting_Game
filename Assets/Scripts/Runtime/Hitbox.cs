@@ -44,6 +44,9 @@ public class Hitbox : MonoBehaviour
     /// instead would hand the shooter a hitmarker and a damage number for a body that
     /// took nothing.
     ///
+    /// A limb hit is capped (<see cref="DamageInfo.coreCapped"/>): it lands in full, but
+    /// only <see cref="EnemyWounds.CoreCapFor"/> of it comes off the core.
+    ///
     /// A headshot on something that cannot survive one is raised to the whole of what
     /// it has left, rather than killed on the side: it has to arrive as damage so the
     /// Damaged and Died events, the kill feed, the score and the stars all see exactly
@@ -59,6 +62,16 @@ public class Hitbox : MonoBehaviour
         if (owner != null && isHeadshot && info.amount > 0f && _wounds != null
             && _wounds.HeadshotIsLethal)
             info.amount = Mathf.Max(info.amount, owner.Current + owner.Shield + 1f);
+
+        // An arm or a leg takes the hit in full, but only a share reaches the core and
+        // never past the floor: a limb shot cripples, it does not kill. A blast or a blow
+        // is not a round through a limb, and finishes a body like anything else.
+        if (_wounds != null && owner != null && !info.fromBlast && !info.fromMelee
+            && (BodyParts.IsLeg(Part) || BodyParts.IsArm(Part)))
+        {
+            info.coreCapped = true;
+            info.coreCap = _wounds.CoreCapFor(info.amount);
+        }
 
         info.amount = owner != null ? owner.ApplyDamage(info) : 0f;
 

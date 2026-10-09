@@ -171,6 +171,8 @@ namespace FPSKit.EditorTools
                 root.AddComponent<EnemyBrain>();
 
                 var body = root.AddComponent<EnemyBody>();
+                root.AddComponent<EnemyMotor>();
+                model.AddComponent<EnemyRootMotion>();
                 body.animator = animator;
                 body.gun = gun;
                 body.rightGrip = rightGrip;
@@ -356,6 +358,23 @@ namespace FPSKit.EditorTools
             Move("Strike", "elbow chop", "Strike", 1.15f);
             Move("StrikeB", "knee strike", "StrikeB", 1.1f);
 
+            // A stumble on the move when pain spikes: over the legs as well, so it plays out
+            // whole and then lets go.
+            controller.AddParameter("Stumble", AnimatorControllerParameterType.Trigger);
+            {
+                var st = actionMachine.AddState("Stumble");
+                st.motion = Mixamo("Injured/Stumble_Jog");
+                st.speed = 1.1f;
+                var into = actionMachine.AddAnyStateTransition(st);
+                into.AddCondition(AnimatorConditionMode.If, 0f, "Stumble");
+                into.duration = 0.12f;
+                into.canTransitionToSelf = false;
+                var back = st.AddTransition(idle);
+                back.hasExitTime = true;
+                back.exitTime = 0.85f;
+                back.duration = 0.2f;
+            }
+
             var action = new AnimatorControllerLayer
             {
                 name = "Action",
@@ -363,10 +382,91 @@ namespace FPSKit.EditorTools
                 defaultWeight = 0f,
                 blendingMode = AnimatorLayerBlendingMode.Override,
             };
-            controller.layers = new[] { layer, action };
+            controller.layers = new[] { layer, Injured(controller), action };
 
             EditorUtility.SetDirty(controller);
             return controller;
+        }
+
+        /// <summary>
+        /// The hurt body, over the walk: the limp on either leg, the crawl face down or face up,
+        /// and the get-ups (Mixamo clips, Assets/Animations/Mixamo). EnemyBody raises the
+        /// layer's weight and picks the state; EnemyMotor drives "Pace" (-1 back, 0 still,
+        /// 1 walk, 2 run) and moves the body by the clip's own root motion, so the feet and
+        /// the ground agree. States are named for EnemyBody (EnemyBody.GetUps).
+        /// </summary>
+        static AnimatorControllerLayer Injured(AnimatorController controller)
+        {
+            controller.AddParameter("Pace", AnimatorControllerParameterType.Float);
+            // How fast a get-up plays: quicker when it is not hurt (EnemyBody.quickRiseSpeed).
+            controller.AddParameter(new AnimatorControllerParameter { name = "RiseSpeed", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
+
+            var machine = new AnimatorStateMachine { name = "Injured" };
+            AssetDatabase.AddObjectToAsset(machine, controller);
+            var empty = machine.AddState("Empty");
+            machine.defaultState = empty;
+
+            BlendTree Tree(string name, params (string clip, float at)[] kids)
+            {
+                var tree = new BlendTree
+                {
+                    name = name,
+                    blendType = BlendTreeType.Simple1D,
+                    blendParameter = "Pace",
+                    useAutomaticThresholds = false,
+                };
+                AssetDatabase.AddObjectToAsset(tree, controller);
+                foreach (var (clip, at) in kids) tree.AddChild(Mixamo(clip), at);
+                return tree;
+            }
+
+            void State(string name, Motion motion, float speed = 1f)
+            {
+                var st = machine.AddState(name);
+                st.motion = motion;
+                st.speed = speed;
+                st.writeDefaultValues = false;
+            }
+
+            // The Mixamo limps favour the right leg (Limp_Back the left); the mirrors are the
+            // other side. Measured: the stiff knee and the foot that carries less weight.
+            State("LimpRight", Tree("LimpRight", ("Injured/Limp_Back_Mirror", -1f), ("Injured/Injured_HoldLeg_Idle", 0f),
+                                    ("Injured/Limp_Walk", 1f), ("Injured/Limp_Run", 2f)));
+            State("LimpLeft", Tree("LimpLeft", ("Injured/Limp_Back", -1f), ("Injured/Injured_HoldLeg_Idle_Mirror", 0f),
+                                   ("Injured/Limp_Walk_Mirror", 1f), ("Injured/Limp_Run_Mirror", 2f)));
+            // Face down: dragging itself on its arms, or flat with the rifle up. The drag is
+            // 0.1 m/s as made; played faster so cover is reachable in a fight.
+            State("CrawlDown", Tree("CrawlDown", ("Crawl/Crawl_Back_Stomach", -1f), ("Crawl/Prone_Idle_Rifle", 0f),
+                                    ("Crawl/Crawl_Drag", 1f)), 1.5f);
+            // Face up: propped on its hands and pushing itself away, facing the threat.
+            State("CrawlUp", Tree("CrawlUp", ("Deaths/Death_OnGround", 0f), ("Crawl/Crawl_Back_Fear", 1f)));
+
+            foreach (var g in EnemyBody.GetUps)
+            {
+                State(g.state, Mixamo("GetUp/" + g.state));
+                var st = System.Array.Find(machine.states, c => c.state.name == g.state).state;
+                st.speedParameter = "RiseSpeed";
+                st.speedParameterActive = true;
+            }
+
+            return new AnimatorControllerLayer
+            {
+                name = "Injured",
+                stateMachine = machine,
+                defaultWeight = 0f,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+            };
+        }
+
+        /// <summary>A Mixamo clip by its path under Assets/Animations/Mixamo, "_Mirror" for the mirrored copy.</summary>
+        static AnimationClip Mixamo(string path)
+        {
+            string name = System.IO.Path.GetFileName(path);
+            string file = path.EndsWith("_Mirror") ? path.Substring(0, path.Length - "_Mirror".Length) : path;
+            foreach (var a in AssetDatabase.LoadAllAssetsAtPath($"{FPSKitMixamoImport.Root}{file}.fbx"))
+                if (a is AnimationClip c && c.name == name) return c;
+            Debug.LogWarning("[FPSKit] Rigged soldier: no Mixamo clip " + path);
+            return null;
         }
 
         static AnimationClip Fighter(string name)

@@ -136,10 +136,14 @@ public class EnemyArchetype : ScriptableObject
     public EnemyVoice.Kind voice = EnemyVoice.Kind.Human;
 
     [Tooltip("How much punishment its limbs take before a wound changes how it fights, " +
-             "0 to 1. At 0 a couple of rounds in the leg put it on the floor and one " +
-             "through the gun arm makes it drop the rifle; at 1 it limps at worst and " +
-             "never lets go of the weapon. Bosses ignore headshot kills whatever this says.")]
+             "0 to 1: stretches every part's health in the body profile (by its resistanceStretch). " +
+             "A boss never crawls, never drops its weapon and never dies to one headshot, whatever this says.")]
     [Range(0f, 1f)] public float woundResistance = 0.2f;
+
+    [Tooltip("This type's body: limb health, when a limb is wounded or crippled, how much of a " +
+             "limb hit reaches its health, pain. Made per type by FPSKit > Enemy AI > Make Body " +
+             "Profiles; empty uses the soldier's own.")]
+    public BodyDamageProfile bodyProfile;
 
     [Header("Reward")]
     [Min(0)] public int scoreValue = 100;
@@ -213,6 +217,11 @@ public class EnemyArchetype : ScriptableObject
 
         var wounds = enemy.GetComponent<EnemyWounds>();
         if (wounds != null) wounds.Configure(this);
+
+        // Every hitbox reads this type's multipliers too, at the moment of the hit.
+        if (bodyProfile != null)
+            foreach (var box in enemy.GetComponentsInChildren<Hitbox>(true))
+                box.profile = bodyProfile;
 
         var voiceBox = enemy.GetComponent<EnemyVoice>();
         if (voiceBox != null) voiceBox.kind = voice;

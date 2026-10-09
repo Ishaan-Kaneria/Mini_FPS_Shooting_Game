@@ -59,6 +59,7 @@ public class EnemyVoice : MonoBehaviour
     float _pitch = 1f;
     float _nextPain;
     float _nextHunt;
+    float _nextGroan;
     bool _alerted;
 
     /// <summary>When the level may next hear a hunting sound, from any enemy.</summary>
@@ -113,6 +114,13 @@ public class EnemyVoice : MonoBehaviour
     void Update()
     {
         if (_ai == null || _health == null || _health.IsDead) return;
+
+        // In bad pain it groans now and then, between the screams.
+        if (_wounds != null && _wounds.InHighPain && Time.time >= _nextGroan)
+        {
+            _nextGroan = Time.time + Random.Range(3f, 6.5f);
+            if (Time.time >= _nextPain) Say(VoiceBank.Pick(Voice?.pain), painVolume * 0.6f);
+        }
 
         if (!_alerted && _ai.HasSpotted)
         {

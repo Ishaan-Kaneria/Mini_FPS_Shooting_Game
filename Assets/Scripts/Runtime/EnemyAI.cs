@@ -308,6 +308,7 @@ public class EnemyAI : MonoBehaviour
         if ((_agent.destination - destination).sqrMagnitude > 0.36f || !_agent.hasPath) _agent.SetDestination(destination);
 
         float multiplier = Mathf.Clamp(speedShare, 0.05f, 1.3f);
+        RequestedPace = multiplier;
         if (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound)
             multiplier = Mathf.Min(multiplier, 1f) * _wounds.MoveSpeedMultiplier;
 
@@ -316,6 +317,13 @@ public class EnemyAI : MonoBehaviour
 
     /// <summary>Stands where it is.</summary>
     public void Hold() => Stop();
+
+    /// <summary>
+    /// The pace the mind last asked for, as a share of full speed, before wounds: 0.55 a
+    /// walk, 1 and over a run. A body that moves by its animation (EnemyMotor) picks its
+    /// gait from this and lets the clip set the speed.
+    /// </summary>
+    public float RequestedPace { get; private set; }
 
     /// <summary>Has got where it was sent (or has nowhere to go).</summary>
     public bool Arrived => _agent == null || !_agent.enabled || !_agent.isOnNavMesh
@@ -786,6 +794,7 @@ public class EnemyAI : MonoBehaviour
         if (CurrentState == State.Retreat) multiplier = retreatSpeedMultiplier;
         else if (Time.time < _chargeUntil) multiplier = chargeSpeedMultiplier;
         else if (ranged && canSee) multiplier = aimMoveSpeedMultiplier;
+        RequestedPace = multiplier;
 
         // A wound caps it rather than scaling it. A limping enemy does not get its limp
         // back by charging, and a crawler drags itself along at one pace whatever the
@@ -1036,7 +1045,8 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
-        _nextAttackTime = Time.time + attackCooldown;
+        // A hurt arm is slower to bring the rifle back on and to reload.
+        _nextAttackTime = Time.time + attackCooldown * (_wounds != null ? _wounds.FireIntervalMultiplier : 1f);
         _attacking = false;
         _attackRoutine = null;
     }

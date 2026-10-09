@@ -974,6 +974,9 @@ namespace FPSKit.EditorTools
                     a.shieldDropChance = 1f;
                     break;
             }
+
+            // Its own body: limb health, thresholds, pain (made once, then tuned by hand).
+            a.bodyProfile = FPSKitBodyProfiles.GetOrCreate(displayName);
         }
 
         // ==================================================================

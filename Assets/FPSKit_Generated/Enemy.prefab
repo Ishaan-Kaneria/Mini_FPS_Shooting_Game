@@ -3496,6 +3496,7 @@ GameObject:
   - component: {fileID: 1880353111154081295}
   - component: {fileID: 5377984926513354841}
   - component: {fileID: 4744877920839733982}
+  - component: {fileID: 5632927864980242109}
   m_Layer: 9
   m_Name: Enemy
   m_TagString: Enemy
@@ -3759,15 +3760,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce131d9c62f52f88382497fe40d2be8d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyWounds
-  limpAt: 0.14
-  crawlAt: 0.34
-  limpSpeed: 0.6
-  crawlSpeed: 0.28
-  shakyAimAt: 0.08
-  disarmAt: 0.3
-  woundedSpread: 2.4
+  profile: {fileID: 0}
   headshotStagger: 0.9
-  resistanceStretch: 2.5
   burstWindow: 0.15
 --- !u!114 &2344973558938156951
 MonoBehaviour:
@@ -3829,6 +3823,8 @@ MonoBehaviour:
   animator: {fileID: 3987893882976663574}
   mainCollider: {fileID: 0}
   deathImpulse: 6
+  settleSeconds: 0.6
+  maxSettleSeconds: 7
 --- !u!114 &1880353111154081295
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3928,10 +3924,35 @@ MonoBehaviour:
   aimLimit: 70
   reactionScale: 1
   lieSeconds: 1.5
+  lieSecondsMax: 4
+  painLieSeconds: 2.5
   maxDownSeconds: 4.5
   getUpSeconds: 1.6
+  riseBlend: {x: 0.3, y: 0.6}
+  quickRiseSpeed: 1.3
+  slowRisePain: 0.5
+  collapseSpeed: 1.2
+  stumbleCooldown: 3.5
   rageSeconds: 7
   rageMoveSeconds: 1.25
+--- !u!114 &5632927864980242109
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6852379658114732486}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8dea6ab4a61af110589a4e63736523e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyMotor
+  limpTurnRate: 140
+  crawlTurnRate: 55
+  turnFirstAngle: 70
+  paceDamping: 0.3
+  runPaceShare: 0.95
+  backOffAngle: 125
 --- !u!1 &6997618155838552525
 GameObject:
   m_ObjectHideFlags: 0
@@ -4207,6 +4228,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6369260773502056669}
   - component: {fileID: 3987893882976663574}
+  - component: {fileID: 3670146877010614558}
   m_Layer: 9
   m_Name: Body
   m_TagString: Untagged
@@ -4260,6 +4282,18 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &3670146877010614558
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7450592132504481839}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 747ec900fc2047cf58239cfe5a246a30, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyRootMotion
 --- !u!1 &7704363279272308508
 GameObject:
   m_ObjectHideFlags: 0

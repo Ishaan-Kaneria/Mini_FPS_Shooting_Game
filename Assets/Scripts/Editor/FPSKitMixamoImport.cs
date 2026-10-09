@@ -92,9 +92,9 @@ namespace FPSKit.EditorTools
             return false;
         }
 
-        /// <summary>Cycles: walks, runs, crawls, idles, strafes.</summary>
+        /// <summary>Cycles: walks, runs, crawls, idles, strafes. "Move_" is the 8-way rifle set.</summary>
         static bool Loops(string name) =>
-            Has(name, "Idle", "Limp_", "Crawl_", "Pistol_Walk", "Pistol_Run", "Pistol_Strafe", "Cover_Sneak");
+            Has(name, "Idle", "Move_", "Limp_", "Crawl_", "Pistol_Walk", "Pistol_Run", "Pistol_Strafe", "Cover_Sneak");
 
         /// <summary>Clips whose root turns on purpose.</summary>
         static bool Turns(string name) => Has(name, "Turn");

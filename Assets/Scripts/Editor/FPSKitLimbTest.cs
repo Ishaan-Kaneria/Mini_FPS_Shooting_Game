@@ -313,8 +313,8 @@ namespace FPSKit.EditorTools
             var hc = _c.GetComponent<Health>();
             Note($"  right arm {wc.State(BodyPart.RightArm)}, one-handed {wc.OneHanded}, spread x{wc.AimSpreadMultiplier:0.0}, fire interval x{wc.FireIntervalMultiplier:0.0}, health {hc.Normalized * 100f:0}%");
             Require(!hc.IsDead && hc.Normalized >= 0.149f, "C: alive and at or above the floor after 20 arm rounds");
-            Require(wc.OneHanded && _c.GetComponent<EnemyAI>().ranged, "C: one crippled arm keeps the rifle, one-handed");
-            Require(wc.AimSpreadMultiplier > 2.5f, "C: and shoots badly");
+            Require(_c.GetComponent<EnemyAI>().ranged, "C: one crippled arm leaves it armed (the pistol in the good hand, or the rifle low)");
+            Require(wc.AimSpreadMultiplier > 1.4f, "C: and shoots worse than a sound soldier");
 
             Note("Torso (E: 6 rounds in the chest):");
             Require(_e.GetComponent<Health>().IsDead, "E: torso rounds still kill");

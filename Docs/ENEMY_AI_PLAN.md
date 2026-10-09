@@ -289,3 +289,36 @@ should go through Git LFS with the other packs (open decision below).
   DESIGN_NOTES).
 - Still to download before Stage 5: Mixamo "Reload" x3 (run, crouch, walk variants) and
   "Injured Stumble Idle" (Firefox dropped them).
+
+**Fixes before Stage 2, and Stage 2 (sections 4-5 and the Stage 1 leftovers), 2026-10-09/10.**
+
+- Fix 2, his correction "everything after the fall is too slow": ground 1-2.5 s (+1 at full
+  pain, +0.5 wounded), with small movements (groans, a hand to the wound, a little roll); each
+  get-up trimmed to its real rise and played at whatever speed fits 1.5-2.5 s (0.85-1.8x, slow
+  clips in pain); a brief recovery (0.2-0.4 s stagger, hand to the knee, a look), the rifle back
+  (0.5 s), then 0.4-0.8 s before the first shot (scaled by aggression). All on `BodyDamageProfile`.
+- Fix 1, the rifle's weight: `EnemyRifle`. A fall at under 4 m/s keeps it on a sling (a 3.5 kg
+  body on a damped, limited strap from the chest); over 10 m/s knocks it out of the hands; in
+  between the chance rises with speed (a full kick, about 7.7, drops it about 60% of the time).
+  Standing again: the hand brings it up off the sling, or it walks over, crouches and picks it up
+  (within 5 m, the player at least 8 m off), or goes to the pistol. Held, it hangs on a spring
+  under the hand: it lags and settles when the body starts, stops or turns.
+- Stage 2: rifle movement in eight directions (walk, run, sprint, crouch) by root motion with the
+  agent following (`EnemyMotor`); a separate Idle state with calm variations per soldier, tempo
+  and phase differing per soldier; quarter turns on the spot, run start and stop; additive aim
+  down the spine with the head leading (`EnemyBody.RigAim`); left-hand IK on the handguard;
+  foot IK on slopes and steps (`EnemyFootIK`); physical hit reactions (springs in the upper body,
+  legs still animated; the head's snap kept); the pistol for a crippled arm or a lost rifle; the
+  face-up crawler shifting and breathing; the rifle carried at the chest in a hobbling run.
+- **Animation Rigging is installed but not used.** Its aim constraints set a bone's rotation
+  outright and straightened the bladed stance the Mixamo rifle clips are made in (chest twisted
+  37 degrees off the target); a rig's weight set from script was put back by the rig's own pass
+  every frame, so the left hand could not be eased on and off. Both are done in our own code
+  (additive spine turn; weighted two-bone IK). Remove the package unless a later stage needs it.
+- Two traps found: an idle clip at the centre of a movement blend tree stretches every clip to
+  its length (the walk ran at a third of its speed), so standing still is its own state; and
+  reparenting anything into the Animator's hierarchy in play makes it rebind, so weapons stay
+  children of the root and are laid on sockets each frame. Write Defaults off on every state.
+- Tests: pose check (FPSKit > Enemy AI > Run Pose Check) and the limb test with the rifle in
+  each fall: all pass. Performance with 20 enemies: player loop 15.8 -> 18.1 ms mean (13.5 ->
+  17.1 median), animation 0.27 -> about 1.0 ms. `Build/Perf/enemies_stage2.txt`.

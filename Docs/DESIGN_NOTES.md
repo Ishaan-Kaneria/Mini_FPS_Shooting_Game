@@ -2845,3 +2845,53 @@ Checks: FPSKit > Enemy AI > Run Limb Test (in the open editor; report and pictur
 `VerifyWounds` still expects the old thresholds (a limp after one round, a crawl after three,
 a disarm from one arm) and the old built soldier's `EnemyDeath`. It is stale and needs
 rewriting against these rules before it is trusted again.
+
+## The rifle weighs something, and the body moves by its clips (2026-10-10, enemy AI Stage 2)
+
+**Root motion for every gait.** `EnemyMotor` moves the enemy by the clip and lays each frame's
+motion onto the navmesh through `NavMeshAgent.nextPosition`; the agent plans and follows. The
+eight-way rifle blend sits each clip at the velocity it was made at (walk 1.84, run 4.54, sprint
+6.8 m/s at the clips' size; x1.18 on this body), and the motor feeds it the body's wanted
+velocity in its own space, so strafing and backing off with the rifle up need no special case.
+
+**Never put a long idle at the centre of a movement blend tree.** A blend tree keeps all its
+clips on one cycle as long as their weighted average: a 9 s idle at a quarter weight stretched
+the walk cycle to about 3 s and the walker covered a third of its distance. Standing still is
+its own state (`Idle`); the centre of `Move` is a short aiming idle retimed to a stride
+(`ChildMotion.timeScale`). Measure speed through the whole pipeline before trusting a blend.
+
+**Never reparent into the Animator's hierarchy in play.** Doing it makes the Animator rebind;
+a rebind takes every bound value of that moment as its default, and states that write defaults
+put it back each frame. It froze the left hand's weight on a rifle that had gone on the back.
+So the rifle and pistol are children of the root and are laid each frame on sockets that are in
+the skeleton from the start (`EnemyRifle.Follow`, `EnemyBody.HoldPistol`). Write Defaults is off
+on every state (`FPSKitRiggedSoldier.LocomotionController`). The blood wounds that `EnemyGore`
+parents to bones on a hit are the remaining case; with Write Defaults off they are harmless, but
+watch for it if anything bound to the Animator starts snapping back after a hit.
+
+**Animation Rigging did not fit.** Its aim constraint sets a bone's rotation outright, which
+straightened the bladed stance the Mixamo rifle clips stand in, and a rig's weight set from
+script was overwritten by the rig's own pass. The aim is an additive turn: measure where the
+clip's rifle points, turn spine, chest and upper chest by the difference (head first, then chest,
+then the body). The left hand is a weighted two-bone IK (`SolveWeighted`: solve fully, then ease
+each bone back by the weight -- easing only the target still swings the elbow into the pole's
+plane at any weight above nothing).
+
+**The rifle in a fall** (`EnemyRifle.OnFall`): the speed of the fall picks sling or drop
+(profile: under 4 m/s sling, over 10 drop, between by chance). The sling is a 3.5 kg body on a
+`ConfigurableJoint` to the chest's ragdoll body: 16 cm of slack, 35 degrees of swing, a slerp
+damper; the drop is a free body with a grippy, dead material. Getting it back: the right hand
+reaches for it where it hangs (IK) and brings it up; or the enemy walks to it, crouches and picks
+it up; or it goes without and draws the pistol. The mind waits while the body is busy
+(`EnemyBody.Busy`).
+
+**The pistol needs its own upper body.** The pistol clips' arms point ahead only with their own
+twist of the torso; laid over the rifle stance's torso (arms-only mask) the arm pointed 57
+degrees off and the aim twisted the chest back across it. So the `Sidearm` layer masks the whole
+upper body, while `Carry` (the rifle over a limp or a calm idle) masks only the arms so the limp's
+torso comes through. Mixamo's pistol idle kicks its legs about, so standing with a pistol is the
+normal idle with the pistol walk's upper body.
+
+Checks: FPSKit > Enemy AI > Run Pose Check (hold, aim, walk speed, both pistols) and Run Limb
+Test (now with the rifle in each fall). Get-up timings and the rifle numbers are on
+`BodyDamageProfile` ("Knockdown and getting up", "The rifle in a fall").

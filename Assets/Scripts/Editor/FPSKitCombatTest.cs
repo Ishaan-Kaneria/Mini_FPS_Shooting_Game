@@ -323,7 +323,7 @@ namespace FPSKit.EditorTools
                         _punchKilled = target.IsDead;
                         _gunLowered = melee.weapon != null && melee.weapon.IsLowered;
 
-                        Notes.Append($"\n  jab at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
+                        Notes.Append($"\n  rifle butt at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
                                      $"hit {(hit != null ? hit.name : "nothing")} ({_punchRole}): pool " +
                                      $"{_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0}");
 

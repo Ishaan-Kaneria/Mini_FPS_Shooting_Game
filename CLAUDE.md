@@ -116,7 +116,10 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Limb states (Healthy, Wounded, Crippled, Severed) never improve: one crippled leg limps for
   life, two (or a severed one) crawl for life, and nothing stands a crawler up. Tuning is one
   `BodyDamageProfile` per type (`EnemyArchetype.bodyProfile`, `FPSKitBodyProfiles`). A hurt
-  body moves by its clip's root motion with the agent following (`EnemyMotor`). Enemy body changes:
+  body moves by its clip's root motion with the agent following (`EnemyMotor`; every gait since
+  Stage 2). Never reparent anything into the enemy's Animator hierarchy in play (it rebinds and
+  freezes values): weapons are root children laid on sockets each frame. Write Defaults stays off.
+  Standing still is its own state: no long idle at a movement blend tree's centre. Enemy body changes:
   FPSKit > Enemy > Build Rigged Soldier, then FPSKit > Enemy AI > Run Limb Test (open editor).
   Blood materials: `_BlendModePreserveSpecular` 0, low smoothness. Blood obeys `GameSettings.Blood`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);

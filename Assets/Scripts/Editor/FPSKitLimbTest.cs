@@ -92,6 +92,7 @@ namespace FPSKit.EditorTools
             _bMaxHips = 0f; _bWatching = false;
             _dKicks = 0; _dKickAt = -1f; _dRiseAt = -1f; _dWasRising = false; _dWasDown = false;
             _dMaxHipsStep = 0f; _dMaxBoneStep = 0f; _dMaxJerk = 0f; _dMaxSpin = 0f; _dFalls.Clear();
+            _rifleLog.Clear(); _rifleBad = 0; _rifleInHandWhileDown = false; _rifleUpAt = -1f;
             _aMoveTime = 0f; _aMoveDist = 0f;
             FPSKitPlayMode.SuspendStartScene();
             _realStart = EditorApplication.timeSinceStartup;
@@ -124,7 +125,7 @@ namespace FPSKit.EditorTools
                         Watch();
                         float t = Time.time - _t0;
                         while (_next < _script.Count && t >= _script[_next].at) _script[_next++].act();
-                        if (_fallsOnly && _dFalls.Count >= 3 && _d != null && !_d.GetComponent<EnemyBody>().IsDown && _next < _script.Count)
+                        if (_fallsOnly && _dFalls.Count >= 3 && _rifleLog.Count >= 3 && _d != null && !_d.GetComponent<EnemyBody>().IsDown && _next < _script.Count)
                             _script[_next++].act();
                         if (_next >= _script.Count) Finish();
                         return;
@@ -216,7 +217,7 @@ namespace FPSKit.EditorTools
             if (_fallsOnly)
             {
                 s.Add((1f, () => Kick(_d)));
-                s.Add((30f, CheckFalls));
+                s.Add((45f, CheckFalls));
                 return s;
             }
             // A: twenty rounds through the left thigh, a tenth of a second apart.
@@ -269,7 +270,13 @@ namespace FPSKit.EditorTools
             Vector3 away = enemy.transform.position - _player.transform.position;
             away.y = 0f;
             ai.Knock((away.normalized + Vector3.up * 0.25f) * 7.5f, 1.5f);
-            if (enemy == _d) { _dKickAt = Time.time; _dKicks++; }
+            if (enemy == _d)
+            {
+                _dKickAt = Time.time; _dKicks++;
+                var rifle = _d.GetComponent<EnemyRifle>();
+                _rifleNow = $"fall {_dKicks}: rifle {(rifle != null ? rifle.State.ToString().ToLower() : "none")}";
+                _rifleChestMax = 0f; _rifleRest = -1f; _rifleUpAt = -1f; _rifleShot = false;
+            }
         }
 
         static void CheckLegsAndArms()
@@ -330,6 +337,11 @@ namespace FPSKit.EditorTools
             Note($"  each get-up, from the ragdoll to 0.6 s after standing, 30 fps: fastest pelvis {_dMaxHipsStep * 100f:0.0} cm/frame, fastest bone {_dMaxBoneStep:0.0} deg/frame");
             Note($"  biggest sudden change: pelvis {_dMaxJerk * 100f:0.0} cm/frame at {_dJerkAt:0.00} s in, a bone {_dMaxSpin:0.0} deg/frame at {_dSpinAt:0.00} s in ({_dSpinBone}, {_dSpinRise}, {_dSpinWhen})");
             Require(_dFalls.Count >= 2, $"D: got up from at least two kicks ({_dFalls.Count})");
+            Note("  The rifle in each fall:");
+            foreach (var r in _rifleLog) Note("    " + r);
+            Require(_rifleLog.Count >= 2, $"D: the rifle came back (or was given up) after at least two falls ({_rifleLog.Count})");
+            Require(_rifleBad == 0, "D: the slung rifle stayed within 60 cm of the chest and a dropped one lay within 20 cm of the ground");
+            Require(!_rifleInHandWhileDown, "D: the rifle never stayed fixed to the hand while it lay on the ground");
             // 8 cm: just above the sharpest the get-up clips are themselves (Zombie Stand Up lurches
             // its pelvis 6.9 cm/frame at 30 fps, by design). Anything past it is ours.
             Require(_dMaxJerk < 0.08f, "D: no pelvis pop (its frame-to-frame speed never changes by 8 cm/frame or more, the clips' own sharpest)");
@@ -360,6 +372,7 @@ namespace FPSKit.EditorTools
 
             var d = _d != null ? _d.GetComponent<EnemyBody>() : null;
             if (d == null) return;
+            WatchRifle(d);
             bool rising = d.Rising;
             if (!rising && _dWasRising) _dRiseEnd = Time.time;
             if (rising && !_dWasRising) _dRiseEnd = -1f;
@@ -400,12 +413,50 @@ namespace FPSKit.EditorTools
             // Up again: kick it once more, after a breath.
             bool down = d.IsDown;
             if (_dWasDown && !down && _dKicks < 3) _nextKick = Time.time + 1.5f;
-            if (_nextKick > 0f && Time.time >= _nextKick) { _nextKick = -1f; Kick(_d); }
+            var dRifle = _d.GetComponent<EnemyRifle>();
+            bool rifleSettled = dRifle == null || dRifle.State == EnemyRifle.Hold.Held || dRifle.Lost;
+            if (_nextKick > 0f && Time.time >= _nextKick && rifleSettled) { _nextKick = -1f; Kick(_d); }
             _dWasDown = down;
             _dWasRising = rising;
         }
 
         static int _pendingPictures;
+        static string _rifleNow = "";
+        static float _rifleChestMax, _rifleRest = -1f, _rifleUpAt = -1f;
+        static bool _rifleShot, _rifleInHandWhileDown;
+        static readonly List<string> _rifleLog = new List<string>();
+        static int _rifleBad;
+
+        /// <summary>D's rifle through each fall: on the sling or on the ground while it lies, then back in the hands.</summary>
+        static void WatchRifle(EnemyBody d)
+        {
+            var rifle = _d.GetComponent<EnemyRifle>();
+            if (rifle == null || d.gun == null) return;
+            var anim = _d.GetComponentInChildren<Animator>();
+            var chest = anim.GetBoneTransform(HumanBodyBones.UpperChest);
+            if (d.IsDown && !d.Rising)
+            {
+                if (rifle.State == EnemyRifle.Hold.Slung) _rifleChestMax = Mathf.Max(_rifleChestMax, Vector3.Distance(d.gun.position, chest.position));
+                if (rifle.State == EnemyRifle.Hold.Dropped)
+                {
+                    var rb = d.gun.GetComponent<Rigidbody>();
+                    if (rb != null && rb.linearVelocity.sqrMagnitude < 0.01f
+                        && Physics.Raycast(d.gun.position + Vector3.up * 0.5f, Vector3.down, out var hit, 3f, 1 << LayerMask.NameToLayer("Environment")))
+                        _rifleRest = d.gun.position.y - hit.point.y;
+                }
+                if (d.gun.IsChildOf(_d.transform) && rifle.State != EnemyRifle.Hold.OnBack) _rifleInHandWhileDown = true;
+                if (!_rifleShot && Time.time - _dKickAt > 2.2f) { _rifleShot = true; Picture(_d, $"D_fall{_dKicks}_rifle_{rifle.State.ToString().ToLower()}"); }
+            }
+            if (!d.IsDown && _dKickAt > 0f && _rifleUpAt < 0f && (rifle.State == EnemyRifle.Hold.Held || rifle.Lost))
+            {
+                _rifleUpAt = Time.time;
+                string rest = _rifleChestMax > 0f ? $"hung up to {_rifleChestMax * 100f:0} cm from the chest" : _rifleRest >= 0f ? $"lay {_rifleRest * 100f:0} cm above the ground" : "no reading on the ground";
+                string after = rifle.Lost ? "went without it" : $"held again {Time.time - _dKickAt:0.0} s after the kick";
+                _rifleLog.Add($"{_rifleNow}; {rest}; {after}");
+                if (_rifleChestMax > 0.6f) _rifleBad++;
+                if (_rifleRest > 0.2f) _rifleBad++;
+            }
+        }
         static float _nextKick = -1f;
 
         static Vector3 _poseStart, _walkLast;

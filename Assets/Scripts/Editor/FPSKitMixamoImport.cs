@@ -18,7 +18,8 @@ namespace FPSKit.EditorTools
     ///   the root stays on the ground.
     /// - Horizontal root motion is kept on anything that travels (walks, crawls, starts,
     ///   stops, get-ups) and baked on anything that stands in place (idles, hits, reloads).
-    /// - A limp is downloaded for one leg; a mirrored copy ("_Mirror") gives the other.
+    /// - A limp is downloaded for one leg; a mirrored copy ("_Mirror") gives the other. The
+    ///   pistol clips are mirrored too, for a pistol in the left hand.
     /// </summary>
     public class FPSKitMixamoImport : AssetPostprocessor
     {
@@ -104,7 +105,7 @@ namespace FPSKit.EditorTools
             Has(name, "Idle", "Hit_", "Reload_", "Throw_", "Signal_", "Death_", "Melee_");
 
         /// <summary>One-sided clips that need the other side too.</summary>
-        static bool Mirrored(string name) => Has(name, "Limp_", "Injured_HoldLeg");
+        static bool Mirrored(string name) => Has(name, "Limp_", "Injured_HoldLeg", "Pistol_");
     }
 }
 #endif

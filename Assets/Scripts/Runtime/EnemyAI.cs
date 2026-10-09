@@ -325,13 +325,34 @@ public class EnemyAI : MonoBehaviour
     /// </summary>
     public float RequestedPace { get; private set; }
 
+    /// <summary>Its full speed in metres a second, before pace, wounds and level.</summary>
+    public float BaseSpeed => _baseSpeed;
+
+    /// <summary>Set by the mind: down behind something, or keeping its head down under fire.</summary>
+    [System.NonSerialized] public bool WantCrouch;
+
+    EnemyMotor _motorCache;
+    bool _motorLooked;
+    EnemyMotor Motor
+    {
+        get
+        {
+            if (!_motorLooked) { _motorCache = GetComponent<EnemyMotor>(); _motorLooked = true; }
+            return _motorCache;
+        }
+    }
+
     /// <summary>Has got where it was sent (or has nowhere to go).</summary>
     public bool Arrived => _agent == null || !_agent.enabled || !_agent.isOnNavMesh
                            || (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance + 0.4f);
 
-    /// <summary>Turns the body to face a point, at a rate.</summary>
+    /// <summary>
+    /// Turns the body to face a point, at a rate. A body moved by its animation (EnemyMotor)
+    /// is turned by the motor instead, head first and at a body's pace: the point is handed to it.
+    /// </summary>
     public void FaceTowards(Vector3 point, float rate)
     {
+        if (Motor != null && Motor.RootMotion) { Motor.Face(point); return; }
         Vector3 flat = point - transform.position;
         flat.y = 0f;
         if (flat.sqrMagnitude < 0.001f) return;
@@ -946,6 +967,7 @@ public class EnemyAI : MonoBehaviour
 
     void FaceTarget()
     {
+        if (Motor != null && Motor.RootMotion) { Motor.Face(target.position); return; }
         Vector3 flat = target.position - transform.position;
         flat.y = 0f;
         if (flat.sqrMagnitude < 0.001f) return;

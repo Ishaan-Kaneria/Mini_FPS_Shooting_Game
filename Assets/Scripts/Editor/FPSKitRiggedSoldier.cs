@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Animations.Rigging;
 using Object = UnityEngine.Object;
 
 namespace FPSKit.EditorTools
@@ -172,12 +173,17 @@ namespace FPSKit.EditorTools
 
                 var body = root.AddComponent<EnemyBody>();
                 root.AddComponent<EnemyMotor>();
+                root.AddComponent<EnemyRifle>();
                 model.AddComponent<EnemyRootMotion>();
                 body.animator = animator;
                 body.gun = gun;
                 body.rightGrip = rightGrip;
                 body.leftGrip = leftGrip;
                 body.garments = garments;
+
+                // ---- the rifle in the right hand, the left hand on it, the aim ----
+                if (gun != null) HoldRifle(animator, root.transform, gun, rightGrip, leftGrip, body);
+                model.AddComponent<EnemyFootIK>();
 
                 // Held at the shoulder: the rear sight a hand in front of the eye and a little
                 // below it, the shoulder it pivots on where the arm meets the body.
@@ -292,9 +298,23 @@ namespace FPSKit.EditorTools
         // ==================================================================
 
         /// <summary>
-        /// Idle, walk and run, blended by the agent's speed in metres a second. The pack's
-        /// clips are in place, so the thresholds are the speeds they were made for (the
-        /// Starter Assets controller walks at 2 and sprints at 5.3), scaled with the body.
+        /// The soldier's movement with a rifle, moved by the clips' own root motion (EnemyMotor
+        /// lays it onto the navmesh and the agent follows). The base layer's states, all picked
+        /// by EnemyMotor:
+        ///
+        /// - **Idle**: standing (or crouched) still: alert with the rifle up, or one of the calm
+        ///   idles by IdleVariant, each at its own pace.
+        /// - **Move**: stance (Crouch 0 stand, 1 crouch) over an eight-way freeform blend on the
+        ///   body's own velocity (MoveX, MoveZ, metres a second at the clips' size). Each clip
+        ///   sits at the velocity it was made at, so walk, run and sprint blend by speed and the
+        ///   feet match the ground at any of them.
+        /// - **Pistol**: the same for a one-handed pistol; PistolLeft is its mirror, for a body
+        ///   whose right arm is gone.
+        /// - **TurnLeft/TurnRight** (and crouched): ninety degrees on the spot, the root's own turn.
+        /// - **RunStart/RunStop**: into a run from standing, and pulling up out of one.
+        ///
+        /// Rifle clips from the Pro Rifle Pack (Assets/Animations/Mixamo/Rifle). The Speed
+        /// parameter is kept for EnemyAI, which still writes it.
         /// </summary>
         static RuntimeAnimatorController LocomotionController()
         {
@@ -305,25 +325,120 @@ namespace FPSKit.EditorTools
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Die", AnimatorControllerParameterType.Trigger);
+            foreach (var name in new[] { "MoveX", "MoveZ", "Crouch", "IdleVariant", "Aim" })
+                controller.AddParameter(name, AnimatorControllerParameterType.Float);
+            controller.AddParameter(new AnimatorControllerParameter { name = "MoveRate", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
 
-            var tree = new BlendTree
+            BlendTree Tree(string name, BlendTreeType type, string x, string y = null)
             {
-                name = "Locomotion",
-                blendType = BlendTreeType.Simple1D,
-                blendParameter = "Speed",
-                useAutomaticThresholds = false,
-            };
-            AssetDatabase.AddObjectToAsset(tree, controller);
+                var t = new BlendTree { name = name, blendType = type, blendParameter = x, useAutomaticThresholds = false };
+                if (y != null) t.blendParameterY = y;
+                AssetDatabase.AddObjectToAsset(t, controller);
+                return t;
+            }
 
-            tree.AddChild(Clip("Stand--Idle"), 0f);
-            tree.AddChild(Clip("Locomotion--Walk_N"), 2f * Scale);
-            tree.AddChild(Clip("Locomotion--Run_N"), 5.3f * Scale);
+            // A still clip at the centre of a movement blend, played fast enough to last one
+            // stride (cycle seconds), so it never drags the stride out.
+            void Centre(BlendTree t, AnimationClip clip, float cycle)
+            {
+                if (clip == null) return;
+                t.AddChild(clip, Vector2.zero);
+                var kids = t.children;
+                kids[kids.Length - 1].timeScale = Mathf.Max(1f, clip.length / Mathf.Max(0.1f, cycle));
+                t.children = kids;
+            }
+
+            // Each clip at the velocity it moves at (measured, x sideways, z forward).
+            void Ring(BlendTree t, string gait)
+            {
+                foreach (var dir in new[] { "F", "FR", "R", "BR", "B", "BL", "L", "FL" })
+                {
+                    var clip = Mixamo($"Rifle/Move_{gait}_{dir}");
+                    if (clip == null) continue;
+                    var v = clip.averageSpeed;
+                    t.AddChild(clip, new Vector2(v.x, v.z));
+                }
+            }
+
+            // The idles in the middle: 0 alert, rifle up; 1 low and calm; 2-4 the calm variations
+            // (unarmed clips: the Carry layer puts the rifle in their hands).
+            var idles = Tree("Idles", BlendTreeType.Simple1D, "IdleVariant");
+            idles.AddChild(Mixamo("Rifle/Rifle_Idle_Aim"), 0f);
+            idles.AddChild(Mixamo("Rifle/Rifle_Idle_Low"), 1f);
+            idles.AddChild(Mixamo("Idle/Idle_Breathing"), 2f);
+            idles.AddChild(Mixamo("Idle/Idle_WeightShift"), 3f);
+            idles.AddChild(Mixamo("Idle/Idle_LookAround"), 4f);
+
+            // A blend tree keeps all its clips on one cycle, as long as their weighted average:
+            // a nine-second idle at the centre of the movement blend stretched the walk to a
+            // third of its speed. So standing still is its own state (Idle, with the variations
+            // at their own pace), and the centre of the movement blend is the short aiming idle,
+            // retimed to a stride, only ever seen in passing between standing and walking.
+            var stand = Tree("Stand", BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
+            Centre(stand, Mixamo("Rifle/Rifle_Idle_Aim"), 1f);
+            Ring(stand, "Walk");
+            Ring(stand, "Run");
+            Ring(stand, "Sprint");
+
+            var crouchIdle = Tree("CrouchIdles", BlendTreeType.Simple1D, "Aim");
+            crouchIdle.AddChild(Mixamo("Rifle/Rifle_Idle_Crouch"), 0f);
+            crouchIdle.AddChild(Mixamo("Rifle/Rifle_Idle_CrouchAim"), 1f);
+            var crouch = Tree("Crouch", BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
+            Centre(crouch, Mixamo("Rifle/Rifle_Idle_CrouchAim"), 1f);
+            Ring(crouch, "Crouch");
+
+            var stance = Tree("Stance", BlendTreeType.Simple1D, "Crouch");
+            stance.AddChild(stand, 0f);
+            stance.AddChild(crouch, 1f);
+
+            var still = Tree("Still", BlendTreeType.Simple1D, "Crouch");
+            still.AddChild(idles, 0f);
+            still.AddChild(crouchIdle, 1f);
+
+            BlendTree Pistol(string name, string suffix)
+            {
+                var t = Tree(name, BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
+                void Add(string clip)
+                {
+                    var c = Mixamo("Pistol/" + clip + suffix);
+                    if (c == null) return;
+                    var v = c.averageSpeed;
+                    t.AddChild(c, new Vector2(v.x, v.z));
+                }
+                Centre(t, Mixamo("Pistol/Pistol_Idle" + suffix), 0.8f);
+                Add("Pistol_Walk"); Add("Pistol_Run"); Add("Pistol_Walk_Back");
+                // Mirrored, left and right swap over: a mirrored strafe left goes right.
+                Add("Pistol_Strafe_Left"); Add("Pistol_Strafe_Right");
+                return t;
+            }
 
             var layer = controller.layers[0];
-            layer.iKPass = false;
-            var state = layer.stateMachine.AddState("Locomotion");
-            state.motion = tree;
-            layer.stateMachine.defaultState = state;
+            layer.iKPass = true;    // the feet on the ground (EnemyFootIK)
+            var sm = layer.stateMachine;
+
+            AnimatorState State(string name, Motion motion, float speed = 1f)
+            {
+                var st = sm.AddState(name);
+                st.motion = motion;
+                st.speed = speed;
+                st.writeDefaultValues = false;
+                return st;
+            }
+
+            sm.defaultState = State("Idle", still);
+            var move = State("Move", stance);
+            move.speedParameter = "MoveRate";
+            move.speedParameterActive = true;
+            State("Pistol", Pistol("PistolMove", ""));
+            State("PistolLeft", Pistol("PistolMoveLeft", "_Mirror"));
+            State("PistolIdle", Mixamo("Pistol/Pistol_Idle"));
+            State("PistolIdleLeft", Mixamo("Pistol/Pistol_Idle_Mirror"));
+            State("TurnLeft", Mixamo("Rifle/Rifle_Turn90_Left"));
+            State("TurnRight", Mixamo("Rifle/Rifle_Turn90_Right"));
+            State("CrouchTurnLeft", Mixamo("Rifle/Rifle_CrouchTurn90_Left"));
+            State("CrouchTurnRight", Mixamo("Rifle/Rifle_CrouchTurn90_Right"));
+            State("RunStart", Mixamo("Transitions/Rifle_Run_Start_B"));
+            State("RunStop", Mixamo("Transitions/Rifle_Run_Stop"));
 
             // The fighting moves, over everything: the rage after being kicked down and the
             // blows it then throws. From the EEJANAI fighter set (Humanoid, so they play on
@@ -382,7 +497,7 @@ namespace FPSKit.EditorTools
                 defaultWeight = 0f,
                 blendingMode = AnimatorLayerBlendingMode.Override,
             };
-            controller.layers = new[] { layer, Injured(controller), action };
+            controller.layers = new[] { layer, Injured(controller), Carry(controller), action };
 
             EditorUtility.SetDirty(controller);
             return controller;
@@ -453,6 +568,48 @@ namespace FPSKit.EditorTools
             {
                 name = "Injured",
                 stateMachine = machine,
+                defaultWeight = 0f,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+            };
+        }
+
+        /// <summary>
+        /// The arms only, holding the rifle, over clips made without one: the limp, the calm idle
+        /// variations, a calm walk carried low. "Low" is the rifle at low ready, "Aim" up at the
+        /// shoulder; EnemyBody sets the weight and the state. Arms and fingers only, so the walk's
+        /// own torso and legs come through.
+        /// </summary>
+        static AnimatorControllerLayer Carry(AnimatorController controller)
+        {
+            var maskPath = Folder + "/Arms.mask";
+            if (AssetDatabase.LoadAssetAtPath<AvatarMask>(maskPath) != null) AssetDatabase.DeleteAsset(maskPath);
+            var mask = new AvatarMask();
+            for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++) mask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, false);
+            foreach (var part in new[] { AvatarMaskBodyPart.LeftArm, AvatarMaskBodyPart.RightArm,
+                                         AvatarMaskBodyPart.LeftFingers, AvatarMaskBodyPart.RightFingers,
+                                         AvatarMaskBodyPart.LeftHandIK, AvatarMaskBodyPart.RightHandIK })
+                mask.SetHumanoidBodyPartActive(part, true);
+            AssetDatabase.CreateAsset(mask, maskPath);
+
+            var machine = new AnimatorStateMachine { name = "Carry" };
+            AssetDatabase.AddObjectToAsset(machine, controller);
+            AnimatorState Add(string name, Motion motion)
+            {
+                var st = machine.AddState(name);
+                st.motion = motion;
+                st.writeDefaultValues = false;
+                return st;
+            }
+            machine.defaultState = Add("Low", Mixamo("Rifle/Rifle_Idle_Low"));
+            Add("Aim", Mixamo("Rifle/Rifle_Idle_Aim"));
+            Add("Pistol", Mixamo("Pistol/Pistol_Idle"));
+            Add("PistolLeft", Mixamo("Pistol/Pistol_Idle_Mirror"));
+
+            return new AnimatorControllerLayer
+            {
+                name = "Carry",
+                stateMachine = machine,
+                avatarMask = mask,
                 defaultWeight = 0f,
                 blendingMode = AnimatorLayerBlendingMode.Override,
             };
@@ -663,6 +820,124 @@ namespace FPSKit.EditorTools
         /// with its hand sockets and muzzle placed; its own spec stripped, its parts tagged
         /// as metal so the archetype never paints it and the damage flash never lights it.
         /// </summary>
+        /// <summary>
+        /// The rifle goes into the right hand: a socket under the hand bone where the rifle sits
+        /// in the "rifle idle, aiming" clip -- the hand at the grip, the bore along the line
+        /// from the right hand to the left -- and a "sway" child the rifle hangs from, which
+        /// EnemyBody springs a little behind the hand so it has weight. The left hand is reached
+        /// onto the handguard by a two-bone IK constraint; the head, chest and spine turn to
+        /// their look targets by aim constraints (Animation Rigging), the head furthest.
+        /// The pose is sampled on this body and put back.
+        /// </summary>
+        static void HoldRifle(Animator animator, Transform root, Transform gun, Transform rightGrip, Transform leftGrip, EnemyBody body)
+        {
+            Transform B(HumanBodyBones b) => animator.GetBoneTransform(b);
+            var rHand = B(HumanBodyBones.RightHand);
+            var lHand = B(HumanBodyBones.LeftHand);
+            var chest = B(HumanBodyBones.UpperChest) ?? B(HumanBodyBones.Chest);
+            var aim = Mixamo("Rifle/Rifle_Idle_Aim");
+            if (rHand == null || lHand == null || chest == null || aim == null) return;
+
+            var bones = animator.GetComponentsInChildren<Transform>();
+            var pos = new Vector3[bones.Length];
+            var rot = new Quaternion[bones.Length];
+            for (int i = 0; i < bones.Length; i++) { pos[i] = bones[i].localPosition; rot[i] = bones[i].localRotation; }
+            Vector3 modelPos = animator.transform.position;
+            Quaternion modelRot = animator.transform.rotation;
+            try
+            {
+                aim.SampleAnimation(animator.gameObject, 0.5f);
+                animator.transform.SetPositionAndRotation(modelPos, modelRot);
+
+                // Aiming, the rifle points straight ahead and level, its grip in the right hand.
+                // (The line between the hands is not the bore: in the bladed stance it runs
+                // well across the body.)
+                Vector3 R = rHand.position;
+                gun.rotation = Quaternion.LookRotation(root.forward, root.up);
+                gun.position += R - rightGrip.position;
+
+                var socket = new GameObject("RifleSocket").transform;
+                socket.SetParent(rHand, false);
+                socket.SetPositionAndRotation(gun.position, gun.rotation);
+                var sway = new GameObject("RifleSway").transform;
+                sway.SetParent(socket, false);
+                gun.SetParent(sway, true);
+
+                // The left hand's target: on the handguard, turned the way that hand's frame
+                // wants to hold it (LimbIK.HandFrame, as the old grip did).
+                var frame = LimbIK.HandFrame.Measure(lHand, B(HumanBodyBones.LeftMiddleProximal), B(HumanBodyBones.LeftIndexProximal),
+                                                     B(HumanBodyBones.LeftLittleProximal), right: false);
+                var target = new GameObject("LeftHandTarget").transform;
+                target.SetParent(leftGrip, false);
+                if (frame.valid) target.rotation = frame.World(leftGrip.forward, leftGrip.up);
+
+                var hint = new GameObject("LeftElbowHint").transform;
+                hint.SetParent(chest, false);
+                var lElbow = B(HumanBodyBones.LeftLowerArm);
+                hint.position = lElbow.position - root.right * 0.25f + Vector3.down * 0.25f;
+
+                // The aim is EnemyBody's additive turn down the spine, head first: an aim
+                // constraint sets a bone's rotation outright and straightens the bladed rifle
+                // stance the clips are made in. The rig does the left hand.
+                var rigs = new GameObject("Rigs").transform;
+                rigs.SetParent(animator.transform, false);
+
+                var handRig = new GameObject("HandRig").AddComponent<Rig>();
+                handRig.transform.SetParent(rigs, false);
+                var ik = new GameObject("LeftHandIK").AddComponent<TwoBoneIKConstraint>();
+                ik.transform.SetParent(handRig.transform, false);
+                var d = ik.data;
+                d.root = B(HumanBodyBones.LeftUpperArm);
+                d.mid = B(HumanBodyBones.LeftLowerArm);
+                d.tip = lHand;
+                d.target = target;
+                d.hint = hint;
+                d.targetPositionWeight = 1f;
+                d.targetRotationWeight = 1f;
+                d.hintWeight = 1f;
+                ik.data = d;
+
+                var builder = animator.gameObject.AddComponent<RigBuilder>();
+                builder.layers.Add(new RigLayer(handRig, true));
+
+                body.rifleSocket = socket;
+                body.rifleSway = sway;
+                body.leftHandTarget = target;
+                body.handRig = handRig;
+            }
+            finally
+            {
+                for (int i = 0; i < bones.Length; i++) { bones[i].localPosition = pos[i]; bones[i].localRotation = rot[i]; }
+            }
+        }
+
+        /// <summary>An aim constraint turning a bone's forward (as the body's forward, in the aiming pose) to a target.</summary>
+        static void Aim(Transform parent, string name, Transform bone, Transform target, Transform root, float limit)
+        {
+            if (bone == null) return;
+            var c = new GameObject(name).AddComponent<MultiAimConstraint>();
+            c.transform.SetParent(parent, false);
+            var d = c.data;
+            d.constrainedObject = bone;
+            var sources = new WeightedTransformArray(0);
+            sources.Add(new WeightedTransform(target, 1f));
+            d.sourceObjects = sources;
+            d.aimAxis = AxisOf(bone.InverseTransformDirection(root.forward));
+            d.upAxis = AxisOf(bone.InverseTransformDirection(root.up));
+            d.limits = new Vector2(-limit, limit);
+            d.maintainOffset = false;
+            d.constrainedXAxis = d.constrainedYAxis = d.constrainedZAxis = true;
+            c.data = d;
+        }
+
+        static MultiAimConstraintData.Axis AxisOf(Vector3 v)
+        {
+            Vector3 a = new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+            if (a.x >= a.y && a.x >= a.z) return v.x >= 0f ? MultiAimConstraintData.Axis.X : MultiAimConstraintData.Axis.X_NEG;
+            if (a.y >= a.z) return v.y >= 0f ? MultiAimConstraintData.Axis.Y : MultiAimConstraintData.Axis.Y_NEG;
+            return v.z >= 0f ? MultiAimConstraintData.Axis.Z : MultiAimConstraintData.Axis.Z_NEG;
+        }
+
         static Transform Gun(Transform root, Transform head, out Transform rightGrip, out Transform leftGrip, out Transform muzzle)
         {
             rightGrip = leftGrip = muzzle = null;

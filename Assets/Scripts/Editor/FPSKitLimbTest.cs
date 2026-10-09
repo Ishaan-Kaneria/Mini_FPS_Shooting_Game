@@ -65,10 +65,14 @@ namespace FPSKit.EditorTools
         static float _aMoveTime, _aMoveDist;
         static Vector3 _aLast;
 
-        static bool _fallsOnly;
+        static bool _fallsOnly, _poseOnly;
+
+        /// <summary>Stage 2's quick look: the rifle held, the aim, a walk across the player, in pictures.</summary>
+        [MenuItem("FPSKit/Enemy AI/Run Pose Check")]
+        public static void RunPose() { _poseOnly = true; Run(false); }
 
         [MenuItem("FPSKit/Enemy AI/Run Limb Test")]
-        public static void Run() => Run(false);
+        public static void Run() { _poseOnly = false; Run(false); }
 
         /// <summary>Only D's three kicks and get-ups: the slow part, on its own.</summary>
         [MenuItem("FPSKit/Enemy AI/Run Limb Test (Falls Only)")]
@@ -77,6 +81,7 @@ namespace FPSKit.EditorTools
         public static void Run(bool fallsOnly)
         {
             _fallsOnly = fallsOnly;
+            if (fallsOnly) _poseOnly = false;
             if (Running || EditorApplication.isPlaying) return;
             _returnTo = EditorSceneManager.GetActiveScene().path;
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -147,6 +152,17 @@ namespace FPSKit.EditorTools
                 return go;
             }
             _a = _b = _c = _e = null;
+            if (_poseOnly)
+            {
+                _d = null;
+                _a = Spawn("A_Alert", -2f);
+                _c = Spawn("C_Walker", 6f);
+                var camGo0 = new GameObject("TestCam");
+                _cam = camGo0.AddComponent<Camera>();
+                _cam.fieldOfView = 45f;
+                _cam.enabled = false;
+                return;
+            }
             _d = Spawn("D_Kicks", 4.5f);
             // The rage after a kick is its own move (fists, a charge); the falls test judges
             // the get-up and the hand-over to standing, so D gets up calm.
@@ -177,6 +193,26 @@ namespace FPSKit.EditorTools
         static List<(float, Action)> Script()
         {
             var s = new List<(float, Action)>();
+            if (_poseOnly)
+            {
+                // A stands alert; C walks a line across in front of the player.
+                s.Add((0.5f, () => { Note("Pose check"); _poseStart = _c.transform.position; _walkLastT = 0f; }));
+                // The walker is sent, then left alone: its mind and its fighting rules switched
+                // off so nothing else moves it. The motor walks it by the clip.
+                s.Add((0.6f, () =>
+                {
+                    var ai = _c.GetComponent<EnemyAI>();
+                    ai.MoveTo(new Vector3(-10f, 0f, 9f), 0.55f);
+                    _c.GetComponent<EnemyBrain>().enabled = false;
+                    ai.enabled = false;
+                }));
+                s.Add((3.0f, () => { PictureFrom(_a, "P_alert_front", 0f, 2.6f); PictureFrom(_a, "P_alert_side", 90f, 2.4f); }));
+                s.Add((4.0f, () => { PictureFrom(_c, "P_walk_side", 90f, 3.2f); PictureFrom(_c, "P_walk_front", 20f, 3.2f); }));
+                for (int i = 1; i <= 11; i++) s.Add((0.5f * i + 0.6f, LogWalker));
+                s.Add((6.0f, CheckPose));
+                s.Add((6.3f, () => PictureFrom(_a, "P_alert_front_late", 0f, 2.6f)));
+                return s;
+            }
             if (_fallsOnly)
             {
                 s.Add((1f, () => Kick(_d)));
@@ -371,6 +407,65 @@ namespace FPSKit.EditorTools
 
         static int _pendingPictures;
         static float _nextKick = -1f;
+
+        static Vector3 _poseStart, _walkLast;
+        static float _walkLastT;
+
+        static void LogWalker()
+        {
+            var anim = _c.GetComponentInChildren<Animator>();
+            var agent = _c.GetComponent<UnityEngine.AI.NavMeshAgent>();
+            float dt = Time.time - _walkLastT;
+            float v = _walkLastT > 0f && dt > 0f ? Vector3.Distance(_c.transform.position, _walkLast) / dt : 0f;
+            _walkLast = _c.transform.position; _walkLastT = Time.time;
+            var st = anim.GetCurrentAnimatorStateInfo(0);
+            Note($"    t={Time.time - _t0:0.0}: {v:0.00} m/s, MoveX {anim.GetFloat("MoveX"):0.00} MoveZ {anim.GetFloat("MoveZ"):0.00}, base state {(st.IsName("Move") ? "Move" : st.IsName("TurnLeft") ? "TurnLeft" : st.IsName("TurnRight") ? "TurnRight" : st.IsName("RunStart") ? "RunStart" : st.IsName("RunStop") ? "RunStop" : "other")}, remaining {agent.remainingDistance:0.0} m, stopped {agent.isStopped}, path {agent.hasPath}, animator speed {anim.speed:0.00}");
+        }
+
+        static void CheckPose()
+        {
+            var agent = _c.GetComponent<UnityEngine.AI.NavMeshAgent>();
+            var motor = _c.GetComponent<EnemyMotor>();
+            float moved = Vector3.Distance(_c.transform.position, _poseStart);
+            float apart = Vector3.Distance(new Vector3(agent.nextPosition.x, 0f, agent.nextPosition.z), new Vector3(_c.transform.position.x, 0f, _c.transform.position.z));
+            Note($"  walker moved {moved:0.0} m in 5.4 s (root motion {motor.RootMotion}, gait {motor.Current}, measured {motor.MeasuredSpeed:0.00} m/s); body and agent {apart * 100f:0} cm apart");
+            Require(moved > 2f, "the walker walked (root motion moves the body)");
+            Require(apart < 0.3f, "the agent follows the body");
+            var rifle = _a.GetComponent<EnemyRifle>();
+            Note($"  A's rifle: {rifle.State}, left hand {rifle.LeftHandWant:0.00}, hand rig {_a.GetComponent<EnemyBody>().handRig.weight:0.00}");
+            Require(rifle.State == EnemyRifle.Hold.Held, "A holds its rifle");
+            Note("  " + Facings(_a, "with the aim rig"));
+            
+        }
+
+        static float _aimRigWas;
+
+        /// <summary>Which way the hips, chest, head and rifle face against the root's forward, in degrees (positive: to its right).</summary>
+        static string Facings(GameObject who, string label)
+        {
+            var anim = who.GetComponentInChildren<Animator>();
+            Transform B(HumanBodyBones b) => anim.GetBoneTransform(b);
+            Vector3 f = who.transform.forward;
+            float Yaw(Vector3 v) { v.y = 0f; return Vector3.SignedAngle(f, v, Vector3.up); }
+            Vector3 hips = Vector3.Cross(B(HumanBodyBones.RightUpperLeg).position - B(HumanBodyBones.LeftUpperLeg).position, Vector3.up);
+            Vector3 chest = Vector3.Cross(B(HumanBodyBones.RightUpperArm).position - B(HumanBodyBones.LeftUpperArm).position, Vector3.up);
+            var body = who.GetComponent<EnemyBody>();
+            Vector3 toPlayer = _player.transform.position - body.gun.position;
+            float aimOff = Vector3.Angle(body.gun.forward, toPlayer);
+            return $"{label}: hips {Yaw(hips):0}, chest {Yaw(chest):0}, rifle {Yaw(body.gun.forward):0}, head {Yaw(B(HumanBodyBones.Head).position - B(HumanBodyBones.Neck).position):0}, player {Yaw(_player.transform.position - who.transform.position):0} (deg from the root's forward); rifle bore {aimOff:0} deg off the player";
+        }
+
+        /// <summary>A picture of the subject from an angle round it (0 = in front of it), at a distance.</summary>
+        static void PictureFrom(GameObject subject, string name, float angle, float distance)
+        {
+            if (subject == null) return;
+            var anim = subject.GetComponentInChildren<Animator>();
+            Vector3 at = anim.GetBoneTransform(HumanBodyBones.Chest).position;
+            Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * subject.transform.forward;
+            _cam.transform.position = at + dir * distance + Vector3.up * 0.15f;
+            _cam.transform.LookAt(at);
+            FairgroundShots.Capture(_cam, $"{Folder}/{_shot++:00}_{name}.png", 480, 270);
+        }
 
         static void Picture(GameObject subject, string name)
         {

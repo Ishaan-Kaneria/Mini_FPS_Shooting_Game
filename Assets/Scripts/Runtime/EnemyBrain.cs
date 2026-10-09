@@ -259,6 +259,9 @@ public class EnemyBrain : MonoBehaviour
         }
 
         if (!_ai.Attacking) _ai.HasAimPoint = false;
+        // Down, getting up, or fetching its rifle: the body has it for now. It keeps noticing.
+        if (_body != null && _body.Busy) return;
+        _ai.WantCrouch = false;
         if (Hurting()) return;
         if (Evade()) return;
         Act();
@@ -647,6 +650,7 @@ public class EnemyBrain : MonoBehaviour
             if (_hasCover)
             {
                 Doing = "keeping its head down";
+                _ai.WantCrouch = true;
                 _ai.Hold();
                 LookPoint = _lastKnown + Vector3.up * 1.4f;
                 return;

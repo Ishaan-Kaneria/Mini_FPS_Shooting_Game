@@ -152,9 +152,11 @@ public class MeleeSettings : ScriptableObject
     [Range(0f, 0.25f)] public float kickHitStop = 0.08f;
     [Range(0f, 0.3f)] public float takedownHitStop = 0.12f;
     [Tooltip("Camera shake on a landed punch, 0 to 1.")]
-    [Range(0f, 1f)] public float punchShake = 0.3f;
-    [Range(0f, 1f)] public float kickShake = 0.5f;
-    [Range(0f, 1f)] public float takedownShake = 0.6f;
+    [Range(0f, 1f)] public float punchShake = 0.25f;
+    [Tooltip("Camera shake when a kick lands: a blip at the impact only, never in the wind-up. " +
+             "Shake goes with the square of this: 0.35 is about a fifth of a degree for a few frames.")]
+    [Range(0f, 1f)] public float kickShake = 0.35f;
+    [Range(0f, 1f)] public float takedownShake = 0.4f;
 
     // ======================================================================
 

@@ -73,6 +73,6 @@ MonoBehaviour:
   punchHitStop: 0.045
   kickHitStop: 0.08
   takedownHitStop: 0.12
-  punchShake: 0.3
-  kickShake: 0.5
-  takedownShake: 0.6
+  punchShake: 0.25
+  kickShake: 0.35
+  takedownShake: 0.4

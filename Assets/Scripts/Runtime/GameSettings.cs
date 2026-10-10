@@ -262,6 +262,33 @@ public static class GameSettings
     }
 
     /// <summary>
+    /// How much the camera shakes (blasts, recoil, a landed blow), 0 to 1. Turned down by
+    /// players who feel motion sick; the aim's own recoil climb is not shake and stays.
+    /// </summary>
+    public static float CameraShake
+    {
+        get => Mathf.Clamp01(GetFloat("cameraShake", 1f));
+        set => SetFloat("cameraShake", Mathf.Clamp01(value));
+    }
+
+    /// <summary>How much the view bobs and rolls with each step, 0 to 1.</summary>
+    public static float HeadBob
+    {
+        get => Mathf.Clamp01(GetFloat("headBob", 1f));
+        set => SetFloat("headBob", Mathf.Clamp01(value));
+    }
+
+    /// <summary>
+    /// The arms' and weapon's own field of view, degrees (vertical), 45 to 75: drawn by their
+    /// own camera so a wide world view never stretches them.
+    /// </summary>
+    public static float ArmsFieldOfView
+    {
+        get => Mathf.Clamp(GetFloat("armsFov", 58f), 45f, 75f);
+        set => SetFloat("armsFov", Mathf.Clamp(Mathf.Round(value), 45f, 75f));
+    }
+
+    /// <summary>
     /// Blood on hits, on walls and under bodies. On by default; off leaves a dull puff so a
     /// hit still reads as a hit. The wounds still cost enemies their legs and arms either way.
     /// </summary>
@@ -282,6 +309,7 @@ public static class GameSettings
                      "invertY", "assist", "assistStrength", "autoFire", "gyro", "gyroSens", "aimMode",
                      "leftHanded", "touchOpacity",
                      "mouseSens", "fov", "vsync", "volMaster", "volMusic", "volSfx", "hudScale", "minimapRotates", "blood",
+                     "cameraShake", "headBob", "armsFov",
                  })
             PlayerPrefs.DeleteKey(Prefix + key);
         // The HUD layout is a setting like the rest and goes with them; the named layouts the

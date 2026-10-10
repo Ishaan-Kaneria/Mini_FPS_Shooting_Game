@@ -92,8 +92,8 @@ public class SettingsPanel : OverlayPanel
         close.onClick.AddListener(Close);
 
         // Tabs.
-        var names = new List<string> { "Controls" };
-        var icons = new List<string> { "keyboard" };
+        var names = new List<string> { "Controls", "Gameplay" };
+        var icons = new List<string> { "keyboard", "run" };
         bool touch = DeviceProfile.Touched;
         if (touch) { names.Add("Touch"); icons.Add("hand-finger"); }
         names.Add("Video"); icons.Add("device-desktop");
@@ -135,6 +135,7 @@ public class SettingsPanel : OverlayPanel
         scroll.content = content;
 
         BuildControls(Page(content, "Controls"), t);
+        BuildGameplay(Page(content, "Gameplay"), t);
         if (touch) BuildTouch(Page(content, "Touch"), t);
         BuildDisplay(Page(content, "Video"), t);
         BuildAudio(Page(content, "Audio"), t);
@@ -401,6 +402,8 @@ public class SettingsPanel : OverlayPanel
         Heading(page, "View", t);
         AddSlider(page, "Field of view", "Wider sees more at the edges and makes everything smaller.", 70f, 110f,
                   () => GameSettings.FieldOfView, v => GameSettings.FieldOfView = v, v => Mathf.RoundToInt(v) + "°", t);
+        AddSlider(page, "Arms and weapon FOV", "Your own arms and gun, drawn on their own: lower shows them bigger.", 45f, 75f,
+                  () => GameSettings.ArmsFieldOfView, v => GameSettings.ArmsFieldOfView = v, v => Mathf.RoundToInt(v) + "°", t);
 
         // A desktop's own window: a phone has one resolution and a browser is the page's.
         bool desktop = !QualityTiers.Handheld && ScreenInfo.SimulatedMobile != true && Application.platform != RuntimePlatform.WebGLPlayer;
@@ -588,6 +591,16 @@ public class SettingsPanel : OverlayPanel
         var sw = UIKit.Switch(slot, "Switch", t);
         sw.Changed += set;
         _refreshers.Add(() => sw.IsOn = get());
+    }
+
+    /// <summary>Comfort: how much the camera shakes and bobs. For players sensitive to motion.</summary>
+    void BuildGameplay(RectTransform page, UITheme t)
+    {
+        Heading(page, "Comfort", t);
+        AddSlider(page, "Camera shake", "Blasts, landed blows and gunfire. The aim's recoil is not shake and stays.", 0f, 1f,
+                  () => GameSettings.CameraShake, v => GameSettings.CameraShake = v, Percent, t);
+        AddSlider(page, "Head bob", "How much the view moves with your steps.", 0f, 1f,
+                  () => GameSettings.HeadBob, v => GameSettings.HeadBob = v, Percent, t);
     }
 
     void AddSlider(RectTransform page, string label, string hint, float min, float max,

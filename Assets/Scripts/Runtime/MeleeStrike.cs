@@ -806,13 +806,9 @@ public class MeleeStrike : MonoBehaviour
         weapon.HandsOffset = offset;
         weapon.HandsRotation = turn;
 
-        // Into a punch the view leans forward at the blow; on a kick it dips as the knee
-        // comes up, so the leg is seen rising and the boot going in, not just the boot.
-        if (swinging && !_lunged && k >= (_strike == Strike.Kick ? 0f : ImpactAt(_strike) * 0.7f))
-        {
-            _lunged = true;
-            if (_motor != null) _motor.AddRecoil(_strike == Strike.Kick ? -9f : -1.2f, 0f, _strike == Strike.Kick ? 3.5f : 5f);
-        }
+        // The view never moves for a strike: it stays where the player is aiming, so the
+        // enemy stays in sight. (It used to dip 9 degrees for a kick and lean into a punch;
+        // the kicking leg now comes into view on its own.) Only the impact shakes, a blip.
     }
 
     /// <summary>
@@ -882,7 +878,7 @@ public class MeleeStrike : MonoBehaviour
         if (!_lunged && k >= 0.3f)
         {
             _lunged = true;
-            if (_motor != null) _motor.AddRecoil(-buttLunge, 0f, 7f);
+            // (No view lunge: the camera holds still for every strike.)
         }
     }
 

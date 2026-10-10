@@ -642,7 +642,7 @@ public class PlayerMotor : MonoBehaviour
     /// Adds a camera shake impulse, 0 to 1. Impulses take the strongest rather than
     /// summing, so a burst of fire cannot stack into an unplayable screen.
     /// </summary>
-    public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount));
+    public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount * GameSettings.CameraShake));
 
     Vector3 _lunge;
     float _lungeUntil;
@@ -1012,7 +1012,8 @@ public class PlayerMotor : MonoBehaviour
         _stepPhase += speed * Time.deltaTime / Mathf.Max(0.2f, stepLength);
         if (IsGrounded && Mathf.Floor(_stepPhase) > Mathf.Floor(before)) PlayFootstep();
 
-        float scale = (IsSprinting ? move.sprintBob : 1f) * (IsCrouching ? 0.6f : 1f) * moving;
+        // The player's comfort setting scales all of it: dip, sway, the step's roll and the lean.
+        float scale = (IsSprinting ? move.sprintBob : 1f) * (IsCrouching ? 0.6f : 1f) * moving * GameSettings.HeadBob;
         if (_weapon != null && _weapon.IsAiming) scale *= 0.35f;
 
         float dip = move.bobDip * (Mathf.Cos(_stepPhase * Mathf.PI * 2f) - 1f) * 0.5f * scale;
@@ -1025,7 +1026,7 @@ public class PlayerMotor : MonoBehaviour
 
         // A step's roll, and the lean against a sidestep.
         float lateral = Vector3.Dot(planar, transform.right) / Mathf.Max(0.5f, move.jogSpeed);
-        float roll = move.stepRoll * Mathf.Sin(_stepPhase * Mathf.PI) * scale - move.strafeLean * Mathf.Clamp(lateral, -1f, 1f);
+        float roll = move.stepRoll * Mathf.Sin(_stepPhase * Mathf.PI) * scale - move.strafeLean * GameSettings.HeadBob * Mathf.Clamp(lateral, -1f, 1f);
         _cameraRoll = Mathf.Lerp(_cameraRoll, IsGrounded ? roll : 0f, Time.deltaTime * 8f);
     }
 

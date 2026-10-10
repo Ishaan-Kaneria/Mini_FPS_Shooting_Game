@@ -4278,7 +4278,8 @@ namespace FPSKit.EditorTools
         {
             EnsureTags("Player", "Enemy", "Concrete", "Metal", "Wood", "Flesh", "Water", SandTag,
                        SnowTag, IceTag);
-            EnsureLayers("Player", "Enemy", "Environment", "Backdrop");
+            // FirstPerson: the player's own arms and gun, drawn by their own camera (PlayerBody).
+            EnsureLayers("Player", "Enemy", "Environment", "Backdrop", "FirstPerson");
         }
 
         private static void EnsureTags(params string[] tags)

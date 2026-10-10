@@ -23,6 +23,7 @@ namespace FPSKit.EditorTools
 
             Make<MeleeSettings>(MeleeSettings.ResourcePath);
             Make<MovementSettings>(MovementSettings.ResourcePath);
+            Make<PlayerBodySettings>(PlayerBodySettings.ResourcePath);
             var condition = Make<ConditionSettings>(ConditionSettings.ResourcePath);
 
             bool dirty = false;

@@ -126,6 +126,11 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
   `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via
   `Weapon.HandsRotation`/`HandsOffset`); no fist is built. Hands are lofted (`BuildGunHands`).
+- The player is a full body (`PlayerBody`, FPSKit > Player > Build Body / Preview Body, values in
+  `PlayerBodySettings`): the body follows the camera, never the reverse; arms and gun are on the
+  FirstPerson layer under a stacked arms camera (own FOV); aiming raises the rifle to the eye. The
+  camera never moves for a strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting).
+  Without `bodyPrefab` the old `ViewModelRig` is used. Springs there are sub-stepped (1/120 s).
 - Reload is animated in `Weapon.ReloadPose` (tilt, magazine out/in, left hand, bolt) with
   three `WeaponData` clips on its beats (`MagOutAt`/`MagInAt`/`BoltAt`); keep them in step.
 

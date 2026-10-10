@@ -69,6 +69,20 @@ namespace FPSKit.EditorTools
             ("EnemyAI", "NeighbourBuffer",
              "scratch buffer: OverlapSphereNonAlloc rewrites it before every read and " +
              "the loop is bounded by the returned count, so nothing stale is ever read"),
+
+            ("EnemyBody", "GetUps",
+             "a readonly table of get-up clips and their trimmed times, written once where it " +
+             "is declared and never again: the body only picks from it"),
+
+            ("EnemyWounds", "Arms",
+             "a readonly list of the two arm parts, declared once and only iterated"),
+
+            ("EnemyWounds", "Limbs",
+             "a readonly list of the four limb parts, declared once and only iterated"),
+
+            ("PerfProbe", "Views",
+             "a readonly table of the Fairground's measuring viewpoints, declared once and " +
+             "only read by the perf build's runner"),
         };
 
         // ==================================================================

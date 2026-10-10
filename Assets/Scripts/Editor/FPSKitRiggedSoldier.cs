@@ -260,7 +260,7 @@ namespace FPSKit.EditorTools
         /// colour so the archetype's tint multiplies the cloth, and emission enabled (black)
         /// so the wind-up flash can light it through a property block.
         /// </summary>
-        static Material Lit(string packName)
+        internal static Material Lit(string packName)
         {
             if (string.IsNullOrEmpty(packName)) return null;
 
@@ -298,6 +298,85 @@ namespace FPSKit.EditorTools
         // ==================================================================
 
         /// <summary>
+        /// The rifle movement both the enemy and the player's own body stand and walk in: the
+        /// parameters (MoveX, MoveZ, Crouch, IdleVariant, Aim, MoveRate) and two trees. "still"
+        /// is standing or crouching still (alert, low, or a calm variation); "stance" is the
+        /// eight-way walk, run, sprint and crouch walk, each clip at the velocity it moves at.
+        /// A blend tree keeps all its clips on one cycle, as long as their weighted average: a
+        /// nine-second idle at the centre of the movement blend stretched the walk to a third of
+        /// its speed. So standing still is its own tree, and the centre of the movement blend is
+        /// the short aiming idle retimed to a stride, only ever seen in passing.
+        /// </summary>
+        public static void BuildRifleMovement(AnimatorController controller, out BlendTree still, out BlendTree stance)
+        {
+            foreach (var name in new[] { "MoveX", "MoveZ", "Crouch", "IdleVariant", "Aim" })
+                controller.AddParameter(name, AnimatorControllerParameterType.Float);
+            controller.AddParameter(new AnimatorControllerParameter { name = "MoveRate", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
+
+            BlendTree Tree(string name, BlendTreeType type, string x, string y = null) => NewTree(controller, name, type, x, y);
+
+            // Each clip at the velocity it moves at (measured, x sideways, z forward).
+            void Ring(BlendTree t, string gait)
+            {
+                foreach (var dir in new[] { "F", "FR", "R", "BR", "B", "BL", "L", "FL" })
+                {
+                    var clip = Mixamo($"Rifle/Move_{gait}_{dir}");
+                    if (clip == null) continue;
+                    var v = clip.averageSpeed;
+                    t.AddChild(clip, new Vector2(v.x, v.z));
+                }
+            }
+
+            // The idles: 0 alert, rifle up; 1 low and calm; 2-4 the calm variations (unarmed
+            // clips: a Carry layer puts the rifle in their hands).
+            var idles = Tree("Idles", BlendTreeType.Simple1D, "IdleVariant");
+            idles.AddChild(Mixamo("Rifle/Rifle_Idle_Aim"), 0f);
+            idles.AddChild(Mixamo("Rifle/Rifle_Idle_Low"), 1f);
+            idles.AddChild(Mixamo("Idle/Idle_Breathing"), 2f);
+            idles.AddChild(Mixamo("Idle/Idle_WeightShift"), 3f);
+            idles.AddChild(Mixamo("Idle/Idle_LookAround"), 4f);
+
+            var stand = Tree("Stand", BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
+            CentreChild(stand, Mixamo("Rifle/Rifle_Idle_Aim"), 1f);
+            Ring(stand, "Walk");
+            Ring(stand, "Run");
+            Ring(stand, "Sprint");
+
+            var crouchIdle = Tree("CrouchIdles", BlendTreeType.Simple1D, "Aim");
+            crouchIdle.AddChild(Mixamo("Rifle/Rifle_Idle_Crouch"), 0f);
+            crouchIdle.AddChild(Mixamo("Rifle/Rifle_Idle_CrouchAim"), 1f);
+            var crouch = Tree("Crouch", BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
+            CentreChild(crouch, Mixamo("Rifle/Rifle_Idle_CrouchAim"), 1f);
+            Ring(crouch, "Crouch");
+
+            stance = Tree("Stance", BlendTreeType.Simple1D, "Crouch");
+            stance.AddChild(stand, 0f);
+            stance.AddChild(crouch, 1f);
+
+            still = Tree("Still", BlendTreeType.Simple1D, "Crouch");
+            still.AddChild(idles, 0f);
+            still.AddChild(crouchIdle, 1f);
+        }
+
+        public static BlendTree NewTree(AnimatorController controller, string name, BlendTreeType type, string x, string y = null)
+        {
+            var t = new BlendTree { name = name, blendType = type, blendParameter = x, useAutomaticThresholds = false };
+            if (y != null) t.blendParameterY = y;
+            AssetDatabase.AddObjectToAsset(t, controller);
+            return t;
+        }
+
+        /// <summary>A still clip at the centre of a movement blend, played fast enough to last one stride (cycle seconds).</summary>
+        public static void CentreChild(BlendTree t, AnimationClip clip, float cycle)
+        {
+            if (clip == null) return;
+            t.AddChild(clip, Vector2.zero);
+            var kids = t.children;
+            kids[kids.Length - 1].timeScale = Mathf.Max(1f, clip.length / Mathf.Max(0.1f, cycle));
+            t.children = kids;
+        }
+
+        /// <summary>
         /// The soldier's movement with a rifle, moved by the clips' own root motion (EnemyMotor
         /// lays it onto the navmesh and the agent follows). The base layer's states, all picked
         /// by EnemyMotor:
@@ -325,75 +404,9 @@ namespace FPSKit.EditorTools
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Die", AnimatorControllerParameterType.Trigger);
-            foreach (var name in new[] { "MoveX", "MoveZ", "Crouch", "IdleVariant", "Aim" })
-                controller.AddParameter(name, AnimatorControllerParameterType.Float);
-            controller.AddParameter(new AnimatorControllerParameter { name = "MoveRate", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
-
-            BlendTree Tree(string name, BlendTreeType type, string x, string y = null)
-            {
-                var t = new BlendTree { name = name, blendType = type, blendParameter = x, useAutomaticThresholds = false };
-                if (y != null) t.blendParameterY = y;
-                AssetDatabase.AddObjectToAsset(t, controller);
-                return t;
-            }
-
-            // A still clip at the centre of a movement blend, played fast enough to last one
-            // stride (cycle seconds), so it never drags the stride out.
-            void Centre(BlendTree t, AnimationClip clip, float cycle)
-            {
-                if (clip == null) return;
-                t.AddChild(clip, Vector2.zero);
-                var kids = t.children;
-                kids[kids.Length - 1].timeScale = Mathf.Max(1f, clip.length / Mathf.Max(0.1f, cycle));
-                t.children = kids;
-            }
-
-            // Each clip at the velocity it moves at (measured, x sideways, z forward).
-            void Ring(BlendTree t, string gait)
-            {
-                foreach (var dir in new[] { "F", "FR", "R", "BR", "B", "BL", "L", "FL" })
-                {
-                    var clip = Mixamo($"Rifle/Move_{gait}_{dir}");
-                    if (clip == null) continue;
-                    var v = clip.averageSpeed;
-                    t.AddChild(clip, new Vector2(v.x, v.z));
-                }
-            }
-
-            // The idles in the middle: 0 alert, rifle up; 1 low and calm; 2-4 the calm variations
-            // (unarmed clips: the Carry layer puts the rifle in their hands).
-            var idles = Tree("Idles", BlendTreeType.Simple1D, "IdleVariant");
-            idles.AddChild(Mixamo("Rifle/Rifle_Idle_Aim"), 0f);
-            idles.AddChild(Mixamo("Rifle/Rifle_Idle_Low"), 1f);
-            idles.AddChild(Mixamo("Idle/Idle_Breathing"), 2f);
-            idles.AddChild(Mixamo("Idle/Idle_WeightShift"), 3f);
-            idles.AddChild(Mixamo("Idle/Idle_LookAround"), 4f);
-
-            // A blend tree keeps all its clips on one cycle, as long as their weighted average:
-            // a nine-second idle at the centre of the movement blend stretched the walk to a
-            // third of its speed. So standing still is its own state (Idle, with the variations
-            // at their own pace), and the centre of the movement blend is the short aiming idle,
-            // retimed to a stride, only ever seen in passing between standing and walking.
-            var stand = Tree("Stand", BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
-            Centre(stand, Mixamo("Rifle/Rifle_Idle_Aim"), 1f);
-            Ring(stand, "Walk");
-            Ring(stand, "Run");
-            Ring(stand, "Sprint");
-
-            var crouchIdle = Tree("CrouchIdles", BlendTreeType.Simple1D, "Aim");
-            crouchIdle.AddChild(Mixamo("Rifle/Rifle_Idle_Crouch"), 0f);
-            crouchIdle.AddChild(Mixamo("Rifle/Rifle_Idle_CrouchAim"), 1f);
-            var crouch = Tree("Crouch", BlendTreeType.FreeformDirectional2D, "MoveX", "MoveZ");
-            Centre(crouch, Mixamo("Rifle/Rifle_Idle_CrouchAim"), 1f);
-            Ring(crouch, "Crouch");
-
-            var stance = Tree("Stance", BlendTreeType.Simple1D, "Crouch");
-            stance.AddChild(stand, 0f);
-            stance.AddChild(crouch, 1f);
-
-            var still = Tree("Still", BlendTreeType.Simple1D, "Crouch");
-            still.AddChild(idles, 0f);
-            still.AddChild(crouchIdle, 1f);
+            BuildRifleMovement(controller, out var still, out var stance);
+            BlendTree Tree(string name, BlendTreeType type, string x, string y = null) => NewTree(controller, name, type, x, y);
+            void Centre(BlendTree t, AnimationClip clip, float cycle) => CentreChild(t, clip, cycle);
 
             BlendTree Pistol(string name, string suffix)
             {
@@ -664,7 +677,7 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>A Mixamo clip by its path under Assets/Animations/Mixamo, "_Mirror" for the mirrored copy.</summary>
-        static AnimationClip Mixamo(string path)
+        public static AnimationClip Mixamo(string path)
         {
             string name = System.IO.Path.GetFileName(path);
             string file = path.EndsWith("_Mirror") ? path.Substring(0, path.Length - "_Mirror".Length) : path;

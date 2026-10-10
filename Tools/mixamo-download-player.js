@@ -42,6 +42,9 @@
     ['Player', 'butt stroke', 1, []],
     ['Player', 'rifle melee', 2, []],
     ['Player', 'firing rifle', 1, ['Firing Rifle']],
+    // Fists up between punches, the rifle on the back.
+    ['Player', 'boxing idle', 1, ['Boxing Idle']],
+    ['Player', 'fight idle', 1, ['Fight Idle']],
     // Left over from last time (Firefox dropped them).
     ['Actions', 'reload', 4, ['Reload', 'Rifle Reload', 'Crouch Reload']],
     ['Injured', 'injured stumble idle', 1, ['Injured Stumble Idle']],

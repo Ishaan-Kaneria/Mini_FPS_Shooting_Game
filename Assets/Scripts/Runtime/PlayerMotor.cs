@@ -291,6 +291,8 @@ public class PlayerMotor : MonoBehaviour
         // enemies to hear. Added here so every arena already built has them.
         if (GetComponent<PlayerCondition>() == null) gameObject.AddComponent<PlayerCondition>();
         if (GetComponent<PlayerNoise>() == null) gameObject.AddComponent<PlayerNoise>();
+        // The player as a whole body under the camera, when the settings name one.
+        if (PlayerBody.Wanted && GetComponent<PlayerBody>() == null) gameObject.AddComponent<PlayerBody>();
         if (controls == null) controls = ControlSettings.CreateDefault();
         // The player's own keys first, so the actions are bound to them and not to the asset's.
         KeyBindings.Apply(controls);

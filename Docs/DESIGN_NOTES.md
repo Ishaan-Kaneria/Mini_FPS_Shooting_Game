@@ -2895,3 +2895,44 @@ normal idle with the pistol walk's upper body.
 Checks: FPSKit > Enemy AI > Run Pose Check (hold, aim, walk speed, both pistols) and Run Limb
 Test (now with the rifle in each fall). Get-up timings and the rifle numbers are on
 `BodyDamageProfile` ("Knockdown and getting up", "The rifle in a fall").
+
+## The player is a body, and the camera never moves for a strike (2026-10-10, before Stage 3)
+
+**Camera in melee.** The kick used to tip the view 9 degrees and the punches leaned it; both are
+gone (`MeleeStrike`), and only a landed blow shakes it, a blip (`MeleeSettings.punchShake`,
+`kickShake`, `takedownShake`), never the wind-up. Every shake goes through `PlayerMotor.AddShake`,
+scaled by Settings > Gameplay > Camera Shake; the walk's head bob and strafe lean by Head Bob.
+
+**The body** (`PlayerBody`, built by FPSKit > Player > Build Body, values in `PlayerBodySettings`,
+seen without playing in FPSKit > Player > Preview Body). The enemies' Survivalist in his own outfit,
+moved by the same Mixamo rifle clips (`FPSKitRiggedSoldier.BuildRifleMovement`), standing under the
+camera. Things that were not obvious:
+
+- **The camera never follows the head; the body follows the camera.** Each frame the body slides so
+  its eyes are where the camera is (horizontally at `followRate`, vertically slowly within
+  `liftLimits`, so a stride's rise and fall moves the arms, not the view).
+- **A real body's hands are level with its eyes.** In Mixamo's aiming idle the right hand is 8 cm
+  *behind* the eye: drawn honestly, nothing is in view. So the mesh is cut three ways by bone weight
+  at start: forearms, hands and the lower upper arm on the FirstPerson layer, drawn by a stacked
+  overlay camera (its own FOV, Settings > Video) sitting `armsViewOffset` behind and below the eye;
+  the body without head on the main camera; arms and head in the shadows only. A triangle on a seam
+  goes to the arms only if all of it is arm (the shoulder seen from the arms camera was a spike).
+  The arms camera's offset fades out looking down (behind the eye in view space is above the
+  shoulders then) and it tips down and drops at a sprint, so the clip's rifle-across-the-chest is seen.
+- **Aiming raises the rifle to the eye; it does not lower the eye to the rifle.** The rear sight goes
+  onto the camera at `ViewModelSpec.aimPosition`, the arms camera returns to the eye, both hands follow
+  by IK (the right hand turned by the gun's grip frame, or its fingers lay flat along the receiver).
+  The first version moved the arms camera down to the clip's low rifle: it sat inside the shoulder.
+- **Looking down bent the chest under the eyes.** The additive aim put the whole pitch on the spine;
+  now the spine takes `spinePitchShare` and the arms swing the rest at the shoulders. And the body
+  steps back `lookDownBack` (0.22) looking down: the vest front is 15 cm ahead of the eye standing,
+  the forward boot 41 cm, so the eye clears the vest and the boot stays in view.
+- **The muzzle is where the drawn muzzle is seen**, not where it is: tracers and flash start from the
+  main camera's point at the same screen position and depth (`PlaceMuzzle`).
+- **Springs are sub-stepped** (1/120 s). In the unfocused editor a frame is 0.33 s, and the rifle's
+  sway spring, stepped once, flung the muzzle 10^21 m away on the first frame.
+- Opening a scratch scene unloads assets nothing in it uses: the preview loads the WeaponData after.
+- Strikes are drawn by clips in `Assets/Animations/Mixamo/Player/` (the builder finds them by name,
+  takes the mirrored side that throws with the wanted hand, and measures where the blow lands); a
+  clip's time is driven by `MeleeStrike.StrikeProgress` so its blow lands on the damage frame. A strike
+  with no clip is drawn the old way (MeleeStrike's offsets on the rifle, the right hand following).

@@ -16,55 +16,23 @@ MonoBehaviour:
   eyeAhead: 0.09
   eyeUp: 0.06
   followRate: 14
-  lookDownBack: 0.22
   liftRate: 3
   liftLimits: {x: -0.15, y: 0.1}
-  armsViewOffset: {x: 0, y: -0.07, z: -0.25}
-  armsOffsetGoneAt: 0.7
-  aimArmsOffset: {x: 0, y: 0, z: 0}
-  aimSwayShare: 0.4
-  sprintArmsTilt: 22
-  sprintArmsDrop: 0.16
-  sprintBetween: {x: 0.7, y: 0.95}
-  armsFromUpperArm: 0.4
-  armsNearClip: 0.01
-  spinePitchShare: 0.35
-  aimRate: 14
-  aimLimit: 70
-  sightsRate: 12
-  swayStiffness: 150
-  swayDamping: 18
-  swayInertia: 0.005
-  swayTurnInertia: 0.02
-  swayLimit: {x: 0.035, y: 6}
-  recoilBack: 0.03
-  recoilPitch: 3
-  recoilYaw: 0.8
-  recoilStiffness: 260
-  recoilDamping: 24
-  recoilAimShare: 0.6
-  flinchKick: 220
-  flinchStiffness: 160
-  flinchDamping: 16
-  strikes:
-  - strike: 1
-    state: Jab
-    range: {x: 0.37288135, y: 0.7457627}
-    impact: 0.55932206
-    turn: 44.652443
-    rifle: 1
-  - strike: 2
-    state: Cross
-    range: {x: 0.27118644, y: 0.5084746}
-    impact: 0.33898306
-    turn: 2.9849138
-    rifle: 2
-  - strike: 3
+  lookDownBack: 0.22
+  sprintClipSpeed: 6.3285913
+  kickLean: 14
+  kick:
     state: Kick
     range: {x: 0.20338982, y: 0.86440676}
     impact: 0.3898305
-    turn: 21.281338
-    rifle: 0
-  sprintClipSpeed: 6.3285913
-  kickLean: 14
-  reloadMagazineBeats: {x: 0.3, y: 0.62}
+    turn: 23.294739
+  eyeBack: 0.07
+  armsNearClip: 0.01
+  armsScale: 1
+  gunScale: 1
+  hipNudge: {x: 0, y: 0, z: 0}
+  leftCarryPosition: {x: -0.2, y: -0.3, z: 0.3}
+  leftCarryTurn: {x: 30, y: -15, z: 25}
+  rightGuard: {x: 0.12, y: -0.16, z: 0.26}
+  rightReach: {x: 0, y: -0.05, z: 0.56}
+  doubleJabReach: 0.75

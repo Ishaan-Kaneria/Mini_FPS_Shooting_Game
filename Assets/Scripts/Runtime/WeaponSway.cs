@@ -60,7 +60,10 @@ public class WeaponSway : MonoBehaviour
         // --- bob from moving ----------------------------------------------
         // Toned down by the movement asset: a steady gun while moving, not a swinging one.
         float speed01 = (_motor != null && _motor.IsGrounded ? _motor.PlanarSpeed01 : 0f) * MovementSettings.Active.gunBob;
-        _bobTimer += Time.deltaTime * bobFrequency * (0.5f + speed01);
+        // On the footsteps when there is a motor: a dip with every footfall, across and back over
+        // a stride, so the gun moves with the steps that are heard rather than on a clock of its own.
+        if (_motor != null) _bobTimer = (_motor.StepPhase - 0.25f) * Mathf.PI * 2f;   // lowest at each footfall
+        else _bobTimer += Time.deltaTime * bobFrequency * (0.5f + speed01);
 
         float bobX = Mathf.Cos(_bobTimer * 0.5f) * bobAmount * speed01;
         float bobY = Mathf.Sin(_bobTimer) * bobAmount * speed01;

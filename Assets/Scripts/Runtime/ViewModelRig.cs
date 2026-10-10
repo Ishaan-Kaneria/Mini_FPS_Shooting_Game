@@ -81,7 +81,18 @@ public class ViewModelRig : MonoBehaviour
     float _feetZ;
     float _standingEye = -1f;
 
-    readonly List<Renderer> _hidden = new List<Renderer>();
+    List<Renderer> _hiddenList;
+    List<Renderer> _hidden => _hiddenList ??= new List<Renderer>();
+
+    // The arms and gun's own camera (the FirstPerson layer), and the gun's muzzle as it is seen.
+    Camera _armsCam;
+    int _firstPerson = -1;
+
+    // A single punch: the rifle carried in the left hand while the right is thrown.
+    float _carry;
+    MeleeStrike.Strike _lastFists = MeleeStrike.Strike.None;
+
+    static PlayerBodySettings Body => PlayerBodySettings.Active;
 
     /// <summary>The body the kick legs hang from when there is no PlayerMotor: the preview tool's stand-in.</summary>
     [System.NonSerialized] public Transform PreviewBody;
@@ -129,8 +140,13 @@ public class ViewModelRig : MonoBehaviour
         _holder = _weapon.transform.parent;
         if (_holder == null) return;
 
-        Build(data.viewModel, _holder, gameObject.layer);
+        // On the FirstPerson layer, drawn by the arms camera at its own field of view, when the
+        // project has the layer (every arena built since the full-body work).
+        _firstPerson = LayerMask.NameToLayer("FirstPerson");
+        bool ownCamera = _firstPerson >= 0 && Application.isPlaying && _weapon.fpsCamera != null;
+        Build(data.viewModel, _holder, ownCamera ? _firstPerson : gameObject.layer);
         if (_spec == null) return;
+        if (ownCamera) BuildArmsCamera(_weapon.fpsCamera);
 
         // The scene's own gun and hands are hidden, never destroyed: the rig can come down
         // again (a gun with no model) and they are what is left.
@@ -141,7 +157,9 @@ public class ViewModelRig : MonoBehaviour
             _hidden.Add(r);
         }
 
-        if (_weapon.muzzlePoint != null && _spec.muzzle != null)
+        // Drawn by its own camera, the gun is seen somewhere other than where it is: the muzzle is
+        // placed each frame where it is seen (PlaceMuzzle) rather than parented to the gun.
+        if (_weapon.muzzlePoint != null && _spec.muzzle != null && _armsCam == null)
         {
             _weapon.muzzlePoint.SetParent(_spec.muzzle, false);
             _weapon.muzzlePoint.localPosition = Vector3.zero;
@@ -166,7 +184,7 @@ public class ViewModelRig : MonoBehaviour
 
         var gun = Instantiate(viewModel, holder, false);
         gun.name = viewModel.name;
-        gun.transform.localScale *= ViewScale;
+        gun.transform.localScale *= Body.gunScale;
         _spec = gun.GetComponent<ViewModelSpec>();
         if (_spec == null) { Destroy(gun); return; }
 
@@ -175,7 +193,9 @@ public class ViewModelRig : MonoBehaviour
         _gunRenderers = gun.GetComponentsInChildren<Renderer>(true);
 
         if (_arms == null && _spec.armsPrefab != null) BuildArms(_spec.armsPrefab, holder, layer);
-        if (_legs == null && _spec.legsPrefab != null) BuildLegs(_spec.legsPrefab, layer);
+        // The full body (PlayerBody) has the legs, the kick and the shadow when there is one.
+        bool bodied = PlayerBody.Wanted && _motor != null;
+        if (_legs == null && _spec.legsPrefab != null && !bodied) BuildLegs(_spec.legsPrefab, layer);
     }
 
     void Teardown(bool keepBodies)
@@ -200,6 +220,54 @@ public class ViewModelRig : MonoBehaviour
         if (_legs != null) Destroy(_legs.gameObject);
         _arms = _legs = null;
         _left = _right = null;
+    }
+
+    /// <summary>
+    /// The arms and gun's own camera: stacked on the main one, depth cleared, at its own field of
+    /// view (Settings > Video), set back from the eye so the arms are seen from a little behind
+    /// them. The main camera stops drawing the FirstPerson layer.
+    /// </summary>
+    void BuildArmsCamera(Camera main)
+    {
+        if (_armsCam != null) return;
+        var existing = main.transform.Find("ArmsCamera");
+        var go = existing != null ? existing.gameObject : new GameObject("ArmsCamera");
+        go.transform.SetParent(main.transform, false);
+        _armsCam = go.GetComponent<Camera>();
+        if (_armsCam == null) _armsCam = go.AddComponent<Camera>();
+        _armsCam.cullingMask = 1 << _firstPerson;
+        _armsCam.nearClipPlane = Body.armsNearClip;
+        _armsCam.farClipPlane = 10f;
+        var data = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(_armsCam);
+        data.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
+        data.renderShadows = false;
+        data.renderPostProcessing = false;
+        var stack = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(main).cameraStack;
+        if (!stack.Contains(_armsCam)) stack.Add(_armsCam);
+        main.cullingMask &= ~(1 << _firstPerson);
+        PlaceArmsCamera();
+    }
+
+    void PlaceArmsCamera()
+    {
+        if (_armsCam == null) return;
+        _armsCam.transform.localPosition = new Vector3(0f, 0f, -Body.eyeBack);
+        _armsCam.transform.localRotation = Quaternion.identity;
+        _armsCam.fieldOfView = GameSettings.ArmsFieldOfView;
+    }
+
+    /// <summary>
+    /// The weapon's muzzle (where tracers start and the flash is drawn, by the main camera) put
+    /// where the drawn muzzle is seen: found on the arms camera's screen, and the same screen
+    /// point on the main camera's, at the same depth.
+    /// </summary>
+    void PlaceMuzzle()
+    {
+        if (_armsCam == null || _weapon == null || _weapon.muzzlePoint == null || _spec == null || _spec.muzzle == null) return;
+        Vector3 at = _spec.muzzle.position;
+        Vector3 vp = _armsCam.WorldToViewportPoint(at);
+        if (vp.z > 0.01f) at = _weapon.fpsCamera.ViewportToWorldPoint(vp);
+        _weapon.muzzlePoint.SetPositionAndRotation(at, _spec.muzzle.rotation);
     }
 
     /// <summary>A view model is drawn, never hit and never casts a shadow onto the world it is not really in.</summary>
@@ -235,7 +303,7 @@ public class ViewModelRig : MonoBehaviour
         _arms = go.transform;
         _arms.localPosition = Vector3.zero;
         _arms.localRotation = Quaternion.identity;
-        _arms.localScale = Vector3.one * ArmsScale;
+        _arms.localScale = Vector3.one * Body.armsScale;
 
         var animator = go.GetComponent<Animator>();
         if (animator == null || animator.avatar == null || !animator.avatar.isHuman) { Destroy(go); _arms = null; return; }
@@ -245,7 +313,7 @@ public class ViewModelRig : MonoBehaviour
 
         var head = Bone(HumanBodyBones.Head);
         // In the holder's space, scale included: it is what is subtracted to put the head on the eye.
-        _headLocal = head != null ? holder.InverseTransformPoint(head.position) : new Vector3(0f, 1.65f, 0f) * ArmsScale;
+        _headLocal = head != null ? holder.InverseTransformPoint(head.position) : new Vector3(0f, 1.65f, 0f) * Body.armsScale;
 
         _left = MakeArm(Bone, right: false);
         _right = MakeArm(Bone, right: true);
@@ -381,12 +449,8 @@ public class ViewModelRig : MonoBehaviour
     /// <summary>Behind the eye and the player's centre, so the camera is never inside the chest.</summary>
     static readonly Vector3 BodyOffset = new Vector3(0f, -0.04f, -0.24f);
 
-    /// <summary>
-    /// The arms and the gun a size up on life. At the camera's wide view a true-size rifle
-    /// and true-size fists read small and far off; every shooter draws its hands larger.
-    /// </summary>
-    const float ArmsScale = 1.14f;
-    const float ViewScale = 1.1f;
+    // The arms' and gun's sizes are PlayerBodySettings.armsScale and gunScale: true size, now that
+    // they have their own camera and field of view (they were drawn 14% and 10% over life).
     static readonly Vector3 LookDownOffset = new Vector3(0f, -0.12f, -0.32f);
 
     Leg MakeLeg(Animator animator, bool right)
@@ -414,7 +478,9 @@ public class ViewModelRig : MonoBehaviour
     void LateUpdate()
     {
         if (!Built || _weapon == null) return;
+        PlaceArmsCamera();
         Pose(Read());
+        PlaceMuzzle();
     }
 
     State Read()
@@ -483,15 +549,25 @@ public class ViewModelRig : MonoBehaviour
             turn = Quaternion.Inverse(_weapon.HipRotation) * model.localRotation;
         }
 
-        Vector3 basePos = Vector3.Lerp(_spec.hipPosition, _spec.aimPosition, s.aim);
+        Vector3 basePos = Vector3.Lerp(_spec.hipPosition + Body.hipNudge, _spec.aimPosition, s.aim);
         Quaternion baseTurn = Quaternion.Slerp(Quaternion.Euler(_spec.hipTurn), Quaternion.identity, s.aim);
 
         var gun = _spec.transform;
         gun.localPosition = basePos + delta;
         gun.localRotation = baseTurn * turn;
 
+        // A single punch: the rifle is carried low at the side in the left hand while the right
+        // is thrown, rather than going on the back.
+        UpdateCarry(s);
+        if (_carry > 0.001f)
+        {
+            float w = UITheme.EaseOut(_carry);
+            gun.localPosition = Vector3.Lerp(gun.localPosition, Body.leftCarryPosition, w);
+            gun.localRotation = Quaternion.Slerp(gun.localRotation, Quaternion.Euler(Body.leftCarryTurn), w);
+        }
+
         // On the back it is out of sight: hidden rather than left hanging behind the eye.
-        bool shown = s.gunAway < 0.97f;
+        bool shown = s.gunAway < 0.97f || _carry > 0.05f;
         if (_gunRenderers != null && _gunRenderers.Length > 0 && _gunRenderers[0] != null && _gunRenderers[0].enabled != shown)
             foreach (var r in _gunRenderers) if (r != null) r.enabled = shown;
 
@@ -503,6 +579,19 @@ public class ViewModelRig : MonoBehaviour
                 ? Mathf.Sin((s.reloadProgress - 0.74f) / 0.16f * Mathf.PI) : 0f;
             _spec.bolt.localPosition = _boltRest + _spec.boltTravel * Mathf.Max(cycle, run);
         }
+    }
+
+    /// <summary>
+    /// The left hand carries the rifle from a single punch (the jab) until the fight moves on: to
+    /// the double punch, which puts it on the back, or back to the gun when the fists come down.
+    /// </summary>
+    void UpdateCarry(State s)
+    {
+        if (s.strike == MeleeStrike.Strike.Jab || s.strike == MeleeStrike.Strike.Cross) _lastFists = s.strike;
+        if (s.gunAway <= 0.01f && s.strike == MeleeStrike.Strike.None) _lastFists = MeleeStrike.Strike.None;
+        bool carrying = _arms != null && _lastFists == MeleeStrike.Strike.Jab && (s.gunAway > 0.01f || s.strike == MeleeStrike.Strike.Jab);
+        float dt = Application.isPlaying ? Time.deltaTime : 1f;
+        _carry = Mathf.MoveTowards(_carry, carrying ? 1f : 0f, dt * 8f);
     }
 
     // ---- fists, in the view's space --------------------------------------
@@ -556,15 +645,30 @@ public class ViewModelRig : MonoBehaviour
         Vector3 lPos = _spec.leftHand.position;
         Quaternion lRot = _spec.leftHand.rotation;
 
+        // Where the hands are on the gun (the left hand stays there while it carries the rifle).
+        Vector3 gunL = lPos;
+        Quaternion gunLRot = lRot;
+
         // Off it, for the punches: both fists up in a guard, one thrown at a time. The left
         // jabs; the right throws the cross, and the finishing blow, harder and further.
         float f = Mathf.Clamp01(s.fistsUp);
+        float carry = UITheme.EaseOut(_carry);
+        float lFistW = f, rFistW = f;
         if (f > 0f)
         {
             bool finisher = s.strike == MeleeStrike.Strike.Takedown && s.takedownWithFists;
             float jab = s.strike == MeleeStrike.Strike.Jab ? Extension(s.strikeProgress, MeleeStrike.ImpactAt(MeleeStrike.Strike.Jab)) : 0f;
             float cross = s.strike == MeleeStrike.Strike.Cross || finisher
                 ? Extension(s.strikeProgress, MeleeStrike.ImpactAt(MeleeStrike.Strike.Cross)) * (finisher ? 1.12f : 1f) : 0f;
+
+            // The double punch: a quick left jab out and back in the first part of the cross's
+            // wind-up, then the right cross lands on the strike's own moment.
+            if (s.strike == MeleeStrike.Strike.Cross)
+            {
+                float early = MeleeStrike.ImpactAt(MeleeStrike.Strike.Cross) * 0.85f;
+                if (s.strikeProgress >= 0f && s.strikeProgress < early)
+                    jab = Mathf.Max(jab, Extension(s.strikeProgress / early, 0.5f) * Body.doubleJabReach);
+            }
 
             // The off hand pulls back to the chin as the other is thrown.
             Vector3 lFist = Vector3.LerpUnclamped(LeftGuard, JabReach, jab) + new Vector3(0.02f, 0.02f, -0.06f) * Mathf.Clamp01(cross);
@@ -578,14 +682,28 @@ public class ViewModelRig : MonoBehaviour
             Quaternion rFistRot = Quaternion.Slerp(Look(view, new Vector3(-0.25f, 0.55f, 0.8f), new Vector3(0.8f, 0.1f, 0.2f)),
                                                    Look(view, new Vector3(-0.08f, 0.05f, 1f), new Vector3(0f, 1f, 0f)), ct);
 
+            // A single punch (the rifle carried in the left hand): the right fist is thrown from
+            // its own guard at the crosshair, and the left stays on the rifle.
+            if (carry > 0f)
+            {
+                Vector3 single = Vector3.LerpUnclamped(Body.rightGuard, Body.rightReach, jab);
+                rFist = Vector3.Lerp(rFist, single, carry);
+                rFistRot = Quaternion.Slerp(rFistRot, Quaternion.Slerp(
+                    Look(view, new Vector3(-0.25f, 0.55f, 0.8f), new Vector3(0.8f, 0.1f, 0.2f)),
+                    Look(view, new Vector3(-0.08f, 0.05f, 1f), new Vector3(0f, 1f, 0f)), jt), carry);
+                lFist = view.InverseTransformPoint(gunL);
+                lFistRot = gunLRot;
+                lFistW = f * (1f - carry);
+            }
+
             lPos = Vector3.Lerp(lPos, view.TransformPoint(lFist), f);
             rPos = Vector3.Lerp(rPos, view.TransformPoint(rFist), f);
             lRot = Quaternion.Slerp(lRot, lFistRot, f);
             rRot = Quaternion.Slerp(rRot, rFistRot, f);
         }
 
-        Reach(_right, rPos, rRot, view.TransformDirection(new Vector3(0.55f, -0.7f, -0.2f)), f);
-        Reach(_left, lPos, lRot, view.TransformDirection(new Vector3(-0.35f, -0.8f, 0.05f)), f);
+        Reach(_right, rPos, rRot, view.TransformDirection(new Vector3(0.55f, -0.7f, -0.2f)), rFistW);
+        Reach(_left, lPos, lRot, view.TransformDirection(new Vector3(-0.35f, -0.8f, 0.05f)), lFistW);
     }
 
     /// <summary>A rotation whose +Z points along <paramref name="fingers"/> and +Y along <paramref name="back"/>, in the view's space.</summary>

@@ -219,6 +219,9 @@ public class PlayerMotor : MonoBehaviour
     /// <summary>0 when still, 1 at full sprint speed. Drives weapon spread and bob.</summary>
     public float PlanarSpeed01 { get; private set; }
 
+    /// <summary>Steps taken, counted by distance walked: the whole part is the step, the fraction how far into it (a footfall at each whole number).</summary>
+    public float StepPhase => _stepPhase;
+
     /// <summary>Multiplier on look sensitivity. Weapon drives this down while aiming.</summary>
     public float LookSensitivityMultiplier { get; set; } = 1f;
 

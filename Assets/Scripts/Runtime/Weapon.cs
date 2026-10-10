@@ -363,9 +363,8 @@ public class Weapon : MonoBehaviour
         }
 
         // The rigged arms and the gun's own model, when its data has one. Added here
-        // rather than by the scene builder so every arena already built gets them. Not when
-        // the player is drawn as a whole body: its own arms hold the gun (PlayerBody).
-        if (!PlayerBody.Wanted && GetComponent<ViewModelRig>() == null) gameObject.AddComponent<ViewModelRig>();
+        // rather than by the scene builder so every arena already built gets them.
+        if (GetComponent<ViewModelRig>() == null) gameObject.AddComponent<ViewModelRig>();
     }
 
     void Start()

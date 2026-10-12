@@ -1359,7 +1359,10 @@ public class EnemyAI : MonoBehaviour
 
         float remaining = (_shoveUntil - Time.time) / _shoveLength;
         float share = Mathf.Clamp01(Time.deltaTime / _shoveLength) * 2f * remaining;
-        _agent.Move(_shove * share);
+        // A body moved by its clips takes the push through the motor; the agent would only be overwritten.
+        var motor = Motor;
+        if (motor != null && motor.RootMotion) motor.Push(_shove * share);
+        else _agent.Move(_shove * share);
     }
 
     /// <summary>

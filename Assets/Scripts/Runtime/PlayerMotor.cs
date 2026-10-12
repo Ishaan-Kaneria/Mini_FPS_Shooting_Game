@@ -330,8 +330,32 @@ public class PlayerMotor : MonoBehaviour
         HandleLook();
         HandleCrouch();
         HandleMove();
+        if (_slideOff != Vector3.zero && _cc.enabled) { var slide = _slideOff; _slideOff = Vector3.zero; _cc.Move(slide); }
         HandleBobAndFootsteps();
     }
+
+    int _enemyLayer = -2;
+
+    /// <summary>
+    /// Never standing on an enemy: the controller climbs anything under its step height, and an
+    /// enemy's leg and arm hitboxes are under it, so walking or lunging into one put the player on
+    /// its shoulders (and a punch then met nothing). Landing on top of one slides the player off,
+    /// away from its middle.
+    /// </summary>
+    void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        if (_enemyLayer == -2) _enemyLayer = LayerMask.NameToLayer("Enemy");
+        if (_enemyLayer < 0 || hit.collider == null || hit.collider.gameObject.layer != _enemyLayer) return;
+        if (hit.normal.y < 0.5f) return;   // against its side, not on top of it
+        var body = hit.collider.attachedRigidbody != null ? hit.collider.transform.root : hit.collider.transform;
+        Vector3 off = transform.position - body.position;
+        off.y = 0f;
+        if (off.sqrMagnitude < 1e-4f) off = -transform.forward;
+        // Applied after this frame's move (a Move from inside the controller's own callback recurses).
+        _slideOff = off.normalized * (3f * Time.deltaTime) + Vector3.down * (2f * Time.deltaTime);
+    }
+
+    Vector3 _slideOff;
 
     // ======================================================================
     /// <summary>

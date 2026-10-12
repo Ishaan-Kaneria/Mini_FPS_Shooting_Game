@@ -123,6 +123,7 @@ public class MeleeStrike : MonoBehaviour
         get
         {
             if (_strike == Strike.None || _strikeLength <= 0f) return -1f;
+            if (Time.time < _holdUntil) return _heldAt;   // held on the blow (StartHitStop)
             float k = (Time.time - _strikeStart) / _strikeLength;
             return k >= 0f && k < 1f ? k : -1f;
         }
@@ -142,6 +143,9 @@ public class MeleeStrike : MonoBehaviour
 
     /// <summary>When the next strike may start. For checks that throw strikes on a timer.</summary>
     public float ReadyAt => _nextStrike;
+
+    /// <summary>The strike thrown last, including one still waiting on its start (the first punch waits for the gun to go).</summary>
+    public Strike Thrown => _strike;
 
     /// <summary>Raised when <see cref="InReach"/> flips.</summary>
     public event Action<MeleeStrike, bool> ReachChanged;
@@ -182,8 +186,7 @@ public class MeleeStrike : MonoBehaviour
     float _nextScan;
     bool _lunged;
 
-    float _hitStopUntil;
-    float _hitStopScale;
+    float _holdUntil = -1f, _heldAt;
 
     Collider[] _overlap;
     Collider[] Overlap => _overlap ??= new Collider[32];
@@ -233,13 +236,11 @@ public class MeleeStrike : MonoBehaviour
         _strike = Strike.None;
         _fists = false;
         GunAway = 0f;
-        EndHitStop();
         SetTarget(null);
     }
 
     void Update()
     {
-        UpdateHitStop();
 
         bool able = PlayerMotor.InputEnabled && (_self == null || !_self.IsDead)
                     && !(_bombs != null && _bombs.IsAiming);
@@ -526,14 +527,17 @@ public class MeleeStrike : MonoBehaviour
         var ai = target.GetComponent<EnemyAI>();
         if (ai == null) return true;
 
+        // The stagger starts on this frame: a step back off the blow (through the motor, so a body
+        // moved by its clips moves for it too), its attack taken away.
+        Vector3 away = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
+        float give = role == EnemyArchetype.Role.Boss ? 0.3f : role == EnemyArchetype.Role.Elite ? 0.6f : 1f;
         switch (strike)
         {
-            case Strike.Jab: ai.ForceStagger(s.jabStagger); break;
-            case Strike.Butt:
-            case Strike.Cross: ai.ForceStagger(s.crossStagger); break;
+            case Strike.Jab: ai.Shove(away * s.jabStepBack * give, s.stepBackSeconds, s.jabStagger); break;
+            case Strike.Butt: ai.Shove(away * s.buttStepBack * give, s.stepBackSeconds, s.crossStagger); break;
+            case Strike.Cross: ai.Shove(away * s.crossStepBack * give, s.stepBackSeconds, s.crossStagger); break;
             case Strike.Kick:
             {
-                Vector3 away = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
                 if (role == EnemyArchetype.Role.Boss)
                 {
                     ai.Shove(away * 0.4f, 0.3f, 0.3f);
@@ -697,30 +701,24 @@ public class MeleeStrike : MonoBehaviour
     // ======================================================================
 
     /// <summary>
-    /// Freezes the world for a few hundredths of a second on a landed blow: the single
-    /// thing that most makes a hit feel heavy. Real time, so it lasts the same at any frame
-    /// rate. Put back only if the time scale is still the one this set -- a pause or the
-    /// end of the level writing zero in the meantime wins.
+    /// The hit-stop: on a landed blow the player's own strike holds where it met the body for a
+    /// few hundredths of a second (the single thing that most makes a hit feel heavy), and
+    /// everything after it in the strike moves on by the same amount, so the strike's timings
+    /// do not change. Only the player's strike: it used to slow the whole world to 4%, which
+    /// held the enemy's answer back by the length of the stop -- 50 to 120 ms of a body that
+    /// had been hit and did not move.
     /// </summary>
     void StartHitStop(float seconds)
     {
-        if (seconds <= 0f || Time.timeScale != 1f) return;
-
-        _hitStopScale = 0.04f;
-        Time.timeScale = _hitStopScale;
-        _hitStopUntil = Time.realtimeSinceStartup + seconds;
-    }
-
-    void UpdateHitStop()
-    {
-        if (_hitStopScale > 0f && Time.realtimeSinceStartup >= _hitStopUntil) EndHitStop();
-    }
-
-    void EndHitStop()
-    {
-        if (_hitStopScale <= 0f) return;
-        if (Mathf.Approximately(Time.timeScale, _hitStopScale)) Time.timeScale = 1f;
-        _hitStopScale = 0f;
+        if (seconds <= 0f || _strike == Strike.None) return;
+        float k = StrikeProgress;
+        if (k < 0f) return;
+        _heldAt = k;
+        _holdUntil = Time.time + seconds;
+        _strikeStart += seconds;
+        _nextStrike += seconds;
+        _chainUntil += seconds;
+        if (_fists) _fistsUntil += seconds;
     }
 
     // ======================================================================
@@ -731,7 +729,7 @@ public class MeleeStrike : MonoBehaviour
     void Feel(Strike strike, bool killed)
     {
         var s = Settings;
-        float extra = killed ? 0.04f : 0f;
+        float extra = killed ? 0.01f : 0f;
         switch (strike)
         {
             case Strike.Kick:
@@ -833,7 +831,8 @@ public class MeleeStrike : MonoBehaviour
             return;
         }
 
-        const float blowAt = 0.38f;
+        // The stock arrives on the frame the blow is dealt.
+        float blowAt = ImpactAt(Strike.Butt);
 
         // Blended as rotations, not as three angles: the lean is across the view, after
         // the pitch, which Euler angles cannot say and a per-axis blend would wobble.

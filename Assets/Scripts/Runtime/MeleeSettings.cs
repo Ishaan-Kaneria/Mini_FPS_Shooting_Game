@@ -147,10 +147,19 @@ public class MeleeSettings : ScriptableObject
     [Range(0f, 3f)] public float staminaRegenDelay = 0.7f;
 
     [Header("Hit feel")]
-    [Tooltip("Seconds the world freezes when a punch lands. Real time, so it is the same at any frame rate.")]
-    [Range(0f, 0.2f)] public float punchHitStop = 0.045f;
-    [Range(0f, 0.25f)] public float kickHitStop = 0.08f;
-    [Range(0f, 0.3f)] public float takedownHitStop = 0.12f;
+    [Tooltip("Seconds the player's own strike holds where it met the body when a punch lands (the hit-stop). " +
+             "Only the strike holds: the enemy answers the blow on the frame it lands. Kept to 40-60 ms.")]
+    [Range(0f, 0.06f)] public float punchHitStop = 0.045f;
+    [Range(0f, 0.06f)] public float kickHitStop = 0.055f;
+    [Range(0f, 0.06f)] public float takedownHitStop = 0.06f;
+    [Tooltip("Metres an ordinary enemy steps back off a punch, starting on the frame it lands (an elite 60%, a boss 30%).")]
+    [Range(0f, 1f)] public float jabStepBack = 0.25f;
+    [Tooltip("Metres it steps back off the cross.")]
+    [Range(0f, 1f)] public float crossStepBack = 0.35f;
+    [Tooltip("Metres it steps back off the rifle butt.")]
+    [Range(0f, 1f)] public float buttStepBack = 0.3f;
+    [Tooltip("Seconds the step back takes. Most of it in the first frames: the blow moves the body at once.")]
+    [Range(0.05f, 0.5f)] public float stepBackSeconds = 0.18f;
     [Tooltip("Camera shake on a landed punch, 0 to 1.")]
     [Range(0f, 1f)] public float punchShake = 0.25f;
     [Tooltip("Camera shake when a kick lands: a blip at the impact only, never in the wind-up. " +

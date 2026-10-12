@@ -368,6 +368,19 @@ public class EnemyBody : MonoBehaviour
 
     void OnDamaged(Health health, DamageInfo info)
     {
+        if (_health != null && !_health.IsDead)
+        {
+            _hitFrame = Time.frameCount;
+            _hitTime = Time.time;
+            _reactFrame = -1;
+            _hitHips = _hips != null ? _hips.position : transform.position;
+            if (_springs == null) BuildSprings();
+            if (_springs != null)
+            {
+                if (AnglesAtHit.Length != _springs.Length) _anglesAtHitCache = new Vector3[_springs.Length];
+                for (int i = 0; i < _springs.Length; i++) AnglesAtHit[i] = _springs[i].angle;
+            }
+        }
         if (_health == null || _health.IsDead || IsDown || reactionScale <= 0f) return;
 
         Vector3 dir = info.direction.sqrMagnitude > 0.0001f ? info.direction.normalized : -transform.forward;
@@ -469,8 +482,9 @@ public class EnemyBody : MonoBehaviour
     /// <summary>Snaps in over a few hundredths of a second, swings a touch past, and settles.</summary>
     static float Envelope(float t)
     {
-        if (t < 0.12f) { float a = t / 0.12f; return a * (2f - a); }
-        float d = (t - 0.12f) / 0.88f;
+        // Up fast (6% of the reaction), so a snap is mostly there on the frame after the blow.
+        if (t < 0.06f) { float a = t / 0.06f; return a * (2f - a); }
+        float d = (t - 0.06f) / 0.94f;
         return (1f - d) * (1f - d) * (1f + 0.25f * Mathf.Sin(d * Mathf.PI * 2f));
     }
 
@@ -1008,8 +1022,8 @@ public class EnemyBody : MonoBehaviour
 
     void LateUpdate()
     {
-        if (_hips == null || _down == Down.Flying) return;
-        if (_ragdoll != null && _ragdoll.IsRagdolled) return;
+        if (_hips == null) return;
+        if (_down == Down.Flying || (_ragdoll != null && _ragdoll.IsRagdolled)) { TrackReaction(); return; }
 
         bool alive = _health == null || !_health.IsDead;
         if (!alive) return;
@@ -1515,6 +1529,39 @@ public class EnemyBody : MonoBehaviour
     [Range(0.05f, 1.5f)] public float hitReach = 0.35f;
     [Tooltip("The most any bone is turned by hits, degrees.")]
     [Range(5f, 80f)] public float hitLimit = 35f;
+    [Tooltip("Seconds of a hit's turn given at once, on the frame it lands, before the springs take over. " +
+             "Without it the first frame of a reaction was a velocity only, and a blow read as late.")]
+    [Range(0f, 0.08f)] public float hitLead = 0.03f;
+
+    // Hit to visible reaction, measured (VerifyCombat): the frame a blow landed and the first
+    // frame the body was seen to answer it.
+    int _hitFrame = -1, _reactFrame = -1;
+    float _hitTime;
+    Vector3 _hitHips;
+    Vector3[] _anglesAtHitCache;
+    Vector3[] AnglesAtHit => _anglesAtHitCache ??= new Vector3[_springs != null ? _springs.Length : 0];
+
+    /// <summary>Frames from the last blow landing to the body visibly answering it; -1 while waiting or with no blow.</summary>
+    public int ReactionLatencyFrames => _hitFrame >= 0 && _reactFrame >= 0 ? _reactFrame - _hitFrame : -1;
+
+    /// <summary>The frame the last blow landed on, or -1.</summary>
+    public int LastHitFrame => _hitFrame;
+
+    /// <summary>Notes the first frame after a blow that the body is seen to move for it: the hit springs or a head snap past 1.5 degrees, or a thrown body 2 cm off.</summary>
+    void TrackReaction()
+    {
+        if (_hitFrame < 0 || _reactFrame >= 0) return;
+        // What this blow moved: each spring against where it was when the blow landed (a body
+        // still swinging from the last one is not an answer to this one), and snaps it started.
+        float deg = 0f;
+        if (_springs != null && AnglesAtHit.Length == _springs.Length)
+            for (int i = 0; i < _springs.Length; i++) deg = Mathf.Max(deg, (_springs[i].angle - AnglesAtHit[i]).magnitude);
+        foreach (var k in _kicks)
+            if (k.start >= _hitTime) deg = Mathf.Max(deg, Mathf.Abs(k.degrees * Envelope(Mathf.Clamp01((Time.time - k.start) / k.length))));
+        bool thrown = (_down == Down.Flying || (_ragdoll != null && _ragdoll.IsRagdolled)) && _hips != null
+                      && (_hips.position - _hitHips).sqrMagnitude > 0.02f * 0.02f;
+        if (deg >= 1.5f || thrown) _reactFrame = Time.frameCount;
+    }
 
     struct Spring { public Transform bone; public Vector3 angle, velocity; public float give; }
     Spring[] _springs;
@@ -1549,7 +1596,10 @@ public class EnemyBody : MonoBehaviour
             Vector3 axis = Vector3.Cross(lever, dir);
             if (axis.sqrMagnitude < 1e-6f) axis = Vector3.Cross(Vector3.up, dir);
             float near = Mathf.Exp(-lever.magnitude / Mathf.Max(0.05f, hitReach));
-            sp.velocity += axis.normalized * (hitKick * strength * near * sp.give * jitter);
+            Vector3 add = axis.normalized * (hitKick * strength * near * sp.give * jitter);
+            sp.velocity += add;
+            // Some of the turn at once: the body answers on the frame the blow lands.
+            sp.angle = Vector3.ClampMagnitude(sp.angle + add * hitLead, hitLimit);
             _springs[i] = sp;
         }
     }
@@ -1582,6 +1632,7 @@ public class EnemyBody : MonoBehaviour
             if (t >= 1f || k.bone == null) { _kicks.RemoveAt(i); continue; }
             k.bone.rotation = Quaternion.AngleAxis(k.degrees * Envelope(t), k.axis) * k.bone.rotation;
         }
+        TrackReaction();
     }
 
     /// <summary>One leg short of good: the hips drop over it with each step and the body leans to it.</summary>

@@ -42,7 +42,15 @@ namespace FPSKit.EditorTools
         /// <summary>How close the player is held during the point-blank phase.</summary>
         const float PointBlank = 1.6f;
 
-        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Punch, PunchCross, PunchMiss, Judge }
+        enum Phase { Enter, Tune, AwaitLevel, Inspect, Engage, CloseIn, Punch, PunchCross, PunchMiss, Reactions, Judge }
+
+        // The reaction check: each strike thrown at point-blank range, and the frames from the
+        // blow landing to the body visibly answering it (EnemyBody.ReactionLatencyFrames).
+        static readonly MeleeStrike.Strike[] ReactionOrder = { MeleeStrike.Strike.Butt, MeleeStrike.Strike.Jab, MeleeStrike.Strike.Cross, MeleeStrike.Strike.Kick };
+        const int MaxReactionFrames = 2;
+        static int _rxStep, _rxStage, _rxFrame, _rxLastFrame, _rxHitBefore;
+        static EnemyAI _rxTarget;
+        static EnemyBody _rxBody;
 
         /// <summary>
         /// Seconds the level is given while this test runs.
@@ -126,6 +134,10 @@ namespace FPSKit.EditorTools
                 _punchRole = _punchMissHit = "";
                 _punchTarget = null;
                 _punchPoolBefore = _punchPoolAfter = -1f;
+                _rxStep = _rxStage = _rxFrame = 0;
+                _rxLastFrame = -1;
+                _rxTarget = null;
+                _rxBody = null;
                 _startedAt = EditorApplication.timeSinceStartup;
                 _phase = Phase.Enter;
 
@@ -354,6 +366,8 @@ namespace FPSKit.EditorTools
 
                         if (melee != null && _punchTarget != null && !_punchTarget.IsDead)
                         {
+                            // Still facing it, as a player keeps the enemy in the crosshair after the butt.
+                            if (player != null) { Face(player, _punchTarget.transform.position); Physics.SyncTransforms(); }
                             var hit = melee.TryPunch();
                             Notes.Append($"\n  punch thrown at {(hit != null ? hit.name : "nothing")}");
                             if (hit == null)
@@ -413,9 +427,13 @@ namespace FPSKit.EditorTools
                             _punchMissHit = hit != null ? hit.name : "";
                         }
 
-                        _phase = Phase.Judge;
+                        _phase = Phase.Reactions;
                         return;
                     }
+
+                    case Phase.Reactions:
+                        if (Reactions()) _phase = Phase.Judge;
+                        return;
 
                     case Phase.Judge:
                         if (EditorApplication.isPlaying) { EditorApplication.ExitPlaymode(); return; }
@@ -762,6 +780,106 @@ namespace FPSKit.EditorTools
                       $"and hit them again at point-blank range for {_poolBeforeClose - _poolAtEnd:0.0} " +
                       $"more.{Notes}");
             FPSKitBatch.Exit(0);
+        }
+
+        /// <summary>
+        /// One frame of the reaction check; true when every strike has been measured. Each strike
+        /// is thrown from arm's length at a living enemy (its health topped up, so the chain of
+        /// butt, punch, cross runs on one body), and the frames from the blow landing to the body
+        /// visibly moving for it are read off EnemyBody. Game time runs at 1/60 s a frame, so a
+        /// frame is 16.7 ms: two frames is the most allowed.
+        /// </summary>
+        static bool Reactions()
+        {
+            if (Time.frameCount == _rxLastFrame) return false;   // once per game frame
+            _rxLastFrame = Time.frameCount;
+            _rxFrame++;
+
+            var player = GameObject.FindGameObjectWithTag("Player");
+            var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
+            if (melee == null || _rxStep >= ReactionOrder.Length) return true;
+            var strike = ReactionOrder[_rxStep];
+            Time.captureDeltaTime = 1f / 60f;
+            var playerHealth = player.GetComponent<Health>();
+            if (playerHealth != null && playerHealth.Normalized < 0.5f) playerHealth.ResetHealth();
+
+            switch (_rxStage)
+            {
+                case 0:   // a target: the nearest living rigged enemy, standing
+                {
+                    if (_rxTarget == null || _rxBody == null || _rxTarget.CurrentState == EnemyAI.State.Dead || _rxBody.IsDown)
+                    {
+                        _rxTarget = null; _rxBody = null;
+                        float best = float.MaxValue;
+                        foreach (var ai in Enemies())
+                        {
+                            var body = ai.GetComponent<EnemyBody>();
+                            if (body == null || body.IsDown || ai.CurrentState == EnemyAI.State.Dead) continue;
+                            float d = Vector3.Distance(ai.transform.position, player.transform.position);
+                            if (d < best) { best = d; _rxTarget = ai; _rxBody = body; }
+                        }
+                    }
+                    if (_rxTarget == null)
+                    {
+                        if (_rxFrame > 600) { Notes.Append($"\n  reaction to {strike}: no standing enemy to strike"); _rxStep++; _rxFrame = 0; }
+                        return false;
+                    }
+                    if (melee.Current != MeleeStrike.Strike.None || Time.time < melee.ReadyAt + 0.02f) return false;
+                    // The butt only opens a fight: the last chain (and the fists) must have run out first.
+                    if (strike == MeleeStrike.Strike.Butt && (_rxFrame < 200 || melee.GunAway > 0.01f)) return false;
+
+                    var health = _rxTarget.GetComponent<Health>();
+                    health.ResetHealth();
+                    Vector3 away = Vector3.ProjectOnPlane(player.transform.position - _rxTarget.transform.position, Vector3.up);
+                    away = away.sqrMagnitude > 0.01f ? away.normalized : _rxTarget.transform.forward;
+                    var controller = player.GetComponent<CharacterController>();
+                    if (controller != null) controller.enabled = false;
+                    player.transform.position = _rxTarget.transform.position + away * 1.3f + Vector3.up * 0.05f;
+                    if (controller != null) controller.enabled = true;
+                    Face(player, _rxTarget.transform.position);
+                    Physics.SyncTransforms();
+
+                    _rxHitBefore = _rxBody.LastHitFrame;
+                    var hit = strike == MeleeStrike.Strike.Kick ? melee.TryKick() : melee.TryPunch();
+                    if (melee.Thrown != strike)
+                    {
+                        Notes.Append($"\n  reaction to {strike}: the chain threw {melee.Thrown} instead");
+                        Errors.Add($"the reaction check could not throw a {strike} (got {melee.Thrown})");
+                        _rxStep = ReactionOrder.Length;
+                        return true;
+                    }
+                    _rxStage = 1;
+                    _rxFrame = 0;
+                    return false;
+                }
+
+                case 1:   // the blow lands, then the body answers it
+                {
+                    bool landed = _rxBody != null && _rxBody.LastHitFrame > _rxHitBefore;
+                    int latency = landed ? _rxBody.ReactionLatencyFrames : -1;
+                    if (latency >= 0)
+                    {
+                        float ms = latency * 1000f / 60f;
+                        Notes.Append($"\n  reaction to {strike}: {latency} frame(s), {ms:0} ms from the blow landing to the body moving");
+                        if (latency > MaxReactionFrames)
+                            Errors.Add($"the enemy answered a {strike} {latency} frames ({ms:0} ms) after it landed; at most {MaxReactionFrames}");
+                        _rxStep++;
+                        _rxStage = 0;
+                        _rxFrame = 0;
+                        return _rxStep >= ReactionOrder.Length;
+                    }
+                    if (_rxFrame > 120)
+                    {
+                        Notes.Append($"\n  reaction to {strike}: no blow landed, or no answer within 2 s");
+                        Errors.Add($"a {strike} at arm's length never got a visible reaction");
+                        _rxStep++;
+                        _rxStage = 0;
+                        _rxFrame = 0;
+                    }
+                    return false;
+                }
+            }
+            return false;
         }
 
         /// <summary>When a strike hits nothing: what the strike could see from the eye, so the reason is in the report.</summary>

@@ -71,8 +71,8 @@ MonoBehaviour:
   staminaRegen: 32
   staminaRegenDelay: 0.7
   punchHitStop: 0.045
-  kickHitStop: 0.08
-  takedownHitStop: 0.12
+  kickHitStop: 0.055
+  takedownHitStop: 0.06
   punchShake: 0.25
   kickShake: 0.35
   takedownShake: 0.4

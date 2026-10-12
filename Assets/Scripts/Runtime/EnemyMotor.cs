@@ -360,6 +360,15 @@ public class EnemyMotor : MonoBehaviour
         return true;
     }
 
+    Vector3 _push;
+
+    /// <summary>
+    /// A push from outside (a strike's shove), added to the clip's motion this frame. Under root
+    /// motion the agent is only told where the clip put the body, so a push through the agent
+    /// alone was overwritten and the shove did nothing.
+    /// </summary>
+    public void Push(Vector3 step) { step.y = 0f; _push += step; }
+
     /// <summary>The Animator has worked out this frame's root motion (from EnemyRootMotion).</summary>
     public void AnimatorMoved()
     {
@@ -371,6 +380,8 @@ public class EnemyMotor : MonoBehaviour
         delta.y = 0f;
         // Still on the ground, the slow shifting clip must not creep the body along.
         if ((Current == Gait.CrawlUp || Current == Gait.CrawlDown) && Mathf.Abs(_animator.GetFloat(Pace)) < 0.2f) delta = Vector3.zero;
+        delta += _push;
+        _push = Vector3.zero;
 
         if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
         {

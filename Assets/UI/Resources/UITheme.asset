@@ -208,6 +208,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 2c8873674c359caf29cd12d3de7cf7be, type: 3}
   - id: keyboard
     sprite: {fileID: 21300000, guid: a3f1d4fcf7ad61f6d9d2c9c1c8982275, type: 3}
+  - id: kick
+    sprite: {fileID: 21300000, guid: 4214842facc526c1483232776077ca7d, type: 3}
   - id: layout
     sprite: {fileID: 21300000, guid: ce88a9a58a693a6b69cdca8d94f2ece7, type: 3}
   - id: list-details

@@ -33,6 +33,14 @@ public class EnemyBrutality : MonoBehaviour
     [Range(0f, 1f)] public float breakAt = 0.6f;
     [Tooltip("Limbs a blast can take off.")]
     [Range(0, 4)] public int blastSevers = 2;
+    [Tooltip("A blast that leaves the body alive takes a limb off when it was worth this share of its health.")]
+    [Range(0.05f, 1f)] public float livingBlastShare = 0.3f;
+
+    [Header("Pieces")]
+    [Tooltip("Seconds a severed piece lies before it sinks away.")]
+    [Range(5f, 120f)] public float pieceLife = 40f;
+    [Tooltip("The most severed pieces in the world at once; past it the oldest goes.")]
+    [Range(4, 64)] public int maxPieces = 16;
 
     [Header("Look")]
     [Tooltip("The caved skull: how the head is squashed, on its own axes.")]
@@ -60,12 +68,65 @@ public class EnemyBrutality : MonoBehaviour
 
     void OnEnable()
     {
-        if (_health != null) _health.Died += OnDied;
+        if (_health != null) { _health.Died += OnDied; _health.Damaged += OnDamaged; }
     }
 
     void OnDisable()
     {
-        if (_health != null) _health.Died -= OnDied;
+        if (_health != null) { _health.Died -= OnDied; _health.Damaged -= OnDamaged; }
+    }
+
+    // ======================================================================
+    // On a living body (Stage 3): a heavy round or a blast takes a crippled limb off
+    // ======================================================================
+
+    bool _pending;
+    DamageInfo _pendingBlow;
+
+    void OnDamaged(Health h, DamageInfo info)
+    {
+        if (!info.heavy || info.amount <= 0f || _health.IsDead || !BloodFX.Enabled) return;
+        _pending = true;
+        _pendingBlow = info;
+    }
+
+    /// <summary>
+    /// After the wounds have booked the hit and the body is in this frame's pose: a heavy round on
+    /// a limb it has crippled takes the limb off at the joint above the wound; a heavy enough blast
+    /// takes a forearm or a shin. The body then lives on with it: crawling for a leg, one-armed (the
+    /// pistol, or the rifle dropped with both) for an arm (EnemyWounds). Never a boss.
+    /// </summary>
+    void LateUpdate()
+    {
+        if (!_pending) return;
+        _pending = false;
+        var blow = _pendingBlow;
+        if (_health.IsDead || _done || _wounds == null || _animator == null || !_animator.isHuman) return;
+        var ai = GetComponent<EnemyAI>();
+        if (ai != null && ai.archetype != null && ai.archetype.role == EnemyArchetype.Role.Boss) return;
+
+        HumanBodyBones bone;
+        BodyPart limb;
+        if (blow.fromBlast)
+        {
+            float share = blow.amount / Mathf.Max(1f, _health.maxHealth + _health.maxShield);
+            if (share < livingBlastShare) return;
+            var options = new[] { (HumanBodyBones.LeftLowerLeg, BodyPart.LeftLeg), (HumanBodyBones.RightLowerLeg, BodyPart.RightLeg),
+                                  (HumanBodyBones.LeftLowerArm, BodyPart.LeftArm), (HumanBodyBones.RightLowerArm, BodyPart.RightArm) };
+            var pick = options[Random.Range(0, options.Length)];
+            bone = pick.Item1; limb = pick.Item2;
+        }
+        else
+        {
+            limb = BodyParts.Limb(blow.part);
+            bone = SeverBoneFor(blow.part);
+            if (bone == HumanBodyBones.LastBone || bone == HumanBodyBones.Head) return;
+            if (_wounds.State(limb) < EnemyWounds.LimbState.Crippled) return;
+        }
+        if (_wounds.State(limb) == EnemyWounds.LimbState.Severed) return;
+
+        Sever(bone, blow);
+        _wounds.Sever(limb);
     }
 
     void OnDied(Health h)
@@ -78,14 +139,19 @@ public class EnemyBrutality : MonoBehaviour
     /// <summary>One physics step later, so the ragdoll has taken the bones and the cut is made in the pose it fell in.</summary>
     IEnumerator Brutalise(DamageInfo blow)
     {
+        // A body that dies by a clip first (RagdollController.Dying) is cut once the ragdoll has it.
+        var ragdoll = GetComponent<RagdollController>();
+        float waited = 0f;
+        while (ragdoll != null && ragdoll.Dying && waited < 1.5f) { waited += Time.deltaTime; yield return null; }
         yield return new WaitForFixedUpdate();
 
         float share = blow.amount / Mathf.Max(1f, _health.maxHealth + _health.maxShield);
         var part = blow.part;
 
+        // Taking a part off is a heavy blow's (a heavy round or a blast); anything else caves and breaks.
         if (blow.isHeadshot || part == BodyPart.Head)
         {
-            if (share >= decapitateShare) Sever(HumanBodyBones.Head, blow);
+            if (blow.heavy && share >= decapitateShare) Sever(HumanBodyBones.Head, blow);
             else CaveHead();
         }
         else if (blow.fromBlast)
@@ -104,7 +170,7 @@ public class EnemyBrutality : MonoBehaviour
                 limbs.RemoveAt(pick);
             }
         }
-        else if (share >= severShare && !blow.fromMelee)
+        else if (blow.heavy && share >= severShare && !blow.fromMelee)
         {
             var bone = SeverBoneFor(part);
             if (bone != HumanBodyBones.LastBone) Sever(bone, blow);
@@ -235,6 +301,7 @@ public class EnemyBrutality : MonoBehaviour
         body.linearVelocity = (along + Vector3.up * 0.6f) * throwSpeed * Random.Range(0.7f, 1.1f);
         body.angularVelocity = Random.onUnitSphere * 8f;
         try { piece.tag = "Flesh"; } catch (UnityException) { }
+        SeveredPiece.Register(piece, pieceLife, maxPieces);
 
         // The part on the corpse folds into the joint it came off at, and stops being a body.
         // The joint goes first: a frozen bone still jointed to a moving body tugs it back

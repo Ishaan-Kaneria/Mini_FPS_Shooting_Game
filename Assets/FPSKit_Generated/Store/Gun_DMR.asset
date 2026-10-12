@@ -16,6 +16,8 @@ MonoBehaviour:
   fireMode: 0
   roundsPerMinute: 200
   damage: 62
+  damageClass: 1
+  heavyRange: 0
   maxRange: 260
   pelletsPerShot: 1
   burstCount: 3

@@ -540,6 +540,7 @@ public class EnemyBody : MonoBehaviour
 
         _down = Down.Flying;
         _downStart = Time.time;
+        _groundFired = false;
         _stillSince = -1f;
         _lieFor = -1f;
         if (_motor != null) _motor.SetRootMotion(false, EnemyMotor.Gait.Still);
@@ -659,6 +660,7 @@ public class EnemyBody : MonoBehaviour
     /// <summary>The clip get-up running: done once it is standing (or, for a crawler, once it is down in the crawl).</summary>
     void RiseProgress()
     {
+        if (_riseState == "ProneFire") { GroundFire(); return; }
         float elapsed = Time.time - _getUpStart;
         bool crawl = _ai != null && _ai.Crawling;
         if (elapsed < Mathf.Max(_riseBlendSeconds, _riseLength)) return;
@@ -788,7 +790,22 @@ public class EnemyBody : MonoBehaviour
         bool slow = pain >= (prof != null ? prof.slowRisePain : 0.5f) || (_wounds != null && _wounds.Legs != EnemyWounds.LegState.Sound);
 
         float start = 0f;
-        if (crawl)
+        // Sometimes, landed face down with the rifle still on it and the player ahead of it, it
+        // fires from the ground for a few seconds instead of getting straight up (ProneFire), then
+        // gets up the usual way (Rise again, with _groundFired set).
+        if (!crawl && !faceUp && !_groundFired && WantsGroundFire(prof))
+        {
+            _riseState = "ProneFire";
+            _riseSpeed = 1f;
+            _riseLength = 0f;
+            Vector2 lie = prof.groundFireSeconds;
+            _groundFireUntil = Time.time + Random.Range(Mathf.Min(lie.x, lie.y), Mathf.Max(lie.x, lie.y));
+            // Firing, not brawling: a rage left from the last fall would sling the rifle it has just taken up.
+            _rageUntil = _rageMoveUntil = -1f;
+            _rageAfterRecover = false;
+            _wantSlung = false;
+        }
+        else if (crawl)
         {
             _riseState = faceUp ? "CrawlUp" : "CrawlDown";
             _crawlFaceUp = faceUp;
@@ -842,6 +859,45 @@ public class EnemyBody : MonoBehaviour
     }
 
     bool _alignPending;
+
+    /// <summary>Why the last fire from the ground ended (for the Stage 3 test).</summary>
+    [System.NonSerialized] public string GroundFireEnd = "";
+
+    /// <summary>Lying face down firing from the ground (Stage 3).</summary>
+    public bool FiringFromGround => _down == Down.GettingUp && _clipRise && _riseState == "ProneFire";
+
+    // Firing from the ground (Stage 3): until when, and whether this fall has had its go.
+    float _groundFireUntil;
+    bool _groundFired;
+
+    /// <summary>Whether this fall ends with firing from the ground: the chance (scaled by aggression), the rifle still on the body, a ranged mind, and the player inside the cone ahead of the head.</summary>
+    bool WantsGroundFire(BodyDamageProfile prof)
+    {
+        if (prof == null || prof.groundFireChance <= 0f || _ai == null || !_ai.ranged || _ai.target == null || HandToHand) return false;
+        if (!Rigged || _rifle == null || !_rifle.OnBody) return false;
+        if (animator == null || _injuredLayer < 0 || !animator.HasState(_injuredLayer, Animator.StringToHash("ProneFire"))) return false;
+        Vector3 ahead = Flat(_snapHead - _snapHipsPos);
+        Vector3 toPlayer = Flat(_ai.target.position - _snapHipsPos);
+        if (ahead.sqrMagnitude < 1e-4f || Vector3.Angle(ahead, toPlayer) > prof.groundFireCone) return false;
+        float chance = prof.groundFireChance * Mathf.Lerp(0.6f, 1.4f, _ai.Aggression);
+        return Random.value < chance && _rifle.TakeInHand();
+    }
+
+    /// <summary>Lying face down firing: after the blend in, round after round while it can see the player, then up.</summary>
+    void GroundFire()
+    {
+        if (Time.time - _getUpStart < _riseBlendSeconds) return;
+        var prof = Profile;
+        bool rifle = Rigged && _rifle != null && _rifle.State == EnemyRifle.Hold.Held;
+        if (Time.time >= _groundFireUntil || !rifle || (_ai != null && _ai.Crawling))
+        {
+            GroundFireEnd = Time.time >= _groundFireUntil ? "time" : !rifle ? $"rifle {(_rifle != null ? _rifle.State.ToString() : "none")}" : "crawling";
+            _groundFired = true;
+            Rise();
+            return;
+        }
+        if (_ai != null) _ai.FireFromGround(prof != null ? prof.groundFireIntervalScale : 1.5f);
+    }
 
     /// <summary>A get-up or crawl clip's length (the get-up states share their clip's name).</summary>
     float ClipLength(string state)

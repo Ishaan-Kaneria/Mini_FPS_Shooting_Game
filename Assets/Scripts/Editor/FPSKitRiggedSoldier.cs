@@ -571,6 +571,13 @@ namespace FPSKit.EditorTools
             // 0.1 m/s as made; played faster so cover is reachable in a fight.
             State("CrawlDown", Tree("CrawlDown", ("Crawl/Crawl_Back_Stomach", -1f), ("Crawl/Prone_Idle_Rifle", 0f),
                                     ("Crawl/Crawl_Drag", 1f)), 1.5f);
+            // Fallen face down and firing from there instead of getting up (EnemyBody.Rise): flat
+            // with the rifle up, still (Stage 3).
+            State("ProneFire", Mixamo("Crawl/Prone_Idle_Rifle"));
+            // Dying: the start of the fall, by where the killing round came from, before the ragdoll
+            // takes the body with the clip's motion (RagdollController, Stage 3).
+            foreach (var death in RagdollController.DeathStates)
+                State(death, Mixamo("Deaths/" + death));
             // Face up: propped on its hands and pushing itself away, facing the threat. Still, the
             // same clip barely moving (CrawlRate): shifting, struggling, never a corpse.
             controller.AddParameter(new AnimatorControllerParameter { name = "CrawlRate", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });

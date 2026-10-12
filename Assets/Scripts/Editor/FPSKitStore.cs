@@ -184,6 +184,9 @@ namespace FPSKit.EditorTools
                     g.roundsPerMinute = 85f;
                     g.damage = 13f;
                     g.pelletsPerShot = 9;
+                    // Heavy up close: a volley can take a limb it has crippled off (Blood on).
+                    g.damageClass = WeaponData.DamageClass.Heavy;
+                    g.heavyRange = 8f;
                     g.maxRange = 60f;
                     g.magazineSize = 7;
                     g.reloadTime = 2.9f;
@@ -248,6 +251,9 @@ namespace FPSKit.EditorTools
                     g.fireMode = FireMode.Single;
                     g.roundsPerMinute = 200f;
                     g.damage = 62f;
+                    // Heavy at any range: one round through a crippled limb takes it off (Blood on).
+                    g.damageClass = WeaponData.DamageClass.Heavy;
+                    g.heavyRange = 0f;
                     g.maxRange = 260f;
                     g.magazineSize = 12;
                     g.reloadTime = 2.4f;

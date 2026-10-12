@@ -557,7 +557,10 @@ public class Weapon : MonoBehaviour
                             hitMask, QueryTriggerInteraction.Ignore))
         {
             float amount = DamageAtDistance(hit.distance);
-            var info = new DamageInfo(amount, hit.point, hit.normal, direction, gameObject);
+            var info = new DamageInfo(amount, hit.point, hit.normal, direction, gameObject)
+            {
+                heavy = data.damageClass == WeaponData.DamageClass.Heavy && (data.heavyRange <= 0f || hit.distance <= data.heavyRange),
+            };
 
             var hitbox = hit.collider.GetComponent<Hitbox>();
             if (hitbox != null)

@@ -136,6 +136,22 @@ public class BodyDamageProfile : ScriptableObject
     [Tooltip("It will not go for a dropped rifle with the player nearer than this, metres.")]
     [Range(0f, 30f)] public float pickUpPlayerDistance = 8f;
 
+    [Header("Firing from the ground (Stage 3)")]
+    [Tooltip("Chance a body that lands face down, rifle still with it and the player ahead of it, fires " +
+             "from the ground for a while before it gets up. Scaled up by aggression.")]
+    [Range(0f, 1f)] public float groundFireChance = 0.35f;
+    [Tooltip("Seconds it stays down firing: picked between these.")]
+    public Vector2 groundFireSeconds = new Vector2(2f, 4f);
+    [Tooltip("Degrees either side of where its head points the player must be for it to fire from the ground.")]
+    [Range(10f, 180f)] public float groundFireCone = 70f;
+    [Tooltip("Its time between shots on the ground, against standing (slower: it is aiming lying down).")]
+    [Range(1f, 4f)] public float groundFireIntervalScale = 1.5f;
+
+    [Header("Dying (Stage 3)")]
+    [Tooltip("Seconds a death clip plays before the ragdoll takes the body, keeping the clip's motion: picked " +
+             "between these. 0 drops straight into the ragdoll. Blasts, kicks, punches and heavy blows always do.")]
+    public Vector2 deathClipSeconds = new Vector2(0.35f, 0.55f);
+
     public float For(BodyPart part) => part switch
     {
         BodyPart.Head => head,

@@ -16,6 +16,14 @@ public class WeaponData : ScriptableObject
     [Header("Ballistics")]
     public float roundsPerMinute = 600f;
     public float damage = 24f;
+
+    public enum DamageClass { Standard, Heavy }
+
+    [Tooltip("Heavy rounds can take a limb off a living body (with the Blood setting on): only on a limb they " +
+             "have already crippled. Standard rounds never do; they only cripple.")]
+    public DamageClass damageClass = DamageClass.Standard;
+    [Tooltip("Metres within which a Heavy weapon's rounds count as heavy (a shotgun's pellets lose it with range). 0 is any range.")]
+    [Min(0f)] public float heavyRange = 0f;
     public float maxRange = 200f;
     [Min(1)] public int pelletsPerShot = 1;          // >1 turns it into a shotgun
     public int burstCount = 3;

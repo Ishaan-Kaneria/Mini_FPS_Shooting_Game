@@ -230,6 +230,7 @@ public class Explosion : MonoBehaviour
                                               away.normalized, away.normalized, attacker)
                     {
                         fromBlast = true,
+                        heavy = true,
                     };
 
                     if (health.ApplyDamage(info) > 0f) count++;

@@ -414,6 +414,25 @@ public class EnemyRifle : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Off the sling (or the back) and into the hand at once: lying face down and firing from there
+    /// (EnemyBody), the arms are the prone clip's and the rifle is laid in the hand by Follow. False
+    /// when it is not on the body (dropped or lost).
+    /// </summary>
+    public bool TakeInHand()
+    {
+        if (State == Hold.Held) return true;
+        if (State != Hold.Slung && State != Hold.OnBack && State != Hold.Recovering) return false;
+        if (_joint != null) Destroy(_joint);
+        if (_rb != null) { _rb.isKinematic = true; _rb.interpolation = RigidbodyInterpolation.None; }
+        if (_box != null) _box.enabled = false;
+        Finish(true);
+        return true;
+    }
+
+    /// <summary>On the body (in the hand, on the sling or the back), not on the ground.</summary>
+    public bool OnBody => State == Hold.Held || State == Hold.Slung || State == Hold.OnBack || State == Hold.Recovering;
+
     void Finish(bool held)
     {
         if (_motor != null) _motor.ForceCrouch = false;

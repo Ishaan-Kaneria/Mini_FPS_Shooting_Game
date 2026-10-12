@@ -24,6 +24,21 @@ public class RagdollController : MonoBehaviour
 
     public bool IsRagdolled { get; private set; }
 
+    /// <summary>The death clips on the "Injured" layer (FPSKitRiggedSoldier), by what killed it.</summary>
+    public static readonly string[] DeathStates =
+    {
+        "Death_FallBack", "Death_Back", "Death_FallForward", "Death_Front",
+        "Death_Back_Head", "Death_Front_Head", "Death_Head_TwoKnees",
+    };
+
+    /// <summary>A death clip is playing and the ragdoll takes over at the end of it.</summary>
+    public bool Dying => _dyingUntil > 0f;
+
+    float _dyingUntil = -1f;
+    Vector3[] _lastPos;
+    Quaternion[] _lastRot;
+    bool _haveLast;
+
     Rigidbody[] _bones;
     Health _health;
     DamageInfo _lastHit;
@@ -66,6 +81,9 @@ public class RagdollController : MonoBehaviour
     /// <summary>Drops the character into physics, pushed by whatever killed it.</summary>
     public void Collapse()
     {
+        // An ordinary killing round: the start of the fall is a clip, the rest is the ragdoll.
+        if (!IsRagdolled && !Dying && StartDeathClip()) return;
+
         // Killed while already thrown (a kick, say): it only has to be let come to rest.
         if (_settle != null) StopCoroutine(_settle);
         _settle = StartCoroutine(Settle());
@@ -197,5 +215,98 @@ public class RagdollController : MonoBehaviour
             bone.isKinematic = true;
         }
         _settle = null;
+    }
+
+    // ======================================================================
+    // Dying by a clip, then the ragdoll (Stage 3)
+    // ======================================================================
+
+    /// <summary>
+    /// Plays the start of the fall as a clip (by where the round came from: shot from the front it
+    /// falls back, from behind forward, through the head its own; through a leg it goes to its
+    /// knees), and at the end of it hands the bones to physics carrying the clip's motion, so the
+    /// body falls on without a jolt. Blasts, kicks, punches, heavy blows and a body on the ground
+    /// go straight to the ragdoll (false).
+    /// </summary>
+    bool StartDeathClip()
+    {
+        // The killing blow: the Damaged event that records it comes after Died, so read the health's own.
+        if (_health != null) { _lastHit = _health.LastDamage; _hasLastHit = true; }
+        if (animator == null || !animator.enabled || !_hasLastHit) return false;
+        var wounds = GetComponent<EnemyWounds>();
+        var profile = wounds != null ? wounds.Body : null;
+        if (profile == null || profile.deathClipSeconds.y <= 0f) return false;
+        var body = GetComponent<EnemyBody>();
+        if (body != null && body.IsDown) return false;
+        int layer = animator.GetLayerIndex("Injured");
+        if (layer < 0) return false;
+
+        float max = _health != null ? Mathf.Max(1f, _health.maxHealth) : 100f;
+        float burst = wounds != null ? Mathf.Max(wounds.RecentDamage, _lastHit.amount) : _lastHit.amount;
+        bool crawling = wounds != null && wounds.Legs == EnemyWounds.LegState.Crawling;
+        var style = EnemyDeath.Classify(_lastHit, burst / max, crawling);
+        // Straight to the ragdoll: a blast, a fist or a boot, and a heavy round (shotgun, DMR) blowing it
+        // back. A burst of ordinary rounds also reads as "blown back" by its total, but falls by a clip.
+        if (crawling || style == EnemyDeath.Style.Thrown || style == EnemyDeath.Style.Spun
+            || (style == EnemyDeath.Style.BlownBack && _lastHit.heavy)) return false;
+
+        bool fromBehind = _lastHit.direction.sqrMagnitude > 0.001f && Vector3.Dot(_lastHit.direction, transform.forward) > 0f;
+        string state = style == EnemyDeath.Style.Drop
+            ? (fromBehind ? "Death_Front_Head" : "Death_Back_Head")
+            : style == EnemyDeath.Style.Buckle ? "Death_Head_TwoKnees"
+            : fromBehind ? (Random.value < 0.5f ? "Death_FallForward" : "Death_Front")
+                         : (Random.value < 0.5f ? "Death_FallBack" : "Death_Back");
+        if (!animator.HasState(layer, Animator.StringToHash(state))) return false;
+
+        // Nothing over it: the full body is the clip's (the carry and the sidearm layers are the arms').
+        for (int i = 0; i < animator.layerCount; i++) if (i != 0 && i != layer) animator.SetLayerWeight(i, 0f);
+        animator.SetLayerWeight(layer, 1f);
+        animator.CrossFadeInFixedTime(state, 0.06f, layer);
+        _dyingUntil = Time.time + Random.Range(profile.deathClipSeconds.x, Mathf.Max(profile.deathClipSeconds.x, profile.deathClipSeconds.y));
+        _haveLast = false;
+        return true;
+    }
+
+    /// <summary>After the Animator: remembers where the bones were, and at the end of the clip gives each its motion as the ragdoll takes it.</summary>
+    void LateUpdate()
+    {
+        if (!Dying || IsRagdolled) return;
+        float dt = Mathf.Max(1e-4f, Time.deltaTime);
+        if (_lastPos == null || _lastPos.Length != _bones.Length) { _lastPos = new Vector3[_bones.Length]; _lastRot = new Quaternion[_bones.Length]; }
+
+        if (Time.time >= _dyingUntil && _haveLast)
+        {
+            var velocity = new Vector3[_bones.Length];
+            var spin = new Vector3[_bones.Length];
+            for (int i = 0; i < _bones.Length; i++)
+            {
+                var b = _bones[i];
+                if (b == null) continue;
+                velocity[i] = (b.position - _lastPos[i]) / dt;
+                (b.rotation * Quaternion.Inverse(_lastRot[i])).ToAngleAxis(out float angle, out Vector3 axis);
+                if (angle > 180f) angle -= 360f;
+                spin[i] = axis.sqrMagnitude > 0.5f ? axis * (angle * Mathf.Deg2Rad / dt) : Vector3.zero;
+            }
+            _dyingUntil = -1f;
+            SetRagdollActive(true);
+            for (int i = 0; i < _bones.Length; i++)
+            {
+                var b = _bones[i];
+                if (b == null || b.isKinematic) continue;
+                b.linearVelocity = Vector3.ClampMagnitude(velocity[i], 6f);
+                b.angularVelocity = Vector3.ClampMagnitude(spin[i], 12f);
+            }
+            if (_settle != null) StopCoroutine(_settle);
+            _settle = StartCoroutine(Settle());
+            return;
+        }
+
+        for (int i = 0; i < _bones.Length; i++)
+        {
+            if (_bones[i] == null) continue;
+            _lastPos[i] = _bones[i].position;
+            _lastRot[i] = _bones[i].rotation;
+        }
+        _haveLast = true;
     }
 }

@@ -122,6 +122,10 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Standing still is its own state: no long idle at a movement blend tree's centre. Enemy body changes:
   FPSKit > Enemy > Build Rigged Soldier, then FPSKit > Enemy AI > Run Limb Test (open editor).
   Blood materials: `_BlendModePreserveSpecular` 0, low smoothness. Blood obeys `GameSettings.Blood`.
+  A limb comes off a living body only to a heavy blow (`WeaponData.damageClass` Heavy within
+  `heavyRange`, or a blast) on a limb already crippled, with Blood on, never a boss (`EnemyBrutality`);
+  pieces are capped (`SeveredPiece`). A melee blow's reaction starts on its contact frame: never slow
+  `Time.timeScale` for hit-stop (VerifyCombat measures it). Stage 3 check: `FPSKitStage3Test.Batch`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
   `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via

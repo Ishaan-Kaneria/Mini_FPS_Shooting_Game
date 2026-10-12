@@ -80,6 +80,9 @@ namespace FPSKit.EditorTools
             ("EnemyWounds", "Limbs",
              "a readonly list of the four limb parts, declared once and only iterated"),
 
+            ("RagdollController", "DeathStates",
+             "a readonly list of the death clips' state names, declared once and only read"),
+
             ("PerfProbe", "Views",
              "a readonly table of the Fairground's measuring viewpoints, declared once and " +
              "only read by the perf build's runner"),

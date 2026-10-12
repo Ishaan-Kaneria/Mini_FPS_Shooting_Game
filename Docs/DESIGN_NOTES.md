@@ -2965,3 +2965,21 @@ with no sprite (flat red over everything on each hit); it now gets an edge-vigne
 The colour fringing is `PlayerCondition`'s split on a hit (intended). The red line was most likely an
 incoming tracer. The empty minimap square was the frame left on screen when Blackout hid only the map's
 view; the whole minimap now goes dark.
+
+## Enemies answer a blow on its frame, and lose limbs only to heavy weapons (2026-10-12)
+
+- **The hit-stop was the delay.** On a landed blow it set `Time.timeScale` to 4% for 45-120 ms, so the
+  enemy's springs, knockback and ragdoll barely moved: the reaction looked late. Now only the player's
+  strike holds (`MeleeStrike.StartHitStop` shifts the strike's own clock); the world runs on.
+  VerifyCombat measures blow-to-movement per strike (`EnemyBody.ReactionLatencyFrames`): 0-1 frames.
+- **Shoves did nothing to root-motion bodies.** `EnemyAI.ApplyShove` moved the agent, and the motor
+  then set the agent from the clip; it now goes through `EnemyMotor.Push`.
+- **The player could stand on an enemy**: the controller steps onto anything under its step height,
+  and an enemy's leg and arm hitboxes are. `PlayerMotor.OnControllerColliderHit` slides it off.
+- **Culled enemies froze their hitboxes**: with `CullUpdateTransforms` an unseen body's bones stopped
+  where it was last seen while its root walked on. Within 35 m enemies always animate (`EnemyMotor`).
+- **A death clip needs the killing blow from `Health.LastDamage`**: `Died` is raised before `Damaged`.
+  And a burst of ordinary rounds reads "blown back" by its total; only a heavy one skips the clip.
+- **First-person arms**: the right hand at the hip sat below the arms camera's view (hip carry raised
+  and moved out); the pack's bare-armed mesh under the gloved one showed through as white patches;
+  the gloves are the dark skin. Running uses keyframed stride clips (`FirstPersonMoves`) on the footsteps.

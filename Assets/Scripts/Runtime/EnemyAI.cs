@@ -1118,11 +1118,42 @@ public class EnemyAI : MonoBehaviour
     public bool HasAimPoint { get; set; }
     public Vector3 AimPoint { get; set; }
 
-    void FireRangedShot()
+    float _groundShotAt;
+
+    /// <summary>Why the last shot from the ground was not fired (for the Stage 3 test); empty when it was.</summary>
+    [System.NonSerialized] public string GroundFireRefusal = "";
+
+    /// <summary>
+    /// One round from where the muzzle is, lying on the ground (EnemyBody's fire from the ground):
+    /// only with a clear line to the player, and no sooner than the standing rate times
+    /// <paramref name="intervalScale"/>. Its own clock, not the attack's (a fall holds that back).
+    /// </summary>
+    public bool FireFromGround(float intervalScale)
+    {
+        if (CurrentState == State.Dead || target == null || !ranged) { GroundFireRefusal = "no target or no gun"; return false; }
+        if (Time.time < _groundShotAt) return false;
+        Vector3 from = muzzlePoint != null ? muzzlePoint.position : eyes.position;
+        Vector3 at = target.position + Vector3.up * 1.2f;
+        // Clear of everything but its own body (lying on it, the muzzle starts among its own parts) and the player.
+        Vector3 line = at - from;
+        foreach (var h in Physics.RaycastAll(from, line.normalized, line.magnitude, rangedHitMask, QueryTriggerInteraction.Ignore))
+        {
+            var root = h.collider.transform.root;
+            if (root == transform.root || root == target.root) continue;
+            GroundFireRefusal = $"line blocked by {h.collider.name}";
+            return false;
+        }
+        GroundFireRefusal = "";
+        FireRangedShot(from);
+        _groundShotAt = Time.time + attackCooldown * Mathf.Max(1f, intervalScale) * (_wounds != null ? _wounds.FireIntervalMultiplier : 1f);
+        return true;
+    }
+
+    void FireRangedShot(Vector3? from = null)
     {
         if (target == null) return;
 
-        Vector3 origin = eyes.position;
+        Vector3 origin = from ?? eyes.position;
         Vector3 aimAt = HasAimPoint ? AimPoint : target.position + Vector3.up * 1.2f;
         Vector3 direction = (aimAt - origin).normalized;
 

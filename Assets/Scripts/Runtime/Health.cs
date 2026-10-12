@@ -85,6 +85,9 @@ public struct DamageInfo
     /// <summary>A fist did this. Deaths read it: a punch spins a body, a round does not.</summary>
     public bool fromMelee;
 
+    /// <summary>A heavy round (WeaponData.DamageClass.Heavy, inside its heavy range) or a blast: what can take a limb off.</summary>
+    public bool heavy;
+
     /// <summary>Where it landed, from the hitbox. <see cref="BodyPart.Torso"/> when no hitbox was involved.</summary>
     public BodyPart part;
 
@@ -110,6 +113,7 @@ public struct DamageInfo
         this.isHeadshot = false;
         this.fromBlast = false;
         this.fromMelee = false;
+        this.heavy = false;
         this.part = BodyPart.Torso;
         this.coreCapped = false;
         this.coreCap = 0f;

@@ -24,6 +24,7 @@ namespace FPSKit.EditorTools
             Make<MeleeSettings>(MeleeSettings.ResourcePath);
             Make<MovementSettings>(MovementSettings.ResourcePath);
             Make<PlayerBodySettings>(PlayerBodySettings.ResourcePath);
+            FPSKitFirstPersonMoves.Ensure();
             var condition = Make<ConditionSettings>(ConditionSettings.ResourcePath);
 
             bool dirty = false;

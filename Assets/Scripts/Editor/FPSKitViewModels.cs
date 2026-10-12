@@ -106,7 +106,10 @@ namespace FPSKit.EditorTools
         {
             EnsureFolder(Folder);
 
-            var arms = BuildBody(ArmsSource, "FP_Arms", keep: n => n.Contains("FPS"), enable: n => n.Contains("FPS"));
+            // The gloved arms and the sleeve only: the pack's bare-armed mesh lies under the gloved one,
+            // and with both drawn the skin showed through the gloves in white patches.
+            bool ArmPart(string n) => n.Contains("FPS") && (n.Contains("Gloves") || n.Contains("Shirt"));
+            var arms = BuildBody(ArmsSource, "FP_Arms", keep: ArmPart, enable: ArmPart);
             // The player's own body: what is seen looking down, and the leg that kicks. No
             // head and no arms (the first-person arms are separate); one vest.
             bool BodyPart(string n) => n.Contains("Pants") || n.Contains("Boots") || n == "SK_Military_Shirt3" || n == "SK_Military_Vest1";
@@ -228,7 +231,9 @@ namespace FPSKit.EditorTools
         static Material UrpMaterial(Material m, string skin = "Skin2")
         {
             if (m == null) return null;
-            string name = m.name.Replace("Skin1", skin);
+            // The gloves stay dark (Skin1, black tactical): the olive outfit's gloves are a tan camo
+            // that lit up white and gold in first person.
+            string name = m.name.Contains("Gloves") ? m.name.Replace("Skin2", "Skin1") : m.name.Replace("Skin1", skin);
             var urp = AssetDatabase.LoadAssetAtPath<Material>($"{BodyUrpMaterials}/URP_{name}.mat");
             if (urp == null) urp = AssetDatabase.LoadAssetAtPath<Material>($"{BodyUrpMaterials}/URP_{m.name}.mat");
             if (urp == null) Debug.LogWarning($"[FPSKit] View Models: no URP version of {m.name}; it will draw pink");

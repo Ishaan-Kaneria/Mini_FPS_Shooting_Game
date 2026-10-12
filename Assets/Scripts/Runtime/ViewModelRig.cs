@@ -48,7 +48,7 @@ public class ViewModelRig : MonoBehaviour
         public Transform upper, lower, hand;
         public LimbIK.HandFrame frame;
         public Transform[] fingers;
-        public Quaternion[] hold, fist;
+        public Quaternion[] hold, fist, squeeze;
         public Quaternion upperBind, lowerBind, handBind;
     }
 
@@ -379,7 +379,11 @@ public class ViewModelRig : MonoBehaviour
         var pose = new HumanPose();
         handler.GetHumanPose(ref pose);
 
-        _right.hold = Curl(handler, ref pose, _right, thumb: -0.3f, index: 0.1f, others: -0.6f, spread: 0f);
+        // Round the pistol grip: the three fingers below the trigger closed on it, the thumb round the
+        // far side, the index finger curled onto the trigger (Fix 2: half-open fingers left a gap and
+        // read as a hand resting under the gun). The squeeze when it fires is _right.squeeze.
+        _right.hold = Curl(handler, ref pose, _right, thumb: -0.65f, index: -0.35f, others: -0.95f, spread: -0.3f);
+        _right.squeeze = Curl(handler, ref pose, _right, thumb: -0.65f, index: -0.75f, others: -0.95f, spread: -0.3f);
         _right.fist = Curl(handler, ref pose, _right, thumb: -0.7f, index: -1f, others: -1f, spread: -0.4f);
         _left.hold = Curl(handler, ref pose, _left, thumb: -0.1f, index: -0.35f, others: -0.45f, spread: -0.7f);
         _left.fist = Curl(handler, ref pose, _left, thumb: -0.7f, index: -1f, others: -1f, spread: -0.4f);
@@ -555,12 +559,18 @@ public class ViewModelRig : MonoBehaviour
             turn = Quaternion.Inverse(_weapon.HipRotation) * model.localRotation;
         }
 
-        Vector3 basePos = Vector3.Lerp(_spec.hipPosition + Body.hipNudge, _spec.aimPosition, s.aim);
+        Vector3 hip = _spec.hipPosition + Body.hipNudge + (DeviceProfile.Handheld ? Body.handsetHipNudge : Vector3.zero);
+        Vector3 basePos = Vector3.Lerp(hip, _spec.aimPosition, s.aim);
         Quaternion baseTurn = Quaternion.Slerp(Quaternion.Euler(_spec.hipTurn), Quaternion.identity, s.aim);
 
         var gun = _spec.transform;
         gun.localPosition = basePos + delta;
         gun.localRotation = baseTurn * turn;
+
+        // The movement clips: the rifle (and both hands with it) through the stride.
+        PlayMoves(out Vector3 moveOffset, out Vector3 moveTurn);
+        gun.localPosition += moveOffset;
+        gun.localRotation = gun.localRotation * Quaternion.Euler(moveTurn);
 
         // A single punch: the rifle is carried low at the side in the left hand while the right
         // is thrown, rather than going on the back.
@@ -573,7 +583,9 @@ public class ViewModelRig : MonoBehaviour
         }
 
         // On the back it is out of sight: hidden rather than left hanging behind the eye.
-        bool shown = s.gunAway < 0.97f || _carry > 0.05f;
+        // Carried in the left hand it is seen; once the cross starts (both fists) it is on the back at
+        // once, rather than drawn sliding from the hand to the sling across the view.
+        bool shown = s.gunAway < 0.97f || (_carry > 0.05f && _lastFists == MeleeStrike.Strike.Jab);
         if (_gunRenderers != null && _gunRenderers.Length > 0 && _gunRenderers[0] != null && _gunRenderers[0].enabled != shown)
             foreach (var r in _gunRenderers) if (r != null) r.enabled = shown;
 
@@ -597,7 +609,68 @@ public class ViewModelRig : MonoBehaviour
         if (s.gunAway <= 0.01f && s.strike == MeleeStrike.Strike.None) _lastFists = MeleeStrike.Strike.None;
         bool carrying = _arms != null && _lastFists == MeleeStrike.Strike.Jab && (s.gunAway > 0.01f || s.strike == MeleeStrike.Strike.Jab);
         float dt = Application.isPlaying ? Time.deltaTime : 1f;
-        _carry = Mathf.MoveTowards(_carry, carrying ? 1f : 0f, dt * 8f);
+        // Into the cross the left hand lets go at once: its jab opens the double punch.
+        float rate = !carrying && _lastFists == MeleeStrike.Strike.Cross ? 25f : 8f;
+        _carry = Mathf.MoveTowards(_carry, carrying ? 1f : 0f, dt * rate);
+    }
+
+    // ---- the movement clips ---------------------------------------------
+
+    // Each clip's weight, eased so walk, run, sprint and firing hand over with no pop.
+    float _wWalk, _wRun, _wSprint, _wRunFire, _wAim;
+
+    /// <summary>
+    /// The movement clips (FirstPersonMoves) played on the player's footsteps: the stride's phase
+    /// is the motor's distance-counted step phase, so a clip never drifts from the feet. Which clip
+    /// by gait, how much of it by speed against the speed it was made for.
+    /// </summary>
+    void PlayMoves(out Vector3 offset, out Vector3 turn)
+    {
+        offset = turn = Vector3.zero;
+        var moves = FirstPersonMoves.Active;
+        if (moves == null || _motor == null || !Application.isPlaying) return;
+
+        Vector3 v = _motor.Velocity; v.y = 0f;
+        float speed = _motor.IsGrounded ? v.magnitude : 0f;
+        bool aiming = _weapon != null && _weapon.AimProgress > 0.5f;
+        bool firing = _weapon != null && Time.time - _weapon.LastShotTime < moves.firingHold;
+        bool sprinting = _motor.IsSprinting && !firing;
+        bool runFire = !aiming && (_motor.IsCombatJogging || firing && speed > moves.walk.speed * 1.2f);
+
+        float walkT = Mathf.InverseLerp(moves.walk.speed, moves.run.speed, speed);
+        float tw = 0f, tr = 0f, ts = 0f, tf = 0f, ta = 0f;
+        if (aiming) ta = 1f;
+        else if (sprinting) ts = 1f;
+        else if (runFire) tf = 1f;
+        else { tw = 1f - walkT; tr = walkT; }
+
+        float step = Time.deltaTime * moves.blendRate;
+        _wWalk = Mathf.MoveTowards(_wWalk, tw, step);
+        _wRun = Mathf.MoveTowards(_wRun, tr, step);
+        _wSprint = Mathf.MoveTowards(_wSprint, ts, step);
+        _wRunFire = Mathf.MoveTowards(_wRunFire, tf, step);
+        _wAim = Mathf.MoveTowards(_wAim, ta, step);
+
+        // One stride is two steps: the footfalls at 0 and 0.5.
+        float phase = Mathf.Repeat(_motor.StepPhase * 0.5f, 1f);
+        void Add(FirstPersonMoves.Move m, float w, ref Vector3 o, ref Vector3 t)
+        {
+            if (w <= 0.001f || m == null) return;
+            float size = Mathf.Clamp01(speed / Mathf.Max(0.1f, m.speed));
+            m.Sample(phase, out Vector3 mo, out Vector3 mt);
+            o += mo * (w * size);
+            t += mt * (w * size);
+        }
+        Add(moves.walk, _wWalk, ref offset, ref turn);
+        Add(moves.run, _wRun, ref offset, ref turn);
+        Add(moves.sprint, _wSprint, ref offset, ref turn);
+        Add(moves.runFire, _wRunFire, ref offset, ref turn);
+        Add(moves.aimWalk, _wAim, ref offset, ref turn);
+
+        // Not while the strikes or the left-hand carry move the rifle.
+        float free = 1f - Mathf.Max(_carry, 0f);
+        offset *= free;
+        turn *= free;
     }
 
     // ---- fists, in the view's space --------------------------------------
@@ -709,7 +782,19 @@ public class ViewModelRig : MonoBehaviour
         }
 
         Reach(_right, rPos, rRot, view.TransformDirection(new Vector3(0.55f, -0.7f, -0.2f)), rFistW);
+        Squeeze(s, rFistW);
         Reach(_left, lPos, lRot, view.TransformDirection(new Vector3(-0.35f, -0.8f, 0.05f)), lFistW);
+    }
+
+    /// <summary>The trigger finger pulls on each shot and lets go: index only, the grip's other fingers stay closed.</summary>
+    void Squeeze(State s, float fist)
+    {
+        if (_right == null || _right.squeeze == null || fist > 0.01f) return;
+        float pull = s.sinceShot >= 0f && s.sinceShot < 0.09f ? Mathf.Sin(s.sinceShot / 0.09f * Mathf.PI) : 0f;
+        if (pull <= 0f) return;
+        // The index finger's three joints follow the thumb's three in the list (HumanBodyBones order).
+        for (int i = 3; i < 6 && i < _right.fingers.Length; i++)
+            _right.fingers[i].localRotation = Quaternion.Slerp(_right.hold[i], _right.squeeze[i], pull);
     }
 
     /// <summary>A rotation whose +Z points along <paramref name="fingers"/> and +Y along <paramref name="back"/>, in the view's space.</summary>

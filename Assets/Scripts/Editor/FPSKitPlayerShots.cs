@@ -23,7 +23,7 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static class FPSKitPlayerShots
     {
-        public const string DefaultPoses = "stand,walk,run,sprint,runfire,aim,reload,punch,double,kick,down";
+        public const string DefaultPoses = "stand,walk,run,sprint,runfire,aim,reload,punch,double,kick,down,hand_idle,hand_walk,hand_run,hand_fire,hand_aim";
         const float Step = 1f / 30f;
 
         [MenuItem("FPSKit/Player/Shots (Desert Outpost)", false, 48)]
@@ -59,6 +59,29 @@ namespace FPSKit.EditorTools
         }
 
         static bool _blackout;
+        static string _onlyPoses;
+
+        /// <summary>Batch: the right-hand close-ups only, in the Desert (quick, for tuning the grip).</summary>
+        public static void BatchHands()
+        {
+            _batch = new Queue<(string, string)>(new[] { Arenas[0] });
+            _onlyPoses = "stand,hand_idle,hand_walk,hand_run,hand_fire,hand_aim";
+            EditorApplication.update += NextArena;
+        }
+
+        /// <summary>
+        /// Batch: every gun's right hand on its grip, seen from outside (red marker = the wrist socket)
+        /// and from the eye, at the hip and aimed. Edit mode, so seconds.
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchGrips
+        /// </summary>
+        public static void BatchGrips()
+        {
+            // The preview adds a scratch scene, which an untitled batch scene does not allow: open a real one.
+            EditorSceneManager.OpenScene("Assets/FPSKit_Generated/Scenes/Menu.unity");
+            var written = FPSKitViewModels.Preview("Build/Grips", null, 640, 400, "hip,aim", "eye,rhand");
+            Debug.Log("[FPSKit] Grip previews: " + string.Join(", ", written));
+            FPSKitBatch.Exit(0);
+        }
 
         static void NextArena()
         {
@@ -77,7 +100,7 @@ namespace FPSKit.EditorTools
                 return;
             }
             var (path, tag) = _batch.Dequeue();
-            Run(path, -1, DefaultPoses, "Build/PlayerShots", tag, 960, 540);
+            Run(path, -1, _onlyPoses ?? DefaultPoses, "Build/PlayerShots", tag, 960, 540);
         }
 
         public static bool Running { get; private set; }
@@ -213,6 +236,12 @@ namespace FPSKit.EditorTools
                     if (lm != null && lm.IsBriefing) { _frame = Mathf.Min(_frame, Frames(1f)); return false; }
                     return _frame >= Frames(2f);
                 case "stand": return _frame >= Frames(1.2f) && Shoot();
+                // Close-ups of the right hand on the grip (cropped round it from a full-HD frame).
+                case "hand_idle": return _frame >= Frames(1.2f) && Shoot(closeUp: true);
+                case "hand_walk": MobileInput.Move = new Vector2(0f, 0.45f); return _frame >= Frames(1.6f) && Shoot(closeUp: true);
+                case "hand_run": MobileInput.Move = new Vector2(0f, 1f); return _frame >= Frames(1.6f) && Shoot(closeUp: true);
+                case "hand_fire": MobileInput.SetFireButton(_frame >= Frames(1f)); return _frame >= Frames(1f) + 2 && Shoot(closeUp: true);
+                case "hand_aim": MobileInput.Aim = true; return _frame >= Frames(1.0f) && Shoot(closeUp: true);
                 case "down": Pitch(65f); return _frame >= Frames(1.2f) && Shoot();
                 case "walk": MobileInput.Move = new Vector2(0f, 0.45f); return _frame >= Frames(1.6f) && Shoot();
                 case "run": MobileInput.Move = new Vector2(0f, 1f); return _frame >= Frames(1.6f) && Shoot();
@@ -253,12 +282,36 @@ namespace FPSKit.EditorTools
         static bool AtImpact(MeleeStrike.Strike strike)
             => _melee != null && _melee.Current == strike && _melee.StrikeProgress >= MeleeStrike.ImpactAt(strike) - 0.02f;
 
+        /// <summary>A 720x480 window of the frame centred on where the right hand's grip is seen.</summary>
+        static Texture2D CropRoundHand(Texture2D full, Camera cam)
+        {
+            var spec = _weapon != null ? _weapon.GetComponentInChildren<ViewModelSpec>() : null;
+            var arms = cam.transform.Find("ArmsCamera");
+            var view = arms != null ? arms.GetComponent<Camera>() : cam;
+            Vector2 at = new Vector2(full.width * 0.7f, full.height * 0.25f);
+            if (spec != null && spec.rightHand != null && view != null)
+            {
+                Vector3 vp = view.WorldToViewportPoint(spec.rightHand.position);
+                if (vp.z > 0f) at = new Vector2(vp.x * full.width, vp.y * full.height);
+            }
+            const int w = 720, h = 480;
+            // The bottom of the frame round the grip: at the hip the hand is at the frame's lower edge.
+            int x = Mathf.Clamp(Mathf.RoundToInt(at.x - w * 0.5f), 0, full.width - w);
+            int y = Mathf.Clamp(Mathf.RoundToInt(Mathf.Min(at.y, h * 0.5f) - h * 0.5f), 0, full.height - h);
+            var crop = new Texture2D(w, h, TextureFormat.RGB24, false);
+            crop.SetPixels(full.GetPixels(x, y, w, h));
+            crop.Apply();
+            Object.DestroyImmediate(full);
+            return crop;
+        }
+
         /// <summary>The game camera and its stack (the arms camera on top) into a PNG.</summary>
-        static bool Shoot()
+        static bool Shoot(bool closeUp = false)
         {
             var cam = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
             string path = $"{_folder}/{_tag}_{_pose}.png";
-            var rt = RenderTexture.GetTemporary(_width, _height, 24, RenderTextureFormat.ARGB32);
+            int width = closeUp ? 1920 : _width, height = closeUp ? 1080 : _height;
+            var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
             try
             {
                 var request = new RenderPipeline.StandardRequest { destination = rt };
@@ -266,9 +319,10 @@ namespace FPSKit.EditorTools
                 RenderPipeline.SubmitRenderRequest(cam, request);
                 var prev = RenderTexture.active;
                 RenderTexture.active = rt;
-                var tex = new Texture2D(_width, _height, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, _width, _height), 0, 0);
+                var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 tex.Apply();
+                if (closeUp) tex = CropRoundHand(tex, cam);
                 RenderTexture.active = prev;
                 File.WriteAllBytes(path, tex.EncodeToPNG());
                 Object.DestroyImmediate(tex);

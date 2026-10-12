@@ -32,6 +32,54 @@ namespace FPSKit.EditorTools
         [MenuItem("FPSKit/Player/Shots (Fairground)", false, 49)]
         static void FairgroundMenu() => Run("Assets/FPSKit_Generated/Scenes/AbandonedFairground.unity", -1, DefaultPoses, "Build/PlayerShots", "fairground", 960, 540);
 
+        static readonly (string path, string tag)[] Arenas =
+        {
+            ("Assets/FPSKit_Generated/Scenes/DesertOutpost.unity", "desert"),
+            ("Assets/FPSKit_Generated/Scenes/AbandonedFairground.unity", "fairground"),
+        };
+
+        static Queue<(string path, string tag)> _batch;
+
+        /// <summary>
+        /// Batch: both arenas, one after the other, then exit. Needs a graphics device:
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.Batch
+        /// </summary>
+        public static void Batch()
+        {
+            _batch = new Queue<(string, string)>(Arenas);
+            EditorApplication.update += NextArena;
+        }
+
+        /// <summary>Batch: Desert Outpost's level 23 ("Blackout"), standing and after a run, then exit.</summary>
+        public static void BatchBlackout()
+        {
+            _batch = new Queue<(string, string)>();
+            _blackout = true;
+            EditorApplication.update += NextArena;
+        }
+
+        static bool _blackout;
+
+        static void NextArena()
+        {
+            if (Running || EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (_batch == null || _batch.Count == 0 && !_blackout)
+            {
+                EditorApplication.update -= NextArena;
+                FPSKitPlayMode.RestoreStartScene();
+                FPSKitBatch.Exit(Report.Contains("failed") ? 1 : 0);
+                return;
+            }
+            if (_blackout)
+            {
+                _blackout = false;
+                Run(Arenas[0].path, 22, "stand,run,down", "Build/PlayerShots", "blackout", 960, 540);
+                return;
+            }
+            var (path, tag) = _batch.Dequeue();
+            Run(path, -1, DefaultPoses, "Build/PlayerShots", tag, 960, 540);
+        }
+
         public static bool Running { get; private set; }
         public static string Report { get; private set; } = "";
 
@@ -44,6 +92,10 @@ namespace FPSKit.EditorTools
         static MeleeStrike _melee;
         static Health _health;
         static FieldInfo _pitch;
+        static Vector3 _startPos;
+        static Quaternion _startRot;
+        static bool _started;
+        static int _lastGameFrame = -1;
 
         /// <summary>Plays <paramref name="scenePath"/> (level index, or -1 for the scene's own) and shoots each pose.</summary>
         public static void Run(string scenePath, int level, string poses, string folder, string tag, int width, int height)
@@ -60,7 +112,7 @@ namespace FPSKit.EditorTools
             _poses = new Queue<string>(poses.Split(','));
             _folder = folder; _tag = tag; _width = width; _height = height; _level = level;
             _written = new List<string>();
-            Report = "";
+            if (_batch == null) Report = "";
             Directory.CreateDirectory(folder);
             Running = true;
             FPSKitPlayMode.SuspendStartScene();
@@ -87,10 +139,22 @@ namespace FPSKit.EditorTools
                     _frame = 0;
                     _pose = "warmup";
                     _phase = 0;
+                    _started = false;
                 }
 
+                // Once per game frame: the editor can tick several times while one heavy frame is drawn.
+                if (Time.frameCount == _lastGameFrame) return;
+                _lastGameFrame = Time.frameCount;
                 if (_health != null && _health.Normalized < 0.9f) _health.ResetHealth();
                 _frame++;
+                if (_frame > Frames(_pose == "warmup" ? 60f : 12f))
+                {
+                    Report += $"{_pose}: timed out (time {Time.time:0.0}, briefing {Object.FindAnyObjectByType<LevelManager>()?.IsBriefing}, paused {EditorApplication.isPaused}, timeScale {Time.timeScale}, dead {(_health != null && _health.IsDead)}, " +
+                              $"lowered {(_weapon != null && _weapon.IsLowered)}, strike {(_melee != null ? _melee.Current.ToString() : "-")}, " +
+                              $"melee on {(_melee != null && _melee.isActiveAndEnabled)}, ammo {(_weapon != null ? _weapon.CurrentAmmo : -1)})\n";
+                    Next();
+                    return;
+                }
                 if (Act()) Next();
             }
             catch (System.Exception e)
@@ -104,6 +168,16 @@ namespace FPSKit.EditorTools
         static void Next()
         {
             Clear();
+            // Every pose from the same spot: the runs carried the player 30 m and more into the arena.
+            if (!_started) { _startPos = _motor.transform.position; _startRot = _motor.transform.rotation; _started = true; }
+            else
+            {
+                var cc = _motor.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                _motor.transform.SetPositionAndRotation(_startPos, _startRot);
+                if (cc != null) cc.enabled = true;
+            }
+            if (_health != null) _health.ResetHealth();
             _frame = 0;
             _phase = 0;
             if (_poses.Count == 0) { Finish(); return; }
@@ -133,7 +207,11 @@ namespace FPSKit.EditorTools
         {
             switch (_pose)
             {
-                case "warmup": return _frame >= Frames(4f);
+                case "warmup":
+                    // Past the level's briefing (it holds the player and lowers the gun) and settled.
+                    var lm = Object.FindAnyObjectByType<LevelManager>();
+                    if (lm != null && lm.IsBriefing) { _frame = Mathf.Min(_frame, Frames(1f)); return false; }
+                    return _frame >= Frames(2f);
                 case "stand": return _frame >= Frames(1.2f) && Shoot();
                 case "down": Pitch(65f); return _frame >= Frames(1.2f) && Shoot();
                 case "walk": MobileInput.Move = new Vector2(0f, 0.45f); return _frame >= Frames(1.6f) && Shoot();
@@ -210,9 +288,9 @@ namespace FPSKit.EditorTools
             _motor = null;
             Running = false;
             Report += "wrote " + string.Join(", ", _written);
-            Debug.Log("[FPSKit] Player shots: " + Report);
+            Debug.Log($"[FPSKit] Player shots ({_tag}): " + Report);
             EditorApplication.isPlaying = false;
-            EditorApplication.delayCall += FPSKitPlayMode.RestoreStartScene;
+            if (_batch == null) EditorApplication.delayCall += FPSKitPlayMode.RestoreStartScene;
         }
     }
 }

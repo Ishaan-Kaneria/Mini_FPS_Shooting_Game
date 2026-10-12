@@ -126,11 +126,13 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
   `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via
   `Weapon.HandsRotation`/`HandsOffset`); no fist is built. Hands are lofted (`BuildGunHands`).
-- The player is a full body (`PlayerBody`, FPSKit > Player > Build Body / Preview Body, values in
-  `PlayerBodySettings`): the body follows the camera, never the reverse; arms and gun are on the
-  FirstPerson layer under a stacked arms camera (own FOV); aiming raises the rifle to the eye. The
-  camera never moves for a strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting).
-  Without `bodyPrefab` the old `ViewModelRig` is used. Springs there are sub-stepped (1/120 s).
+- The player's view is a hybrid (`Docs/DESIGN_NOTES.md` "The player is a body"): arms and gun are the
+  first-person view model (`ViewModelRig`: FP_Arms, IK on the gun's grip points, procedural, no clips) on
+  the FirstPerson layer under a stacked arms camera (own FOV, post-processing ON, set back `eyeBack`
+  except when aiming); `PlayerBody` is legs, kick and shadow only (upper body shadow-only). Mixamo
+  clips never drive the first-person arms. Values in `PlayerBodySettings`. The camera never moves for a
+  strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting). See it in a real
+  arena: `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.Batch` (Build/PlayerShots).
 - Reload is animated in `Weapon.ReloadPose` (tilt, magazine out/in, left hand, bolt) with
   three `WeaponData` clips on its beats (`MagOutAt`/`MagInAt`/`BoltAt`); keep them in step.
 

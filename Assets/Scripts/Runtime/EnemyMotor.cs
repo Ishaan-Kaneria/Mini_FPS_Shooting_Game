@@ -59,6 +59,12 @@ public class EnemyMotor : MonoBehaviour
     [Tooltip("How much its animation speed differs from the next soldier's, either way.")]
     [Range(0f, 0.15f)] public float tempoSpread = 0.05f;
 
+    [Header("Culling")]
+    [Tooltip("Metres from the player within which the body is always animated, seen or not. Culled when " +
+             "unseen, its bones (and the hitboxes on them) froze where it was last seen while it walked on: " +
+             "a blast or a strike aimed at where it really was found nothing. Further off, unseen bodies rest.")]
+    [Min(0f)] public float animateAlwaysWithin = 35f;
+
     /// <summary>The clip is moving the body, not the agent.</summary>
     public bool RootMotion { get; private set; }
 
@@ -157,8 +163,27 @@ public class EnemyMotor : MonoBehaviour
         _faceUntil = Time.time + 0.4f;
     }
 
+    Transform _player;
+    float _nextCullCheck;
+
+    /// <summary>Always animated near the player, culled when unseen further off (checked four times a second).</summary>
+    void UpdateCulling()
+    {
+        if (_animator == null || Time.time < _nextCullCheck) return;
+        _nextCullCheck = Time.time + 0.25f;
+        if (_player == null)
+        {
+            var p = GameObject.FindGameObjectWithTag("Player");
+            _player = p != null ? p.transform : null;
+        }
+        bool near = _player != null && (_player.position - transform.position).sqrMagnitude < animateAlwaysWithin * animateAlwaysWithin;
+        var mode = near ? AnimatorCullingMode.AlwaysAnimate : AnimatorCullingMode.CullUpdateTransforms;
+        if (_animator.cullingMode != mode) _animator.cullingMode = mode;
+    }
+
     void Update()
     {
+        UpdateCulling();
         if (!RootMotion || _animator == null || !_animator.enabled) return;
         if (Current == Gait.Normal) Normal();
         else Hurt();

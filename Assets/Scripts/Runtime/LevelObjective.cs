@@ -440,12 +440,14 @@ public class LevelObjective : MonoBehaviour
         // behaviour stops it redrawing and leaves the last frame it drew on screen,
         // which is a map of where everything was when the lights went out -- more
         // useful than a live one, and exactly the opposite of the objective.
+        // The whole map goes, frame and all: hiding only its view left an empty box on screen.
         _blindedMap = FindAnyObjectByType<Minimap>();
 
-        if (_blindedMap != null && _blindedMap.view != null)
+        if (_blindedMap != null)
         {
-            _blindedMap.view.gameObject.SetActive(false);
+            if (_blindedMap.view != null) _blindedMap.view.gameObject.SetActive(false);
             _blindedMap.enabled = false;
+            _blindedMap.gameObject.SetActive(false);
         }
     }
 
@@ -465,6 +467,7 @@ public class LevelObjective : MonoBehaviour
 
         if (_blindedMap != null)
         {
+            _blindedMap.gameObject.SetActive(true);
             _blindedMap.enabled = true;
             if (_blindedMap.view != null) _blindedMap.view.gameObject.SetActive(true);
             _blindedMap = null;

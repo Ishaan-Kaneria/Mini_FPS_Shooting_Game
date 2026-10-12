@@ -2936,3 +2936,32 @@ camera. Things that were not obvious:
   takes the mirrored side that throws with the wanted hand, and measures where the blow lands); a
   clip's time is driven by `MeleeStrike.StrikeProgress` so its blow lands on the damage frame. A strike
   with no clip is drawn the old way (MeleeStrike's offsets on the rifle, the right hand following).
+
+### The full-body arms were rejected: a hybrid instead (2026-10-12)
+
+His play-test of the full-body version (Desert Outpost, Level 23): the right hand huge, floating above
+the rifle, fingers not round the grip, flat-coloured, filling half the screen; running looked wrong;
+running and firing hid the gun. The cause is structural: Mixamo clips are third-person animation, and
+their arms and hands do not line up from a camera inside the head. Now:
+
+- **Arms and gun are the first-person view model** (`ViewModelRig`, the pack's FP_Arms with textured
+  gloves and sleeves), IK-locked to the gun's grip points with baked finger holds, posed in code. They are
+  on the FirstPerson layer under the arms camera, at true size (they were 14%/10% over life), with the
+  camera set back `eyeBack` (7 cm) from the eye, and at the eye when aiming (else the stock, which ends
+  at the cheek, sat in front of it as a tan blob).
+- **The arms camera has post-processing on.** Off, the overlay was drawn after the stack's tonemapping:
+  white gloves and a flat grey rifle, which is the "flat untextured skin" he saw.
+- **The body is legs, kick and shadow only**: hips and legs drawn (two-sided, so the waist cut shows
+  cloth), everything above shadow-only, with a shadow-only rifle in its hand.
+- The gun's walk bob rides `PlayerMotor.StepPhase` (lowest on each footfall), not its own clock.
+- A single punch keeps the rifle in the left hand, laid across the lower left; the double punch is a
+  left jab then a right cross with the rifle on the back.
+- `FPSKitPlayerShots` plays a real arena and drives the player through every pose with the touch
+  inputs. It acts once per *game* frame: counting editor ticks, the heavy Fairground ran through its
+  timeouts while game time moved a tenth of a second. It waits out the level's briefing first.
+
+Blackout (Level 23) findings: the "red tint" was the HUD's damage overlay, a plain full-screen image
+with no sprite (flat red over everything on each hit); it now gets an edge-vignette sprite at runtime.
+The colour fringing is `PlayerCondition`'s split on a hit (intended). The red line was most likely an
+incoming tracer. The empty minimap square was the frame left on screen when Blackout hid only the map's
+view; the whole minimap now goes dark.

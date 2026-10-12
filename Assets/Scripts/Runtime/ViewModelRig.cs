@@ -241,7 +241,10 @@ public class ViewModelRig : MonoBehaviour
         var data = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(_armsCam);
         data.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
         data.renderShadows = false;
-        data.renderPostProcessing = false;
+        // Post-processing on: the stack's tonemapping and grading are applied after its last camera,
+        // so without it the arms and gun were drawn untonemapped over a graded world (white gloves,
+        // a flat grey rifle).
+        data.renderPostProcessing = true;
         var stack = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(main).cameraStack;
         if (!stack.Contains(_armsCam)) stack.Add(_armsCam);
         main.cullingMask &= ~(1 << _firstPerson);
@@ -251,7 +254,10 @@ public class ViewModelRig : MonoBehaviour
     void PlaceArmsCamera()
     {
         if (_armsCam == null) return;
-        _armsCam.transform.localPosition = new Vector3(0f, 0f, -Body.eyeBack);
+        // Back from the eye at the hip; at the eye aiming, or the stock (which ends at the cheek)
+        // is in front of the camera.
+        float aim = _weapon != null ? _weapon.AimProgress : 0f;
+        _armsCam.transform.localPosition = new Vector3(0f, 0f, -Body.eyeBack * (1f - aim));
         _armsCam.transform.localRotation = Quaternion.identity;
         _armsCam.fieldOfView = GameSettings.ArmsFieldOfView;
     }

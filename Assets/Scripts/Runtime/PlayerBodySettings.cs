@@ -57,9 +57,9 @@ public class PlayerBodySettings : ScriptableObject
 
     [Header("Punches (in the view's metres: right, up, ahead)")]
     [Tooltip("Where the rifle's rear sight is while the left hand carries it, low at the side, for a single punch.")]
-    public Vector3 leftCarryPosition = new Vector3(-0.2f, -0.3f, 0.3f);
+    public Vector3 leftCarryPosition = new Vector3(-0.08f, -0.24f, 0.42f);
     [Tooltip("How the rifle is turned while the left hand carries it (degrees: muzzle down, in, rolled).")]
-    public Vector3 leftCarryTurn = new Vector3(30f, -15f, 25f);
+    public Vector3 leftCarryTurn = new Vector3(8f, -75f, -5f);
     [Tooltip("Where the right fist starts a punch from, and goes back to before taking the grip again.")]
     public Vector3 rightGuard = new Vector3(0.12f, -0.16f, 0.26f);
     [Tooltip("Where the right fist lands: on the crosshair, a forearm's length out.")]

@@ -101,9 +101,11 @@ namespace FPSKit.EditorTools
                     {
                         if (Waiting()) return;
                         int marked = 0;
-                        foreach (var id in new[] { "hud.minimap", "hud.mission", "hud.objective", "hud.feed", "hud.player", "hud.abilities", "hud.weapon", "hud.run" })
+                        // The player card went with the health bars (bf8d38e): seven movable elements.
+                        var ids = new[] { "hud.minimap", "hud.mission", "hud.objective", "hud.feed", "hud.abilities", "hud.weapon", "hud.run" };
+                        foreach (var id in ids)
                             if (HudLayout.TargetById(id) != null) marked++; else Errors.Add($"no movable element \"{id}\"");
-                        Notes.Append($"\n  {marked}/8 HUD elements movable");
+                        Notes.Append($"\n  {marked}/{ids.Length} HUD elements movable");
 
                         HudLayout.Save(Layout());
                         Wait(0.5, Phase.Check);
@@ -132,7 +134,7 @@ namespace FPSKit.EditorTools
                         else
                         {
                             int outlines = editor.transform.Find("Sheet/Handles")?.childCount ?? 0;
-                            if (outlines < 8) Errors.Add($"the editor outlines {outlines} elements, fewer than the HUD has");
+                            if (outlines < 7) Errors.Add($"the editor outlines {outlines} elements, fewer than the HUD has");
                             Notes.Append($"\n  editor opened with {outlines} outlines");
                             ClickTabs(editor.GetComponentInChildren<UITabBar>(true), "HUD editor");
                             editor.Close();

@@ -326,6 +326,7 @@ namespace FPSKit.EditorTools
                         Notes.Append($"\n  rifle butt at {Vector3.Distance(player.transform.position, nearest.transform.position):0.0}m " +
                                      $"hit {(hit != null ? hit.name : "nothing")} ({_punchRole}): pool " +
                                      $"{_punchPoolBefore:0.0} -> {_punchPoolAfter:0.0}");
+                        if (hit == null) Notes.Append(WhyMissed(melee, target));
 
                         Wait(30.0, Phase.PunchCross);
                         return;
@@ -355,6 +356,12 @@ namespace FPSKit.EditorTools
                         {
                             var hit = melee.TryPunch();
                             Notes.Append($"\n  punch thrown at {(hit != null ? hit.name : "nothing")}");
+                            if (hit == null)
+                            {
+                                Notes.Append($"\n    target {Vector3.Distance(player.transform.position, _punchTarget.transform.position):0.0} m from the player; " +
+                                             $"strike ready at {Time.time:0.00}? chain {(melee.Current == MeleeStrike.Strike.None ? "idle" : melee.Current.ToString())}");
+                                Notes.Append(WhyMissed(melee, _punchTarget));
+                            }
                         }
                         _punchAt = Time.time;
                         Wait(30.0, Phase.PunchMiss);
@@ -755,6 +762,40 @@ namespace FPSKit.EditorTools
                       $"and hit them again at point-blank range for {_poolBeforeClose - _poolAtEnd:0.0} " +
                       $"more.{Notes}");
             FPSKitBatch.Exit(0);
+        }
+
+        /// <summary>When a strike hits nothing: what the strike could see from the eye, so the reason is in the report.</summary>
+        static string WhyMissed(MeleeStrike melee, Health target)
+        {
+            var cam = melee.fpsCamera != null ? melee.fpsCamera.transform : null;
+            if (cam == null) return "\n    (no camera on the strike)";
+            int enemy = LayerMask.NameToLayer("Enemy"), playerLayer = LayerMask.NameToLayer("Player");
+            var sb = new System.Text.StringBuilder();
+            Vector3 eye = cam.position;
+            var cols = Physics.OverlapSphere(eye, 3.6f, 1 << enemy, QueryTriggerInteraction.Ignore);
+            sb.Append($"\n    eye {eye}, looking {cam.forward}; enemy-layer colliders within 3.6 m: {cols.Length}");
+            var anim = target.GetComponentInChildren<Animator>();
+            if (anim != null)
+            {
+                var hips = anim.GetBoneTransform(HumanBodyBones.Hips);
+                sb.Append($"\n    enemy root {target.transform.position}; animator '{anim.name}' local {anim.transform.localPosition} " +
+                          $"rootMotion {anim.applyRootMotion} enabled {anim.enabled}; hips world {(hips != null ? hips.position.ToString() : "-")} " +
+                          $"local {(hips != null ? hips.localPosition.ToString() : "-")}; motor rootMotion {target.GetComponent<EnemyMotor>()?.RootMotion}");
+                foreach (var rb in anim.GetComponentsInChildren<Rigidbody>())
+                    if (!rb.isKinematic) { sb.Append($"\n    non-kinematic body part: {rb.name}"); break; }
+            }
+            foreach (var col in target.GetComponentsInChildren<Collider>())
+            {
+                if (!col.enabled || col.isTrigger) continue;
+                Vector3 p = col.ClosestPoint(eye), to = p - eye;
+                float d = to.magnitude;
+                string blocked = "clear";
+                int mask = ~((1 << enemy) | (1 << playerLayer));
+                if (d > 0.05f && Physics.Raycast(eye, to / d, out var h, d - 0.02f, mask, QueryTriggerInteraction.Ignore))
+                    blocked = $"blocked by {h.collider.name} (layer {LayerMask.LayerToName(h.collider.gameObject.layer)}) at {h.distance:0.00} m";
+                sb.Append($"\n    {col.name} (layer {LayerMask.LayerToName(col.gameObject.layer)}): {d:0.00} m, {Vector3.Angle(cam.forward, to):0} deg off, {blocked}");
+            }
+            return sb.ToString();
         }
     }
 }

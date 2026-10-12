@@ -327,7 +327,13 @@ public class HUDController : MonoBehaviour
 
         if (pausePanel != null) pausePanel.SetActive(false);
         if (bossPanel != null) bossPanel.SetActive(false);
-        if (damageVignette != null) damageVignette.color = WithAlpha(damageVignette.color, 0f);
+        if (damageVignette != null)
+        {
+            damageVignette.color = WithAlpha(damageVignette.color, 0f);
+            // The arenas built it as a plain image: with no sprite it covered the whole screen in
+            // flat red on every hit. A vignette is the edges: clear in the middle, red at the rim.
+            if (damageVignette.sprite == null) damageVignette.sprite = EdgeVignette();
+        }
         if (bannerGroup != null) bannerGroup.alpha = 0f;
 
         // The template is a source object, not something that should render.
@@ -1516,6 +1522,25 @@ public class HUDController : MonoBehaviour
 
         float focalLength = referenceHeight * 0.5f / Mathf.Tan(halfFov);
         return focalLength * Mathf.Tan(spreadDegrees * Mathf.Deg2Rad);
+    }
+
+    /// <summary>A white sprite clear in the middle and opaque at the edges, made once per HUD; the image's colour tints it.</summary>
+    Sprite EdgeVignette()
+    {
+        const int size = 128;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "DamageVignette", wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+                float r = Mathf.Sqrt(u * u + v * v) / 1.41421356f;
+                float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.42f, 1f, r));
+                px[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+            }
+        tex.SetPixels32(px);
+        tex.Apply(false, true);
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
     }
 
     // ======================================================================

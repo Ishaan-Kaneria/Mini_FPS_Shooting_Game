@@ -149,17 +149,6 @@ public class PlayerMotor : MonoBehaviour
     public float crouchLerpSpeed = 11f;
     public float eyeOffsetFromTop = 0.15f;
 
-    [Header("Head Bob")]
-    public float bobFrequency = 9f;
-    public float bobAmplitude = 0.045f;
-    public float bobLerpSpeed = 10f;
-
-    [Tooltip("Metres the camera dips on a hard landing. Small: this is a punctuation " +
-             "mark on the jump, not a stumble.")]
-    public float landDipAmount = 0.12f;
-
-    public float landDipRecovery = 6f;
-
     [Tooltip("Impact speed below which a touchdown is ignored. isGrounded flickers off " +
              "for a frame on slopes and floor seams, and without a floor here every seam " +
              "would fire a landing thump and reset the footstep rhythm.")]
@@ -262,11 +251,9 @@ public class PlayerMotor : MonoBehaviour
     bool _padSprint;
     bool _padCrouch;
     float _nextCursorAttempt;
-    float _bobTimer, _stepAccumulator, _stepPhase, _cameraRoll;
+    float _stepAccumulator, _stepPhase;
     bool _blown;
     Weapon _weapon;
-    Vector3 _bobOffset;
-    float _landDip;
     bool _wasGrounded = true;
     int _ceilingMask;
 
@@ -293,6 +280,7 @@ public class PlayerMotor : MonoBehaviour
         // The player's state told without a health bar, and their own noise for the
         // enemies to hear. Added here so every arena already built has them.
         if (GetComponent<PlayerCondition>() == null) gameObject.AddComponent<PlayerCondition>();
+        if (GetComponent<EyeCamera>() == null) gameObject.AddComponent<EyeCamera>();
         if (GetComponent<PlayerNoise>() == null) gameObject.AddComponent<PlayerNoise>();
         // The player as a whole body under the camera, when the settings name one.
         if (PlayerBody.Wanted && GetComponent<PlayerBody>() == null) gameObject.AddComponent<PlayerBody>();
@@ -564,7 +552,7 @@ public class PlayerMotor : MonoBehaviour
         cameraHolder.localRotation = Quaternion.Euler(
             _pitch - _recoilPitch + shake.x,
             _recoilYaw + shake.y,
-            shake.z + _cameraRoll);
+            shake.z);
     }
 
     /// <summary>
@@ -1011,7 +999,6 @@ public class PlayerMotor : MonoBehaviour
     {
         if (impactSpeed < landImpactThreshold) return;
 
-        _landDip = Mathf.Min(landDipAmount, landDipAmount * impactSpeed / 12f);
         _stepAccumulator = 0f;
 
         if (landClip != null && footstepSource != null)
@@ -1027,10 +1014,10 @@ public class PlayerMotor : MonoBehaviour
 
     // ======================================================================
     /// <summary>
-    /// The view rides on the footsteps: it dips with each footfall and sways across over a
-    /// stride, rolls a little with each step, and leans against a sidestep. All of it is
-    /// driven by the distance walked, so the footsteps you hear and the bob you see are the
-    /// same event -- a bob on a timer drifts out of step with the sound and reads as fake.
+    /// The eye at its height (standing or crouched) and the footsteps, counted by distance walked. The
+    /// head's own motion on top -- the bob and sway on these same steps, the lean, the landing, the breath --
+    /// is <see cref="EyeCamera"/>'s, on the camera under the holder, so the footsteps you hear and the bob
+    /// you see stay one event.
     /// </summary>
     void HandleBobAndFootsteps()
     {
@@ -1040,29 +1027,13 @@ public class PlayerMotor : MonoBehaviour
         float eyeHeight = _cc.height - eyeOffsetFromTop;
         Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);
         float speed = IsGrounded ? planar.magnitude : 0f;
-        float moving = Mathf.Clamp01(speed / Mathf.Max(0.5f, move.jogSpeed));
 
         float stepLength = IsSprinting ? move.sprintStepLength : move.stepLength;
         float before = _stepPhase;
         _stepPhase += speed * Time.deltaTime / Mathf.Max(0.2f, stepLength);
         if (IsGrounded && Mathf.Floor(_stepPhase) > Mathf.Floor(before)) PlayFootstep();
 
-        // The player's comfort setting scales all of it: dip, sway, the step's roll and the lean.
-        float scale = (IsSprinting ? move.sprintBob : 1f) * (IsCrouching ? 0.6f : 1f) * moving * GameSettings.HeadBob;
-        if (_weapon != null && _weapon.IsAiming) scale *= 0.35f;
-
-        float dip = move.bobDip * (Mathf.Cos(_stepPhase * Mathf.PI * 2f) - 1f) * 0.5f * scale;
-        float sway = move.bobSway * Mathf.Sin(_stepPhase * Mathf.PI) * scale;
-        Vector3 target = new Vector3(sway, dip, 0f);
-
-        _landDip = Mathf.MoveTowards(_landDip, 0f, landDipRecovery * landDipAmount * Time.deltaTime);
-        _bobOffset = Vector3.Lerp(_bobOffset, target, bobLerpSpeed * Time.deltaTime);
-        cameraHolder.localPosition = new Vector3(_bobOffset.x, eyeHeight + _bobOffset.y - _landDip, 0f);
-
-        // A step's roll, and the lean against a sidestep.
-        float lateral = Vector3.Dot(planar, transform.right) / Mathf.Max(0.5f, move.jogSpeed);
-        float roll = move.stepRoll * Mathf.Sin(_stepPhase * Mathf.PI) * scale - move.strafeLean * GameSettings.HeadBob * Mathf.Clamp(lateral, -1f, 1f);
-        _cameraRoll = Mathf.Lerp(_cameraRoll, IsGrounded ? roll : 0f, Time.deltaTime * 8f);
+        cameraHolder.localPosition = new Vector3(0f, eyeHeight, 0f);
     }
 
     void PlayFootstep()

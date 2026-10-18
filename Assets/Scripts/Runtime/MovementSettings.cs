@@ -49,17 +49,7 @@ public class MovementSettings : ScriptableObject
     [Tooltip("Once blown, the share of breath needed before the sprint comes back.")]
     [Range(0f, 1f)] public float sprintAgainAt = 0.3f;
 
-    [Header("The view")]
-    [Tooltip("Metres the view dips each footfall at a jog.")]
-    [Range(0f, 0.1f)] public float bobDip = 0.017f;
-    [Tooltip("Metres the view sways side to side over a stride.")]
-    [Range(0f, 0.1f)] public float bobSway = 0.011f;
-    [Tooltip("Bob at a sprint, as a multiple of the jog's.")]
-    [Range(1f, 3f)] public float sprintBob = 1.5f;
-    [Tooltip("Degrees the view rolls each step.")]
-    [Range(0f, 3f)] public float stepRoll = 0.3f;
-    [Tooltip("Degrees the view leans against a sidestep.")]
-    [Range(0f, 6f)] public float strafeLean = 1.0f;
+    [Header("Steps (the view's own motion on them is EyeCameraSettings')")]
     [Tooltip("Metres a step covers at a jog; the footsteps and the bob both follow it.")]
     [Range(0.4f, 1.5f)] public float stepLength = 0.78f;
     [Tooltip("Metres a step covers at a sprint.")]

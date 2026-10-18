@@ -3077,3 +3077,41 @@ player left, right, above and below: **30 to 69 degrees off in every case** (Bui
 After: face to camera median 0.0-0.6 degrees in all 16 cases, worst frame 3.2; the muzzle within 0.3-2.5
 degrees of its aim point beyond 3 m (up close, when it has walked into arm's length, 3-10 median: the
 muzzle sits almost at the target). Pictures: Build/FaceTest/faces.png and faces_before_fix.png.
+
+## Smooth animation: compression, blends, frame rate (2026-10-18, animation brief section 3)
+
+- **Compression.** The enemy's Mixamo clips were imported with Unity's default keyframe reduction (0.5
+  degrees). `FPSKitClipCompression` (`FPSKitBatch.VerifyClipCompression`) reimports all 126 files three ways
+  and samples every humanoid bone at 60 Hz: the default strays up to 0.57 degrees from the uncompressed clip
+  (the fingers in a reload, 0.40 in a breathing idle); `FPSKitMixamoImport` now uses 0.1, which strays under
+  0.001. Clip memory (editor size): none 74.9 MB, 0.5 deg 29.9 MB, 0.1 deg 40.5 MB. The Low Poly Shooter
+  Pack's own clips came uncompressed and stay so.
+- **Blends.** `FPSKitBlendAudit` (`VerifyBlends`) lists every controller transition and every crossfade in
+  code, in seconds; a cut is under 0.07 s, mush over 0.45 s. The one cut: the death clip crossfaded in
+  0.06 s while every other layer (carry, sidearm, injured arms) dropped to nothing in one frame. It now
+  eases in over 0.12 s, the other layers out over the same (`RagdollController.FadeIntoDeath`).
+- **Interpolation.** Already on for every visible body: dropped guns, the 13 ragdoll bones, severed limbs,
+  gore. A frozen corpse turns it off once it is kinematic and still.
+- **Animator culling.** Already as asked: `EnemyMotor` animates always within `animateAlwaysWithin` and only
+  culls an unseen enemy further off (a seen one is never culled).
+- **Frame rate.** Settings > Video: VSync (paces to the display) and, with it off, a frame limit of 60, 90,
+  120, 144 or unlimited (`GameSettings.FrameLimit`); a phone keeps 30/60 and battery saver. Note the two
+  reduced arenas (Night Citylife, Abandoned Fairground) carry `ArenaPerformance`, which holds them at 30 for
+  the laptop's heat: left as it is.
+
+## The view is a pair of eyes (2026-10-18, animation brief section 4)
+
+`EyeCamera` (on the player, added by the motor; values in `EyeCameraSettings`, Resources) moves the camera
+under the motor's holder, in LateUpdate after the motor and before the arms: the motor keeps the turn, the
+eye height and the footsteps; the head's own motion is all here, so it cannot accumulate and the aim is
+never delayed. Steps on `PlayerMotor.StepPhase` (the head lowest just after each footfall, over the planted
+foot side to side), by gait from a careful step to a sprint; inertia on springs (lag and pitch on starting
+and stopping, lean against a sidestep, a little roll into a turn); a sprung landing; breathing that gets
+fast and deep after a sprint; aiming leaves 15% of the motion and 35% of the breath; Head Bob scales all of
+it; motion blur only if switched on. Springs step in 1/240 s slices, so 30, 60 and 144 fps move alike.
+
+`FPSKitEyeCamTest` (`VerifyEyeCam`), the same script before and after (Build/EyeCam/report_before.txt,
+report_after.txt): bob up-down careful step / walk / jog / sprint 2.5 / 3.5 / 3.8 / 5.4 mm before, 3.6 /
+10.6 / 18.6 / 34.9 after; aimed walk 1.2, crouched 4.1 (before, crouched was over half a jog's); the head's
+low point 0.11 of a step after the footfall (before 0.65: mid-stride); landing 32 mm sprung back in 0.45 s
+(before 71 mm in one frame, the worst head acceleration 1732 m/s² at 144 fps; now 85).

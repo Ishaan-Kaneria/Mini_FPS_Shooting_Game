@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04f37c28a058143e4b56dfbec4699859, type: 3}
+  m_Name: EyeCameraSettings
+  m_EditorClassIdentifier: Assembly-CSharp::EyeCameraSettings
+  creep:
+    speed: 1.2
+    dip: 0.002
+    sway: 0.001
+    roll: 0.03
+    nod: 0.03
+  walk:
+    speed: 3.2
+    dip: 0.009
+    sway: 0.005
+    roll: 0.18
+    nod: 0.12
+  jog:
+    speed: 6
+    dip: 0.018
+    sway: 0.008
+    roll: 0.32
+    nod: 0.25
+  sprint:
+    speed: 9.5
+    dip: 0.03
+    sway: 0.012
+    roll: 0.55
+    nod: 0.45
+  dipAfterFootfall: 0.1
+  crouched: 0.3
+  lagPerAccel: 0.0009
+  pitchPerAccel: 0.05
+  strafeLean: 1
+  turnRoll: 0.35
+  settle: 11
+  damping: 0.72
+  maxLag: 0.03
+  maxTilt: 2.5
+  landKick: 0.1
+  landFrom: 2
+  landNod: 1.2
+  restRate: 14
+  blownRate: 34
+  restPitch: 0.12
+  blownPitch: 0.55
+  restLift: 0.0012
+  blownLift: 0.004
+  blowSeconds: 6
+  recoverSeconds: 9
+  aimedMotion: 0.15
+  aimedBreath: 0.35
+  blurIntensity: 0.22
+  blurClamp: 0.05

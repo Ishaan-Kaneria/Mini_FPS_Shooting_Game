@@ -225,6 +225,26 @@ public static class GameSettings
         set => SetBool("vsync", value);
     }
 
+    /// <summary>The frame rates a desktop can be held to (0 is no limit).</summary>
+    public static readonly int[] FrameLimits = { 60, 90, 120, 144, 0 };
+
+    /// <summary>
+    /// A desktop's frame limit with VSync off: 60, 90, 120, 144 or 0 for none. Never below 60; with
+    /// VSync on the display paces the game and this is not used.
+    /// </summary>
+    public static int FrameLimit
+    {
+        get { int v = PlayerPrefs.GetInt(Prefix + "frameLimit", 0); return System.Array.IndexOf(FrameLimits, v) >= 0 ? v : 0; }
+        set => SetInt("frameLimit", System.Array.IndexOf(FrameLimits, value) >= 0 ? value : 0);
+    }
+
+    /// <summary>A little motion blur on fast turns and runs. Off by default: some players feel sick with it.</summary>
+    public static bool MotionBlur
+    {
+        get => GetBool("motionBlur", false);
+        set => SetBool("motionBlur", value);
+    }
+
     public static float MasterVolume
     {
         get => Mathf.Clamp01(GetFloat("volMaster", 1f));

@@ -313,6 +313,24 @@ namespace FPSKit.EditorTools
         public static void VerifyFace() => FPSKitFaceTest.Batch();
 
         /// <summary>
+        /// What keyframe reduction loses on the enemy's Mixamo clips: none, Unity's default and the importer's
+        /// minimal setting, memory and the stray from uncompressed on every bone. Build/ClipCompression.
+        /// </summary>
+        public static void VerifyClipCompression() => FPSKitClipCompression.Run();
+
+        /// <summary>Every transition blend in the soldier's and the player body's controllers, in seconds: no cuts, no mush. Build/BlendAudit.</summary>
+        public static void VerifyBlends() => FPSKitBlendAudit.Run();
+
+        /// <summary>
+        /// The first-person view's motion: bob by gait, footstep timing, landing, the same script at 30, 60
+        /// and 144 fps, and jitter. Build/EyeCam.
+        /// </summary>
+        public static void VerifyEyeCam() => FPSKitEyeCamTest.Batch();
+
+        /// <summary>Writes any missing tuning asset under FPSKit_Generated/Resources (FPSKit > Settings > Ensure Runtime Settings).</summary>
+        public static void EnsureRuntimeSettings() => Run(FPSKitRuntimeSettings.Ensure);
+
+        /// <summary>
         /// A dead enemy's gun rests on the ground: rigged and plain bodies, concrete, wood, sand and
         /// slopes, six orientations; mesh-to-surface gap and jitter once settled. Report and (with
         /// UNITY_GRAPHICS=1) close-ups in Build/GunDrop.

@@ -18,6 +18,9 @@ namespace FPSKit.EditorTools
     ///   the root stays on the ground.
     /// - Horizontal root motion is kept on anything that travels (walks, crawls, starts,
     ///   stops, get-ups) and baked on anything that stands in place (idles, hits, reloads).
+    /// - Compression is minimal keyframe reduction (<see cref="RotationError"/> degrees, not Unity's 0.5):
+    ///   fingers, a breath and a weight shift live in fractions of a degree (FPSKitClipCompression
+    ///   measures what each setting loses against no compression at all).
     /// - A limp is downloaded for one leg; a mirrored copy ("_Mirror") gives the other. The
     ///   pistol clips are mirrored too, for a pistol in the left hand, and the player's punches
     ///   and kick (Player/), so the body's builder can take the side that throws with the hand it wants.
@@ -27,6 +30,13 @@ namespace FPSKit.EditorTools
         public const string Root = "Assets/Animations/Mixamo/";
 
         static bool Ours(string path) => path.Replace('\\', '/').StartsWith(Root);
+
+        /// <summary>Degrees (and per cent, for position and scale) a reduced key may stray from the source.</summary>
+        public const float RotationError = 0.1f, PositionError = 0.1f, ScaleError = 0.1f;
+
+        /// <summary>For FPSKitClipCompression only: import with these settings instead, while it measures.</summary>
+        internal static ModelImporterAnimationCompression? MeasureWith;
+        internal static float MeasureError = RotationError;
 
         void OnPreprocessModel()
         {
@@ -40,6 +50,11 @@ namespace FPSKit.EditorTools
             importer.importBlendShapes = false;
             importer.importVisibility = false;
             importer.importAnimation = true;
+            importer.animationCompression = MeasureWith ?? ModelImporterAnimationCompression.KeyframeReduction;
+            float error = MeasureWith.HasValue ? MeasureError : RotationError;
+            importer.animationRotationError = error;
+            importer.animationPositionError = MeasureWith.HasValue ? MeasureError : PositionError;
+            importer.animationScaleError = MeasureWith.HasValue ? MeasureError : ScaleError;
         }
 
         void OnPreprocessAnimation()

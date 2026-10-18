@@ -22,7 +22,7 @@ public static class SettingsApplier
     static void OnChanged(string key)
     {
         Apply();
-        if (key == "vsync" || key == "*") QualityTiers.ApplyFrameRate();
+        if (key == "vsync" || key == "frameLimit" || key == "*") QualityTiers.ApplyFrameRate();
         if (key == "hudScale" || key == "*") HudLayout.Preview(HudLayout.Shown);
     }
 

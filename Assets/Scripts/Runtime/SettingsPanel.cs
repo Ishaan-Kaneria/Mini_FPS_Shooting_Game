@@ -416,9 +416,15 @@ public class SettingsPanel : OverlayPanel
                           () => Mathf.Max(0, sizes.FindIndex(r => r.x == Screen.width && r.y == Screen.height)),
                           i => Screen.SetResolution(sizes[i].x, sizes[i].y, Screen.fullScreenMode), t);
             AddSwitch(page, "Fullscreen", null, () => Screen.fullScreen, v => Screen.fullScreen = v, t);
-            AddSwitch(page, "VSync", "Waits for the display; off can tear and runs as fast as it can.",
+            AddSwitch(page, "VSync", "Waits for the display; off can tear and runs at the frame limit below.",
                       () => GameSettings.VSync, v => GameSettings.VSync = v, t);
+            AddChoice(page, "Frame limit", "With VSync off. Higher is smoother on a fast display and runs the machine hotter.",
+                      Array.ConvertAll(GameSettings.FrameLimits, f => f > 0 ? f + " fps" : "Unlimited"),
+                      () => Mathf.Max(0, Array.IndexOf(GameSettings.FrameLimits, GameSettings.FrameLimit)),
+                      i => GameSettings.FrameLimit = GameSettings.FrameLimits[i], t);
         }
+        AddSwitch(page, "Motion blur", "A little blur on fast turns and sprints. Off by default.",
+                  () => GameSettings.MotionBlur, v => GameSettings.MotionBlur = v, t);
 
         Heading(page, "Content", t);
         AddSwitch(page, "Blood", "Blood on hits, walls and bodies. Off leaves a dull puff; wounds still slow enemies.",

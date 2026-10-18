@@ -164,9 +164,9 @@ public static class QualityTiers
         }
         else
         {
-            // The player's choice; off, the frame rate is whatever the machine gives.
+            // The player's choice: VSync paces to the display; off, the frame limit holds it (none: as fast as it goes).
             QualitySettings.vSyncCount = GameSettings.VSync ? 1 : 0;
-            Application.targetFrameRate = -1;
+            Application.targetFrameRate = GameSettings.VSync || GameSettings.FrameLimit <= 0 ? -1 : GameSettings.FrameLimit;
         }
     }
 

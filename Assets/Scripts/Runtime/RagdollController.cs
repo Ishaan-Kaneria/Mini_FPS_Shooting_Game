@@ -35,6 +35,24 @@ public class RagdollController : MonoBehaviour
     public bool Dying => _dyingUntil > 0f;
 
     float _dyingUntil = -1f;
+
+    /// <summary>Seconds the death clip takes over the body in: quick enough to start on the hit, never a cut.</summary>
+    const float DeathBlend = 0.12f;
+    int _deathLayer = -1;
+    float _deathStart;
+    float[] _fadeFrom;
+
+    /// <summary>The death clip's layer up to all of the body, the others down to none, over <see cref="DeathBlend"/>.</summary>
+    void FadeIntoDeath()
+    {
+        if (_deathLayer < 0 || animator == null || _fadeFrom == null) return;
+        float w = Mathf.Clamp01((Time.time - _deathStart) / DeathBlend);
+        w = w * w * (3f - 2f * w);
+        for (int i = 1; i < animator.layerCount && i < _fadeFrom.Length; i++)
+            animator.SetLayerWeight(i, i == _deathLayer ? Mathf.Lerp(_fadeFrom[i], 1f, w) : _fadeFrom[i] * (1f - w));
+        if (w >= 1f) _deathLayer = -1;
+    }
+
     Vector3[] _lastPos;
     Quaternion[] _lastRot;
     bool _haveLast;
@@ -258,10 +276,14 @@ public class RagdollController : MonoBehaviour
                          : (Random.value < 0.5f ? "Death_FallBack" : "Death_Back");
         if (!animator.HasState(layer, Animator.StringToHash(state))) return false;
 
-        // Nothing over it: the full body is the clip's (the carry and the sidearm layers are the arms').
-        for (int i = 0; i < animator.layerCount; i++) if (i != 0 && i != layer) animator.SetLayerWeight(i, 0f);
-        animator.SetLayerWeight(layer, 1f);
-        animator.CrossFadeInFixedTime(state, 0.06f, layer);
+        // Nothing over it: the full body becomes the clip's (the carry and the sidearm layers are the arms'),
+        // eased over DeathBlend from the weights it had, starting on this frame. Every other layer used to
+        // drop to nothing in one frame, a snap of the arms as the fall began (FPSKitBlendAudit).
+        _deathLayer = layer;
+        _deathStart = Time.time;
+        if (_fadeFrom == null || _fadeFrom.Length != animator.layerCount) _fadeFrom = new float[animator.layerCount];
+        for (int i = 0; i < animator.layerCount; i++) _fadeFrom[i] = animator.GetLayerWeight(i);
+        animator.CrossFadeInFixedTime(state, DeathBlend, layer);
         _dyingUntil = Time.time + Random.Range(profile.deathClipSeconds.x, Mathf.Max(profile.deathClipSeconds.x, profile.deathClipSeconds.y));
         _haveLast = false;
         return true;
@@ -271,6 +293,7 @@ public class RagdollController : MonoBehaviour
     void LateUpdate()
     {
         if (!Dying || IsRagdolled) return;
+        FadeIntoDeath();
         float dt = Mathf.Max(1e-4f, Time.deltaTime);
         if (_lastPos == null || _lastPos.Length != _bones.Length) { _lastPos = new Vector3[_bones.Length]; _lastRot = new Quaternion[_bones.Length]; }
 

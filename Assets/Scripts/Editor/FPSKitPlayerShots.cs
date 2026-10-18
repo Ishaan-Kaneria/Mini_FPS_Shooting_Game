@@ -61,6 +61,18 @@ namespace FPSKit.EditorTools
         static bool _blackout;
         static string _onlyPoses;
 
+        /// <summary>
+        /// Batch: the movement-and-action sequence in Desert Outpost (stand, walk, run, sprint, sprint into fire,
+        /// aim, reload, punch, double punch, kick), then exit. Needs a graphics device:
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchSequence
+        /// </summary>
+        public static void BatchSequence()
+        {
+            _batch = new Queue<(string, string)>(new[] { Arenas[0] });
+            _onlyPoses = "stand,walk,run,sprint,runfire,aim,reload,punch,double,kick";
+            EditorApplication.update += NextArena;
+        }
+
         /// <summary>Batch: the right-hand close-ups only, in the Desert (quick, for tuning the grip).</summary>
         public static void BatchHands()
         {

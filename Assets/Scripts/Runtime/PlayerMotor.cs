@@ -251,7 +251,8 @@ public class PlayerMotor : MonoBehaviour
     bool _padSprint;
     bool _padCrouch;
     float _nextCursorAttempt;
-    float _stepAccumulator, _stepPhase;
+    float _stepAccumulator, _stepPhase, _lastCycles;
+    PlayerBody _body;
     bool _blown;
     Weapon _weapon;
     bool _wasGrounded = true;
@@ -1028,9 +1029,21 @@ public class PlayerMotor : MonoBehaviour
         Vector3 planar = new Vector3(_velocity.x, 0f, _velocity.z);
         float speed = IsGrounded ? planar.magnitude : 0f;
 
-        float stepLength = IsSprinting ? move.sprintStepLength : move.stepLength;
+        // Counted off the legs' own clips when there is a body (two steps a cycle), so the footsteps and the
+        // bob are the feet that are seen; otherwise by distance, the step lengthening with speed.
         float before = _stepPhase;
-        _stepPhase += speed * Time.deltaTime / Mathf.Max(0.2f, stepLength);
+        if (_body == null) _body = GetComponent<PlayerBody>();
+        float cycles = _body != null ? _body.StrideCycles : 0f;
+        if (_body != null && _body.Built && _body.Striding)
+        {
+            if (IsGrounded && speed > 0.2f) _stepPhase += 2f * Mathf.Max(0f, cycles - _lastCycles);
+        }
+        else
+        {
+            float stepLength = move.stepLength + Mathf.Max(0f, speed - 1.5f) * move.strideGrowth;
+            _stepPhase += speed * Time.deltaTime / Mathf.Max(0.2f, stepLength);
+        }
+        _lastCycles = cycles;
         if (IsGrounded && Mathf.Floor(_stepPhase) > Mathf.Floor(before)) PlayFootstep();
 
         cameraHolder.localPosition = new Vector3(0f, eyeHeight, 0f);

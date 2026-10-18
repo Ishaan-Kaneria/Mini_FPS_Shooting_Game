@@ -11,10 +11,12 @@ using UnityEngine;
 /// curls the fingers round them, and lets go of the gun for <see cref="MeleeStrike"/>'s
 /// punches. A kick is drawn with a pair of legs that exist only for it.
 ///
-/// There are no animation clips. Every pose is a place for a hand, said in the view's
-/// metres, which is what can be judged in a screenshot; and nothing here depends on how a
-/// particular rig's bones happen to be oriented (see <see cref="LimbIK"/>), so a different
-/// arms model is a different prefab and no code.
+/// Every pose is a place for a hand, said in the view's metres, which is what can be judged in
+/// a screenshot; and nothing here depends on how a particular rig's bones happen to be oriented
+/// (see <see cref="LimbIK"/>), so a different arms model is a different prefab and no code. The
+/// gun's motion through the stride, the aim, the shots, the reload and the draw comes from the
+/// Low Poly Shooter Pack's clips (<see cref="FirstPersonClips"/>, their motion only, measured on
+/// their rig and played about our own grip) when they are baked; the hands stay on the gun by IK.
 ///
 /// Added by Weapon at runtime and built from the gun's data, so no arena scene has to be
 /// rebuilt for it. With no view model on the data it does nothing, and the scene's own
@@ -256,7 +258,7 @@ public class ViewModelRig : MonoBehaviour
         if (_armsCam == null) return;
         // Back from the eye at the hip; at the eye aiming, or the stock (which ends at the cheek)
         // is in front of the camera.
-        float aim = _weapon != null ? _weapon.AimProgress : 0f;
+        float aim = _weapon != null ? Smooth01(Mathf.Clamp01(_weapon.AimProgress)) : 0f;
         _armsCam.transform.localPosition = new Vector3(0f, 0f, -Body.eyeBack * (1f - aim));
         _armsCam.transform.localRotation = Quaternion.identity;
         _armsCam.fieldOfView = GameSettings.ArmsFieldOfView;
@@ -560,8 +562,11 @@ public class ViewModelRig : MonoBehaviour
         }
 
         Vector3 hip = _spec.hipPosition + Body.hipNudge + (DeviceProfile.Handheld ? Body.handsetHipNudge : Vector3.zero);
-        Vector3 basePos = Vector3.Lerp(hip, _spec.aimPosition, s.aim);
-        Quaternion baseTurn = Quaternion.Slerp(Quaternion.Euler(_spec.hipTurn + Body.hipTurnNudge), Quaternion.identity, s.aim);
+        // Eased in and out: the aim's own progress is a straight ramp, which started and stopped the gun at full
+        // speed in a frame (FPSKitEyeCamTest, the worst jolt of the gun at any frame rate).
+        float aimed = Smooth01(Mathf.Clamp01(s.aim));
+        Vector3 basePos = Vector3.Lerp(hip, _spec.aimPosition, aimed);
+        Quaternion baseTurn = Quaternion.Slerp(Quaternion.Euler(_spec.hipTurn + Body.hipTurnNudge), Quaternion.identity, aimed);
 
         var gun = _spec.transform;
         gun.localPosition = basePos + delta;
@@ -571,6 +576,11 @@ public class ViewModelRig : MonoBehaviour
         PlayMoves(out Vector3 moveOffset, out Vector3 moveTurn);
         gun.localPosition += moveOffset;
         gun.localRotation = gun.localRotation * Quaternion.Euler(moveTurn);
+
+        // The first-person clips (the Low Poly Shooter Pack's motion) on top, when there are any.
+        _leftMoved = false;
+        var clips = Clips;
+        if (clips != null) PlayClips(s, gun, clips);
 
         // A single punch: the rifle is carried low at the side in the left hand while the right
         // is thrown, rather than going on the back.
@@ -589,12 +599,13 @@ public class ViewModelRig : MonoBehaviour
         if (_gunRenderers != null && _gunRenderers.Length > 0 && _gunRenderers[0] != null && _gunRenderers[0].enabled != shown)
             foreach (var r in _gunRenderers) if (r != null) r.enabled = shown;
 
-        // The bolt: back and home on every round, and run on an empty reload.
+        // The bolt: back and home on every round, and run on an empty reload (on the clip's beat when there is one).
         if (_spec.bolt != null)
         {
             float cycle = s.sinceShot >= 0f && s.sinceShot < 0.08f ? Mathf.Sin(s.sinceShot / 0.08f * Mathf.PI) : 0f;
-            float run = s.reloadEmpty && s.reloadProgress >= 0.74f && s.reloadProgress < 0.9f
-                ? Mathf.Sin((s.reloadProgress - 0.74f) / 0.16f * Mathf.PI) : 0f;
+            float boltFrom = clips != null && _weapon != null ? _weapon.BoltBeat - 0.03f : 0.74f;
+            float run = s.reloadEmpty && s.reloadProgress >= boltFrom && s.reloadProgress < boltFrom + 0.16f
+                ? Mathf.Sin((s.reloadProgress - boltFrom) / 0.16f * Mathf.PI) : 0f;
             _spec.bolt.localPosition = _boltRest + _spec.boltTravel * Mathf.Max(cycle, run);
         }
     }
@@ -651,6 +662,9 @@ public class ViewModelRig : MonoBehaviour
         _wRunFire = Mathf.MoveTowards(_wRunFire, tf, step);
         _wAim = Mathf.MoveTowards(_wAim, ta, step);
 
+        // The first-person clips play the stride instead (PlayClips), on these same weights.
+        if (Clips != null) return;
+
         // One stride is two steps: the footfalls at 0 and 0.5.
         float phase = Mathf.Repeat(_motor.StepPhase * 0.5f, 1f);
         void Add(FirstPersonMoves.Move m, float w, ref Vector3 o, ref Vector3 t)
@@ -672,6 +686,169 @@ public class ViewModelRig : MonoBehaviour
         offset *= free;
         turn *= free;
     }
+
+    // ---- the first-person clips -------------------------------------------
+
+    FirstPersonClips Clips => _weapon != null && _weapon.UsesClips && Application.isPlaying ? FirstPersonClips.Active : null;
+
+    /// <summary>Metres a second the pack's walk is made for: faster, its swing grows (up to <see cref="MaxSwing"/>).</summary>
+    const float WalkClipSpeed = 3.2f, SprintClipSpeed = 9.5f, MaxSwing = 1.5f;
+
+    /// <summary>The gun lowest a moment after the head is (EyeCameraSettings.dipAfterFootfall): the arms lag the body a little.</summary>
+    const float ArmsLag = 0.17f;
+
+    float _aimWas = -1f, _aimDir = 1f;
+    readonly float[] _shots = new float[6];
+    float _lastShotSeen = -99f;
+    int _shotNext;
+
+    // The left hand's place and turn when a clip takes it off its grip (the reload), world space.
+    bool _leftMoved;
+    Vector3 _leftPos;
+    Quaternion _leftRot = Quaternion.identity;
+
+    // The magazine: carried in the left hand from the moment it leaves the well until it is seated again.
+    bool _magHeld, _magRestKnown;
+    Vector3 _magInHand, _magRest;
+    Quaternion _magInHandRot, _magRestRot;
+
+    /// <summary>
+    /// The pack's motion on our gun (FirstPersonClips): the stride on the footsteps and the idle's breathing,
+    /// the arc between the hip and the sights, every shot's kick (each one played to its end, so a burst
+    /// adds up and never restarts), the reload with the left hand and the magazine in it, and the draw.
+    /// All of it turns the gun about the right hand's grip, which is where the pack's motion was measured
+    /// from; the IK keeps both hands on our own grip and handguard.
+    /// </summary>
+    void PlayClips(State s, Transform gun, FirstPersonClips c)
+    {
+        Vector3 dp = Vector3.zero, hp = Vector3.zero;
+        Quaternion dr = Quaternion.identity, hr = Quaternion.identity;
+        bool hand = false;
+
+        void Add(FirstPersonClips.Track t, float time, float w, bool swing = false, bool withHand = false, float gunShare = 1f)
+        {
+            if (w <= 0.0001f || t == null || !t.Valid) return;
+            t.Sample(time, out Vector3 p, out Quaternion r, out Vector3 h, out Quaternion hq);
+            if (swing) { p -= t.meanPos; r = r * Quaternion.Inverse(t.meanRot); }
+            dp += p * (w * gunShare);
+            dr = Quaternion.SlerpUnclamped(Quaternion.identity, r, w * gunShare) * dr;
+            if (withHand) { hand = true; hp += h * w; hr = Quaternion.SlerpUnclamped(Quaternion.identity, hq, w) * hr; }
+        }
+
+        float dt = Time.deltaTime;
+        Vector3 v = _motor != null ? _motor.Velocity : Vector3.zero;
+        v.y = 0f;
+        float speed = _motor != null && _motor.IsGrounded ? v.magnitude : 0f;
+        float phase = _motor != null ? _motor.StepPhase - ArmsLag : 0f;
+        float StrideTime(FirstPersonClips.Track t) => t.footfallAt + phase * 0.5f * t.strideSeconds;
+
+        // The stride: the walk's swing for walking, jogging and firing on the move, bigger with speed; the
+        // aimed walk's down the sights; the sprint's carry and swing as the gun goes into the sprint.
+        float free = 1f - Mathf.Max(_carry, 0f);
+        float sprint = _weapon.SprintPose;
+        float walkSize = Mathf.Min(MaxSwing, speed / WalkClipSpeed) * c.strideWeight * free;
+        Add(c.walk, StrideTime(c.walk), (_wWalk + _wRun + _wRunFire) * walkSize * (1f - sprint), swing: true);
+        Add(c.aimWalk, StrideTime(c.aimWalk), _wAim * Mathf.Min(MaxSwing, speed / WalkClipSpeed) * c.strideWeight * free, swing: true);
+        // The sprint: the pack's swing through the stride on the gun's own carry (Weapon's sprint pose), by the pace.
+        if (sprint > 0.0001f)
+            Add(c.sprint, StrideTime(c.sprint), sprint * free * Mathf.Min(1f, speed / SprintClipSpeed) * c.strideWeight, swing: true);
+        float still = 1f - Mathf.Clamp01(speed / 1.2f);
+        Add(c.idle, Time.time, still * c.idleWeight * (1f - 0.7f * s.aim) * free);
+
+        // The arc between the hip and the sights: the way in on the way in, the way out on the way out.
+        if (_aimWas < 0f) _aimWas = s.aim;
+        if (s.aim > _aimWas + 1e-5f) _aimDir = Mathf.MoveTowards(_aimDir, 1f, dt * 8f);
+        else if (s.aim < _aimWas - 1e-5f) _aimDir = Mathf.MoveTowards(_aimDir, -1f, dt * 8f);
+        _aimWas = s.aim;
+        if (s.aim > 0.001f && s.aim < 0.999f)
+        {
+            // The pack's arcs take half a second; this gun may come up in a tenth. Squeezed into that, the full arc
+            // is a jolt, so it is played by how long the gun's own transition really is (a third of a second for all of it).
+            float arc = _weapon.data != null ? Mathf.Clamp01(1f / (Mathf.Max(0.1f, _weapon.data.adsSpeed) * 0.35f)) : 1f;
+            float into = 0.5f * (1f + _aimDir);
+            Add(c.aimIn, s.aim * c.aimIn.length, into * arc);
+            Add(c.aimOut, (1f - s.aim) * c.aimOut.length, (1f - into) * arc);
+        }
+
+        // Every shot's kick, each to its own end: a burst adds up and never jumps back to the start.
+        if (_weapon.LastShotTime > _lastShotSeen + 1e-4f)
+        {
+            _lastShotSeen = _weapon.LastShotTime;
+            _shots[_shotNext] = _lastShotSeen;
+            _shotNext = (_shotNext + 1) % _shots.Length;
+        }
+        foreach (float shot in _shots)
+        {
+            float age = Time.time - shot;
+            if (age < 0f || age > c.fire.length) continue;
+            Add(c.fire, age, c.fireWeight * (1f - s.aim) * free);
+            Add(c.aimFire, age, c.fireWeight * s.aim * free);
+        }
+
+        // The reload, stretched over the gun's own reload time, the left hand and the magazine with it.
+        var reload = s.reloadEmpty ? c.reloadEmpty : c.reload;
+        bool reloading = s.reloadProgress >= 0f && s.reloadProgress <= 1f && reload.Valid;
+        if (reloading) Add(reload, s.reloadProgress * reload.length, 1f, withHand: true, gunShare: c.reloadTurn);
+
+        // The draw: up from below the frame.
+        float drawn = _weapon.DrawProgress;
+        if (drawn < 1f) Add(c.unholster, drawn * c.unholster.length, 1f);
+
+        // About the right hand's grip.
+        Vector3 pivot = _holder.InverseTransformPoint(_spec.rightHand.position);
+        gun.localRotation = dr * gun.localRotation;
+        gun.localPosition = pivot + dr * (gun.localPosition - pivot) + dp;
+
+        if (hand)
+        {
+            Quaternion q = _holder.rotation * dr;
+            _leftPos = _spec.leftHand.position + q * hp;
+            _leftRot = q * hr * Quaternion.Inverse(q) * _spec.leftHand.rotation;
+            _leftMoved = true;
+        }
+        Magazine(s, reloading ? reload : null);
+    }
+
+    /// <summary>The magazine in the left hand from when it leaves the well (the clip's beat) until it is seated.</summary>
+    void Magazine(State s, FirstPersonClips.Track reload)
+    {
+        var mag = _spec.magazine;
+        if (mag == null) return;
+        if (!_magRestKnown) { _magRest = mag.localPosition; _magRestRot = mag.localRotation; _magRestKnown = true; }
+
+        float p = s.reloadProgress;
+        float outAt = _weapon.MagOutBeat, inAt = _weapon.MagInBeat;
+        if (reload == null || !_leftMoved || p < outAt || p >= inAt)
+        {
+            _magHeld = false;
+            mag.localPosition = _magRest;
+            mag.localRotation = _magRestRot;
+            return;
+        }
+        if (!_magHeld)
+        {
+            // Its turn in the hand as the hand closes on it; its place is the palm (below the knuckles, toward the fingers).
+            _magInHandRot = Quaternion.Inverse(_leftRot) * (mag.parent.rotation * _magRestRot);
+            _magHeld = true;
+        }
+        mag.localPosition = _magRest;
+        mag.localRotation = _magRestRot;
+        Vector3 restPos = mag.position;
+        Quaternion restRot = mag.rotation;
+        Vector3 held = _leftPos + _leftRot * PalmHold;
+        Quaternion heldRot = _leftRot * _magInHandRot;
+        // Out of the well into the hand over a moment, and back into the well over the last stretch, so it
+        // seats exactly however the hand arrives.
+        float take = Mathf.Clamp01((p - outAt) / 0.05f);
+        float seat = Mathf.Clamp01((p - (inAt - 0.08f)) / 0.08f);
+        float w = Smooth01(take) * (1f - Smooth01(seat));
+        mag.SetPositionAndRotation(Vector3.Lerp(restPos, held, w), Quaternion.Slerp(restRot, heldRot, w));
+    }
+
+    /// <summary>Where a magazine sits in the left hand, in its frame (+Z the fingers, +Y the back of the hand), metres.</summary>
+    static readonly Vector3 PalmHold = new Vector3(0f, -0.05f, 0.05f);
+
+    static float Smooth01(float x) => x * x * (3f - 2f * x);
 
     // ---- fists, in the view's space --------------------------------------
 
@@ -721,8 +898,8 @@ public class ViewModelRig : MonoBehaviour
         // On the gun.
         Vector3 rPos = _spec.rightHand.position;
         Quaternion rRot = _spec.rightHand.rotation;
-        Vector3 lPos = _spec.leftHand.position;
-        Quaternion lRot = _spec.leftHand.rotation;
+        Vector3 lPos = _leftMoved ? _leftPos : _spec.leftHand.position;
+        Quaternion lRot = _leftMoved ? _leftRot : _spec.leftHand.rotation;
 
         // Where the hands are on the gun (the left hand stays there while it carries the rifle).
         Vector3 gunL = lPos;

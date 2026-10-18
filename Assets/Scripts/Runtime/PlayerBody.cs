@@ -66,6 +66,36 @@ public class PlayerBody : MonoBehaviour
     /// <summary>The body is built.</summary>
     public bool Built => _anim != null;
 
+    static readonly int MoveState = Animator.StringToHash("Move");
+    float _lastNorm;
+    bool _wasMoving;
+
+    /// <summary>
+    /// Gait cycles the legs' movement clips have played (two steps each), counted after the Animator: the
+    /// footsteps, the head's bob and the arms' swing are taken from it (<see cref="PlayerMotor.StepPhase"/>),
+    /// so what is heard and seen is the feet that are seen.
+    /// </summary>
+    public float StrideCycles { get; private set; }
+
+    /// <summary>The legs are in their movement clips (not standing, not in the air).</summary>
+    public bool Striding { get; private set; }
+
+    /// <summary>Counts the movement clips' cycles: the state the legs are in, or the one they are blending into.</summary>
+    void CountStride()
+    {
+        var now = _anim.GetCurrentAnimatorStateInfo(0);
+        if (_anim.IsInTransition(0))
+        {
+            var next = _anim.GetNextAnimatorStateInfo(0);
+            if (next.shortNameHash == MoveState) now = next;
+        }
+        bool moving = now.shortNameHash == MoveState;
+        if (moving && _wasMoving) StrideCycles += Mathf.Repeat(now.normalizedTime - _lastNorm, 1f);
+        _lastNorm = now.normalizedTime;
+        _wasMoving = moving;
+        Striding = moving;
+    }
+
     /// <summary>
     /// What the body acts out this frame. Read from the player's own parts; the kick's
     /// calibration (FPSKit > Player > Build Body) sets it instead.
@@ -270,7 +300,7 @@ public class PlayerBody : MonoBehaviour
         // at the clips' own size.
         Vector3 v = _d.velocity;
         v.y = 0f;
-        Vector3 local = transform.InverseTransformDirection(v) / Mathf.Max(0.1f, _body.lossyScale.x);
+        Vector3 local = transform.InverseTransformDirection(v) / Mathf.Max(0.1f, _body.lossyScale.x) * S.LegPaceAt(v.magnitude);
         _anim.SetFloat(MoveX, local.x, 0.12f, dt);
         _anim.SetFloat(MoveZ, local.z, 0.12f, dt);
         float speed = local.magnitude;
@@ -326,6 +356,7 @@ public class PlayerBody : MonoBehaviour
 
     void LateUpdate()
     {
+        if (_anim != null && !previewing) CountStride();
         if (_anim == null || _cam == null || previewing) return;
         LateTick(Mathf.Max(1e-4f, Time.deltaTime));
     }

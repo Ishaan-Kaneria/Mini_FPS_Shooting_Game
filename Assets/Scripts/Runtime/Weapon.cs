@@ -246,6 +246,25 @@ public class Weapon : MonoBehaviour
 
     const float DrawSeconds = 0.45f;
     float _drawStart = -99f;
+
+    /// <summary>0 as the gun starts coming up from below the frame, 1 once it is up.</summary>
+    public float DrawProgress => Mathf.Clamp01((Time.time - _drawStart) / DrawSeconds);
+
+    /// <summary>How far the gun is into the sprint's carry, eased (0 at the ready); quick to leave when firing out of a sprint.</summary>
+    public float SprintPose => UITheme.EaseOut(_sprintPose) * (1f - AimProgress);
+
+    /// <summary>
+    /// The first-person clips (<see cref="FirstPersonClips"/>, played by <see cref="ViewModelRig"/>) move this gun:
+    /// the procedural reload, sprint carry and draw stand down, and the reload's sounds land on the clip's beats.
+    /// </summary>
+    public bool UsesClips => HasArms && FirstPersonClips.Active != null;
+
+    FirstPersonClips.Track ReloadTrack => !UsesClips ? null : ReloadIsEmpty ? FirstPersonClips.Active.reloadEmpty : FirstPersonClips.Active.reload;
+
+    /// <summary>Where in the reload the magazine leaves, is seated and the bolt is run, as shares of it: the clip's when it has them.</summary>
+    public float MagOutBeat => ReloadTrack != null && ReloadTrack.magOut > 0f ? ReloadTrack.magOut : MagOutAt;
+    public float MagInBeat => ReloadTrack != null && ReloadTrack.magIn > MagOutBeat ? ReloadTrack.magIn : MagInAt;
+    public float BoltBeat => ReloadTrack != null && ReloadTrack.bolt > MagInBeat ? ReloadTrack.bolt : ReloadTrack != null ? Mathf.Lerp(MagInBeat, 1f, 0.45f) : BoltAt;
     float _sprintPose;
     bool _raiseFast;
 
@@ -657,13 +676,14 @@ public class Weapon : MonoBehaviour
             // Each sound on its beat of the animation (see ReloadPose), so a longer or an
             // upgraded reload stretches both together and the click is always the moment
             // the magazine seats.
-            yield return new WaitForSeconds(length * MagOutAt);
+            float magOut = MagOutBeat, magIn = MagInBeat, bolt = BoltBeat;
+            yield return new WaitForSeconds(length * magOut);
             PlayClip(data.reloadOutClip, 0.85f);
-            yield return new WaitForSeconds(length * (MagInAt - MagOutAt));
+            yield return new WaitForSeconds(length * (magIn - magOut));
             PlayClip(data.reloadInClip, 0.95f);
-            yield return new WaitForSeconds(length * (BoltAt - MagInAt));
+            yield return new WaitForSeconds(length * (bolt - magIn));
             if (ReloadIsEmpty) PlayClip(data.reloadBoltClip, 1f);
-            yield return new WaitForSeconds(length * (1f - BoltAt));
+            yield return new WaitForSeconds(length * (1f - bolt));
         }
 
         int needed = MagazineSize - CurrentAmmo;
@@ -852,6 +872,9 @@ public class Weapon : MonoBehaviour
         float drawn = Mathf.Clamp01((Time.time - _drawStart) / DrawSeconds);
         float down = 1f - UITheme.EaseOut(drawn);
 
+        // With the first-person clips the rig plays the draw itself (the sprint's carry stays this one: the
+        // pack's swings the rifle flat across the body, a game's pose, not a soldier's).
+        if (UsesClips) down = 0f;
         Vector3 poseOffset = new Vector3(-0.07f, -0.05f, -0.04f) * sprint + new Vector3(0.02f, -0.28f, -0.08f) * down;
         Vector3 poseTurn = new Vector3(14f, -32f, 12f) * sprint + new Vector3(35f, -12f, 8f) * down;
 
@@ -883,7 +906,8 @@ public class Weapon : MonoBehaviour
         // fixing on what it is shooting at.
         bool focused = _motor != null && (_motor.IsCombatJogging || (Time.time - LastShotTime < 0.4f && _motor.PlanarSpeed01 > 0.3f));
         float sprintFov = running ? baseFov * 1.06f : focused ? baseFov * 0.95f : baseFov;
-        float targetFov = Mathf.Lerp(sprintFov, GameSettings.VerticalFovFor(data.adsFieldOfView, aspect), AimProgress);
+        float eased = AimProgress * AimProgress * (3f - 2f * AimProgress);   // the zoom eases in and out with the gun
+        float targetFov = Mathf.Lerp(sprintFov, GameSettings.VerticalFovFor(data.adsFieldOfView, aspect), eased);
 
         fpsCamera.fieldOfView = Mathf.Lerp(fpsCamera.fieldOfView, targetFov,
                                            Mathf.Clamp01(data.adsSpeed * Time.deltaTime));
@@ -1000,7 +1024,7 @@ public class Weapon : MonoBehaviour
     // The reload, drawn
     // ======================================================================
 
-    /// <summary>Where in the reload each sound lands, as a share of it.</summary>
+    /// <summary>Where in the reload each sound lands, as a share of it, without the first-person clips.</summary>
     const float MagOutAt = 0.16f, MagInAt = 0.6f, BoltAt = 0.78f;
 
     /// <summary>
@@ -1024,6 +1048,9 @@ public class Weapon : MonoBehaviour
             ResetReloadParts();
             return;
         }
+
+        // The rig plays the reload's clip and moves the magazine and the hand with it.
+        if (UsesClips) return;
 
         // The tilt: in quickly, held, out at the end.
         float tilt = p < 0.14f ? UITheme.EaseOut(p / 0.14f)

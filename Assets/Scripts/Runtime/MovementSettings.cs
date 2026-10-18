@@ -50,10 +50,13 @@ public class MovementSettings : ScriptableObject
     [Range(0f, 1f)] public float sprintAgainAt = 0.3f;
 
     [Header("Steps (the view's own motion on them is EyeCameraSettings')")]
-    [Tooltip("Metres a step covers at a jog; the footsteps and the bob both follow it.")]
+    [Tooltip("Metres a step covers at a walk, when the steps are counted by distance (no body); the footsteps and the bob both follow it.")]
     [Range(0.4f, 1.5f)] public float stepLength = 0.78f;
-    [Tooltip("Metres a step covers at a sprint.")]
+    [Tooltip("Metres a step covers at a sprint (unused: the step grows with speed, strideGrowth).")]
     [Range(0.6f, 2f)] public float sprintStepLength = 1.15f;
+    [Tooltip("Metres the step lengthens per metre a second faster than a walk: a run is long strides, " +
+             "not quick ones (about 3.5 steps a second at a jog, 4 at a sprint). Only without the body's legs.")]
+    [Range(0f, 0.4f)] public float strideGrowth = 0.19f;
 
     [Header("Handling")]
     [Tooltip("Reload time as a share of the gun's own. Under 1 is quicker.")]

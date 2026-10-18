@@ -21,14 +21,17 @@ namespace FPSKit.EditorTools
     /// - the bob, sway, roll and nod in each part (peak to peak), at 60 fps;
     /// - where the head is lowest after each footstep (share of a step);
     /// - the landing's dip and how long it takes to settle;
-    /// - the same script at 30 and 144 against 60: the largest difference in any part's bob and roll, which
-    ///   is how far the motion depends on the frame rate;
+    /// - the same script at 30 and 144 against 60: the largest difference in any part's bob and roll (RMS
+    ///   amplitude), which is how far the motion depends on the frame rate;
     /// - jitter: the camera's own acceleration in the player's space, frame to frame (99th percentile and
     ///   worst), which a frame-rate-dependent smoothing or a snap shows as a spike.
     ///
+    /// - the arms: the wrists against their places on the grip and handguard, and the gun's own jolts in the view;
+    /// - the legs: how fast a planted foot goes along the travel, walking, jogging and sprinting.
+    ///
     /// Fails if the bob does not grow from a careful step to a sprint, if aiming or crouching do not cut
-    /// it to under half of a walk, or if the 30 and 144 runs stray from the 60 one by more than
-    /// <see cref="MaxFrameRateDrift"/>.
+    /// it to under half of a walk, if the 30 and 144 runs stray from the 60 one by more than
+    /// <see cref="MaxFrameRateDrift"/>, if a hand leaves the gun, or if a planted foot slips over <see cref="MaxSlip"/>.
     ///
     ///   Tools/unity-batch.sh FPSKitBatch.VerifyEyeCam      (Build/EyeCam/report.txt)
     /// </summary>
@@ -38,6 +41,7 @@ namespace FPSKit.EditorTools
         const string Folder = "Build/EyeCam";
         const float Floor = 400f;
         const float MaxFrameRateDrift = 0.0015f;   // metres of a part's bob between frame rates
+        const float MaxSlip = 0.3f;                // metres a second a planted foot may go along the travel (median)
 
         public static bool Running { get; private set; }
 
@@ -58,7 +62,11 @@ namespace FPSKit.EditorTools
             new Part { name = "jump", seconds = 2f, jump = true },
         };
 
-        struct Sample { public float t; public int part; public Vector3 head; public float pitch, roll, phase; public bool grounded; }
+        struct Sample
+        {
+            public float t; public int part; public Vector3 head; public float pitch, roll, phase; public bool grounded;
+            public Vector3 gun, lFoot, rFoot, lToe, rToe, body; public float rightGap, leftGap, legsSpeed;
+        }
 
         static readonly Dictionary<int, List<Sample>> Runs = new Dictionary<int, List<Sample>>();
         static IEnumerator _script;
@@ -67,6 +75,9 @@ namespace FPSKit.EditorTools
         static GameObject _player, _floor;
         static PlayerMotor _motor;
         static Transform _cam;
+        static Animator _arms, _legs;
+        static ViewModelSpec _spec;
+        static Weapon _weapon;
         static LevelSet.Level _tunedLevel;
         static float _clockBackup = -1f, _rate = 60f;
         static string _error;
@@ -125,6 +136,9 @@ namespace FPSKit.EditorTools
             _player = GameObject.FindGameObjectWithTag("Player");
             _motor = _player.GetComponent<PlayerMotor>();
             _cam = Camera.main.transform;
+            _weapon = _player.GetComponentInChildren<Weapon>();
+            var body = _player.transform.Find("PlayerBody");
+            _legs = body != null ? body.GetComponentInChildren<Animator>() : null;
             _floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             _floor.name = "EyeCam_Floor";
             _floor.transform.position = new Vector3(0f, Floor - 0.5f, 0f);
@@ -161,8 +175,23 @@ namespace FPSKit.EditorTools
                     {
                         yield return null;
                         Vector3 head = _player.transform.InverseTransformPoint(_cam.position);
+                        if (_spec == null) _spec = _player.GetComponentInChildren<ViewModelSpec>();
+                        if (_arms == null) foreach (var a in _player.GetComponentsInChildren<Animator>(true)) if (a.name == "Arms") _arms = a;
+                        float rightGap = -1f, leftGap = -1f;
+                        if (_arms != null && _spec != null)
+                        {
+                            rightGap = Vector3.Distance(_arms.GetBoneTransform(HumanBodyBones.RightHand).position, _spec.rightHand.position);
+                            if (_weapon == null || !_weapon.IsReloading)
+                                leftGap = Vector3.Distance(_arms.GetBoneTransform(HumanBodyBones.LeftHand).position, _spec.leftHand.position);
+                        }
                         Vector3 e = (Quaternion.Inverse(_player.transform.rotation) * _cam.rotation).eulerAngles;
-                        samples.Add(new Sample { t = Time.time - start, part = p, head = head, pitch = Wrap(e.x), roll = Wrap(e.z), phase = _motor.StepPhase, grounded = _motor.IsGrounded });
+                        samples.Add(new Sample { t = Time.time - start, part = p, head = head, pitch = Wrap(e.x), roll = Wrap(e.z), phase = _motor.StepPhase, grounded = _motor.IsGrounded,
+                            gun = _spec != null ? _cam.InverseTransformPoint(_spec.transform.position) : Vector3.zero,
+                            lFoot = _legs != null ? _legs.GetBoneTransform(HumanBodyBones.LeftFoot).position : Vector3.zero,
+                            rFoot = _legs != null ? _legs.GetBoneTransform(HumanBodyBones.RightFoot).position : Vector3.zero,
+                            lToe = Toe(HumanBodyBones.LeftToes, HumanBodyBones.LeftFoot), rToe = Toe(HumanBodyBones.RightToes, HumanBodyBones.RightFoot),
+                            body = _player.transform.position, rightGap = rightGap, leftGap = leftGap,
+                            legsSpeed = _legs != null ? new Vector3(_legs.velocity.x, 0f, _legs.velocity.z).magnitude : 0f });
                     }
                 }
                 MobileInput.Reset();
@@ -171,6 +200,13 @@ namespace FPSKit.EditorTools
         }
 
         static float Wrap(float a) => a > 180f ? a - 360f : a;
+
+        static Vector3 Toe(HumanBodyBones toe, HumanBodyBones foot)
+        {
+            if (_legs == null) return Vector3.zero;
+            var t = _legs.GetBoneTransform(toe) ?? _legs.GetBoneTransform(foot);
+            return t.position;
+        }
 
         static float P2P(IEnumerable<float> v) { var l = v.ToList(); return l.Count == 0 ? 0f : l.Max() - l.Min(); }
 
@@ -221,22 +257,27 @@ namespace FPSKit.EditorTools
                 }
                 else lines.Add("  landing: no landing found");
 
-                // Frame rate: every part's bob and roll at 30 and 144 against 60 (the jump's arc is the controller's, not the view's).
+                // Frame rate: every part's bob and roll at 30 and 144 against 60, as an RMS amplitude (2.83 x the
+                // standard deviation, a sine's peak to peak): a peak to peak at 30 fps catches the true peak only
+                // now and then (the jump's arc is the controller's, not the view's).
+                float Amp(IEnumerable<float> v) { var l = v.ToList(); float m = l.Average(); return 2.83f * Mathf.Sqrt(l.Sum(x => (x - m) * (x - m)) / l.Count); }
                 foreach (int rate in new[] { 30, 144 })
                 {
                     var other = Runs[rate];
                     float drift = 0f, rollDrift = 0f;
+                    string worstPart = "";
                     for (int p = 0; p < Script.Length; p++)
                     {
-                        if (Script[p].jump || Script[p].name == "standing again") continue;   // the controller's own arc and rise
+                        if (Script[p].jump || Script[p].name == "standing again") continue;
                         List<Sample> Last2(List<Sample> r) { float end = r.Where(x => x.part == p).Max(x => x.t); return r.Where(x => x.part == p && x.t > end - 2f).ToList(); }
                         var a = Last2(r60); var b = Last2(other);
-                        drift = Mathf.Max(drift, Mathf.Abs(P2P(a.Select(x => x.head.y)) - P2P(b.Select(x => x.head.y))));
-                        rollDrift = Mathf.Max(rollDrift, Mathf.Abs(P2P(a.Select(x => x.roll)) - P2P(b.Select(x => x.roll))));
+                        float d = Mathf.Abs(Amp(a.Select(x => x.head.y)) - Amp(b.Select(x => x.head.y)));
+                        if (d > drift) { drift = d; worstPart = Script[p].name; }
+                        rollDrift = Mathf.Max(rollDrift, Mathf.Abs(Amp(a.Select(x => x.roll)) - Amp(b.Select(x => x.roll))));
                     }
                     bool same = drift <= MaxFrameRateDrift;
                     ok &= same;
-                    lines.Add($"  {rate} fps against 60: a part's bob differs by at most {drift * 1000f:0.0} mm, its roll by {rollDrift:0.00} deg{(same ? "" : "  <-- FAIL")}");
+                    lines.Add($"  {rate} fps against 60: a part's bob differs by at most {drift * 1000f:0.0} mm ({worstPart}), its roll by {rollDrift:0.00} deg{(same ? "" : "  <-- FAIL")}");
                 }
 
                 // Jitter: the head's acceleration in the player's space, frame to frame.
@@ -257,6 +298,109 @@ namespace FPSKit.EditorTools
                     acc.Sort();
                     lines.Add($"  jitter at {rate,3} fps: head acceleration 99th percentile {acc[(int)(0.99f * (acc.Count - 1))],6:0.00} m/s², worst {acc[acc.Count - 1],6:0.00} m/s² in '{Script[worstPart].name}' ({r.Count} frames)");
                 }
+            }
+
+            if (ok)
+            {
+                // The hands on the gun: the wrists against their places on the grip and the handguard.
+                var all60 = Runs[60];
+                float right = all60.Max(x => x.rightGap), left = all60.Where(x => x.leftGap >= 0f).DefaultIfEmpty().Max(x => x.leftGap);
+                var leftWorst = all60.Where(x => x.leftGap >= 0f).OrderByDescending(x => x.leftGap).FirstOrDefault();
+                // The left arm is a little short of its place on the handguard at rest (the hand sits further back on
+                // it, as built): the clips may not take it further off than standing does, by more than 15 mm.
+                float rest = all60.Where(x => x.part == 0 && x.leftGap >= 0f).Select(x => x.leftGap).DefaultIfEmpty(0f).Max();
+                bool held = right >= 0f && right < 0.01f && left < rest + 0.015f;
+                ok &= held;
+                lines.Add($"  hands on the gun (60 fps, the whole script): right wrist at most {right * 1000f:0.0} mm off the grip, left at most {left * 1000f:0.0} mm off its place on the handguard (standing {rest * 1000f:0.0}) (in '{Script[leftWorst.part].name}' at {leftWorst.t:0.00} s){(held ? "" : "  <-- FAIL")}");
+
+                lines.Add("    left hand off the handguard, worst per part: " + string.Join(", ", Enumerable.Range(0, Script.Length).Select(p =>
+                    $"{Script[p].name} {all60.Where(x => x.part == p && x.leftGap >= 0f).Select(x => x.leftGap).DefaultIfEmpty(0f).Max() * 1000f:0}")) + " mm");
+                // Around the left hand's worst moment, frame by frame (for finding what pulled it off).
+                int wi = all60.IndexOf(leftWorst);
+                for (int i = Mathf.Max(0, wi - 6); i < Mathf.Min(all60.Count, wi + 4); i++)
+                    lines.Add($"    t {all60[i].t:0.000} gun {all60[i].gun.ToString("F3")} left {all60[i].leftGap * 1000f:0.0} mm right {all60[i].rightGap * 1000f:0.0} mm phase {all60[i].phase:0.00}");
+
+                // The gun in the view, frame to frame: its own acceleration against the camera.
+                foreach (int rate in new[] { 30, 60, 144 })
+                {
+                    var r = Runs[rate];
+                    var acc = new List<float>();
+                    float gw = 0f; Sample gs = default;
+                    for (int i = 1; i < r.Count - 1; i++)
+                    {
+                        if (r[i - 1].part != r[i + 1].part) continue;
+                        float h = r[i].t - r[i - 1].t, h2 = r[i + 1].t - r[i].t;
+                        if (h <= 0f || h2 <= 0f) continue;
+                        float a = (((r[i + 1].gun - r[i].gun) / h2 - (r[i].gun - r[i - 1].gun) / h) / (0.5f * (h + h2))).magnitude;
+                        acc.Add(a);
+                        if (a > gw) { gw = a; gs = r[i]; }
+                    }
+                    acc.Sort();
+                    if (rate == 60)
+                    {
+                        int gi = r.IndexOf(gs);
+                        for (int i = Mathf.Max(0, gi - 4); i < Mathf.Min(r.Count, gi + 4); i++)
+                            lines.Add($"    t {r[i].t:0.000} gun {r[i].gun.ToString("F4")} head {r[i].head.ToString("F3")}");
+                    }
+                    lines.Add($"  the gun in the view at {rate,3} fps: acceleration 99th percentile {acc[(int)(0.99f * (acc.Count - 1))],6:0.00} m/s², worst {acc[acc.Count - 1],6:0.00} m/s² ('{Script[gs.part].name}' at {gs.t:0.00} s)");
+                }
+
+                // The feet: the lower (planted) foot's speed over the ground against the body's, walking, jogging, sprinting.
+                if (_legs != null)
+                    foreach (string gait in new[] { "walk", "jog", "sprint" })
+                    {
+                        int p = Array.FindIndex(Script, x => x.name == gait);
+                        var w = all60.Where(x => x.part == p).ToList();
+                        float end = w.Max(x => x.t);
+                        w = w.Where(x => x.t > end - 2f).ToList();
+                        var slide = new List<float>(); var toeSlide = new List<float>(); var speed = new List<float>();
+                        void Planted(System.Func<Sample, Vector3> at, List<float> into)
+                        {
+                            float low = w.Min(x => at(x).y);
+                            for (int i = 1; i < w.Count; i++)
+                            {
+                                float h = w[i].t - w[i - 1].t;
+                                Vector3 a = at(w[i - 1]), b = at(w[i]);
+                                // Planted: within 2 cm of its lowest over the window, now and a frame ago.
+                                if (h <= 0f || a.y > low + 0.02f || b.y > low + 0.02f) continue;
+                                Vector3 d = b - a; d.y = 0f;
+                                into.Add(d.magnitude / h);
+                            }
+                        }
+                        Planted(x => x.lFoot, slide); Planted(x => x.rFoot, slide);
+                        // Which way a planted ankle goes, along the body's travel (+ ahead with it: the legs too slow).
+                        var along = new List<float>();
+                        foreach (bool lf in new[] { true, false })
+                        {
+                            float low = w.Min(x => (lf ? x.lFoot : x.rFoot).y);
+                            for (int i = 1; i < w.Count; i++)
+                            {
+                                float h = w[i].t - w[i - 1].t;
+                                Vector3 a = lf ? w[i - 1].lFoot : w[i - 1].rFoot, b = lf ? w[i].lFoot : w[i].rFoot;
+                                if (h <= 0f || a.y > low + 0.02f || b.y > low + 0.02f) continue;
+                                Vector3 dir = w[i].body - w[i - 1].body; dir.y = 0f;
+                                if (dir.sqrMagnitude < 1e-8f) continue;
+                                along.Add(Vector3.Dot(b - a, dir.normalized) / h);
+                            }
+                        }
+                        along.Sort();
+                        if (along.Count > 0 && Mathf.Abs(along[along.Count / 2]) > MaxSlip) { ok = false; lines.Add($"  <-- FAIL: the {gait}'s planted foot slips over {MaxSlip} m/s along the travel"); }
+                        Planted(x => x.lToe, toeSlide); Planted(x => x.rToe, toeSlide);
+                        for (int i = 1; i < w.Count; i++)
+                        {
+                            float h = w[i].t - w[i - 1].t;
+                            if (h <= 0f) continue;
+                            Vector3 m = w[i].body - w[i - 1].body; m.y = 0f;
+                            speed.Add(m.magnitude / h);
+                        }
+                        if (slide.Count == 0) { lines.Add($"  feet, {gait}: no planted frames"); continue; }
+                        slide.Sort(); toeSlide.Sort();
+                        if (gait == "walk") lines.Add($"    legs: human scale {_legs.humanScale:0.000}, body scale {_legs.transform.lossyScale.x:0.000}");
+                        float legs = w.Average(x => x.legsSpeed);
+                        lines.Add($"    {gait}: the legs' clips carry the body {legs:0.00} m/s against its {speed.Average():0.00} m/s ({legs / Mathf.Max(0.01f, speed.Average()) * 100f:0}%)");
+                        lines.Add($"  feet, {gait}: while the body moves {speed.Average():0.00} m/s, a planted ankle moves {slide[slide.Count / 2]:0.00} m/s (median, {slide.Count} frames; it rolls over the foot) " +
+                                  $"and planted toes {(toeSlide.Count > 0 ? toeSlide[toeSlide.Count / 2].ToString("0.00") : "-")} m/s ({toeSlide.Count} frames); the ankle along the travel {(along.Count > 0 ? along[along.Count / 2].ToString("+0.00;-0.00") : "-")} m/s");
+                    }
             }
 
             string report = (ok ? "eye camera test passed" : "eye camera test FAILED")

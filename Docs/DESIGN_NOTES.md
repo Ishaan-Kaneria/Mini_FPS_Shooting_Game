@@ -3115,3 +3115,38 @@ report_after.txt): bob up-down careful step / walk / jog / sprint 2.5 / 3.5 / 3.
 10.6 / 18.6 / 34.9 after; aimed walk 1.2, crouched 4.1 (before, crouched was over half a jog's); the head's
 low point 0.11 of a step after the footfall (before 0.65: mid-stride); landing 32 mm sprung back in 0.45 s
 (before 71 mm in one frame, the worst head acceleration 1732 m/s² at 144 fps; now 85).
+
+## The arms move like the pack's, on our own arms (2026-10-18, animation brief section 5)
+
+The Low Poly Shooter Pack (Free Sample) is used for its motion only. Its arms rig is the same Unreal
+mannequin skeleton as ours, but binding its clips to our bones would bring its proportions and its rifle's
+geometry with them; instead `FPSKitFirstPersonClips` samples each clip on its own rig (whose root is the camera)
+and stores what our view model can use (`FirstPersonClips`, Resources): the gun bone's turn and shift from the
+pack's idle (or aimed) pose re-expressed about the right hand's grip, and the left hand's path on the gun.
+`ViewModelRig.PlayClips` plays them about our own grip and the IK keeps both hands on our gun:
+
+- the walk's swing for walking, jogging and firing on the move (bigger with speed), the aimed walk's down the
+  sights, the sprint's swing on our own sprint carry; all on the footsteps, the gun lowest 0.07 of a step after
+  the head (the arms carried by the body, a moment late), and the idle's breathing standing still;
+- the arc between hip and sights, scaled to the gun's own aim time (the pack's 0.5 s arc squeezed into our
+  0.08 s was a jolt);
+- every shot's kick played to its end and summed, so a burst never jumps back to the start;
+- the reload stretched over the gun's reload time, the left hand on the pack's path, the magazine taken into
+  the palm as it leaves the well and seated again on the pack's own beats (out 0.16, seated 0.55; the empty
+  reload's bolt at 0.63), which the reload sounds now use;
+- the draw from below the frame.
+
+Two of the pack's poses are a game's, not a soldier's, and are not used as they are: its sprint swings the rifle
+flat across the body, muzzle left (our own low carry stays, with its swing on top), and its reload lifts the
+muzzle some 60 degrees (played at 40%, `reloadTurn`). The samples are joined by a Catmull-Rom curve: straight
+lines between 30 Hz samples turned the motion in a corner every 33 ms, which showed at 144 fps.
+
+Also: `WeaponSway` measured the look in degrees a frame (at 120 fps the gun swung half as far as at 60) and
+smoothed with `Clamp01(k dt)`; it now uses the turn rate and an exponential, and the head's bob reaches the
+gun through a spring (`headLag`). The aim's pose and zoom ease in and out (the aim's progress is a straight
+ramp). The footsteps come off the legs' own clips (`PlayerBody.StrideCycles`): about 4 steps a second at a jog
+where the distance count gave 7.7. The legs' clips are asked for `PlayerBodySettings.legPace` of the body's
+speed (1.17 walking, 0.92 jogging, 0.81 sprinting): their feet do not move at their measured speeds, and a
+planted foot slid back 1.1 m/s at a jog and 1.9 at a sprint; now -0.19, +0.01 and +0.08 m/s along the travel.
+The left arm is about 78 mm short of its place on the handguard at rest (as built: the hand sits further back on
+it); the clips add at most 13 mm to that.

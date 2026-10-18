@@ -37,6 +37,15 @@ public class PlayerBodySettings : ScriptableObject
     [Range(0f, 0.6f)] public float lookDownBack = 0.22f;
     [Tooltip("Metres a second the forward sprint clip moves at, at the body's size (measured by the builder).")]
     [Min(0.5f)] public float sprintClipSpeed = 6.8f;
+    [Tooltip("Share of the body's speed the legs' movement clips are asked for, at a walk (3 m/s), a jog (6) and a sprint " +
+             "(9.5), blended between. The clips' feet do not move at their measured speeds (the planted foot slid forward " +
+             "at a walk and back 18-20% at a jog and a sprint, FPSKitEyeCamTest); these put it back under the body.")]
+    public Vector3 legPace = new Vector3(1.17f, 0.92f, 0.81f);
+
+    /// <summary>The legs' pace at a speed, metres a second: <see cref="legPace"/> blended between walk, jog and sprint.</summary>
+    public float LegPaceAt(float speed) => speed <= 3f ? legPace.x
+        : speed <= 6f ? Mathf.Lerp(legPace.x, legPace.y, (speed - 3f) / 3f)
+        : Mathf.Lerp(legPace.y, legPace.z, Mathf.Clamp01((speed - 6f) / 3.5f));
     [Tooltip("Degrees the body leans back for a kick (around its feet), which lifts the kicking leg into view.")]
     [Range(0f, 30f)] public float kickLean = 14f;
     [Tooltip("Degrees right of the crosshair the boot lands, so at the moment of the kick it is beside the " +

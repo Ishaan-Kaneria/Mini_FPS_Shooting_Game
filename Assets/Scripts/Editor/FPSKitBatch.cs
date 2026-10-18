@@ -327,6 +327,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void VerifyEyeCam() => FPSKitEyeCamTest.Batch();
 
+        /// <summary>The Low Poly Shooter Pack's first-person motion baked for our arms (Resources/FirstPersonClips). Build/FirstPersonClips.</summary>
+        public static void BakeFirstPersonClips() => Run(FPSKitFirstPersonClips.Bake);
+
         /// <summary>Writes any missing tuning asset under FPSKit_Generated/Resources (FPSKit > Settings > Ensure Runtime Settings).</summary>
         public static void EnsureRuntimeSettings() => Run(FPSKitRuntimeSettings.Ensure);
 

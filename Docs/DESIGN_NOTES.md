@@ -2987,3 +2987,68 @@ view; the whole minimap now goes dark.
 - **First-person arms**: the right hand at the hip sat below the arms camera's view (hip carry raised
   and moved out); the pack's bare-armed mesh under the gloved one showed through as white patches;
   the gloves are the dark skin. Running uses keyframed stride clips (`FirstPersonMoves`) on the footsteps.
+
+## A strike never moves the player, and a blow is heard only when it lands (2026-10-18, combat audit Part A)
+
+Ishaan: "attacking must never move the player by itself ... my movement comes only from my movement
+input." Everything below is measured by a batch check named after it.
+
+- **No lunge.** A strike with an enemy within 3.6 m stepped the player up to 2.2 m in
+  (`PlayerMotor.Lunge`), on top of walking: ~200 mm in the throw's first frame, 0.52-0.92 m in all.
+  The lunge is gone (method, settings and the reach it added to the target search). The reach is the
+  arm's or the leg's, drawn by the view model and the body; the body does not slide. Pad and touch keep
+  the magnetism, a turn of the view only (`MeleeSettings.magnetism`); a mouse never gets it.
+  `VerifyMeleeMotion` throws butt, punch, double punch, kick, fire and butt-then-fire, standing,
+  walking, jogging and sprinting, with and without a target, on a flat floor of its own: no frame may
+  move the body further (and forward) than the motor's own velocity. It must run on a floor of its own:
+  on an arena's ground kerbs and seams make the controller step further than its velocity, and earlier
+  trials' dropped rifles lie in the way.
+- **Walking into a standing enemy does not climb it.** The controller stepped onto a reeling body's
+  hitboxes (0.42 m up) and the old slide-off then pushed the player, sometimes forward. While touching a
+  living, standing enemy the controller takes no steps, and on top of one it slides off along the
+  contact's own slope. Bodies on the ground, alive or dead, are stepped over as before: corpses must
+  never become walls.
+- **Impact is decided at impact.** Line of sight is asked again as the blow lands, with the target
+  search's masks, and the reach then is the strike's range plus `impactTolerance` (0.25 m, a target
+  stepping back during the swing) -- it was +1.2 m, room for the lunge.
+- **Three events, not one.** `AttackStarted` (the swing, with whom it is aimed at), `Landed` (the
+  contact frame, with whom it hit) and `Missed` (the moment it would have landed). `PlayerNoise` makes a
+  3 m movement whoosh on a swing and the 14 m Violence noise only on `Landed`: a miss is not a blow.
+- **Nothing waits through a pause.** A press queued during a recovery is dropped whenever strikes are
+  not possible: game time stands still in a pause, so the queue's 0.4 s never ran out and the press
+  fired on unpause.
+- **A crowd does not hide the target.** Every enemy is a dozen or more hitboxes; the 32-collider
+  overlap buffer filled with two or three bodies near and could leave out the one under the crosshair.
+  It doubles while full (the test has 112 enemy colliders in reach). `VerifyMeleeRules` covers these
+  four; with the old rules put back, five of its checks fail.
+- **`kickKnockback` is the fallback shove.** A kicked body that cannot fly (no ragdoll, or already on
+  its way up) is driven back that far (`EnemyAI.Knock`'s fallback, which used a hard-coded distance).
+- **The kick lands beside the face.** Leaned back 14 degrees and turned onto the crosshair, the boot
+  covered over half of the enemy for five frames around impact. `kickLean` 8 and `kickAside` 8 (the boot
+  lands 8 degrees right of the crosshair; the blow still goes to whoever is under it): no frame over
+  half. `VerifyKickView` renders each frame three ways to measure it (needs `UNITY_GRAPHICS=1`).
+
+### Dropped guns lie on what is drawn (`GunColliders`)
+
+One box round all of a gun's meshes is its outline seen down three axes: the AK on its right side lay
+on the plane of its bolt handle, 2 cm out from the receiver, and hung over the ground on a shelf nobody
+could see; the plain body's fixed box floated it 15-59 mm or sank the magazine 112 mm. Boxes per part
+were still wrong in kind (a box lies on a face where the gun touches along ridges). Now: convex hulls
+of each visible part's own vertices, a long part cut into 10 cm lengths first; the rigidbody's centre
+of mass comes from them; swept CCD (speculative let thin hulls sink 42 mm into a terrain heightfield),
+set back to speculative before the body goes kinematic. `VerifyGunDrop`: rigged and plain bodies,
+concrete, a mesh collider, terrain, 15/26-degree slopes, six orientations; the lowest drawn point and
+the main part within 1 cm, the centre of mass over the drawn contacts, no jitter.
+
+### Get-ups, frame by frame (`VerifyGetUp`)
+
+Sample once per *game* frame: the limb test sampled once per editor tick, and two ticks on one frame
+read as a stop then a double step. The root is not drawn: the hand-over moves it under the pelvis
+(metres) and `AlignRise` turns it (up to 180 degrees) on purpose, which is what the "12.7 m pelvis
+step / 180-degree root" readings were; judge the pelvis and the bones. The real pops were all after the
+clip, at the hand-back: the look point jumping (the head now turns at most 240 degrees a second and
+does not whip across behind the shoulder), overlays switched on at full weight (eased in over 0.35 s),
+`RecoverPose`'s sine envelope (steepest at its start; now sine squared), and the pick-up's hand letting
+go of the rifle for a frame. GetUp_Stomach_Zombie's own right-arm swing exceeds 25 degrees/frame at fast
+rise speeds; the probe proves such frames are the clip's by sampling the clip alone at the same times,
+and renders it (`zombie_arm_sheet.png`) to be judged by eye. The 25-degree bar is unchanged.

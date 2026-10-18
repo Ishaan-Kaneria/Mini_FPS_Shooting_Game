@@ -705,7 +705,11 @@ public class EnemyBody : MonoBehaviour
         }
         float span = Mathf.Max(0.05f, _recoverEnd - _recoverStart);
         float t = (Time.time - _recoverStart) / span;
-        float w = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);   // in and out
+        // In and out with no kick at either end: a plain sine starts at its steepest, and over a
+        // short recovery that put half the hand-to-knee reach on in one frame (a 27-degree snap of
+        // the left arm as the get-up ended, FPSKitGetUpProbe).
+        float w = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);
+        w *= w;
         if (_hips == null) return;
         Turn(_spine, transform.right, 16f * w);
         Turn(_chest, transform.right, 8f * w);
@@ -1076,6 +1080,9 @@ public class EnemyBody : MonoBehaviour
     // Posing, after the animation
     // ======================================================================
 
+    float _armsUp = 1f;
+    const float ArmsEaseSeconds = 0.35f;
+
     void LateUpdate()
     {
         if (_hips == null) return;
@@ -1115,7 +1122,11 @@ public class EnemyBody : MonoBehaviour
             // Stage 2's hold: the rifle rides in the right hand (EnemyRifle), the left hand and
             // the aim are the rig's, evaluated with the animation. Here only their weights and
             // targets, and the overlays on top.
-            float arms = (_down == Down.Up ? 1f : 0f) * (1f - _actionWeight);
+            // Eased in once it is up, not switched on: the pain pose, the clutch, the hurt arms and
+            // the look all came on in one frame as the get-up ended (a 32-degree arm snap, measured
+            // by FPSKitGetUpProbe).
+            _armsUp = _down == Down.Up ? Mathf.MoveTowards(_armsUp, 1f, Time.deltaTime / ArmsEaseSeconds) : 0f;
+            float arms = Smooth(_armsUp) * (1f - _actionWeight);
             float hurt = PainWeight();
             PainPose(hurt * arms);
             RecoverPose();
@@ -1206,11 +1217,17 @@ public class EnemyBody : MonoBehaviour
         Turn(_chest, side, _aimPitch * 0.45f);
 
         // The head: whatever the chest has not already turned, quickly, within a neck's reach.
-        float headYaw = Mathf.Clamp(Vector3.SignedAngle(Flat(transform.forward), Flat(look - eye), Vector3.up) - _aimYaw, -70f, 70f);
+        // Never faster than a neck turns, and a point behind the shoulder keeps the head on the side
+        // it is already turned to: the mind's look point jumps (a scan, the last-known place, a new
+        // goal) and the head used to follow it in a frame, 32 to 53 degrees, or whip from one
+        // shoulder to the other as the point crossed behind (FPSKitGetUpProbe).
+        float rawYaw = Vector3.SignedAngle(Flat(transform.forward), Flat(look - eye), Vector3.up) - _aimYaw;
+        if (Mathf.Abs(rawYaw) > 110f && Mathf.Abs(_headYaw) > 5f && Mathf.Sign(rawYaw) != Mathf.Sign(_headYaw)) rawYaw = Mathf.Sign(_headYaw) * 70f;
+        float headYaw = Mathf.Clamp(rawYaw, -70f, 70f);
         float headPitch = Mathf.Clamp(-Elevation(look - eye) - _aimPitch, -40f, 40f);
         float lookWeight = weight * (crawling ? 0.6f : 1f);
-        _headYaw = Mathf.Lerp(_headYaw, headYaw * lookWeight, 1f - Mathf.Exp(-dt * 9f));
-        _headPitch = Mathf.Lerp(_headPitch, headPitch * lookWeight * 0.7f, 1f - Mathf.Exp(-dt * 9f));
+        _headYaw = Mathf.MoveTowards(_headYaw, Mathf.Lerp(_headYaw, headYaw * lookWeight, 1f - Mathf.Exp(-dt * 9f)), HeadTurnRate * dt);
+        _headPitch = Mathf.MoveTowards(_headPitch, Mathf.Lerp(_headPitch, headPitch * lookWeight * 0.7f, 1f - Mathf.Exp(-dt * 9f)), HeadTurnRate * 0.7f * dt);
         Turn(_neck, Vector3.up, _headYaw * 0.4f);
         Turn(_head, Vector3.up, _headYaw * 0.6f);
         Vector3 headSide = Quaternion.AngleAxis(_aimYaw + _headYaw, Vector3.up) * transform.right;
@@ -1218,6 +1235,9 @@ public class EnemyBody : MonoBehaviour
     }
 
     float _aimYaw, _aimPitch, _headYaw, _headPitch;
+
+    /// <summary>Degrees a second the look turns the head at most: brisk, but a turn, never a snap.</summary>
+    const float HeadTurnRate = 240f;
 
     /// <summary>On the ground, alive: the chest rises and falls, faster and deeper in pain.</summary>
     void Breathe()

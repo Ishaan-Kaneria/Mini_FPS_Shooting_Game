@@ -300,6 +300,13 @@ namespace FPSKit.EditorTools
         public static void VerifyGunDrop() => FPSKitGunDropTest.Batch();
 
         /// <summary>
+        /// The get-up, frame by frame: one enemy kicked over and over (10 falls; -fpskitFalls N for
+        /// more), sampled once per game frame, failing on any bone, pelvis or root pop that is not the
+        /// clip's own motion. Report in Build/GetUpProbe/report.txt.
+        /// </summary>
+        public static void VerifyGetUp() => FPSKitGetUpProbe.Batch();
+
+        /// <summary>
         /// Wounds, blood, voices and deaths: a leg shot limps then floors an enemy, a gun
         /// arm shot disarms it, a headshot kills a grunt and not a boss, a kill ragdolls
         /// the body the way the killing hit says.

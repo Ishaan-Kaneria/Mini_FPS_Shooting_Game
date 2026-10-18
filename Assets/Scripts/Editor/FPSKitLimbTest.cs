@@ -78,6 +78,14 @@ namespace FPSKit.EditorTools
         [MenuItem("FPSKit/Enemy AI/Run Limb Test (Falls Only)")]
         public static void RunFalls() => Run(true);
 
+        /// <summary>
+        /// Batch entries, exiting with the result: Tools/unity-batch.sh FPSKit.EditorTools.FPSKitLimbTest.BatchFalls
+        /// (or .Batch for the whole test). Report in Build/LimbTest/report.txt.
+        /// </summary>
+        public static void BatchFalls() { _exitWhenDone = true; _poseOnly = false; Run(true); }
+        public static void Batch() { _exitWhenDone = true; _poseOnly = false; Run(false); }
+        static bool _exitWhenDone;
+
         public static void Run(bool fallsOnly)
         {
             _fallsOnly = fallsOnly;
@@ -96,9 +104,12 @@ namespace FPSKit.EditorTools
             _aMoveTime = 0f; _aMoveDist = 0f;
             FPSKitPlayMode.SuspendStartScene();
             _realStart = EditorApplication.timeSinceStartup;
+            _watchedFrame = -1;
             Running = true;
             EditorApplication.update += Tick;
         }
+
+        static int _watchedFrame = -1;
 
         static void Note(string s) { _log.AppendLine(s); }
         static void Require(bool ok, string what) { Note((ok ? "  PASS  " : "  FAIL  ") + what); if (!ok) _fails.Add(what); }
@@ -122,6 +133,10 @@ namespace FPSKit.EditorTools
                         _step = 2;
                         return;
                     case 2:
+                        // Once per game frame: two editor ticks on one frame read as a stop and then
+                        // a double step, a "pop" of the sampling rather than the body (FPSKitGetUpProbe).
+                        if (Time.frameCount == _watchedFrame) return;
+                        _watchedFrame = Time.frameCount;
                         Watch();
                         float t = Time.time - _t0;
                         while (_next < _script.Count && t >= _script[_next].at) _script[_next++].act();
@@ -576,6 +591,7 @@ namespace FPSKit.EditorTools
         {
             if (EditorApplication.isPlaying) { EditorApplication.delayCall += Restore; return; }
             FPSKitPlayMode.RestoreStartScene();
+            if (_exitWhenDone) { _exitWhenDone = false; FPSKitBatch.Exit(_fails.Count == 0 ? 0 : 1); return; }
             if (!string.IsNullOrEmpty(_returnTo) && _returnTo != FPSKitAITestScene.ScenePath)
                 EditorSceneManager.OpenScene(_returnTo, OpenSceneMode.Single);
         }

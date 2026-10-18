@@ -352,8 +352,13 @@ public class EnemyRifle : MonoBehaviour
         }
     }
 
-    /// <summary>The right hand goes to it where it hangs, then brings it up to the ready.</summary>
-    void StartBringUp()
+    /// <summary>
+    /// The right hand goes to it where it hangs, then brings it up to the ready. Already holding it
+    /// (crouched over it after walking to it), the hand stays on it and it comes straight up: the
+    /// reach used to start again from nothing, which dropped the arm back to the clip's pose and
+    /// swung it out again, 39 then 36 degrees in two frames (FPSKitGetUpProbe).
+    /// </summary>
+    void StartBringUp(bool handOnIt = false)
     {
         if (_joint != null) Destroy(_joint);
         if (_rb != null) { _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative; _rb.isKinematic = true; _rb.interpolation = RigidbodyInterpolation.None; }
@@ -362,9 +367,10 @@ public class EnemyRifle : MonoBehaviour
         _fromPos = transform.InverseTransformPoint(_gun.position);
         _fromRot = Quaternion.Inverse(transform.rotation) * _gun.rotation;
         State = Hold.Recovering;
-        _phase = 0;
+        _phase = handOnIt ? 1 : 0;
         _phaseStart = Time.time;
-        _reach = 0f;
+        _reach = handOnIt ? 1f : 0f;
+        if (handOnIt && _motor != null) _motor.ForceCrouch = false;
     }
 
     void PickUp()
@@ -382,7 +388,7 @@ public class EnemyRifle : MonoBehaviour
                 return;
             case 1:     // down, and the hand to it
                 if (Time.time - _phaseStart < 0.55f) return;
-                StartBringUp();
+                StartBringUp(handOnIt: true);
                 _recoverSeconds = Mathf.Max(_recoverSeconds, 0.6f);
                 return;
         }

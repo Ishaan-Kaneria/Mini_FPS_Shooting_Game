@@ -286,6 +286,13 @@ namespace FPSKit.EditorTools
         public static void VerifyCombat() => FPSKitCombatTest.VerifyCombat();
 
         /// <summary>
+        /// Attacking never moves the player: every strike and a burst of fire, standing,
+        /// walking, jogging and sprinting, with and without a target in reach, against the
+        /// motor's own velocity. Report in Build/MeleeMotion/report.txt.
+        /// </summary>
+        public static void VerifyMeleeMotion() => FPSKitMeleeMotionTest.Batch();
+
+        /// <summary>
         /// Wounds, blood, voices and deaths: a leg shot limps then floors an enemy, a gun
         /// arm shot disarms it, a headshot kills a grunt and not a boss, a kill ragdolls
         /// the body the way the killing hit says.

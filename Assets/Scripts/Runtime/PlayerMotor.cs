@@ -335,27 +335,52 @@ public class PlayerMotor : MonoBehaviour
     }
 
     int _enemyLayer = -2;
+    float _enemyContactUntil = -1f;
+    float _stepOffset = -1f;
 
     /// <summary>
-    /// Never standing on an enemy: the controller climbs anything under its step height, and an
-    /// enemy's leg and arm hitboxes are under it, so walking or lunging into one put the player on
-    /// its shoulders (and a punch then met nothing). Landing on top of one slides the player off,
-    /// away from its middle.
+    /// Never standing on a standing enemy: the controller climbs anything under its step height,
+    /// and an enemy's leg and arm hitboxes are under it, so walking into one put the player on its
+    /// shoulders (and a punch then met nothing). Two parts. While the player is touching one the
+    /// controller takes no steps at all (<see cref="HandleMove"/>), so walking into a body reeling
+    /// from a blow is blocked by it rather than carried up it (measured: 0.42 m of climb walking
+    /// into a punched enemy, then a push off it). And on top of one anyway (one thrown onto the
+    /// player) the player slides off along the contact's own slope -- away from the part touched,
+    /// not from the body's middle, which after a shove can be behind the player and slid it forward.
+    /// A body on the ground, alive or dead, is stepped over like anything else that low: corpses
+    /// stay where they fell and must never turn into walls.
     /// </summary>
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
         if (_enemyLayer == -2) _enemyLayer = LayerMask.NameToLayer("Enemy");
         if (_enemyLayer < 0 || hit.collider == null || hit.collider.gameObject.layer != _enemyLayer) return;
+        if (!StandingEnemy(hit.collider)) return;
+        _enemyContactUntil = Time.time + 0.25f;
         if (hit.normal.y < 0.5f) return;   // against its side, not on top of it
-        var body = hit.collider.attachedRigidbody != null ? hit.collider.transform.root : hit.collider.transform;
-        Vector3 off = transform.position - body.position;
-        off.y = 0f;
+
+        Vector3 off = new Vector3(hit.normal.x, 0f, hit.normal.z);
+        if (off.sqrMagnitude < 0.01f)
+        {
+            // Square on top: off the side away from its middle.
+            var body = hit.collider.attachedRigidbody != null ? hit.collider.transform.root : hit.collider.transform;
+            off = transform.position - body.position;
+            off.y = 0f;
+        }
         if (off.sqrMagnitude < 1e-4f) off = -transform.forward;
         // Applied after this frame's move (a Move from inside the controller's own callback recurses).
         _slideOff = off.normalized * (3f * Time.deltaTime) + Vector3.down * (2f * Time.deltaTime);
     }
 
     Vector3 _slideOff;
+
+    /// <summary>A living enemy on its feet, as opposed to a corpse or a body on the ground.</summary>
+    static bool StandingEnemy(Collider c)
+    {
+        var health = c.GetComponentInParent<Health>();
+        if (health == null || health.IsDead) return false;
+        var body = c.GetComponentInParent<EnemyBody>();
+        return body == null || !body.IsDown;
+    }
 
     // ======================================================================
     /// <summary>
@@ -673,33 +698,6 @@ public class PlayerMotor : MonoBehaviour
     /// </summary>
     public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount * GameSettings.CameraShake));
 
-    Vector3 _lunge;
-    float _lungeUntil;
-    float _lungeLeft;
-
-    /// <summary>
-    /// Carries the player a short way across the ground over a fraction of a second: the
-    /// step a punch or a kick takes into the target, so a strike thrown from just outside
-    /// reach still lands. Horizontal only, and through the controller's own Move, so it
-    /// stops at a wall or a body like walking does. A second call replaces the first.
-    /// </summary>
-    public void Lunge(Vector3 displacement, float seconds)
-    {
-        displacement.y = 0f;
-        _lunge = displacement;
-        _lungeLeft = Mathf.Max(0.01f, seconds);
-        _lungeUntil = Time.time + _lungeLeft;
-    }
-
-    /// <summary>This frame's share of the lunge, front-loaded so it reads as a step and not a slide.</summary>
-    Vector3 LungeStep()
-    {
-        if (Time.time >= _lungeUntil || _lungeLeft <= 0f) return Vector3.zero;
-        float remaining = (_lungeUntil - Time.time) / _lungeLeft;          // 1 at the start, 0 at the end
-        float share = Mathf.Clamp01(Time.deltaTime / _lungeLeft) * 2f * remaining;
-        return _lunge * share;
-    }
-
     /// <summary>
     /// Whether the sprint key itself is down *and* is allowed to carry the player
     /// forward on its own.
@@ -967,7 +965,15 @@ public class PlayerMotor : MonoBehaviour
         _velocity.y += gravity * Time.deltaTime;
 
         float impactSpeed = -_velocity.y;
-        CollisionFlags flags = _cc.Move(_velocity * Time.deltaTime + LungeStep());
+        // No stepping up while touching an enemy: its limbs are under the step height (see
+        // OnControllerColliderHit). Everything else steps as it always did.
+        if (_stepOffset < 0f) _stepOffset = _cc.stepOffset;
+        float stepOffset = Time.time < _enemyContactUntil ? 0f : _stepOffset;
+        if (_cc.stepOffset != stepOffset) _cc.stepOffset = stepOffset;
+
+        // Only the player's own movement moves the player: nothing is added here for a strike
+        // or a shot (the melee lunge that was is gone; VerifyMeleeMotion holds the rule).
+        CollisionFlags flags = _cc.Move(_velocity * Time.deltaTime);
 
         // Clipping the head on an overhang has to kill the upward velocity, or you
         // hang under the ceiling for the rest of the arc still travelling up.

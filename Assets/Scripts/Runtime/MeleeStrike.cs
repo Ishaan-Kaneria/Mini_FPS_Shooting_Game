@@ -27,9 +27,11 @@ using UnityEngine;
 /// body part the blow lands on. A target that has got away by then is missed.
 ///
 /// Reach is found, not aimed: whoever is closest to the crosshair within reach and a cone
-/// in front gets hit, as long as nothing solid is in between. A target just outside reach
-/// draws the player in a step (the lunge). On a pad or a touch screen the view is also
-/// pulled onto the target; never with a mouse, which is the aim-assist rule.
+/// in front gets hit, as long as nothing solid is in between. **A strike never moves the
+/// player**: the arm or the leg reaches, the body stays where the player's own movement
+/// puts it (it used to step up to 2.2 m in, which read as a surge; see DESIGN_NOTES, "A strike
+/// never moves the player"). On a pad or a touch screen the view is pulled onto the target;
+/// never with a mouse, which is the aim-assist rule.
 ///
 /// Stamina stops the keys being held down into a blender: every strike draws on it, and
 /// a winded player cannot throw until it comes back. The takedown is free.
@@ -92,8 +94,6 @@ public class MeleeStrike : MonoBehaviour
     public Vector3 buttStrikeSightsFace = new Vector3(-1f, 0.1f, 0f);
     [Tooltip("Metres from the model's pivot, at the receiver, back to the butt plate.")]
     [Range(0.1f, 0.5f)] public float buttLength = 0.25f;
-    [Tooltip("Degrees the view dips on the thrust: the body leaning into the blow.")]
-    [Range(0f, 5f)] public float buttLunge = 1.6f;
 
     // ======================================================================
 
@@ -184,7 +184,6 @@ public class MeleeStrike : MonoBehaviour
     bool _crossNext;
     float _lastStrikeTime = -99f;
     float _nextScan;
-    bool _lunged;
 
     float _holdUntil = -1f, _heldAt;
 
@@ -400,7 +399,6 @@ public class MeleeStrike : MonoBehaviour
         _strike = strike;
         _strikeStart = Time.time + delay;
         _strikeLength = length;
-        _lunged = false;
 
         float impact = _strikeStart + length * ImpactAt(strike);
         _nextStrike = strike == Strike.Kick || strike == Strike.Takedown
@@ -418,12 +416,12 @@ public class MeleeStrike : MonoBehaviour
 
         PlayClip(swingClip, strike == Strike.Kick ? 0.95f : 0.8f);
 
-        // The step in and the pull of the view happen now; the blow lands when the fist or
-        // the boot gets there (Animate), so what the eye sees and what the body feels are
-        // the same moment. A target that has got away by then is missed.
+        // The pull of the view happens now; the blow lands when the fist or the boot gets
+        // there (Animate), so what the eye sees and what the body feels are the same moment.
+        // A target that has got away by then is missed.
         if (target != null)
         {
-            Close(target, range);
+            Pull(target);
             _pendingTarget = target;
             _pendingStrike = strike;
             _pendingRange = range;
@@ -459,24 +457,15 @@ public class MeleeStrike : MonoBehaviour
         return false;
     }
 
-    /// <summary>The step in, and on a pad or a touch screen the pull of the view onto the target.</summary>
-    void Close(Health target, float range)
+    /// <summary>
+    /// On a pad or a touch screen, the pull of the view onto the target: a turn, never a step.
+    /// Nothing here moves the player (VerifyMeleeMotion measures it).
+    /// </summary>
+    void Pull(Health target)
     {
         var s = Settings;
-        Transform cam = fpsCamera.transform;
-        Vector3 point = ClosestPoint(target, cam.position, out _);
-
-        Vector3 flat = Vector3.ProjectOnPlane(point - cam.position, Vector3.up);
-        float distance = flat.magnitude;
-
-        if (_motor != null && s.lungeRange > 0f && distance > s.lungeStopDistance && distance <= Mathf.Max(range, s.lungeRange))
-        {
-            float step = Mathf.Min(distance - s.lungeStopDistance, s.lungeMaxStep);
-            if (step > 0.05f) _motor.Lunge(flat.normalized * step, s.lungeSeconds);
-        }
-
-        if (_motor != null && s.magnetism > 0f && GameInput.Scheme != InputScheme.KeyboardMouse)
-            _motor.TurnTowards(point, s.magnetism);
+        if (_motor == null || s.magnetism <= 0f || GameInput.Scheme == InputScheme.KeyboardMouse) return;
+        _motor.TurnTowards(ClosestPoint(target, fpsCamera.transform.position, out _), s.magnetism);
     }
 
     bool _tired;
@@ -572,8 +561,7 @@ public class MeleeStrike : MonoBehaviour
 
     /// <summary>
     /// The enemy nearest the crosshair within reach and the cone, with nothing solid
-    /// between the eye and it. Null when there is none. Reach includes the lunge: a
-    /// target the step will close on counts.
+    /// between the eye and it. Null when there is none.
     /// </summary>
     Health FindTarget(float range)
     {
@@ -588,7 +576,7 @@ public class MeleeStrike : MonoBehaviour
         }
 
         var s = Settings;
-        float reach = s.lungeRange > 0f ? Mathf.Max(range, Mathf.Min(s.lungeRange, range + s.lungeMaxStep)) : range;
+        float reach = range;
 
         Transform cam = fpsCamera.transform;
         Vector3 eye = cam.position;
@@ -873,12 +861,6 @@ public class MeleeStrike : MonoBehaviour
 
         weapon.HandsRotation = turn.eulerAngles;
         weapon.HandsOffset = offset;
-
-        if (!_lunged && k >= 0.3f)
-        {
-            _lunged = true;
-            // (No view lunge: the camera holds still for every strike.)
-        }
     }
 
     /// <summary>

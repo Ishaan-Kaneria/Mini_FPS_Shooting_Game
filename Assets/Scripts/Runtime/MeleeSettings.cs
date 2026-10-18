@@ -50,18 +50,11 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Degrees either side of the crosshair a target can be and still be hit.")]
     [Range(10f, 80f)] public float coneDegrees = 45f;
 
-    [Header("Lunge")]
-    [Tooltip("A target this close draws the player in a step as the strike is thrown, so " +
-             "a punch from just outside reach still lands. 0 turns the lunge off.")]
-    [Range(0f, 5f)] public float lungeRange = 3.6f;
-    [Tooltip("How close the lunge brings the player's eye to the target's body, in metres.")]
-    [Range(0.4f, 2f)] public float lungeStopDistance = 0.75f;
-    [Tooltip("The longest step the lunge will take, in metres.")]
-    [Range(0f, 2.5f)] public float lungeMaxStep = 2.2f;
-    [Tooltip("Seconds the step takes.")]
-    [Range(0.05f, 0.4f)] public float lungeSeconds = 0.11f;
-    [Tooltip("How hard the view turns onto the target as the strike is thrown, as a " +
-             "share of the angle between them. 0 = no help, 1 = snaps onto it.")]
+    [Header("Pad and touch help (never a mouse)")]
+    [Tooltip("How hard the view turns onto the target as the strike is thrown, on a pad or a " +
+             "touch screen, as a share of the angle between them. 0 = no help, 1 = snaps onto it. " +
+             "A turn only: no strike ever moves the player (the lunge that used to step the " +
+             "player up to 2.2 m in is gone).")]
     [Range(0f, 1f)] public float magnetism = 0.5f;
 
     [Header("The chain: rifle butt, then the gun goes on the back and the fists come up")]

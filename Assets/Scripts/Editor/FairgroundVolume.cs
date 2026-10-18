@@ -84,6 +84,7 @@ namespace FPSKit.EditorTools
             bl.threshold.Override(1.0f);
             bl.intensity.Override(0.3f);
             bl.scatter.Override(0.6f);
+            bl.clamp.Override(8f);           // as every arena (FPSKitSceneBuilder): an HDR highlight no brighter than 8 feeds the blur, so it cannot flicker or flood
             var vg = Add<Vignette>(p);
             vg.color.Override(Color.black);
             vg.intensity.Override(0.40f);

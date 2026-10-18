@@ -2842,9 +2842,13 @@ knee (smallest bend range) and the foot that bears less weight. Mirrored copies 
 
 Checks: FPSKit > Enemy AI > Run Limb Test (in the open editor; report and pictures in
 `Build/LimbTest`). Performance: FPSKit > Enemy AI > Measure 20 Enemies (`Build/Perf`).
-`VerifyWounds` still expects the old thresholds (a limp after one round, a crawl after three,
-a disarm from one arm) and the old built soldier's `EnemyDeath`. It is stale and needs
-rewriting against these rules before it is trusted again.
+`VerifyWounds` (rewritten 2026-10-18) proves these rules on the rigged soldier in the AI test
+scene: every amount is read from the body's own profile (`EnemyWounds.CrippleDamage`), so a
+retune never breaks it, only a broken rule does. Wounded, then limping, then crawling, each
+slower; states still held seconds later; both arms crippled drops the rifle; twenty rounds of
+three times its health into the limbs leave it at the core floor, and one chest round finishes
+it; headshots by role; a boss limps on two crippled legs, keeps its weapon and keeps its limbs;
+the dead go limp; dress by role (cap on all, backpack on elites and bosses).
 
 ## The rifle weighs something, and the body moves by its clips (2026-10-10, enemy AI Stage 2)
 

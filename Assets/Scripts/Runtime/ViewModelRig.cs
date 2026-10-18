@@ -561,7 +561,7 @@ public class ViewModelRig : MonoBehaviour
 
         Vector3 hip = _spec.hipPosition + Body.hipNudge + (DeviceProfile.Handheld ? Body.handsetHipNudge : Vector3.zero);
         Vector3 basePos = Vector3.Lerp(hip, _spec.aimPosition, s.aim);
-        Quaternion baseTurn = Quaternion.Slerp(Quaternion.Euler(_spec.hipTurn), Quaternion.identity, s.aim);
+        Quaternion baseTurn = Quaternion.Slerp(Quaternion.Euler(_spec.hipTurn + Body.hipTurnNudge), Quaternion.identity, s.aim);
 
         var gun = _spec.transform;
         gun.localPosition = basePos + delta;

@@ -53,10 +53,13 @@ public class PlayerBodySettings : ScriptableObject
     [Tooltip("Size of the gun against life. 1 is true size.")]
     [Range(0.8f, 1.3f)] public float gunScale = 1f;
     [Tooltip("Metres added to each gun's own hip position (right, up, ahead): the whole hip carry moved at once.")]
-    public Vector3 hipNudge = new Vector3(-0.01f, 0.05f, 0.06f);
+    public Vector3 hipNudge = new Vector3(0.04f, 0.05f, 0.06f);
     [Tooltip("Metres added to the hip carry on a phone (right, up, ahead): its own framing, clear of the fire " +
              "button, which sits over the lower right of the screen where the rifle is on a desktop.")]
-    public Vector3 handsetHipNudge = new Vector3(-0.05f, -0.02f, 0f);
+    public Vector3 handsetHipNudge = new Vector3(-0.10f, -0.02f, 0f);
+    [Tooltip("Degrees added to each gun's own hip turn (muzzle down, muzzle right, rolled right). Positive right " +
+             "turns the muzzle out of its angle in towards the middle, so a carry moved right still points ahead.")]
+    public Vector3 hipTurnNudge = new Vector3(0f, 2f, 0f);
 
     [Header("Punches (in the view's metres: right, up, ahead)")]
     [Tooltip("Where the rifle's rear sight is while the left hand carries it, low at the side, for a single punch.")]

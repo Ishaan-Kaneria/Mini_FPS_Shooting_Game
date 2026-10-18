@@ -30,7 +30,9 @@ MonoBehaviour:
   armsNearClip: 0.01
   armsScale: 1
   gunScale: 1
-  hipNudge: {x: -0.01, y: 0.05, z: 0.06}
+  hipNudge: {x: 0.04, y: 0.05, z: 0.06}
+  handsetHipNudge: {x: -0.1, y: -0.02, z: 0}
+  hipTurnNudge: {x: 0, y: 2, z: 0}
   leftCarryPosition: {x: -0.08, y: -0.24, z: 0.42}
   leftCarryTurn: {x: 8, y: -75, z: -5}
   rightGuard: {x: 0.12, y: -0.16, z: 0.26}

@@ -54,6 +54,10 @@ fi
 
 echo "unity-batch: $METHOD  (log: $LOG)"
 
+# Unity's working directory is the shell's, and every tool writes its output (Build/...) relative
+# to it: run from a script folder, the limb test's pictures landed inside Assets/Scripts/Runtime.
+cd "$PROJECT"
+
 set +e
 "$UNITY" -batchmode "${GFX[@]}" -projectPath "$PROJECT" \
          -executeMethod "$METHOD" -logFile "$LOG" "$@"

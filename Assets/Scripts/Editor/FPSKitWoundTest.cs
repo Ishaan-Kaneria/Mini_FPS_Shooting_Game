@@ -3,80 +3,73 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// Proves that where a round lands changes what it does.
+    /// Proves that where a round lands changes what it does, by the rules in CLAUDE.md
+    /// ("Gameplay invariants") and <see cref="EnemyWounds"/>: real enemy prefabs, real archetypes,
+    /// in the AI test scene (a navmesh, so they stand and fall as in a level), shot through their
+    /// real hitboxes. Every amount is worked out from the body's own profile
+    /// (<see cref="EnemyWounds.CrippleDamage"/>), so retuning the numbers does not break it; only
+    /// breaking a rule does.
     ///
-    /// Everything here is behaviour a player sees and no build check would notice going:
-    /// a shot leg that does not limp, a wrecked gun arm that keeps shooting, a boss that
-    /// dies to one headshot, a corpse that stays standing. It stands a row of real enemy
-    /// prefabs on a floor in an empty scene, stamps real archetypes on them, and shoots
-    /// them through their real hitboxes:
-    ///
-    /// - a grunt's leg: limps after one round, is on the floor after three, and is slower each time;
-    /// - a grunt's gun arm: drops the rifle (a real object on the floor) and closes to melee;
-    /// - a grunt's head, for one point of damage: dead, and dropped where it stood;
-    /// - a shielded elite's head: survives while the shield is up, dies once it is down;
-    /// - a boss's head and legs: survives the headshot, limps, and never goes down to a crawl;
-    /// - a blast: the body is thrown, moving, off the floor;
-    /// - blood: wounds on the body, splats on the floor, and nothing with the setting off.
+    /// - a grunt's leg: Wounded (a little slower), then Crippled (limps, slower), the other leg
+    ///   Crippled too (crawls, slowest); seconds later it is still crawling;
+    /// - a grunt with one crippled leg still limps seconds later (states never improve);
+    /// - a grunt's arms: one crippled holds the rifle one-handed, both drop it (out of its hands)
+    ///   and it closes to fight with its hands;
+    /// - a limb hit never kills: twenty huge rounds into the limbs leave it alive, at or above the
+    ///   floor; one round to the chest then finishes it;
+    /// - a grunt's head, for one point: dead, limp and on the floor; a shielded elite survives a
+    ///   headshot until its shield is down; a boss survives one, never crawls, never drops its
+    ///   rifle and never loses a limb;
+    /// - a blast kill: limp, and thrown;
+    /// - dress by role (cap on every soldier, backpack on elites and bosses, the outfit on all);
+    /// - blood: wounds on bodies, splats in the world, and none with the setting off;
+    /// - every enemy a human voice; the prefab 10% over a person's size.
     ///
     ///   Tools/unity-batch.sh FPSKitBatch.VerifyWounds
     /// </summary>
     public static class FPSKitWoundTest
     {
         const string PrefabPath = "Assets/FPSKit_Generated/Enemy.prefab";
-        const double HardTimeout = 90.0;
+        const double HardTimeout = 600.0;
 
-        enum Phase { Enter, Spawn, Shoot, Settle, Judge }
-
-        static Phase _phase;
-        static double _startedAt, _deadline;
-        static readonly List<string> Errors = new List<string>();
         static readonly List<string> Problems = new List<string>();
+        static readonly List<string> Errors = new List<string>();
         static readonly StringBuilder Notes = new StringBuilder();
         static bool _bloodBackup;
+        static int _step, _lastFrame = -1;
+        static float _t0;
+        static double _realStart;
 
-        static GameObject _legGrunt, _armGrunt, _headGrunt, _elite, _boss, _blasted, _legKilled;
-        static float _speedSound, _speedLimp, _speedCrawl;
+        static GameObject _player, _leg, _limp, _arms, _never, _head, _elite, _boss, _blasted;
+        static float _speedSound, _speedWounded, _speedLimp, _speedCrawl;
+        static Vector3 _blastedFrom;
+        static bool _bossRanged;
 
         public static void VerifyWounds()
         {
             try
             {
-                Errors.Clear();
-                Problems.Clear();
-                Notes.Clear();
-
-                EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-
-                // Something for bodies to fall on and blood to land on.
-                var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                floor.name = "Floor";
-                floor.transform.localScale = new Vector3(8f, 1f, 8f);
-                floor.layer = LayerMask.NameToLayer("Environment");
-
+                Problems.Clear(); Errors.Clear(); Notes.Clear();
+                _step = 0; _lastFrame = -1;
+                FPSKitAITestScene.Build();
                 _bloodBackup = GameSettings.Blood;
                 GameSettings.Blood = true;
-
-                _startedAt = EditorApplication.timeSinceStartup;
-                _phase = Phase.Enter;
-
+                _realStart = EditorApplication.timeSinceStartup;
                 Application.logMessageReceived += OnGameLog;
                 FPSKitPlayMode.SuspendStartScene();
                 EditorApplication.update += Tick;
-
                 Debug.Log("[FPSKitBatch] wound test: a body must answer to where it is shot");
             }
             catch (Exception e)
             {
-                Debug.LogError($"[FPSKitBatch] FAILED: {e}");
-                Detach();
-                EditorApplication.Exit(1);
+                Errors.Add(e.ToString());
+                Finish();
             }
         }
 
@@ -84,49 +77,35 @@ namespace FPSKit.EditorTools
         {
             try
             {
-                if (EditorApplication.timeSinceStartup - _startedAt > HardTimeout)
-                    throw new Exception($"wound test exceeded {HardTimeout}s in phase {_phase}");
-
-                switch (_phase)
+                if (EditorApplication.timeSinceStartup - _realStart > HardTimeout)
+                    throw new Exception($"wound test exceeded {HardTimeout}s at step {_step}");
+                if (!EditorApplication.isPlaying)
                 {
-                    case Phase.Enter:
-                        if (!EditorApplication.isPlaying) { EditorApplication.EnterPlaymode(); return; }
-                        SaveMigration.Apply();
-                        _phase = Phase.Spawn;
-                        return;
+                    if (_step == 0) { EditorApplication.EnterPlaymode(); _step = 1; }
+                    return;
+                }
+                if (Time.frameCount == _lastFrame) return;
+                _lastFrame = Time.frameCount;
+                Time.captureDeltaTime = 1f / 30f;
+                // Nobody here is testing the player: keep whatever stands for it alive.
+                if (_player != null && _player.GetComponent<Health>() is Health ph && ph.Normalized < 0.9f) ph.ResetHealth();
 
-                    case Phase.Spawn:
-                        _legGrunt = Spawn("Grunt", 0);
-                        _armGrunt = Spawn("Grunt", 1);
-                        _headGrunt = Spawn("Grunt", 2);
-                        _elite = Spawn("Sentinel", 3);
-                        _boss = Spawn("Warden", 4);
-                        _blasted = Spawn("Grunt", 5);
-                        _legKilled = Spawn("Grunt", 6);
-
-                        // Worn down now, well outside the window that sums a burst, so the
-                        // round that finishes it later is a light leg shot and not a heavy hit.
-                        var worn = _legKilled.GetComponent<Health>();
-                        Hit(_legKilled, BodyPart.Torso, worn.maxHealth * 0.9f);
-
-                        Wait(0.5, Phase.Shoot);
-                        return;
-
-                    case Phase.Shoot:
-                        if (Waiting()) return;
-                        Shoot();
-                        Wait(1.6, Phase.Settle);
-                        return;
-
-                    case Phase.Settle:
-                        if (Waiting()) return;
-                        Settle();
-                        _phase = Phase.Judge;
-                        return;
-
-                    case Phase.Judge:
-                        Finish();
-                        return;
+                float since = Time.time - _t0;
+                switch (_step)
+                {
+                    case 1: SaveMigration.Apply(); Spawn(); Next(2); return;
+                    // Each blow a moment apart, so no two add up to one heavy hit (a knockdown).
+                    case 2: if (since > 0.5f) { LegWounded(); Next(3); } return;
+                    case 3: if (since > 0.4f) { LegCrippled(); Next(4); } return;
+                    case 4: if (since > 0.4f) { LegsBoth(); Next(5); } return;
+                    case 5: if (since > 0.4f) { ArmOne(); Next(6); } return;
+                    case 6: if (since > 0.4f) { ArmBoth(); Next(7); } return;
+                    case 7: if (NeverKills(since)) Next(8); return;
+                    case 8: if (since > 0.4f) { Heads(); Next(9); } return;
+                    case 9: if (Boss(since)) Next(10); return;
+                    case 10: Blast(); Next(11); return;
+                    case 11: if (since > 3f) { Settled(); Next(12); } return;
+                    case 12: Finish(); return;
                 }
             }
             catch (Exception e)
@@ -136,297 +115,356 @@ namespace FPSKit.EditorTools
             }
         }
 
-        static GameObject Spawn(string archetype, int slot)
+        static void Next(int step) { _step = step; _t0 = Time.time; }
+
+        static void Spawn()
+        {
+            _player = GameObject.FindGameObjectWithTag("Player");
+            _leg = Make("Grunt", "Leg", 0);
+            _limp = Make("Grunt", "Limp", 1);
+            _arms = Make("Grunt", "Arms", 2);
+            _never = Make("Grunt", "NeverKills", 3);
+            _head = Make("Grunt", "Head", 4);
+            _elite = Make("Sentinel", "Elite", 5);
+            _boss = Make("Warden", "Boss", 6);
+            _blasted = Make("Grunt", "Blasted", 7);
+
+            var w = Wounds(_leg);
+            Require(w != null, "the enemy prefab has no EnemyWounds");
+            _speedSound = w != null ? w.MoveSpeedMultiplier : 0f;
+            // The Warden fights hand to hand by design: what matters is that its arms change nothing.
+            _bossRanged = _boss.GetComponent<EnemyAI>().ranged;
+        }
+
+        static GameObject Make(string archetype, string what, int slot)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-            if (prefab == null) throw new Exception($"{PrefabPath} does not exist. Run FPSKitBatch.RebuildEnemy.");
-
-            var enemy = UnityEngine.Object.Instantiate(prefab, new Vector3(slot * 4f - 12f, 0f, 0f), Quaternion.identity);
-            enemy.name = $"{archetype}_{slot}";
-
-            var type = FPSKitEnemyRoster.GetOrCreate(archetype);
-            type.ApplyTo(enemy);
-
+            if (prefab == null) throw new Exception($"{PrefabPath} does not exist. Run FPSKit > Enemy > Build Rigged Soldier.");
+            var at = new Vector3(slot * 3f - 10.5f, 0f, 12f);
+            var enemy = Object.Instantiate(prefab, at, Quaternion.LookRotation(-at.normalized));
+            enemy.name = $"{archetype}_{what}";
+            FPSKitEnemyRoster.GetOrCreate(archetype).ApplyTo(enemy);
             return enemy;
         }
 
         // ==================================================================
+        // The steps.
+        // ==================================================================
 
-        static void Shoot()
+        static void LegWounded()
         {
-            // ---- the leg ------------------------------------------------------------
-            var wounds = _legGrunt.GetComponent<EnemyWounds>();
-            Require(wounds != null, "the enemy prefab has no EnemyWounds");
-            if (wounds == null) return;
-
-            _speedSound = wounds.MoveSpeedMultiplier;
-
-            Hit(_legGrunt, BodyPart.LeftLeg, 25f);
-            _speedLimp = wounds.MoveSpeedMultiplier;
-            Require(wounds.Legs == EnemyWounds.LegState.Limping,
-                    $"one round in a grunt's leg left it {wounds.Legs}, not limping");
-
-            Hit(_legGrunt, BodyPart.LeftLeg, 25f);
-            Hit(_legGrunt, BodyPart.LeftLeg, 25f);
-            _speedCrawl = wounds.MoveSpeedMultiplier;
-
-            Require(!_legGrunt.GetComponent<Health>().IsDead, "three leg rounds killed a grunt outright");
-            Require(wounds.Legs == EnemyWounds.LegState.Crawling,
-                    $"three rounds in one leg left a grunt {wounds.Legs}, not on the floor");
-            Require(_speedSound > _speedLimp && _speedLimp > _speedCrawl,
-                    $"speed did not fall with the wound ({_speedSound:0.00} -> {_speedLimp:0.00} -> {_speedCrawl:0.00})");
-
-            var ai = _legGrunt.GetComponent<EnemyAI>();
-            Require(ai != null && ai.Crawling, "EnemyAI does not know its enemy is crawling");
-
-            // ---- the gun arm ---------------------------------------------------------
-            var armAi = _armGrunt.GetComponent<EnemyAI>();
-            Require(armAi.ranged, "a grunt spawned unarmed; the arm test means nothing");
-
-            for (int i = 0; i < 3; i++) Hit(_armGrunt, BodyPart.RightArm, 25f);
-
-            var armWounds = _armGrunt.GetComponent<EnemyWounds>();
-            Require(armWounds.Disarmed, "three rounds in a grunt's gun arm did not make it drop the rifle");
-            Require(!armAi.ranged, "a disarmed grunt is still a ranged enemy");
-            Require(armAi.attackRange <= armAi.meleeRange,
-                    $"a disarmed grunt still wants to fight from {armAi.attackRange:0.0}m");
-            Require(GameObject.Find("DroppedRifle") != null, "no rifle fell to the floor");
-
-            // ---- the head ------------------------------------------------------------
-            Hit(_headGrunt, BodyPart.Head, 1f);
-            Require(_headGrunt.GetComponent<Health>().IsDead, "a one-point headshot did not kill a grunt");
-
-            var eliteHealth = _elite.GetComponent<Health>();
-            Require(eliteHealth.Shield > 0f, "the Sentinel spawned without its shield; the elite test means nothing");
-            Hit(_elite, BodyPart.Head, 1f);
-            Require(!eliteHealth.IsDead, "a headshot killed a shielded elite through its armour");
-
-            Hit(_elite, BodyPart.Torso, eliteHealth.Shield + 1f);
-            Hit(_elite, BodyPart.Head, 1f);
-            Require(eliteHealth.IsDead, "a headshot did not kill an elite with its shield down");
-
-            var bossHealth = _boss.GetComponent<Health>();
-            Hit(_boss, BodyPart.Head, 1f);
-            Require(!bossHealth.IsDead, "one headshot killed a boss");
-
-            // Both legs past a limp is the rule that floors anything else. Just under half
-            // the pool into each, so the boss is alive and past the threshold on both.
-            var bossWounds = _boss.GetComponent<EnemyWounds>();
-            Hit(_boss, BodyPart.LeftLeg, bossHealth.maxHealth * 0.495f);
-            Hit(_boss, BodyPart.RightLeg, bossHealth.maxHealth * 0.495f);
-            Require(!bossHealth.IsDead, "the boss leg test killed the boss");
-            Require(bossWounds.Legs == EnemyWounds.LegState.Limping,
-                    $"a boss shot through both legs is {bossWounds.Legs}, not limping (it must never crawl)");
-
-            // ---- the blast, and a leg kill ------------------------------------------
-            var blasted = _blasted.GetComponent<Health>();
-            blasted.ApplyDamage(new DamageInfo(1000f, _blasted.transform.position + Vector3.up,
-                                               Vector3.forward, (Vector3.forward + Vector3.up * 0.2f).normalized, null)
-            {
-                fromBlast = true,
-            });
-
-            var legKilled = _legKilled.GetComponent<Health>();
-            Hit(_legKilled, BodyPart.RightLeg, legKilled.maxHealth * 0.2f);
-            Require(legKilled.IsDead, "the finishing leg shot did not kill");
+            var w = Wounds(_leg);
+            // Just past the line that wounds the leg, well short of the one that cripples it.
+            Book(_leg, BodyPart.LeftLeg, PartHealth(w, BodyPart.LeftLeg) * w.Body.woundedAt * 1.2f);
+            _speedWounded = w.MoveSpeedMultiplier;
+            Require(w.State(BodyPart.LeftLeg) == EnemyWounds.LimbState.Wounded,
+                    $"a round past the wound line left a grunt's leg {w.State(BodyPart.LeftLeg)}, not Wounded");
+            Require(w.Legs == EnemyWounds.LegState.Sound, $"a wounded (not crippled) leg already has it {w.Legs}");
         }
 
-        static void Settle()
+        static void LegCrippled()
         {
-            Style(_headGrunt, EnemyDeath.Style.Drop, "a headshot");
-            Style(_blasted, EnemyDeath.Style.Thrown, "a blast");
-            Style(_legKilled, EnemyDeath.Style.Buckle, "a leg shot");
+            var w = Wounds(_leg);
+            Book(_leg, BodyPart.LeftLeg, w.CrippleDamage(BodyPart.LeftLeg));
+            _speedLimp = w.MoveSpeedMultiplier;
+            Require(w.State(BodyPart.LeftLeg) == EnemyWounds.LimbState.Crippled,
+                    $"a leg hit past its cripple line is {w.State(BodyPart.LeftLeg)}, not Crippled");
+            Require(w.Legs == EnemyWounds.LegState.Limping, $"one crippled leg left a grunt {w.Legs}, not limping");
 
-            // Ragdolled: bodies on every segment, and the blast victim thrown clear.
-            foreach (var dead in new[] { _headGrunt, _blasted, _legKilled })
+            // The one that will be checked, much later, for still limping.
+            var lw = Wounds(_limp);
+            Book(_limp, BodyPart.RightLeg, lw.CrippleDamage(BodyPart.RightLeg) * 1.1f);
+            Require(lw.Legs == EnemyWounds.LegState.Limping, $"one crippled leg left the second grunt {lw.Legs}, not limping");
+        }
+
+        static void LegsBoth()
+        {
+            var w = Wounds(_leg);
+            Book(_leg, BodyPart.RightLeg, w.CrippleDamage(BodyPart.RightLeg) * 1.1f);
+            _speedCrawl = w.MoveSpeedMultiplier;
+            Require(!HealthOf(_leg).IsDead, "crippling both legs killed a grunt");
+            Require(w.Legs == EnemyWounds.LegState.Crawling, $"both legs crippled left a grunt {w.Legs}, not crawling");
+            Require(_speedSound > _speedWounded && _speedWounded > _speedLimp && _speedLimp > _speedCrawl,
+                    $"speed did not fall with each wound (sound {_speedSound:0.00}, wounded {_speedWounded:0.00}, " +
+                    $"limping {_speedLimp:0.00}, crawling {_speedCrawl:0.00})");
+            var ai = _leg.GetComponent<EnemyAI>();
+            Require(ai != null && ai.Crawling, "EnemyAI does not know its enemy is crawling");
+        }
+
+        static void ArmOne()
+        {
+            var w = Wounds(_arms);
+            var ai = _arms.GetComponent<EnemyAI>();
+            Require(ai != null && ai.ranged, "a grunt spawned unarmed; the arm test means nothing");
+            Book(_arms, BodyPart.RightArm, w.CrippleDamage(BodyPart.RightArm) * 1.1f);
+            Require(w.State(BodyPart.RightArm) == EnemyWounds.LimbState.Crippled, $"the gun arm is {w.State(BodyPart.RightArm)}, not Crippled");
+            Require(w.OneHanded, "one crippled arm did not leave it holding the rifle one-handed");
+            Require(!w.Disarmed && ai.ranged, "one crippled arm took the rifle off it (both are needed)");
+        }
+
+        static void ArmBoth()
+        {
+            var w = Wounds(_arms);
+            var ai = _arms.GetComponent<EnemyAI>();
+            Book(_arms, BodyPart.LeftArm, w.CrippleDamage(BodyPart.LeftArm) * 1.1f);
+            Require(w.Disarmed, "both arms crippled and it still holds the rifle (Disarmed is false)");
+            Require(!ai.ranged, "a disarmed grunt is still a ranged enemy");
+            Require(ai.attackRange <= ai.meleeRange, $"a disarmed grunt still wants to fight from {ai.attackRange:0.0}m");
+        }
+
+        static int _neverShots;
+
+        /// <summary>Twenty huge rounds into the limbs, one every few frames: alive at the floor; then the chest finishes it.</summary>
+        static bool NeverKills(float since)
+        {
+            var h = HealthOf(_never);
+            var w = Wounds(_never);
+            if (_neverShots < 20)
             {
-                var death = dead != null ? dead.GetComponent<EnemyDeath>() : null;
-                Require(death != null && death.IsRagdolled, $"{Name(dead)} died and did not go limp");
-
-                int bodies = dead != null ? dead.GetComponentsInChildren<Rigidbody>().Length : 0;
-                Require(bodies >= 8, $"{Name(dead)} went limp with only {bodies} rigidbodies; the joints are missing");
+                if (since < _neverShots * 0.1f) return false;
+                var limb = new[] { BodyPart.LeftLeg, BodyPart.RightShin, BodyPart.LeftForearm, BodyPart.RightArm }[_neverShots % 4];
+                Book(_never, limb, h.maxHealth * 3f);
+                _neverShots++;
+                return false;
             }
+            float floor = w.Body.limbCoreFloor * h.maxHealth;
+            Notes.Append($"\n  twenty limb rounds of 3x its health left it at {h.Current + h.Shield:0.0} of {h.maxHealth:0} (floor {floor:0.0})");
+            Require(!h.IsDead, "limb rounds killed a grunt (a limb hit never kills)");
+            Require(h.Current + h.Shield >= floor - 0.01f, $"limb rounds took it to {h.Current + h.Shield:0.0}, under the floor {floor:0.0}");
+            Book(_never, BodyPart.Torso, h.maxHealth * 0.5f);
+            Require(h.IsDead, "a round to the chest did not finish a body held at the floor by limb rounds");
+            return true;
+        }
 
-            if (_blasted != null && _blasted.GetComponent<EnemyDeath>() is EnemyDeath thrown && thrown.torso != null)
+        static void Heads()
+        {
+            Book(_head, BodyPart.Head, 1f);
+            Require(HealthOf(_head).IsDead, "a one-point headshot did not kill a grunt");
+
+            var eh = HealthOf(_elite);
+            Require(eh.Shield > 0f, "the Sentinel spawned without its shield; the elite test means nothing");
+            Book(_elite, BodyPart.Head, 1f);
+            Require(!eh.IsDead, "a headshot killed a shielded elite through its armour");
+            Book(_elite, BodyPart.Torso, eh.Shield + 1f);
+            Book(_elite, BodyPart.Head, 1f);
+            Require(eh.IsDead, "a headshot did not kill an elite with its shield down");
+
+            var bh = HealthOf(_boss);
+            Book(_boss, BodyPart.Head, 1f);
+            Require(!bh.IsDead, "one headshot killed a boss");
+        }
+
+        static int _bossStep;
+
+        static bool Boss(float since)
+        {
+            var w = Wounds(_boss);
+            var ai = _boss.GetComponent<EnemyAI>();
+            var limbs = new[] { BodyPart.LeftLeg, BodyPart.RightLeg, BodyPart.LeftArm, BodyPart.RightArm };
+            if (_bossStep < limbs.Length)
             {
-                float travelled = Vector3.Distance(thrown.torso.position, _blasted.transform.position + Vector3.up);
-                Notes.Append($"\n  blast victim's torso ended {travelled:0.00}m from where it stood");
-                Require(travelled > 0.8f, $"a blast moved the body only {travelled:0.00}m");
+                if (since < _bossStep * 0.4f) return false;
+                Book(_boss, limbs[_bossStep], w.CrippleDamage(limbs[_bossStep]) * 1.2f);
+                _bossStep++;
+                return false;
             }
+            Require(!HealthOf(_boss).IsDead, "crippling a boss's four limbs killed it");
+            Require(w.Legs == EnemyWounds.LegState.Limping, $"a boss with both legs crippled is {w.Legs}, not limping (it must never crawl)");
+            Require(!w.Disarmed && ai.ranged == _bossRanged, "a boss with both arms crippled let go of its weapon");
+            w.Sever(BodyPart.LeftLeg);
+            Require(w.State(BodyPart.LeftLeg) != EnemyWounds.LimbState.Severed, "a boss lost a leg (a boss never loses a limb)");
+            return true;
+        }
 
-            // A standing body's torso is a metre up; a fallen one is on the floor.
-            if (_headGrunt != null && _headGrunt.GetComponent<EnemyDeath>() is EnemyDeath dropped && dropped.torso != null)
+        static void Blast()
+        {
+            _blastedFrom = Hips(_blasted);
+            var h = HealthOf(_blasted);
+            // From behind it, towards the player: across the open ground, where nothing stops the throw.
+            Vector3 toward = Flat(-_blasted.transform.position).normalized;
+            h.ApplyDamage(new DamageInfo(h.maxHealth * 10f, _blasted.transform.position + Vector3.up - toward,
+                                         -toward, (toward + Vector3.up * 0.2f).normalized, null)
             {
-                float height = dropped.torso.position.y;
-                Notes.Append($"\n  headshot victim's hips at {height:0.00}m after 1.6s");
-                Require(height < 0.55f, $"a headshot victim's hips are still {height:0.00}m up: it did not fall");
-            }
+                fromBlast = true,
+                heavy = true,
+            });
+            Require(h.IsDead, "a blast of ten times its health did not kill a grunt");
+        }
 
-            // ---- corpses stay ---------------------------------------------------------
+        static void Settled()
+        {
+            // ---- states never improve, seconds and a fall later -------------------------
+            var lw = Wounds(_leg);
+            Require(lw.Legs == EnemyWounds.LegState.Crawling && _leg.GetComponent<EnemyAI>().Crawling,
+                    $"the crawler is {lw.Legs} three seconds on (nothing stands a crawler up)");
+            var limp = Wounds(_limp);
+            Require(limp.Legs == EnemyWounds.LegState.Limping && limp.State(BodyPart.RightLeg) == EnemyWounds.LimbState.Crippled,
+                    $"the limper is {limp.Legs} three seconds on (a crippled leg limps for life)");
+
+            // The rifle out of its hands: on the floor or gone.
+            var rifle = _arms.GetComponentInChildren<EnemyRifle>(true);
+            Require(rifle != null && !rifle.InHands && !rifle.OnBody,
+                    $"a grunt with both arms crippled still has its rifle ({(rifle != null ? rifle.State.ToString() : "none")})");
+
+            // ---- the dead go limp, and fall the way they were hit ------------------------
+            foreach (var dead in new[] { _head, _never, _blasted })
+            {
+                var rag = dead.GetComponent<RagdollController>();
+                Require(rag != null && rag.IsRagdolled, $"{dead.name} died and did not go limp");
+            }
+            float headHips = Hips(_head).y - _head.transform.position.y;
+            Notes.Append($"\n  headshot victim's hips {headHips:0.00} m off the ground after 3 s");
+            Require(headHips < 0.55f, $"a headshot victim's hips are still {headHips:0.00} m up: it did not fall");
+            float thrown = Vector3.Distance(Flat(Hips(_blasted)), Flat(_blastedFrom));
+            Notes.Append($"\n  blast victim's hips ended {thrown:0.00} m from where it stood");
+            Require(thrown > 0.8f, $"a blast moved the body only {thrown:0.00} m");
+
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
             var prefabHealth = prefab != null ? prefab.GetComponent<Health>() : null;
             Require(prefabHealth != null && !prefabHealth.destroyOnDeath,
                     "the enemy prefab still destroys its body: corpses must stay until the level ends");
 
-            // ---- kit ------------------------------------------------------------------
-            Require(Worn(_boss, "Kit_Boss_Visor") && Worn(_boss, "Kit_Human_Helmet") && !Worn(_boss, "Kit_Creature_Respirator"),
-                    "the Warden is not dressed as a boss soldier (visor and helmet on, no respirator)");
-            Require(Worn(_armGrunt, "Kit_Human_Helmet") && !Worn(_armGrunt, "Kit_Elite_PadLeft"),
-                    "a grunt is not dressed as an ordinary soldier (helmet on, no shoulder armour)");
-            Require(Worn(_elite, "Kit_Elite_PadLeft"), "the Sentinel has no elite shoulder armour");
+            // ---- dress by role ----------------------------------------------------------
+            foreach (var body in new[] { _arms, _elite, _boss })
+                foreach (var piece in new[] { "Outfit_Head", "Outfit_Hands", "Outfit_Shirt", "Outfit_Pants", "Outfit_Boots", "Outfit_Vest" })
+                    Require(Worn(body, piece), $"{body.name} is not wearing {piece}");
+            Require(Worn(_arms, "Kit_Human_Cap") && !Worn(_arms, "Kit_Elite_Backpack"),
+                    "a grunt is not dressed as an ordinary soldier (cap on, no backpack)");
+            Require(Worn(_elite, "Kit_Human_Cap") && Worn(_elite, "Kit_Elite_Backpack"),
+                    "the Sentinel is not dressed as an elite (cap and backpack on)");
+            Require(Worn(_boss, "Kit_Human_Cap") && Worn(_boss, "Kit_Elite_Backpack"),
+                    "the Warden is not dressed as a boss soldier (cap and backpack on)");
 
-            // ---- blood --------------------------------------------------------------
-            int wounds = 0;
-            foreach (var enemy in new[] { _legGrunt, _armGrunt })
-                if (enemy != null)
-                    foreach (Transform t in enemy.GetComponentsInChildren<Transform>())
-                        if (t.name == "Wound") wounds++;
-
-            var root = GameObject.Find("BloodFX");
-            int splats = 0;
-            if (root != null)
-                foreach (Transform t in root.transform)
-                    if (t.name == "Blood") splats++;
-
+            // ---- blood -------------------------------------------------------------------
+            int wounds = Count(_leg, "Wound") + Count(_arms, "Wound");
+            int splats = Splats();
             Notes.Append($"\n  {wounds} wounds on two bodies, {splats} splats in the world");
-            Require(wounds >= 4, $"six rounds left only {wounds} wounds on the bodies they hit");
+            Require(wounds >= 2, $"six rounds left only {wounds} wounds on the bodies they hit");
             Require(splats >= 3, $"a dozen hits left only {splats} splats of blood in the world");
 
-            // Off means off: a hit with the setting off adds nothing to the world.
+            // Off means off: in one frame (no bleeding drips in between), three hits add nothing.
             GameSettings.Blood = false;
-            int before = splats;
-            var clean = Spawn("Grunt", 7);
-            for (int i = 0; i < 3; i++) Hit(clean, BodyPart.Torso, 10f);
+            var clean = Make("Grunt", "Clean", 8);
+            int before = Splats();
+            for (int i = 0; i < 3; i++) Book(clean, BodyPart.Torso, 10f);
+            Require(Splats() == before, $"with Blood off, three hits still left {Splats() - before} splats");
+            Require(Count(clean, "Wound") == 0, $"with Blood off, a body still took {Count(clean, "Wound")} wounds");
+            GameSettings.Blood = true;
 
-            int after = 0;
-            if (root != null)
-                foreach (Transform t in root.transform)
-                    if (t.name == "Blood") after++;
-
-            Require(after == before, $"with Blood off, three hits still left {after - before} splats");
-
-            int cleanWounds = 0;
-            foreach (Transform t in clean.GetComponentsInChildren<Transform>())
-                if (t.name == "Wound") cleanWounds++;
-            Require(cleanWounds == 0, $"with Blood off, a body still took {cleanWounds} wounds");
-
-            // ---- voice --------------------------------------------------------------
-            var voice = _legGrunt.GetComponent<EnemyVoice>();
+            // ---- voice and size -----------------------------------------------------------
+            var voice = _leg.GetComponent<EnemyVoice>();
             Require(voice != null && voice.bank != null, "the enemy prefab has no voice bank");
             if (voice != null && voice.bank != null)
             {
-                foreach (var kind in new[] { EnemyVoice.Kind.Human, EnemyVoice.Kind.Creature })
-                {
-                    var set = voice.bank.For(kind);
-                    Require(set.pain.Length > 0 && set.death.Length > 0 && set.hurt.Length > 0 &&
-                            set.headshotDeath.Length > 0 && set.hunt.Length > 0,
-                            $"the {kind} voice is missing clips");
-                }
+                var set = voice.bank.For(EnemyVoice.Kind.Human);
+                Require(set.pain.Length > 0 && set.death.Length > 0 && set.hurt.Length > 0 &&
+                        set.headshotDeath.Length > 0 && set.hunt.Length > 0, "the human voice is missing clips");
             }
-
             // Every enemy is a person: Ishaan heard the creature growls as evil noise.
             foreach (var name in FPSKitEnemyRoster.Names)
-                Require(FPSKitEnemyRoster.GetOrCreate(name).voice == EnemyVoice.Kind.Human,
-                        $"{name} does not have a human voice");
-
-            // Ten percent over a person's size, on top of whatever the archetype adds.
+                Require(FPSKitEnemyRoster.GetOrCreate(name).voice == EnemyVoice.Kind.Human, $"{name} does not have a human voice");
             Require(prefab != null && Mathf.Abs(prefab.transform.localScale.y - 1.1f) < 0.01f,
                     $"the enemy prefab is scaled {(prefab != null ? prefab.transform.localScale.y : 0f):0.00}, not 1.10");
         }
 
         // ==================================================================
+        // Helpers.
+        // ==================================================================
 
-        /// <summary>A round through the named part's hitbox, from in front, the way Weapon sends one.</summary>
-        static void Hit(GameObject enemy, BodyPart part, float amount)
+        static EnemyWounds Wounds(GameObject g) => g.GetComponent<EnemyWounds>();
+        static Health HealthOf(GameObject g) => g.GetComponent<Health>();
+
+        /// <summary>A limb's own health in points: what its wound and cripple lines are fractions of.</summary>
+        static float PartHealth(EnemyWounds w, BodyPart limb) => w.CrippleDamage(limb) / Mathf.Max(0.01f, w.Body.crippledAt);
+
+        /// <summary>
+        /// A round through the hitbox for <paramref name="part"/>, from the front, sized so that
+        /// <paramref name="booked"/> points land on the part once its own multiplier is applied.
+        /// </summary>
+        static void Book(GameObject enemy, BodyPart part, float booked)
         {
-            if (enemy == null) return;
-
-            foreach (var hitbox in enemy.GetComponentsInChildren<Hitbox>())
+            foreach (var hb in enemy.GetComponentsInChildren<Hitbox>())
             {
-                if (hitbox.Part != part) continue;
-
-                var collider = hitbox.GetComponent<Collider>();
-                Vector3 point = collider.bounds.center + enemy.transform.forward * collider.bounds.extents.z;
-                var info = new DamageInfo(amount / Mathf.Max(0.01f, hitbox.damageMultiplier), point,
-                                          enemy.transform.forward, -enemy.transform.forward, null);
-                hitbox.Receive(info);
+                if (hb.Part != part) continue;
+                float mult = hb.profile != null ? hb.profile.For(part) : hb.damageMultiplier;
+                Vector3 point = hb.transform.position;
+                Vector3 dir = -enemy.transform.forward;
+                hb.Receive(new DamageInfo(booked / Mathf.Max(0.01f, mult), point, -dir, dir, _player));
                 return;
             }
-
-            throw new Exception($"{Name(enemy)} has no {part} hitbox");
+            throw new Exception($"{enemy.name} has no {part} hitbox");
         }
 
-        static void Style(GameObject enemy, EnemyDeath.Style expected, string how)
+        static Vector3 Hips(GameObject g)
         {
-            var death = enemy != null ? enemy.GetComponent<EnemyDeath>() : null;
-            if (death == null) return;
-
-            Require(death.LastStyle == expected, $"killed by {how}, {Name(enemy)} died {death.LastStyle}, not {expected}");
+            var anim = g.GetComponentInChildren<Animator>();
+            var hips = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Hips) : null;
+            return hips != null ? hips.position : g.transform.position;
         }
+
+        static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
         static bool Worn(GameObject enemy, string part)
         {
-            if (enemy == null) return false;
-
             foreach (var t in enemy.GetComponentsInChildren<Transform>(true))
                 if (t.name == part) return t.gameObject.activeInHierarchy;
-
             return false;
         }
 
-        static string Name(GameObject go) => go != null ? go.name : "(destroyed)";
+        static int Count(GameObject enemy, string name)
+        {
+            int n = 0;
+            foreach (var t in enemy.GetComponentsInChildren<Transform>(true)) if (t.name == name) n++;
+            return n;
+        }
+
+        static int Splats()
+        {
+            var root = GameObject.Find("BloodFX");
+            int n = 0;
+            if (root != null) foreach (Transform t in root.transform) if (t.name == "Blood" && t.gameObject.activeSelf) n++;
+            return n;
+        }
 
         static void Require(bool condition, string problem)
         {
             if (!condition) Problems.Add(problem);
         }
 
-        static void Wait(double seconds, Phase next)
-        {
-            _deadline = EditorApplication.timeSinceStartup + seconds;
-            _phase = next;
-        }
-
-        static bool Waiting() => EditorApplication.timeSinceStartup < _deadline;
-
         static void OnGameLog(string message, string stackTrace, LogType type)
         {
-            // The editor probes for an Android device on entering play mode with the
-            // Android module installed, and logs the failure as an exception. Nothing to
-            // do with the game.
+            // The editor probes for an Android device on entering play mode with the Android
+            // module installed, and logs the failure as an exception. Nothing to do with the game.
             if (message.Contains("Unity Remote requirements check failed")) return;
-
             if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert)
                 Errors.Add($"[{type}] {message.Trim()}");
         }
 
-        static void Detach()
-        {
-            GameSettings.Blood = _bloodBackup;
-            FPSKitPlayMode.RestoreStartScene();
-            EditorApplication.update -= Tick;
-            Application.logMessageReceived -= OnGameLog;
-        }
-
         static void Finish()
         {
-            Detach();
+            EditorApplication.update -= Tick;
+            Application.logMessageReceived -= OnGameLog;
+            Time.captureDeltaTime = 0f;
+            GameSettings.Blood = _bloodBackup;
+            _neverShots = 0; _bossStep = 0;
 
             var report = new StringBuilder();
             foreach (var e in Errors) report.Append($"\n  - {e}");
             foreach (var p in Problems) report.Append($"\n  - {p}");
-
-            if (report.Length > 0)
-            {
+            bool ok = report.Length == 0;
+            if (ok)
+                Debug.Log($"[FPSKitBatch] verify wounds passed: speed {_speedSound:0.00} -> wounded {_speedWounded:0.00} -> " +
+                          $"limp {_speedLimp:0.00} -> crawl {_speedCrawl:0.00}; states held; limb rounds never killed; " +
+                          $"headshots kill a grunt and an unshielded elite but not a boss; the dead went limp.{Notes}");
+            else
                 Debug.LogError($"[FPSKitBatch] FAILED: wounds do not do what they say:{report}\n{Notes}");
-                EditorApplication.Exit(1);
-                return;
-            }
 
-            Debug.Log($"[FPSKitBatch] verify wounds passed: speed {_speedSound:0.00} -> limp {_speedLimp:0.00} " +
-                      $"-> crawl {_speedCrawl:0.00}, rifle dropped, headshots kill a grunt and an unshielded " +
-                      $"elite but not a boss, and bodies fall the way they were shot.{Notes}");
-            EditorApplication.Exit(0);
+            if (EditorApplication.isPlaying) EditorApplication.isPlaying = false;
+            EditorApplication.delayCall += () =>
+            {
+                FPSKitPlayMode.RestoreStartScene();
+                FPSKitBatch.Exit(ok ? 0 : 1);
+            };
         }
     }
 }

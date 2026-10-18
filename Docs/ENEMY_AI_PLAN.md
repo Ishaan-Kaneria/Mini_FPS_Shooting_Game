@@ -285,8 +285,8 @@ should go through Git LFS with the other packs (open decision below).
 - `VerifyCombat` now exits only in batch mode (`FPSKitBatch.Exit`). Run in the open editor it
   got 14 frames in its 14 s (the unfocused editor runs at ~1 fps) and reported a meaningless
   failure; it also still expects a jab as the first punch (the rework made it a rifle butt).
-  It needs a batch run with Unity closed before the next push. `VerifyWounds` is stale (see
-  DESIGN_NOTES).
+  It needs a batch run with Unity closed before the next push. `VerifyWounds` was rewritten for
+  the current rules on 2026-10-18 and passes.
 - Still to download before Stage 5: Mixamo "Reload" x3 (run, crouch, walk variants) and
   "Injured Stumble Idle" (Firefox dropped them).
 

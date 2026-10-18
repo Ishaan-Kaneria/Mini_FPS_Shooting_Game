@@ -58,7 +58,8 @@ namespace FPSKit.EditorTools
         }
 
         const string MenuScene = "Assets/FPSKit_Generated/Scenes/Menu.unity";
-        const string ArenaScene = "Assets/FPSKit_Generated/Scenes/SnowboundStation.unity";
+        /// <summary>The arena the in-game shots are taken in; <c>-fpskitArena &lt;scene path&gt;</c> picks another.</summary>
+        static string ArenaScene => Arg("-fpskitArena") ?? "Assets/FPSKit_Generated/Scenes/SnowboundStation.unity";
 
         static ScreenInfo.Device Pc(int w, int h) => new ScreenInfo.Device
         {

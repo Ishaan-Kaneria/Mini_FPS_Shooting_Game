@@ -21,7 +21,15 @@ namespace FPSKit.EditorTools
 
         public static void BuildBefore() => Build("before");
 
-        public static void Build(string tag)
+        /// <summary>
+        /// A release build of the menu and Desert Outpost (Linux x64, Vulkan) for SmoothProbe: start it with
+        /// <c>-fpskitsmooth &lt;report&gt;</c>. Build/Perf/smooth/FPSKitSmooth.x86_64.
+        /// </summary>
+        public static void BuildSmooth() => Build("smooth", "Assets/FPSKit_Generated/Scenes/DesertOutpost.unity", BuildOptions.None, "FPSKitSmooth");
+
+        public static void Build(string tag) => Build(tag, ScenePath, BuildOptions.Development, "FPSKitPerf");
+
+        static void Build(string tag, string scene, BuildOptions options, string name)
         {
             string dir = $"Build/Perf/{tag}";
             Directory.CreateDirectory(dir);
@@ -39,10 +47,10 @@ namespace FPSKit.EditorTools
                 System.GC.Collect();
                 var opts = new BuildPlayerOptions
                 {
-                    scenes = new[] { MenuScene, ScenePath },
-                    locationPathName = $"{dir}/FPSKitPerf.x86_64",
+                    scenes = new[] { MenuScene, scene },
+                    locationPathName = $"{dir}/{name}.x86_64",
                     target = BuildTarget.StandaloneLinux64,
-                    options = BuildOptions.Development,
+                    options = options,
                 };
                 var report = BuildPipeline.BuildPlayer(opts);
                 string line = $"{report.summary.result}, {report.summary.totalSize / 1048576} MB, {report.summary.totalTime.TotalSeconds:0} s, errors {report.summary.totalErrors}";

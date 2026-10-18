@@ -330,6 +330,9 @@ namespace FPSKit.EditorTools
         /// <summary>The Low Poly Shooter Pack's first-person motion baked for our arms (Resources/FirstPersonClips). Build/FirstPersonClips.</summary>
         public static void BakeFirstPersonClips() => Run(FPSKitFirstPersonClips.Bake);
 
+        /// <summary>A release Linux build of the menu and Desert Outpost for SmoothProbe (-fpskitsmooth &lt;report&gt;). Build/Perf/smooth.</summary>
+        public static void BuildSmoothPlayer() => Run(FPSKitPerfBuild.BuildSmooth);
+
         /// <summary>Writes any missing tuning asset under FPSKit_Generated/Resources (FPSKit > Settings > Ensure Runtime Settings).</summary>
         public static void EnsureRuntimeSettings() => Run(FPSKitRuntimeSettings.Ensure);
 

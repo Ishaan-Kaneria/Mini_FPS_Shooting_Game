@@ -216,7 +216,7 @@ namespace FPSKit.EditorTools
                 float lookAngle = Vector3.SignedAngle(Vector3.ProjectOnPlane(_d.transform.forward, Vector3.up), Vector3.ProjectOnPlane(lp - _bones[3].position, Vector3.up), Vector3.up);
                 var layers = new StringBuilder();
                 for (int li = 1; li < _anim.layerCount; li++) layers.Append($" {_anim.GetLayerName(li)}:{_anim.GetLayerWeight(li):0.00}");
-                r.look = layers + $" | headYaw {F("_headYaw"),6:0.0} pitch {F("_headPitch"),5:0.0} aimYaw {F("_aimYaw"),5:0.0} aimW {F("_aimWeight"):0.00} look@{lookAngle,6:0.0} base {(baseInfo.Length > 0 ? baseInfo[0].clip.name : "?")}{(_anim.IsInTransition(0) ? "(x)" : "")}";
+                r.look = layers + $" | square {F("_square"),5:0.0} aimYaw {F("_aimYaw"),5:0.0} aimW {F("_aimWeight"):0.00} look@{lookAngle,6:0.0} base {(baseInfo.Length > 0 ? baseInfo[0].clip.name : "?")}{(_anim.IsInTransition(0) ? "(x)" : "")}";
             }
             if (_injuredLayer >= 0)
             {

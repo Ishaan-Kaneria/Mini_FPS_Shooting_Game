@@ -76,6 +76,11 @@ public class EnemyBody : MonoBehaviour
     [Range(0f, 60f)] public float lowReady = 28f;
     [Tooltip("How far the body will turn its aim off its own facing, in degrees.")]
     [Range(10f, 90f)] public float aimLimit = 70f;
+    [Tooltip("Metres inside which the chest turns square on to the player instead of keeping the " +
+             "rifle's bladed stance (the arms turn back by as much, so the muzzle stays on).")]
+    [Range(0f, 8f)] public float squareUpRange = 3f;
+    [Tooltip("How much of the bladed stance is taken out at half that range and closer: 0 none, 1 all.")]
+    [Range(0f, 1f)] public float squareUpShare = 0.6f;
 
     [Header("Reactions")]
     [Tooltip("Scales every hit reaction. 0 turns them off.")]
@@ -284,6 +289,7 @@ public class EnemyBody : MonoBehaviour
                 if (t != null) bones.Add(t);
             }
             _poseBones = bones.ToArray();
+            MeasureFacing();
         }
 
         if (gun != null)
@@ -1132,7 +1138,7 @@ public class EnemyBody : MonoBehaviour
             RecoverPose();
             _rifle.Follow();
             HoldPistol();
-            RigAim(arms, crawling);
+            RigAim(arms, crawling, hurt);
             RigHands(arms);
             Clutch(hurt * arms);
             HoldWoundedArms(arms);
@@ -1183,7 +1189,7 @@ public class EnemyBody : MonoBehaviour
     /// turns the spine, chest and upper chest by the difference to the target, so the clip's
     /// bladed stance is kept and the bore ends up on the player. Calm, only the head looks about.
     /// </summary>
-    void RigAim(float weight, bool crawling)
+    void RigAim(float weight, bool crawling, float pain)
     {
         bool armed = _rifle.InHands || _rifle.State == EnemyRifle.Hold.Recovering || (_pistolHand != 0 && _drawn);
         bool sees = _brain != null ? _brain.WeaponUp && armed : _ai != null && _ai.target != null && _ai.HasSpotted && armed;
@@ -1216,28 +1222,144 @@ public class EnemyBody : MonoBehaviour
         Turn(_chestLow, side, _aimPitch * 0.3f);
         Turn(_chest, side, _aimPitch * 0.45f);
 
-        // The head: whatever the chest has not already turned, quickly, within a neck's reach.
-        // Never faster than a neck turns, and a point behind the shoulder keeps the head on the side
-        // it is already turned to: the mind's look point jumps (a scan, the last-known place, a new
-        // goal) and the head used to follow it in a frame, 32 to 53 degrees, or whip from one
-        // shoulder to the other as the point crossed behind (FPSKitGetUpProbe).
-        float rawYaw = Vector3.SignedAngle(Flat(transform.forward), Flat(look - eye), Vector3.up) - _aimYaw;
-        if (Mathf.Abs(rawYaw) > 110f && Mathf.Abs(_headYaw) > 5f && Mathf.Sign(rawYaw) != Mathf.Sign(_headYaw)) rawYaw = Mathf.Sign(_headYaw) * 70f;
-        float headYaw = Mathf.Clamp(rawYaw, -70f, 70f);
-        float headPitch = Mathf.Clamp(-Elevation(look - eye) - _aimPitch, -40f, 40f);
-        float lookWeight = weight * (crawling ? 0.6f : 1f);
-        _headYaw = Mathf.MoveTowards(_headYaw, Mathf.Lerp(_headYaw, headYaw * lookWeight, 1f - Mathf.Exp(-dt * 9f)), HeadTurnRate * dt);
-        _headPitch = Mathf.MoveTowards(_headPitch, Mathf.Lerp(_headPitch, headPitch * lookWeight * 0.7f, 1f - Mathf.Exp(-dt * 9f)), HeadTurnRate * 0.7f * dt);
-        Turn(_neck, Vector3.up, _headYaw * 0.4f);
-        Turn(_head, Vector3.up, _headYaw * 0.6f);
-        Vector3 headSide = Quaternion.AngleAxis(_aimYaw + _headYaw, Vector3.up) * transform.right;
-        Turn(_head, headSide, _headPitch);
+        // Up close, square on: the chest turns onto the player by part of the stance's blade and
+        // both upper arms turn back by as much, so the rifle keeps its aim and only the shoulders
+        // come round, as a man does when the fight is at arm's length.
+        float squareWant = 0f;
+        Transform foe = _ai != null ? _ai.target : null;
+        if (_aimWeight > 0.001f && foe != null && _chestFace != Vector3.zero && squareUpRange > 0f)
+        {
+            float near = Mathf.InverseLerp(squareUpRange, squareUpRange * 0.5f, Flat(foe.position - transform.position).magnitude);
+            float blade = Vector3.SignedAngle(Flat(_chest.rotation * _chestFace), Flat(foe.position - _chest.position), Vector3.up);
+            squareWant = Mathf.Clamp(blade * squareUpShare * near, -35f, 35f) * _aimWeight * weight;
+        }
+        _square = Mathf.Lerp(_square, squareWant, 1f - Mathf.Exp(-dt * 4f));
+        if (Mathf.Abs(_square) > 0.01f)
+        {
+            Turn(_chest, Vector3.up, _square);
+            Turn(_lUpper, Vector3.up, -_square);
+            Turn(_rUpper, Vector3.up, -_square);
+        }
+
+        // The head, last: measured off the pose as it now stands (the clip's head is not square to
+        // the body in a rifle stance), and turned so the face points at the player's eyes once it
+        // has them in sight. The look direction itself turns at a neck's pace, never a snap; a
+        // point behind the shoulder keeps the head on the side it is already turned to: the
+        // mind's look point jumps (a scan, the last-known place, a new goal) and the head used to
+        // follow it in a frame or whip from one shoulder to the other (FPSKitGetUpProbe).
+        if (_head == null || _headFace == Vector3.zero) return;
+        bool onPlayer = foe != null && (_brain != null ? _brain.FacesPlayer : _ai.HasSpotted);
+        Vector3 at = onPlayer ? EyesOf(foe) : look;
+        Vector3 face = _head.rotation * _headFace;
+        Vector3 gaze = at - EyePosition;
+        if (gaze.sqrMagnitude < 0.01f) gaze = face;
+        Vector3 chestFace = Flat(_chest.rotation * _chestFace);
+        if (chestFace.sqrMagnitude < 1e-6f) chestFace = Flat(transform.forward);
+
+        float yaw = Vector3.SignedAngle(chestFace, Flat(gaze), Vector3.up);
+        if (Mathf.Abs(yaw) > 110f && _headSide != 0f && Mathf.Sign(yaw) != _headSide) yaw = _headSide * NeckYaw;
+        yaw = Mathf.Clamp(yaw, -NeckYaw, NeckYaw);
+        if (Mathf.Abs(yaw) > 5f) _headSide = Mathf.Sign(yaw);
+        float pitch = Mathf.Clamp(Elevation(gaze), -NeckDown, NeckUp);
+        Vector3 limited = Quaternion.AngleAxis(yaw, Vector3.up) * Quaternion.AngleAxis(-pitch, Vector3.Cross(Vector3.up, chestFace.normalized)) * chestFace.normalized;
+
+        float lookWeight = weight * (crawling ? 0.6f : 1f) * (1f - 0.8f * pain);
+        if (lookWeight < 0.001f || _lookDir == Vector3.zero) _lookDir = face;
+        else
+        {
+            float off = Vector3.Angle(_lookDir, limited);
+            float step = Mathf.Min(off * (1f - Mathf.Exp(-dt * 9f)), HeadTurnRate * dt);
+            _lookDir = Vector3.RotateTowards(_lookDir, limited, step * Mathf.Deg2Rad, 0f);
+        }
+
+        // Round first, neck and head sharing it; then up or down about the face's own side.
+        float turnBy = Vector3.SignedAngle(Flat(face), Flat(_lookDir), Vector3.up) * lookWeight;
+        Turn(_neck, Vector3.up, turnBy * 0.4f);
+        Turn(_head, Vector3.up, turnBy * 0.6f);
+        face = _head.rotation * _headFace;
+        float raise = (Elevation(_lookDir) - Elevation(face)) * lookWeight;
+        Vector3 across = Vector3.Cross(Vector3.up, Flat(face)).normalized;
+        if (across.sqrMagnitude > 0.5f)
+        {
+            Turn(_neck, across, -raise * 0.3f);
+            Turn(_head, across, -raise * 0.7f);
+        }
+
+        // The neck carried the eyes a few centimetres as it turned: at arm's length that is four or
+        // five degrees off. Once the look has arrived, the head alone takes the rest, aimed again
+        // from where the eyes now are (FPSKitFaceTest, 1 m cases).
+        // Only inside the neck's reach: past it the body turns, not the head further.
+        float arrived = Mathf.Clamp01(1f - Vector3.Angle(_lookDir, limited) / 10f)
+                      * Mathf.Clamp01(1f - Vector3.Angle(limited, gaze) / 10f) * lookWeight;
+        if (arrived < 0.01f) return;
+        face = _head.rotation * _headFace;
+        gaze = at - EyePosition;
+        float yawLeft = Mathf.Clamp(Vector3.SignedAngle(Flat(face), Flat(gaze), Vector3.up), -10f, 10f) * arrived;
+        Turn(_head, Vector3.up, yawLeft);
+        face = _head.rotation * _headFace;
+        across = Vector3.Cross(Vector3.up, Flat(face)).normalized;
+        float raiseLeft = Mathf.Clamp(Elevation(gaze) - Elevation(face), -10f, 10f) * arrived;
+        if (across.sqrMagnitude > 0.5f) Turn(_head, across, -raiseLeft);
     }
 
-    float _aimYaw, _aimPitch, _headYaw, _headPitch;
+    float _aimYaw, _aimPitch, _square, _headSide;
+    Vector3 _lookDir;
 
     /// <summary>Degrees a second the look turns the head at most: brisk, but a turn, never a snap.</summary>
     const float HeadTurnRate = 240f;
+
+    /// <summary>A neck's reach off the chest: round either way, up, and down.</summary>
+    const float NeckYaw = 75f, NeckUp = 40f, NeckDown = 50f;
+
+    // Which way the face and the chest point, in each bone's own space (from the rest pose).
+    Vector3 _headFace, _headUp, _chestFace;
+
+    /// <summary>
+    /// The face and chest directions in their bones' own space, from the avatar's rest pose, in
+    /// which the model faces its root's forward. The look used to assume the clip's head faced
+    /// the body's forward; in the rifle stance it does not, and up close the face looked past the
+    /// player's left shoulder (Ishaan's screenshot, 2026-10-18).
+    /// </summary>
+    void MeasureFacing()
+    {
+        if (_head == null || _chest == null) return;
+        var rest = new Dictionary<string, Quaternion>();
+        foreach (var bone in animator.avatar.humanDescription.skeleton) rest[bone.name] = bone.rotation;
+
+        Quaternion Rest(Transform bone)
+        {
+            Quaternion r = Quaternion.identity;
+            for (var t = bone; t != null && t != animator.transform; t = t.parent)
+                r = (rest.TryGetValue(t.name, out var local) ? local : t.localRotation) * r;
+            return r;
+        }
+
+        Quaternion head = Quaternion.Inverse(Rest(_head));
+        _headFace = head * Vector3.forward;
+        _headUp = head * Vector3.up;
+        _chestFace = Quaternion.Inverse(Rest(_chest)) * Vector3.forward;
+    }
+
+    /// <summary>Where the face points now, after the look (for tests and the debug overlay).</summary>
+    public Vector3 FaceDirection => _head != null ? _head.rotation * _headFace : transform.forward;
+
+    /// <summary>Between the eyes, roughly: a little up and forward of the head bone.</summary>
+    public Vector3 EyePosition => _head == null ? transform.position + Vector3.up * 1.6f
+        : _head.position + (_head.rotation * _headUp + _head.rotation * _headFace) * 0.09f * transform.lossyScale.y;
+
+    Transform _eyeOwner, _eyeOf;
+
+    /// <summary>The player's eyes: the camera under them, else head height over their feet.</summary>
+    Vector3 EyesOf(Transform target)
+    {
+        if (target != _eyeOwner)
+        {
+            _eyeOwner = target;
+            var cam = Camera.main != null && Camera.main.transform.IsChildOf(target) ? Camera.main : target.GetComponentInChildren<Camera>();
+            _eyeOf = cam != null ? cam.transform : null;
+        }
+        return _eyeOf != null ? _eyeOf.position : target.position + Vector3.up * 1.6f;
+    }
 
     /// <summary>On the ground, alive: the chest rises and falls, faster and deeper in pain.</summary>
     void Breathe()

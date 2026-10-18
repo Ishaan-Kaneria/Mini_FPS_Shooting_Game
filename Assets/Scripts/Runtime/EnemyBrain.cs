@@ -83,6 +83,12 @@ public class EnemyBrain : MonoBehaviour
     /// <summary>Where it is looking: the player, the noise, or whatever it is scanning.</summary>
     public Vector3 LookPoint { get; private set; }
 
+    /// <summary>
+    /// Alert and has had the player in sight this last moment: the face goes to the player's
+    /// eyes, live, not to the last-known point (the body reads this).
+    /// </summary>
+    public bool FacesPlayer => WeaponUp && Time.time - _lastSeen < 1.5f;
+
     public Role Part { get; private set; }
 
     EnemyAI _ai;

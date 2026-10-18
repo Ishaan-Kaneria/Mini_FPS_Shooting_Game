@@ -306,6 +306,13 @@ namespace FPSKit.EditorTools
         public static void VerifyKickView() => FPSKitKickViewTest.Batch();
 
         /// <summary>
+        /// An aware enemy's face points at the player's eyes: 1, 3, 10 and 30 m, left, right, above and
+        /// below; median angle under 5 degrees once turned. Report (and pictures with UNITY_GRAPHICS=1)
+        /// in Build/FaceTest.
+        /// </summary>
+        public static void VerifyFace() => FPSKitFaceTest.Batch();
+
+        /// <summary>
         /// A dead enemy's gun rests on the ground: rigged and plain bodies, concrete, wood, sand and
         /// slopes, six orientations; mesh-to-surface gap and jitter once settled. Report and (with
         /// UNITY_GRAPHICS=1) close-ups in Build/GunDrop.

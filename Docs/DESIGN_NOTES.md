@@ -3052,3 +3052,28 @@ does not whip across behind the shoulder), overlays switched on at full weight (
 go of the rifle for a frame. GetUp_Stomach_Zombie's own right-arm swing exceeds 25 degrees/frame at fast
 rise speeds; the probe proves such frames are the clip's by sampling the clip alone at the same times,
 and renders it (`zombie_arm_sheet.png`) to be judged by eye. The 25-degree bar is unchanged.
+
+## An aware enemy looks you in the eye (2026-10-18)
+
+Ishaan's screenshot: a soldier a metre away looked down past his left shoulder. `FPSKitFaceTest`
+(`FPSKitBatch.VerifyFace`) measured the angle between the face and the player's camera, 1/3/10/30 m,
+player left, right, above and below: **30 to 69 degrees off in every case** (Build/FaceTest/report_before_fix.txt).
+
+- The head look assumed the clip's head faced the body's forward. In the rifle stance it is turned and
+  tipped down to the sights, so the correction was aimed from the wrong start. It also looked at the
+  chest (1.4 m) at 70% of the pitch. Now the face and chest directions are read from the avatar's rest
+  pose (`EnemyBody.MeasureFacing`, `avatar.humanDescription.skeleton`: the model faces its root's forward
+  there), and the head is turned from where the face actually points to the player's **camera**
+  (`EnemyBrain.FacesPlayer`: alert and seen in the last 1.5 s; otherwise the brain's look point).
+- The look direction itself turns at most 240 deg/s with an exponential approach (no snap), inside a
+  neck's reach of the chest (75 round, 40 up, 50 down); past that the body turns. A point behind the
+  shoulder keeps the head on its side (no whip across).
+- Turning the neck carries the eyes a few centimetres: at arm's length that was 4-5 degrees. Once the
+  look has arrived, the head alone takes the remainder, aimed again from where the eyes now are.
+- Under `squareUpRange` (3 m) the chest turns square on by `squareUpShare` of the stance's blade and both
+  upper arms turn back by as much, so the rifle keeps its aim and only the shoulders come round.
+- Pain still owns the head: the look is weakened by 80% of the pain weight.
+
+After: face to camera median 0.0-0.6 degrees in all 16 cases, worst frame 3.2; the muzzle within 0.3-2.5
+degrees of its aim point beyond 3 m (up close, when it has walked into arm's length, 3-10 median: the
+muzzle sits almost at the target). Pictures: Build/FaceTest/faces.png and faces_before_fix.png.

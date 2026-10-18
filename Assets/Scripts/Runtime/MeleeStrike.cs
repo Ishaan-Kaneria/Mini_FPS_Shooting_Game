@@ -150,11 +150,21 @@ public class MeleeStrike : MonoBehaviour
     /// <summary>Raised when <see cref="InReach"/> flips.</summary>
     public event Action<MeleeStrike, bool> ReachChanged;
 
-    /// <summary>Raised on every punch thrown, with who it hit (null for a miss).</summary>
-    public event Action<MeleeStrike, Health> Punched;
+    /// <summary>
+    /// Raised when a strike starts, with who it is aimed at (null when nobody is in reach). Not a
+    /// blow: whether it lands is decided when the fist or the boot gets there (<see cref="Landed"/>,
+    /// <see cref="Missed"/>). A swing is quiet; only a blow that lands is heard as violence.
+    /// </summary>
+    public event Action<MeleeStrike, Strike, Health> AttackStarted;
 
-    /// <summary>Raised on every strike of any kind, with who it hit (null for a miss).</summary>
-    public event Action<MeleeStrike, Strike, Health> Struck;
+    /// <summary>Raised on the frame a blow lands, with who it hit.</summary>
+    public event Action<MeleeStrike, Strike, Health> Landed;
+
+    /// <summary>
+    /// Raised at the moment a blow would have landed when it met nobody: nobody in reach, out of
+    /// reach by then, or behind something solid by then.
+    /// </summary>
+    public event Action<MeleeStrike, Strike> Missed;
 
     /// <summary>Share of each strike at which the blow lands.</summary>
     public static float ImpactAt(Strike s) => s switch
@@ -188,7 +198,7 @@ public class MeleeStrike : MonoBehaviour
     float _holdUntil = -1f, _heldAt;
 
     Collider[] _overlap;
-    Collider[] Overlap => _overlap ??= new Collider[32];
+    Collider[] Overlap => _overlap ??= new Collider[64];
     int _enemyMask = -1;
     int _blockMask;
 
@@ -222,6 +232,15 @@ public class MeleeStrike : MonoBehaviour
         Stamina = Settings.maxStamina;
     }
 
+    void EnsureMasks()
+    {
+        if (_enemyMask >= 0) return;
+        int enemy = LayerMask.NameToLayer("Enemy");
+        int player = LayerMask.NameToLayer("Player");
+        _enemyMask = enemy >= 0 ? 1 << enemy : ~0;
+        _blockMask = ~((enemy >= 0 ? 1 << enemy : 0) | (player >= 0 ? 1 << player : 0));
+    }
+
     void OnDisable()
     {
         if (weapon != null)
@@ -232,6 +251,8 @@ public class MeleeStrike : MonoBehaviour
 
         if (supportHand != null) supportHand.SetActive(true);
         _pendingTarget = null;
+        _pending = false;
+        _queued = Strike.None;
         _strike = Strike.None;
         _fists = false;
         GunAway = 0f;
@@ -259,6 +280,11 @@ public class MeleeStrike : MonoBehaviour
                      | MobileInput.ConsumeMelee() | GameInput.PadPressed(GameAction.Melee);
         bool kick = ControlSettings.Pressed(keys.kick) | ControlSettings.Pressed(keys.altKick)
                     | MobileInput.ConsumeKick() | GameInput.PadPressed(GameAction.Kick);
+
+        // Nothing waits through a pause, a menu or a death: a press queued before them must not
+        // be thrown the moment play comes back (game time stands still in a pause, so the queue's
+        // 0.4 s would never run out).
+        if (!able) _queued = Strike.None;
 
         // A press made while the last strike is still recovering is kept for a moment and
         // thrown the instant it can be, not dropped: mashing must never feel ignored.
@@ -416,19 +442,17 @@ public class MeleeStrike : MonoBehaviour
 
         PlayClip(swingClip, strike == Strike.Kick ? 0.95f : 0.8f);
 
-        // The pull of the view happens now; the blow lands when the fist or the boot gets
-        // there (Animate), so what the eye sees and what the body feels are the same moment.
-        // A target that has got away by then is missed.
-        if (target != null)
-        {
-            Pull(target);
-            _pendingTarget = target;
-            _pendingStrike = strike;
-            _pendingRange = range;
-        }
+        // The pull of the view happens now; the blow lands or misses when the fist or the boot
+        // gets there (Animate), so what the eye sees and what the body feels are the same moment.
+        // A target that has got away by then, or gone behind something, is missed.
+        if (_pending) Resolve();
+        if (target != null) Pull(target);
+        _pending = true;
+        _pendingTarget = target;
+        _pendingStrike = strike;
+        _pendingRange = range;
 
-        if (strike != Strike.Kick) Punched?.Invoke(this, target);
-        Struck?.Invoke(this, strike, target);
+        AttackStarted?.Invoke(this, strike, target);
         return target;
     }
 
@@ -469,6 +493,7 @@ public class MeleeStrike : MonoBehaviour
     }
 
     bool _tired;
+    bool _pending;
     Health _pendingTarget;
     Strike _pendingStrike;
     float _pendingRange;
@@ -534,7 +559,9 @@ public class MeleeStrike : MonoBehaviour
                 }
 
                 float push = role == EnemyArchetype.Role.Elite ? s.eliteKnockbackShare : 1f;
-                ai.Knock((away + Vector3.up * 0.25f) * s.kickLaunchSpeed * push, s.kickStagger);
+                // Thrown as a ragdoll; a body that cannot be (none, or already on its way up) is
+                // driven back kickKnockback metres instead.
+                ai.Knock((away + Vector3.up * 0.25f) * s.kickLaunchSpeed * push, s.kickStagger, s.kickKnockback * push);
                 break;
             }
         }
@@ -566,14 +593,7 @@ public class MeleeStrike : MonoBehaviour
     Health FindTarget(float range)
     {
         if (fpsCamera == null) return null;
-
-        if (_enemyMask < 0)
-        {
-            int enemy = LayerMask.NameToLayer("Enemy");
-            int player = LayerMask.NameToLayer("Player");
-            _enemyMask = enemy >= 0 ? 1 << enemy : ~0;
-            _blockMask = ~((enemy >= 0 ? 1 << enemy : 0) | (player >= 0 ? 1 << player : 0));
-        }
+        EnsureMasks();
 
         var s = Settings;
         float reach = range;
@@ -581,8 +601,15 @@ public class MeleeStrike : MonoBehaviour
         Transform cam = fpsCamera.transform;
         Vector3 eye = cam.position;
 
-        int count = Physics.OverlapSphereNonAlloc(eye, reach, Overlap, _enemyMask,
-                                                  QueryTriggerInteraction.Ignore);
+        // Every enemy is a dozen or more hitboxes, so two or three close by fill a small buffer, and
+        // a full buffer leaves out whatever did not fit -- maybe the one under the crosshair. Asked
+        // again with room to spare until it is not full.
+        int count = Physics.OverlapSphereNonAlloc(eye, reach, Overlap, _enemyMask, QueryTriggerInteraction.Ignore);
+        while (count == _overlap.Length && _overlap.Length < MaxOverlap)
+        {
+            _overlap = new Collider[_overlap.Length * 2];
+            count = Physics.OverlapSphereNonAlloc(eye, reach, _overlap, _enemyMask, QueryTriggerInteraction.Ignore);
+        }
 
         Health best = null;
         float bestAngle = s.coneDegrees;
@@ -738,11 +765,42 @@ public class MeleeStrike : MonoBehaviour
         }
     }
 
-    /// <summary>Whether the target is still within a blow's reach of the eye.</summary>
+    const int MaxOverlap = 1024;
+
+    /// <summary>
+    /// Whether the target can still be hit as the blow lands: within reach of the eye, and with
+    /// nothing solid between (asked again now, not trusted from the throw: an enemy that stepped
+    /// behind a wall during the swing is not hit through it).
+    /// </summary>
     bool Reaches(Health target, float reach)
     {
+        EnsureMasks();
         Vector3 eye = fpsCamera.transform.position;
-        return (ClosestPoint(target, eye, out _) - eye).sqrMagnitude <= reach * reach;
+        Vector3 to = ClosestPoint(target, eye, out _) - eye;
+        float distance = to.magnitude;
+        if (distance > reach) return false;
+        return distance <= 0.05f
+               || !Physics.Raycast(eye, to / distance, distance - 0.02f, _blockMask, QueryTriggerInteraction.Ignore);
+    }
+
+    /// <summary>The blow arrives: it lands on the target if the target can still be hit, else it is a miss.</summary>
+    void Resolve()
+    {
+        _pending = false;
+        var target = _pendingTarget;
+        var strike = _pendingStrike;
+        _pendingTarget = null;
+
+        // The strike's own reach and a hand's breadth more, for a target stepping back during the
+        // swing. It used to be 1.2 m more, room for the lunge the strike no longer takes.
+        bool landed = target != null && !target.IsDead
+                      && Reaches(target, _pendingRange + Settings.impactTolerance) && Hit(target, strike);
+        if (landed)
+        {
+            Feel(strike, target.IsDead);
+            Landed?.Invoke(this, strike, target);
+        }
+        else Missed?.Invoke(this, strike);
     }
 
     /// <summary>
@@ -755,15 +813,7 @@ public class MeleeStrike : MonoBehaviour
         float k = StrikeProgress;
         bool swinging = k >= 0f;
 
-        if (_pendingTarget != null && (!swinging && Time.time >= _strikeStart || k >= ImpactAt(_pendingStrike)))
-        {
-            var target = _pendingTarget;
-            var strike = _pendingStrike;
-            _pendingTarget = null;
-
-            bool landed = !target.IsDead && Reaches(target, _pendingRange + 1.2f) && Hit(target, strike);
-            if (landed) Feel(strike, target.IsDead);
-        }
+        if (_pending && (!swinging && Time.time >= _strikeStart || k >= ImpactAt(_pendingStrike))) Resolve();
 
         if (weapon == null) return;
 

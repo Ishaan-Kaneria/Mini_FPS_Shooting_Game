@@ -542,7 +542,8 @@ namespace FPSKit.EditorTools
         /// <summary>A picture of the subject from an angle round it (0 = in front of it), at a distance.</summary>
         static void PictureFrom(GameObject subject, string name, float angle, float distance)
         {
-            if (subject == null) return;
+            // No graphics device (a -nographics batch run): rendering one crashes the editor; the checks need no pictures.
+            if (subject == null || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return;
             var anim = subject.GetComponentInChildren<Animator>();
             Vector3 at = anim.GetBoneTransform(HumanBodyBones.Chest).position;
             Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * subject.transform.forward;
@@ -553,7 +554,8 @@ namespace FPSKit.EditorTools
 
         static void Picture(GameObject subject, string name)
         {
-            if (subject == null) return;
+            // No graphics device (a -nographics batch run): rendering one crashes the editor; the checks need no pictures.
+            if (subject == null || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return;
             var anim = subject.GetComponentInChildren<Animator>();
             Vector3 at = anim != null && anim.GetBoneTransform(HumanBodyBones.Hips) != null
                 ? anim.GetBoneTransform(HumanBodyBones.Hips).position : subject.transform.position + Vector3.up;

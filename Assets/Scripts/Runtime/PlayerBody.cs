@@ -300,7 +300,9 @@ public class PlayerBody : MonoBehaviour
             _anim.SetLayerWeight(_kickLayer, Smooth(_kickW));
             if (!kicking && _kickW <= 0f) _kickState = "";
         }
-        _turn = Mathf.Lerp(_turn, kicking ? S.kick.turn : 0f, 1f - Mathf.Exp(-30f * dt));
+        // Turned so the boot lands just right of the crosshair (kickAside), beside the enemy's head
+        // and chest rather than over them.
+        _turn = Mathf.Lerp(_turn, kicking ? S.kick.turn - S.kickAside : 0f, 1f - Mathf.Exp(-30f * dt));
     }
 
     /// <summary>

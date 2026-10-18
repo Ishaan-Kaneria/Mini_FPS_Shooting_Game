@@ -20,7 +20,8 @@ MonoBehaviour:
   liftLimits: {x: -0.15, y: 0.1}
   lookDownBack: 0.22
   sprintClipSpeed: 6.3285913
-  kickLean: 14
+  kickLean: 8
+  kickAside: 8
   kick:
     state: Kick
     range: {x: 0.20338982, y: 0.86440676}

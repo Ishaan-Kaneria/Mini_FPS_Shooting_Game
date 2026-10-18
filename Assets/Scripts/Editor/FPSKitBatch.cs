@@ -293,6 +293,19 @@ namespace FPSKit.EditorTools
         public static void VerifyMeleeMotion() => FPSKitMeleeMotionTest.Batch();
 
         /// <summary>
+        /// The melee rules: line of sight and reach at impact, AttackStarted/Landed/Missed and their
+        /// noise, the queue across a pause, a crowd past the old collider buffer, the kick's fallback
+        /// shove. Report in Build/MeleeRules/report.txt.
+        /// </summary>
+        public static void VerifyMeleeRules() => FPSKitMeleeRulesTest.Batch();
+
+        /// <summary>
+        /// How many frames the kick's own leg hides over half of the enemy being kicked, in first
+        /// person. Needs UNITY_GRAPHICS=1. Report and contact sheet in Build/KickView.
+        /// </summary>
+        public static void VerifyKickView() => FPSKitKickViewTest.Batch();
+
+        /// <summary>
         /// A dead enemy's gun rests on the ground: rigged and plain bodies, concrete, wood, sand and
         /// slopes, six orientations; mesh-to-surface gap and jitter once settled. Report and (with
         /// UNITY_GRAPHICS=1) close-ups in Build/GunDrop.

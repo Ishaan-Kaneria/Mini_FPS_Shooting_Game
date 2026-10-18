@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// The sounds the player makes, put into the <see cref="NoiseSystem"/> for enemies to hear:
-/// every shot, every footfall (loud at a sprint, nothing crouched), a landing, and every
-/// blow thrown. Added by the PlayerMotor at runtime.
+/// every shot, every footfall (loud at a sprint, nothing crouched), a landing, the whoosh of
+/// a swing, and every blow that lands. Added by the PlayerMotor at runtime.
 /// </summary>
 [DisallowMultipleComponent]
 public class PlayerNoise : MonoBehaviour
@@ -14,8 +14,11 @@ public class PlayerNoise : MonoBehaviour
     public float sprintSteps = 16f;
     public float jogSteps = 8f;
     public float aimSteps = 4f;
-    [Tooltip("Metres a blow landing carries.")]
+    [Tooltip("Metres a blow landing carries. Heard as violence: something happened over there.")]
     public float blow = 14f;
+    [Tooltip("Metres a swing carries, landed or not: the whoosh and the effort. Heard as movement, " +
+             "never as violence; only a blow that lands is that.")]
+    public float swing = 3f;
 
     PlayerMotor _motor;
     Weapon _weapon;
@@ -32,20 +35,22 @@ public class PlayerNoise : MonoBehaviour
     void OnEnable()
     {
         if (_weapon != null) _weapon.Fired += OnFired;
-        if (_melee != null) _melee.Struck += OnStruck;
+        if (_melee != null) { _melee.AttackStarted += OnSwing; _melee.Landed += OnBlow; }
         if (_motor != null) _motor.Landed += OnLanded;
     }
 
     void OnDisable()
     {
         if (_weapon != null) _weapon.Fired -= OnFired;
-        if (_melee != null) _melee.Struck -= OnStruck;
+        if (_melee != null) { _melee.AttackStarted -= OnSwing; _melee.Landed -= OnBlow; }
         if (_motor != null) _motor.Landed -= OnLanded;
     }
 
     void OnFired(Weapon w) => NoiseSystem.Emit(transform.position, gunshot, NoiseKind.Gunfire, gameObject);
 
-    void OnStruck(MeleeStrike m, MeleeStrike.Strike s, Health target)
+    void OnSwing(MeleeStrike m, MeleeStrike.Strike s, Health target) => NoiseSystem.Emit(transform.position, swing, NoiseKind.Movement, gameObject);
+
+    void OnBlow(MeleeStrike m, MeleeStrike.Strike s, Health target)
     {
         if (target != null) NoiseSystem.Emit(target.transform.position, blow, NoiseKind.Violence, gameObject);
     }

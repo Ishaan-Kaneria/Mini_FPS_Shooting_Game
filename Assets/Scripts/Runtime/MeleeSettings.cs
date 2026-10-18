@@ -49,6 +49,10 @@ public class MeleeSettings : ScriptableObject
     [Range(1f, 4f)] public float kickRange = 2.5f;
     [Tooltip("Degrees either side of the crosshair a target can be and still be hit.")]
     [Range(10f, 80f)] public float coneDegrees = 45f;
+    [Tooltip("Metres past the punch or kick range a target may be when the blow lands and still be " +
+             "hit: it may have stepped back a little during the swing. Small on purpose: the reach is " +
+             "the arm's or the leg's, the body takes no step.")]
+    [Range(0f, 0.6f)] public float impactTolerance = 0.25f;
 
     [Header("Pad and touch help (never a mouse)")]
     [Tooltip("How hard the view turns onto the target as the strike is thrown, on a pad or a " +
@@ -104,7 +108,8 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Speed, in metres a second, an ordinary enemy is thrown back at. It flies, lands " +
              "and gets up; a strike while it is down is a takedown.")]
     [Range(0f, 15f)] public float kickLaunchSpeed = 7.5f;
-    [Tooltip("Metres an enemy with no ragdoll is driven back instead.")]
+    [Tooltip("Metres an enemy that cannot be thrown is driven back along the ground instead: one " +
+             "with no ragdoll, or one already on its way up from the last fall.")]
     [Range(0f, 6f)] public float kickKnockback = 3.5f;
     [Tooltip("Seconds it is off balance afterwards. Long enough to follow up.")]
     [Range(0f, 4f)] public float kickStagger = 1.5f;

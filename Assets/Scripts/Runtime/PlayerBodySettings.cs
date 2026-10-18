@@ -39,6 +39,10 @@ public class PlayerBodySettings : ScriptableObject
     [Min(0.5f)] public float sprintClipSpeed = 6.8f;
     [Tooltip("Degrees the body leans back for a kick (around its feet), which lifts the kicking leg into view.")]
     [Range(0f, 30f)] public float kickLean = 14f;
+    [Tooltip("Degrees right of the crosshair the boot lands, so at the moment of the kick it is beside the " +
+             "enemy's head and chest rather than over them (measured by FPSKitKickViewTest). The blow still " +
+             "lands on whoever is under the crosshair.")]
+    [Range(0f, 25f)] public float kickAside = 8f;
     [Tooltip("The kick's clip, where in it the foot lands and which way it goes (filled by the builder).")]
     public StrikeClip kick;
 

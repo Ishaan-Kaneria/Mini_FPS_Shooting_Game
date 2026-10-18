@@ -1363,7 +1363,7 @@ public class EnemyAI : MonoBehaviour
     /// air at <paramref name="velocity"/>, lands and gets up (<see cref="Knocked"/>); one that
     /// cannot is driven back across the ground instead.
     /// </summary>
-    public void Knock(Vector3 velocity, float staggerSeconds)
+    public void Knock(Vector3 velocity, float staggerSeconds, float fallbackDistance = -1f)
     {
         if (CurrentState == State.Dead) return;
 
@@ -1373,8 +1373,12 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
+        // A body that cannot fly (no ragdoll, or already down or rising) is driven back along the
+        // ground: the caller's distance when it gives one (the kick's kickKnockback), else one
+        // worked out from the speed.
         Vector3 flat = new Vector3(velocity.x, 0f, velocity.z);
-        Shove(flat.normalized * Mathf.Min(4f, flat.magnitude * 0.45f), 0.4f, staggerSeconds);
+        float distance = fallbackDistance >= 0f ? fallbackDistance : Mathf.Min(4f, flat.magnitude * 0.45f);
+        Shove(flat.normalized * distance, 0.4f, staggerSeconds);
     }
 
     /// <summary>

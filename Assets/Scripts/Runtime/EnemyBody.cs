@@ -1559,12 +1559,19 @@ public class EnemyBody : MonoBehaviour
         var body = gun.gameObject.GetComponent<Rigidbody>();
         if (body == null) body = gun.gameObject.AddComponent<Rigidbody>();
         body.mass = 3.5f;
+        body.linearDamping = 0.3f;
+        body.angularDamping = 0.8f;
+        body.interpolation = RigidbodyInterpolation.Interpolate;
+        body.collisionDetectionMode = CollisionDetectionMode.Continuous;   // swept: see EnemyRifle.Loose
         body.isKinematic = false;
+        // Boxes fitted to the gun's own parts (it used to be one fixed box that left it 15 mm up on
+        // its side and the magazine 11 cm into the ground upright); see GunColliders.
         if (gun.GetComponentInChildren<Collider>() == null)
         {
-            var box = gun.gameObject.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, -0.03f, 0.1f);
-            box.size = new Vector3(0.06f, 0.18f, 0.75f);
+            var boxes = GunColliders.Fit(gun);
+            GunColliders.IgnoreBody(boxes, transform);
+            body.ResetCenterOfMass();
+            body.ResetInertiaTensor();
         }
         body.linearVelocity = push;
         body.angularVelocity = Random.insideUnitSphere * 3f;

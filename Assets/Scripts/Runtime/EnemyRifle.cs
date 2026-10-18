@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -71,9 +72,8 @@ public class EnemyRifle : MonoBehaviour
     Transform _gun, _socket, _sway, _rightGrip;
     Transform _chest, _rUpper, _rLower, _rHand;
     Rigidbody _rb;
-    BoxCollider _box;
+    List<Collider> _boxes;
     ConfigurableJoint _joint;
-    PhysicsMaterial _material;
 
     Vector3 _off, _offVel, _turn, _turnVel;
     Vector3 _lastSocketPos, _lastSocketVel;
@@ -261,14 +261,20 @@ public class EnemyRifle : MonoBehaviour
         _rb.linearDamping = 0.3f;
         _rb.angularDamping = 3f;
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
-        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        // Swept, not speculative: a thin hull landing on a terrain heightfield at a few metres a second
+        // sank up to 42 mm into it with speculative contacts (VerifyGunDrop).
+        _rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
         _rb.isKinematic = false;
         _rb.linearVelocity = velocity;
 
-        if (_box == null) _box = MakeCollider();
-        _box.enabled = true;
-        foreach (var c in GetComponentsInChildren<Collider>())
-            if (c != null && c != _box) Physics.IgnoreCollision(_box, c);
+        if (_boxes == null)
+        {
+            _boxes = GunColliders.Fit(_gun);
+            GunColliders.IgnoreBody(_boxes, transform);
+        }
+        GunColliders.Enable(_boxes, true);
+        _rb.ResetCenterOfMass();
+        _rb.ResetInertiaTensor();
         _rb.WakeUp();
     }
 
@@ -296,38 +302,6 @@ public class EnemyRifle : MonoBehaviour
         _joint.slerpDrive = new JointDrive { positionSpring = 0f, positionDamper = 6f, maximumForce = float.MaxValue };
         _joint.projectionMode = JointProjectionMode.PositionAndRotation;
         _joint.enablePreprocessing = false;
-    }
-
-    /// <summary>A box round the rifle's meshes, in its own space, with a grippy, dead material.</summary>
-    BoxCollider MakeCollider()
-    {
-        var bounds = new Bounds();
-        bool any = false;
-        foreach (var mf in _gun.GetComponentsInChildren<MeshFilter>())
-        {
-            if (mf.sharedMesh == null) continue;
-            var b = mf.sharedMesh.bounds;
-            for (int i = 0; i < 8; i++)
-            {
-                Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
-                Vector3 local = _gun.InverseTransformPoint(mf.transform.TransformPoint(corner));
-                if (!any) { bounds = new Bounds(local, Vector3.zero); any = true; }
-                else bounds.Encapsulate(local);
-            }
-        }
-        var box = _gun.gameObject.AddComponent<BoxCollider>();
-        box.center = any ? bounds.center : new Vector3(0f, -0.03f, 0.1f);
-        box.size = any ? Vector3.Max(bounds.size, Vector3.one * 0.04f) : new Vector3(0.06f, 0.18f, 0.75f);
-        _material ??= new PhysicsMaterial("Rifle")
-        {
-            dynamicFriction = 0.85f,
-            staticFriction = 1f,
-            bounciness = 0.05f,
-            frictionCombine = PhysicsMaterialCombine.Maximum,
-            bounceCombine = PhysicsMaterialCombine.Minimum,
-        };
-        box.sharedMaterial = _material;
-        return box;
     }
 
     /// <summary>Out of the hands for good (the arms are gone, or it died): falls and stays.</summary>
@@ -382,8 +356,8 @@ public class EnemyRifle : MonoBehaviour
     void StartBringUp()
     {
         if (_joint != null) Destroy(_joint);
-        if (_rb != null) { _rb.isKinematic = true; _rb.interpolation = RigidbodyInterpolation.None; }
-        if (_box != null) _box.enabled = false;
+        if (_rb != null) { _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative; _rb.isKinematic = true; _rb.interpolation = RigidbodyInterpolation.None; }
+        GunColliders.Enable(_boxes, false);
         if (_gun.parent != transform) _gun.SetParent(transform, true);
         _fromPos = transform.InverseTransformPoint(_gun.position);
         _fromRot = Quaternion.Inverse(transform.rotation) * _gun.rotation;
@@ -424,8 +398,8 @@ public class EnemyRifle : MonoBehaviour
         if (State == Hold.Held) return true;
         if (State != Hold.Slung && State != Hold.OnBack && State != Hold.Recovering) return false;
         if (_joint != null) Destroy(_joint);
-        if (_rb != null) { _rb.isKinematic = true; _rb.interpolation = RigidbodyInterpolation.None; }
-        if (_box != null) _box.enabled = false;
+        if (_rb != null) { _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative; _rb.isKinematic = true; _rb.interpolation = RigidbodyInterpolation.None; }
+        GunColliders.Enable(_boxes, false);
         Finish(true);
         return true;
     }

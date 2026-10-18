@@ -293,6 +293,13 @@ namespace FPSKit.EditorTools
         public static void VerifyMeleeMotion() => FPSKitMeleeMotionTest.Batch();
 
         /// <summary>
+        /// A dead enemy's gun rests on the ground: rigged and plain bodies, concrete, wood, sand and
+        /// slopes, six orientations; mesh-to-surface gap and jitter once settled. Report and (with
+        /// UNITY_GRAPHICS=1) close-ups in Build/GunDrop.
+        /// </summary>
+        public static void VerifyGunDrop() => FPSKitGunDropTest.Batch();
+
+        /// <summary>
         /// Wounds, blood, voices and deaths: a leg shot limps then floors an enemy, a gun
         /// arm shot disarms it, a headshot kills a grunt and not a boss, a kill ragdolls
         /// the body the way the killing hit says.

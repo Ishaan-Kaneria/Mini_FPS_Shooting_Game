@@ -3172,3 +3172,25 @@ every pose, fighting or not, as built; the right hand is clear of them by 30 px 
 pins Unity and everything it starts to the eight efficient cores (threads 8-15; on the performance cores' 0-7 a compile
 check still went over 95 C three times), with as many job workers, and freezes the job above 95 C until it is under 80
 (UNITY_CPUS, UNITY_START_BELOW, UNITY_HOT, UNITY_COOL).
+
+## VerifyCombat's "no damage" coin flip (2026-10-19)
+
+It failed about one run in two on "the player took no damage in 14s under fire". Four causes, all in the test:
+
+1. **The window was wall-clock time.** The enemies live in game time, and a frame gives at most a third of a second of
+   it. On a hot, throttled laptop (the failures came at 94-98 C) or while the batch script's heat guard froze Unity,
+   the "14 s" held a fraction of that: frozen for 10 s on purpose, it held 4.3 s, the one enemy that had seen the
+   player was on its first burst, and the run failed. The windows are now game time, every frame a sixtieth of a
+   second from the fight on; the same 10 s freeze now passes.
+2. **It tested noticing, not fighting.** The player was teleported in front of a calm, patrolling enemy; whether it
+   turned and saw them in time is the perception's job (Stage 1), and some runs nobody did. The squad is now called
+   in on the player's spot as the window opens (`EnemyBrain.HearCall`, what a comrade's shout does in play).
+3. **It asserted luck.** A level-one Grunt spreads 5 degrees: from 12-20 m one round in five lands (400 rays with the
+   game's own spread, against the player's collider), and bounding between firing spots it fired four to eight in the
+   window. Now: the player is hit, or at least 3 rounds were aimed at them along a clear line, in 30 s of game time
+   (it stops at the first hit, 0.6-9 s usually). That a hit registers is proven point-blank, where a round cannot miss.
+4. **The reaction check counted a miss as no reaction.** Since a blow lands only in reach at impact, an alert enemy
+   stepping back during the wind-up made the strike miss; the player is now held at arm's length until it lands.
+
+After: 8 of 8 runs passed, cool; the counts per enemy (rounds fired, what its line met, its hit chance) are in the
+report when it does fail.

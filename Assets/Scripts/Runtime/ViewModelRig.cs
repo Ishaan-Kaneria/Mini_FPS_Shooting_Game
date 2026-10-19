@@ -977,6 +977,11 @@ public class ViewModelRig : MonoBehaviour
                 lFistW = f * (1f - carry);
             }
 
+            // A captured move (FPSKitMocap's first-person track) in place of the drawn one, fitted to this framing.
+            if (Captured != null && Captured.Frames > 1)
+                CapturedFists(view, Guard(LeftGuard, -1f), Guard(RightGuard, 1f), Wide(JabReach, -1f), Wide(CrossReach, 1f),
+                              ref lFist, ref lFistRot, ref rFist, ref rFistRot);
+
             lPos = Vector3.Lerp(lPos, view.TransformPoint(lFist), f);
             rPos = Vector3.Lerp(rPos, view.TransformPoint(rFist), f);
             lRot = Quaternion.Slerp(lRot, lFistRot, f);
@@ -986,6 +991,39 @@ public class ViewModelRig : MonoBehaviour
         Reach(_right, rPos, rRot, view.TransformDirection(new Vector3(0.55f, -0.7f, -0.2f)), rFistW);
         Squeeze(s, rFistW);
         Reach(_left, lPos, lRot, view.TransformDirection(new Vector3(-0.35f, -0.8f, 0.05f)), lFistW);
+    }
+
+    /// <summary>
+    /// A captured first-person move playing on the fists (CapturedFirstPerson, made by FPSKitMocap from a phone video).
+    /// Set by the capture preview; nothing in the game sets it until a captured move is approved and assigned.
+    /// </summary>
+    [System.NonSerialized] public CapturedFirstPerson Captured;
+    [System.NonSerialized] public float CapturedTime;
+
+    /// <summary>
+    /// The captured hands fitted to this view's framing: the striking hand's path from its guard to the blow is turned
+    /// and scaled onto ours (guard to reach, the fighting framing included), and the other hand moves with the same turn
+    /// and scale from its own guard, only PlayerBodySettings.capturedOffHand of it (the hand the body hid from the phone).
+    /// The performer's path, timing and hand turn are kept; where they land is ours.
+    /// </summary>
+    void CapturedFists(Transform view, Vector3 lGuard, Vector3 rGuard, Vector3 lReach, Vector3 rReach,
+                       ref Vector3 lFist, ref Quaternion lRot, ref Vector3 rFist, ref Quaternion rRot)
+    {
+        var c = Captured;
+        bool left = c.striker == 0;
+        Vector3[] strike = left ? c.leftHand : c.rightHand;
+        Vector3 captured = strike[c.ImpactFrame] - strike[0];
+        Vector3 ours = left ? lReach - lGuard : rReach - rGuard;
+        bool fits = c.striker >= 0 && c.striker <= 1 && captured.magnitude > 0.05f;
+        float scale = fits ? ours.magnitude / captured.magnitude : 1f;
+        Quaternion turn = fits ? Quaternion.FromToRotation(captured, ours) : Quaternion.identity;
+        float t = CapturedTime;
+        float lKeep = left || !fits ? 1f : Body.capturedOffHand, rKeep = !left || !fits ? 1f : Body.capturedOffHand;
+        lFist = lGuard + turn * (CapturedFirstPerson.Sample(c.leftHand, t) - c.leftHand[0]) * (scale * lKeep);
+        rFist = rGuard + turn * (CapturedFirstPerson.Sample(c.rightHand, t) - c.rightHand[0]) * (scale * rKeep);
+        Quaternion lTurn = CapturedFirstPerson.Sample(c.leftHandTurn, t), rTurn = CapturedFirstPerson.Sample(c.rightHandTurn, t);
+        lRot = view.rotation * turn * Quaternion.Slerp(c.leftHandTurn[0], lTurn, lKeep);
+        rRot = view.rotation * turn * Quaternion.Slerp(c.rightHandTurn[0], rTurn, rKeep);
     }
 
     /// <summary>The trigger finger pulls on each shot and lets go: index only, the grip's other fingers stay closed.</summary>

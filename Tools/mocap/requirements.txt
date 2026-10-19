@@ -1,0 +1,5 @@
+# The capture pipeline's Python side (Tools/mocap/setup.sh installs these into Tools/mocap/.venv).
+# Every licence is recorded in Docs/MOCAP_LICENSES.md; nothing here may be SMPL-based or non-commercial.
+mediapipe==1.1.1
+numpy
+imageio-ffmpeg

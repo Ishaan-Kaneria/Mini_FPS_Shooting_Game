@@ -146,6 +146,11 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - The view's own motion is `EyeCamera` (`EyeCameraSettings`): on the camera under the motor's holder, never the
   holder. Steps count off the legs' clips (`PlayerBody.StrideCycles`), so the footsteps, bob and arms are the feet seen.
   Check with `FPSKitBatch.VerifyEyeCam` (bob by gait, 30/60/144 fps, hands on the gun, foot slip).
+- Captured animation (`Docs/DESIGN_NOTES.md` "Captured animation"): Ishaan's phone videos (~/MocapVideos, never in git)
+  -> `Tools/mocap/mocap.sh process who_move_NN` (MediaPipe in Tools/mocap/.venv, heat-guarded) -> Humanoid clip, first-person
+  track (`CapturedFirstPerson`) and settings asset in `Assets/Animations/Captured/<Who>/<Move>/`. Tune in the settings asset and
+  re-run; never edit the .anim. A captured move goes into the game only after he approves its preview. Licences:
+  `Docs/MOCAP_LICENSES.md` (no SMPL-based or non-commercial tools). Pipeline check: `Tools/mocap/mocap.sh test`.
 
 ## Terrain and arenas
 

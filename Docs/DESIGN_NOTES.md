@@ -3224,3 +3224,59 @@ as before. The player carries one gun, so the brief's "switch to another weapon 
 
 `FPSKitFistsTest` (`VerifyFists`) runs all of it through the touch inputs (the key and pad as bindings); 20 checks.
 Device shots: `FPSKitDeviceShots.Capture -fpskitOnly fists` (pc_fists, pc_fists_pickup, pixel7_fists_pickup).
+
+## Captured animation (2026-10-19, motion capture Step 1)
+
+Ishaan records himself acting a move on his phone; the pipeline turns the video into a clip for the player and the
+enemies. Free, open-source tools only, nothing SMPL-based or non-commercial (`Docs/MOCAP_LICENSES.md`); how to film
+is `Docs/MOCAP_RECORDING_GUIDE.md`. A captured move goes into the game only after he approves its preview.
+
+**Where things are.** Videos in `~/MocapVideos/who_move_NN.mp4`, never in the project. The Python side is
+`Tools/mocap` (its own Python 3.12 in `Tools/mocap/.venv`, MediaPipe's model files in `Tools/mocap/models`, per-take
+working files in `Tools/mocap/work/<take>`, all gitignored; `setup.sh` rebuilds them). The Unity side is `FPSKitMocap`
+(`FPSKitMocap.cs` the bake, `FPSKitMocapPreview.cs` the pictures and checks). Output per take in
+`Assets/Animations/Captured/<Player|Enemy>/<Move>/`: `<take>.anim` (Humanoid, 60 fps, a key on every frame),
+`<take>_mirror.anim` when asked, `<take>_fp.asset` (`CapturedFirstPerson`, player moves), `<take>_settings.asset`
+(`CapturedClipSettings`, every tuning number) and `<take>_info.json` (source video, calibration, date, the settings
+used and the quality numbers). The preview is `Build/Mocap/<take>_preview.mp4`.
+
+    Tools/mocap/mocap.sh setup | calibrate calibration_01 | process player_punch_01 | preview player_punch_01 | test
+
+**The steps.** `track.py`: MediaPipe Pose Landmarker (heavy) in video mode on every frame at the file's own rate, and
+the Hand Landmarker on a crop round each wrist (a hand is too small in a full-body picture for its own detector).
+`solve.py`: (1) points the tracker doubted are thrown out and filled by interpolation, as are *glitches*: a hidden arm
+the tracker loses jumps faster than any hand moves (over 15 m/s) and back within a quarter second; (2) the hips' place
+in the room from fitting the 3D points onto the picture through the lens (26 mm equivalent unless set); (3) scale and
+every bone's length from the calibration clip (height 175 cm in `Tools/mocap/actor.json`); (4) One Euro smoothing run
+forwards and backwards (no lag), per joint, its cutoff lowered where the tracker was unsure (a hidden arm is smoothed
+harder than one in plain sight); (5) up from the performer standing straight in the neutral second at each end,
+refined by the plane under the planted feet; (6) foot contacts. `FPSKitMocap.Bake` then puts it on the Survivalist
+rig (the enemies' and the player body's): pelvis from the hip line, the first spine bone aiming the shoulders along
+the performer's hip-to-shoulder line and the bones above turning the chest; each limb a two-bone reach along the
+performer's directions at the rig's own lengths, then turned about its upper bone until the rig's own elbow or knee
+hinge (measured from its muscles) lies across the bend; planted feet locked (hips lowered where a foot would be out of
+reach, soles never through the ground); read back as Humanoid muscles, any beyond the rig's limits counted and clamped;
+fingers from the hand model or the settings' shape; trimmed, eased, sped, looped, mirrored. The numbers it reports are
+measured on the saved clip playing on the rig.
+
+**First person.** The hands are taken from the eye along the chest's axes (the camera never turns for a strike),
+cut to the strike alone (guard, blow, guard), and `ViewModelRig` plays them fitted to its own framing: the striking
+hand's guard-to-blow path is turned and scaled onto the game's guard-to-reach (fighting framing included), the other
+hand moves with it, only `PlayerBodySettings.capturedOffHand` (0.3) of it: filmed side-on it is the hand the body
+hides, and the tracker's guesses at it wandered 40 cm in the synthetic take while the true off hand held its guard. `ViewModelRig.Captured` is set only by the preview until a move is approved.
+
+**What was learned building it** (synthetic test: our soldier filmed acting `Punch_Right` the way the guide films
+Ishaan, run through everything and held against the clip it came from):
+- MediaPipe's 3D points are not square to the camera: taking the phone as level made the body lean ~15 degrees
+  (19 cm mean joint error); up from the standing body: 15 cm. With a perfect up the floor is ~10 cm on this CG soldier.
+- A punch thrown towards the phone comes out short and bent (depth is what one camera judges worst): the guide puts
+  the camera side-on with the blow crossing the picture.
+- The retarget alone (the clip's own joints fed straight in): 6 cm mean before the spine aimed the shoulders, 3.3 after.
+- A culled Animator is never evaluated by a PlayableGraph in a batch run (nothing renders it): the checks read zero
+  until the bake rig was set to `AlwaysAnimate`. A new scene opened in a batch run unloads loaded assets nothing in a
+  scene holds: load after opening it.
+- Unity Recorder records nothing in a closed-editor batch run (its capture needs a live Game view), so the previews
+  are rendered by `FPSKitMocap.Preview` and encoded by Tools/mocap's own ffmpeg. The Recorder stays installed for
+  recording from the open editor.
+- Tracking on all eight efficient cores still went over 95 C sixteen times in 950 frames; the Python steps run on four
+  (`MOCAP_CPUS`, default 12-15) under the same pause-above-95, resume-below-80 guard as `unity-batch.sh` (`cool-run.sh`).

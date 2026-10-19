@@ -111,6 +111,9 @@ public class PlayerBodySettings : ScriptableObject
     [Range(0f, 15f)] public float kickRise = 4f;
     [Tooltip("Metres the body comes forward under the eye through a kick: more of the leg in view.")]
     [Range(0f, 0.3f)] public float kickReach = 0.08f;
+    [Tooltip("Share of a captured move's off-hand motion kept in first person (CapturedFirstPerson). Filmed side-on, the off " +
+             "hand is the one the body hides and the tracker guesses at most; the striking hand is always kept whole.")]
+    [Range(0f, 1f)] public float capturedOffHand = 0.3f;
 
     [System.Serializable]
     public struct StrikeClip

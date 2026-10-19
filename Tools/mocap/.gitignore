@@ -1,0 +1,6 @@
+# Rebuilt by setup.sh: the Python environment and MediaPipe's model files.
+.venv/
+models/
+# Per-take intermediate files (landmarks, cleaned motion, preview frames). Videos never live in the project.
+work/
+__pycache__/

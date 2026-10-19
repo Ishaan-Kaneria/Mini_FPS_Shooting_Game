@@ -56,6 +56,7 @@ namespace FPSKit.EditorTools
         private static void ResetDesertFull()
         {
             _hasFob = false;
+            _desertZones.Clear();
             _farmPlans.Clear();
             _hamletPlans.Clear();
             ResetDesertMore();

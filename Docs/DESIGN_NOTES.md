@@ -3280,3 +3280,35 @@ Ishaan, run through everything and held against the clip it came from):
   recording from the open editor.
 - Tracking on all eight efficient cores still went over 95 C sixteen times in 950 frames; the Python steps run on four
   (`MOCAP_CPUS`, default 12-15) under the same pause-above-95, resume-below-80 guard as `unity-batch.sh` (`cool-run.sh`).
+
+## Desert Outpost: the pale-blue "L" and the spawn leash (2026-10-19, combat audit Part C)
+
+**C1, the pale-blue L-shaped strip in the sky** was the *hold-ground objective marker* (`LevelObjective.Beacon`,
+`UITheme.Coolant`), not arena geometry (no arena view, renderer sweep or ray probe found anything pale blue floating;
+it only shows in a level that asks you to hold ground, which Desert's level 1 does). It was a 14 m flat disc 3 cm
+thick laid level at one point plus an opaque 6 m pole: on a dune the disc stood out of the slope on its downhill side
+and the pair read from across the sand as a pale-blue "L" hanging in the air. `Paint` asked for 35% alpha, but the
+material stayed opaque. Now the edge and a faint fill are draped on whatever is under them (a ray per vertex) and the
+column is a translucent beam: URP Lit switched to its transparent surface (a variant the game already ships, through
+the blood materials), no shadows. Before/after: `Build/DesertC1/c1_before_after.png` (markers stood on the dunes ahead
+of the player's start by `FPSKitPixelProbe -probeBeacons`).
+
+**C2, earlier arena work:** all of it is in the checkout, committed inside 8858bf5 (the Fairground replan commit):
+Industrial gate beacons (`BuildGateBeacon`), `CheckIndustrialPerimeter`, storm drains, dock bollards; Desert
+sunshades (`FPSKitDesertVillage.Sunshade`), hamlet pads that cover their 33 x 51 m footprint (claim 34 m against a
+30.4 m half-diagonal). Rebuilding Desert Outpost from the generator changed nothing in the town, village lane or farm
+views (the scene already matched the generator). `VerifyBuild` targets Industrial Warehouse only (hard-coded theme).
+
+**The spawn leash.** Desert used `BuildOpenZoneSpawnPoints`: twelve points on a ring out to 0.72 of the half-width,
+spanning 324 m, so `LevelManager` raised the 158 m leash and warned on every level start. Now `BuildDesertSpawnPoints`
+(`FPSKitDesertSpawns.cs`) does what the Fairground does: zones of points round the desert's places (base, town,
+hamlets, farms, camps, watch posts), nearest the player's start first, each point on open ground at the place's edge,
+inside the arena and out of the river; out of view is LevelManager's own test. 82 points in 16 zones; zone band
+18-240 m; the leash is set from the points' real spread plus 40 m (600 m against 552 m): nothing culled on arrival,
+no warning. `VerifyZone` now counts every point under zone folders (it read only the root's direct children).
+Play check: `FPSKitBatch.VerifyDesertSpawns`.
+
+**Walls meet the ground**, measured (`FPSKitPixelProbe -probeFootings`): of every upright column of wall in the town,
+hamlets and farms, none of the walls, yard walls or the mosque has its foot 15 cm to 1.2 m above the sand. What the
+sweep flags is meant to be off the ground: window frames, furniture, vehicles, and the shells' rounded bottom edge
+(0.2 m) over their footing.

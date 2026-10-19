@@ -113,8 +113,10 @@ namespace FPSKit.EditorTools
 
             if (spawns != null)
             {
-                foreach (Transform point in spawns.transform)
+                // Every point, also those grouped in zones under the root (Desert Outpost, 2026-10-19): the leaves.
+                foreach (var point in spawns.GetComponentsInChildren<Transform>())
                 {
+                    if (point == spawns.transform || point.childCount > 0) continue;
                     total++;
                     if (NavMesh.SamplePosition(point.position, out _, 6f, NavMesh.AllAreas)) onMesh++;
                 }

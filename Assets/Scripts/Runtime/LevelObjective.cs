@@ -747,32 +747,39 @@ public class LevelObjective : MonoBehaviour
     /// A ring on the ground with a column of light over it.
     ///
     /// Built rather than instanced, for the reason at the top of this file: an objective
-    /// that needed a prefab would need one in every scene. Both pieces are collider-less,
+    /// that needed a prefab would need one in every scene. Every piece is collider-less,
     /// because an objective marker that a player can walk into is one they can be stopped
     /// by -- and it would bake into the navmesh as an obstacle in the exact place the
     /// level is telling them to stand.
+    ///
+    /// <b>The ring lies on the ground and the light is see-through</b> (combat audit C1, 2026-10-19). It was a flat
+    /// 14 m disc laid level at one point and an opaque pole: on a dune the disc stood a metre or two off the slope
+    /// on its downhill side and cut into it on the other, and with the pole it read from across the desert as a
+    /// pale-blue "L" hanging in the sky. Paint asked for 35% alpha, but the material was opaque, so nothing was
+    /// ever see-through. Now the ring and a faint fill are draped on whatever is under them, and the column is a
+    /// translucent beam.
     /// </summary>
     Transform Beacon(string name, Vector3 at, Color colour, float radius, float height,
-                     bool marker, bool pip)
+                     bool marker, bool pip) => BuildBeacon(name, at, colour, radius, height, marker, pip);
+
+    /// <summary>The marker itself, static so the shot tools can stand one in a scene outside play.</summary>
+    public static Transform BuildBeacon(string name, Vector3 at, Color colour, float radius, float height,
+                                        bool marker, bool pip)
     {
         var root = new GameObject($"Objective_{name}").transform;
         root.position = at;
 
-        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        ring.name = "Ring";
-        Destroy(ring.GetComponent<Collider>());
-        ring.transform.SetParent(root, false);
-        ring.transform.localScale = new Vector3(radius * 2f, 0.03f, radius * 2f);
-        ring.transform.localPosition = new Vector3(0f, 0.04f, 0f);
-        Paint(ring, colour, 0.35f);
+        // The edge, a band a third of a metre wide, and a faint fill inside it: both laid on the ground.
+        Piece(root, "Ring", Draped(at, Mathf.Max(0.1f, radius - 0.35f), radius, 64, 1), colour, 0.8f, 2.2f);
+        Piece(root, "Fill", Draped(at, 0f, radius - 0.35f, 48, 4), colour, 0.16f, 0.8f);
 
         var column = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         column.name = "Column";
-        Destroy(column.GetComponent<Collider>());
+        Gone(column.GetComponent<Collider>());
         column.transform.SetParent(root, false);
-        column.transform.localScale = new Vector3(0.5f, height * 0.5f, 0.5f);
+        column.transform.localScale = new Vector3(0.35f, height * 0.5f, 0.35f);
         column.transform.localPosition = new Vector3(0f, height * 0.5f, 0f);
-        Paint(column, colour, 0.85f);
+        Paint(column, colour, 0.38f, 1.6f);
 
         if (marker)
         {
@@ -787,6 +794,67 @@ public class LevelObjective : MonoBehaviour
         return root;
     }
 
+    /// <summary>A mesh piece of the marker, on the default Lit material the primitives already use (so it is in every build).</summary>
+    static void Piece(Transform root, string name, Mesh mesh, Color colour, float alpha, float glow)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        go.name = name;
+        Gone(go.GetComponent<Collider>());
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        go.GetComponent<MeshFilter>().sharedMesh = mesh;
+        Paint(go, colour, alpha, glow);
+    }
+
+    /// <summary>
+    /// An annulus (inner 0 is a disc) round <paramref name="at"/>, each vertex laid on the ground under it a few
+    /// centimetres up: what it is laid on is whatever a ray straight down meets first, other than a body.
+    /// In the marker's own space (its root is at <paramref name="at"/>, unturned).
+    /// </summary>
+    static Mesh Draped(Vector3 at, float inner, float outer, int around, int across)
+    {
+        int mask = ~LayerMask.GetMask("Player", "Enemy", "FirstPerson", "Ignore Raycast");
+        var verts = new List<Vector3>();
+        var tris = new List<int>();
+        for (int i = 0; i <= across; i++)
+        {
+            float r = Mathf.Lerp(inner, outer, i / (float)across);
+            for (int j = 0; j < around; j++)
+            {
+                float a = j * Mathf.PI * 2f / around;
+                Vector3 flat = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                Vector3 top = at + flat + Vector3.up * 4f;
+                float y = Physics.Raycast(top, Vector3.down, out RaycastHit hit, 12f, mask, QueryTriggerInteraction.Ignore)
+                    ? hit.point.y - at.y : 0f;
+                verts.Add(flat + Vector3.up * (y + 0.05f));
+                if (r < 1e-3f) break;      // a disc's centre is one point
+            }
+        }
+        int Index(int ring, int j) => inner < 1e-3f && ring == 0 ? 0 : (inner < 1e-3f ? 1 + (ring - 1) * around : ring * around) + j % around;
+        for (int i = 0; i < across; i++)
+            for (int j = 0; j < around; j++)
+            {
+                int a0 = Index(i, j), a1 = Index(i, j + 1), b0 = Index(i + 1, j), b1 = Index(i + 1, j + 1);
+                // Wound to face up.
+                if (a0 == a1) { tris.Add(a0); tris.Add(b1); tris.Add(b0); continue; }
+                tris.Add(a0); tris.Add(b1); tris.Add(b0);
+                tris.Add(a0); tris.Add(a1); tris.Add(b1);
+            }
+        var mesh = new Mesh { name = "ObjectiveGround" };
+        mesh.SetVertices(verts);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    static void Gone(Object o)
+    {
+        if (Application.isPlaying) Destroy(o);
+        else DestroyImmediate(o);
+    }
+
     static void SetBeaconLit(Transform beacon, bool lit)
     {
         if (beacon == null) return;
@@ -795,18 +863,38 @@ public class LevelObjective : MonoBehaviour
             renderer.enabled = lit || renderer.gameObject.name == "Ring";
     }
 
-    static void Paint(GameObject go, Color colour, float alpha)
+    /// <summary>
+    /// The marker's colour, see-through at <paramref name="alpha"/> (URP Lit switched to its transparent surface: the
+    /// alpha alone does nothing on an opaque material, which is how the old marker came out solid) and glowing, because
+    /// every one of these is meant to be found from across an arena and half of them are shown in a level whose lights
+    /// have just been turned off. Casts no shadow.
+    /// </summary>
+    static void Paint(GameObject go, Color colour, float alpha, float glow)
     {
         var renderer = go.GetComponent<Renderer>();
         if (renderer == null) return;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
 
-        var material = renderer.material;
+        var material = Application.isPlaying ? renderer.material : new Material(renderer.sharedMaterial);
+        renderer.sharedMaterial = material;
+        material.SetFloat("_Surface", 1f);
+        material.SetFloat("_Blend", 0f);
+        material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        material.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+        material.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        material.SetFloat("_ZWrite", 0f);
+        material.SetFloat("_Cull", 0f);
+        material.SetOverrideTag("RenderType", "Transparent");
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        material.SetShaderPassEnabled("ShadowCaster", false);
 
-        // Emissive, because every one of these is meant to be found from across an arena
-        // and half of them are shown in a level whose lights have just been turned off.
         material.color = new Color(colour.r, colour.g, colour.b, alpha);
+        material.SetColor("_BaseColor", new Color(colour.r, colour.g, colour.b, alpha));
         material.EnableKeyword("_EMISSION");
-        material.SetColor("_EmissionColor", colour * 2.2f);
+        material.SetColor("_EmissionColor", colour * glow * alpha);
     }
 
     static void DestroyIfAny(ref Transform t)

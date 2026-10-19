@@ -334,6 +334,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void VerifyFists() => FPSKitFistsTest.Batch();
 
+        /// <summary>Desert Outpost's zone spawns in play: no leash warning, arrivals at the zones (FPSKitDesertSpawnTest).</summary>
+        public static void VerifyDesertSpawns() => FPSKitDesertSpawnTest.Run();
+
         /// <summary>The Low Poly Shooter Pack's first-person motion baked for our arms (Resources/FirstPersonClips). Build/FirstPersonClips.</summary>
         public static void BakeFirstPersonClips() => Run(FPSKitFirstPersonClips.Bake);
 

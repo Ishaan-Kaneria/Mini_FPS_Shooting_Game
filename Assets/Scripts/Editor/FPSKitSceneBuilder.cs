@@ -2714,6 +2714,7 @@ namespace FPSKit.EditorTools
         private static Transform[] BuildSpawnPoints()
         {
             if (FairgroundRealisticActive) return BuildFairgroundSpawnPoints();
+            if (DesertLife) return BuildDesertSpawnPoints();
             if (_theme.rooftopZone || _theme.industrialZone) return BuildZoneSpawnPoints();
             if (_theme.parkZone) return BuildOpenZoneSpawnPoints();
             if (_theme.snowZone) return BuildOpenZoneSpawnPoints();
@@ -2905,6 +2906,7 @@ namespace FPSKit.EditorTools
             manager.spawnSightBlockers = 1 << LayerMask.NameToLayer("Environment");
 
             if (FairgroundRealisticActive) WireFairgroundLevelManager(manager);
+            if (DesertLife) WireDesertLevelManager(manager, spawns);
 
             manager.levelClearBonus = 400;
             manager.timeBonusPerSecond = 25;

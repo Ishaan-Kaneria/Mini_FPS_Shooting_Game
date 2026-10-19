@@ -610,7 +610,8 @@ public class ViewModelRig : MonoBehaviour
         // On the back it is out of sight: hidden rather than left hanging behind the eye.
         // Carried in the left hand it is seen; once the cross starts (both fists) it is on the back at
         // once, rather than drawn sliding from the hand to the sling across the view.
-        bool shown = s.gunAway < 0.97f || (_carry > 0.05f && _lastFists == MeleeStrike.Strike.Jab);
+        bool shown = (s.gunAway < 0.97f || (_carry > 0.05f && _lastFists == MeleeStrike.Strike.Jab))
+                     && !(_weapon != null && _weapon.Disarmed);   // out of ammo it is on the ground, not in a hand
         if (_gunRenderers != null && _gunRenderers.Length > 0 && _gunRenderers[0] != null && _gunRenderers[0].enabled != shown)
             foreach (var r in _gunRenderers) if (r != null) r.enabled = shown;
 

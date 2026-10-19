@@ -52,6 +52,10 @@ public class ControlSettings : ScriptableObject
              "one-off item, and it is nowhere near the movement keys.")]
     public KeyCode useItem = KeyCode.F;
 
+    [Tooltip("Picks up the gun on the ground in front of you (out of ammo, the gun is dropped and the fists come up). " +
+             "E, beside the movement keys, where shooters put it.")]
+    public KeyCode interact = KeyCode.E;
+
     [Tooltip("Punches whoever is within arm's reach in front of you. A tap, never a hold, " +
              "and next to the movement keys so it can be thrown mid-strafe.")]
     public KeyCode melee = KeyCode.V;
@@ -195,6 +199,7 @@ public class ControlSettings : ScriptableObject
         aim = KeyCode.Mouse1;
         bomb = KeyCode.G;
         useItem = KeyCode.F;
+        interact = KeyCode.E;
         melee = KeyCode.V;
         altMelee = KeyCode.Mouse3;
         kick = KeyCode.B;

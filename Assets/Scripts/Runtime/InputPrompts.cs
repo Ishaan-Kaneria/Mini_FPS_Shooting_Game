@@ -94,6 +94,7 @@ public static class InputPrompts
         GameAction.UseItem => "medkit",
         GameAction.Melee => "fist",
         GameAction.Kick => "kick",
+        GameAction.Interact => "hand-finger",
         GameAction.Sprint => "run",
         GameAction.Pause => "player-pause",
         GameAction.Move => "stick_l",
@@ -115,6 +116,7 @@ public static class InputPrompts
         GameAction.UseItem => Bumper(pad, right: false),
         GameAction.Melee => pad == PadFamily.PlayStation ? "ps_r3" : "xbox_rs",
         GameAction.Kick => Face(pad, "north"),
+        GameAction.Interact => "dpad",
         GameAction.Pause => pad switch { PadFamily.PlayStation => "ps_options", PadFamily.Generic => "pad_start", _ => "xbox_menu" },
         _ => "pad_south",
     };
@@ -181,6 +183,7 @@ public static class InputPrompts
         GameAction.UseItem => c.useItem,
         GameAction.Melee => c.melee,
         GameAction.Kick => c.kick,
+        GameAction.Interact => c.interact,
         GameAction.Pause => KeyCode.Escape,
         GameAction.Move => c.altForward != KeyCode.None ? c.altForward : c.moveForward,
         _ => KeyCode.None,

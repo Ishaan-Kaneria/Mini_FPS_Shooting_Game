@@ -327,6 +327,13 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void VerifyEyeCam() => FPSKitEyeCamTest.Batch();
 
+        /// <summary>
+        /// Fists when out of ammo: reload with a reserve, one drop single and automatic, nothing answers the trigger
+        /// disarmed, the fists and the HUD, picking up (touch, an enemy's rifle with its rounds, a swap), ammo boxes
+        /// near and far, the bindings and the saved loadout. Build/Fists.
+        /// </summary>
+        public static void VerifyFists() => FPSKitFistsTest.Batch();
+
         /// <summary>The Low Poly Shooter Pack's first-person motion baked for our arms (Resources/FirstPersonClips). Build/FirstPersonClips.</summary>
         public static void BakeFirstPersonClips() => Run(FPSKitFirstPersonClips.Bake);
 

@@ -282,6 +282,7 @@ public class PlayerMotor : MonoBehaviour
         // enemies to hear. Added here so every arena already built has them.
         if (GetComponent<PlayerCondition>() == null) gameObject.AddComponent<PlayerCondition>();
         if (GetComponent<EyeCamera>() == null) gameObject.AddComponent<EyeCamera>();
+        if (GetComponent<GunPickup>() == null) gameObject.AddComponent<GunPickup>();
         if (GetComponent<PlayerNoise>() == null) gameObject.AddComponent<PlayerNoise>();
         // The player as a whole body under the camera, when the settings name one.
         if (PlayerBody.Wanted && GetComponent<PlayerBody>() == null) gameObject.AddComponent<PlayerBody>();
@@ -428,7 +429,8 @@ public class PlayerMotor : MonoBehaviour
                ControlSettings.Held(controls.reload) ||
                ControlSettings.Held(controls.sprintKey) ||
                ControlSettings.Held(controls.bomb) ||
-               ControlSettings.Held(controls.useItem);
+               ControlSettings.Held(controls.useItem) ||
+               ControlSettings.Held(controls.interact);
     }
 
     /// <summary>The inspector's invert and the player's setting, either of which flips it.</summary>

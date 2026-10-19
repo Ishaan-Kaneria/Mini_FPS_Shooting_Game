@@ -217,6 +217,9 @@ public class MeleeStrike : MonoBehaviour
     /// <summary>The gun has rigged arms that can let go of it; without them every strike is the rifle butt.</summary>
     bool HasArms => weapon != null && weapon.HasArms;
 
+    /// <summary>The gun went to the ground out of ammo (Weapon.Disarmed): the fists stay up until one is picked up.</summary>
+    bool Disarmed => weapon != null && weapon.Disarmed;
+
     void Awake()
     {
         _motor = GetComponentInParent<PlayerMotor>();
@@ -320,7 +323,9 @@ public class MeleeStrike : MonoBehaviour
     {
         var s = Settings;
 
-        if (_fists && Current == Strike.None)
+        // Disarmed, the fists are the weapon: up, and staying up, whatever the trigger does.
+        if (Disarmed) _fists = true;
+        else if (_fists && Current == Strike.None)
         {
             bool wantsGun = ControlSettings.Pressed(keys.fire) || ControlSettings.Pressed(keys.aim)
                             || ControlSettings.Pressed(keys.reload) || MobileInput.Fire || MobileInput.Aim
@@ -354,9 +359,10 @@ public class MeleeStrike : MonoBehaviour
     {
         if (Time.time < _nextStrike) return null;
 
-        if (!HasArms) return Throw(Strike.Butt, 0f);
+        // No rifle to swing with the gun on the ground: always the fists.
+        if (!HasArms && !Disarmed) return Throw(Strike.Butt, 0f);
 
-        if (!_fists && Time.time > _chainUntil) return Throw(Strike.Butt, 0f);
+        if (!_fists && Time.time > _chainUntil && !Disarmed) return Throw(Strike.Butt, 0f);
 
         // Into the fists, or already in them. The first punch waits for the hand that
         // swings the gun away; the ones after it go at once.

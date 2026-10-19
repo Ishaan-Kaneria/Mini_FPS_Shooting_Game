@@ -240,6 +240,7 @@ public class EnemyRifle : MonoBehaviour
             State = Hold.Dropped;
             _rb.angularDamping = 0.8f;
             _rb.angularVelocity = Random.insideUnitSphere * 5f;
+            OnGround();
         }
         else
         {
@@ -314,6 +315,27 @@ public class EnemyRifle : MonoBehaviour
         _rb.angularVelocity = Random.insideUnitSphere * 3f;
         State = Hold.Lost;
         LeftHandWant = 0f;
+        OnGround();
+    }
+
+    /// <summary>
+    /// On the ground, the player can take it (GroundGun): while it lies there (dropped or lost), with the rounds the
+    /// enemy had left. Taken, it is lost to its owner for good and gone from the ground.
+    /// </summary>
+    void OnGround()
+    {
+        if (_gun == null) return;
+        int left = GroundGun.EnemyLoad(GroundGun.DataFor(_gun)) - (_ai != null ? _ai.RoundsFired : 0);
+        GroundGun.MarkEnemyRifle(_gun.gameObject, left,
+            () => State == Hold.Dropped || State == Hold.Lost,
+            () =>
+            {
+                State = Hold.Lost;
+                LeftHandWant = 0f;
+                if (_joint != null) Destroy(_joint);
+                GunColliders.Enable(_boxes, false);
+                _gun.gameObject.SetActive(false);
+            });
     }
 
     // ======================================================================

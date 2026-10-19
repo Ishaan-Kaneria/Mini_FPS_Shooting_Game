@@ -142,6 +142,10 @@ namespace FPSKit.EditorTools
                 new Shot { File = "pc_hudedit", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit", Wait = 8f },
                 new Shot { File = "pc_hudedit_crosshair", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "hudedit_crosshair", Wait = 8f },
                 new Shot { File = "iphone15_hudedit", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "hudedit", Wait = 8f },
+                // Out of ammo: the fists up and the HUD saying so; then a gun in reach and the prompt (on a phone, RELOAD reads PICK UP).
+                new Shot { File = "pc_fists", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "fists", Wait = 20f, After = 1.2f },
+                new Shot { File = "pc_fists_pickup", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "fists_pickup", Wait = 20f, After = 1.2f },
+                new Shot { File = "pixel7_fists_pickup", Scene = ArenaScene, Device = Pixel7, Scheme = InputScheme.Touch, Open = "fists_pickup", Wait = 20f, After = 1.2f },
                 new Shot { File = "pc_punch", Scene = ArenaScene, Device = pc, Scheme = InputScheme.KeyboardMouse, Open = "punch", Wait = 20f, After = 0.12f },
                 new Shot { File = "iphone15_punch", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "punch", Wait = 20f, After = 0.12f },
                 new Shot { File = "iphone15_results", Scene = ArenaScene, Device = IPhone15, Scheme = InputScheme.Touch, Open = "results", Wait = 6f },
@@ -262,6 +266,28 @@ namespace FPSKit.EditorTools
         /// The player at arm's length from the nearest enemy, facing it, with a punch just
         /// thrown: the fist out, the gun dipped, and the prompt under the crosshair.
         /// </summary>
+        /// <summary>
+        /// Out of ammo (Part B): the last round gone with nothing carried, so the gun drops and the fists come up; with
+        /// <paramref name="nearGun"/>, an enemy's rifle lying in reach a step ahead, looked at, so the prompt is up.
+        /// </summary>
+        static void StageFists(bool nearGun)
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            var weapon = player != null ? player.GetComponentInChildren<Weapon>() : null;
+            if (weapon == null) throw new Exception("the player has no gun to run dry");
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None)) ai.gameObject.SetActive(false);
+            weapon.SetReserve(0);
+            typeof(Weapon).GetProperty("CurrentAmmo").GetSetMethod(true).Invoke(weapon, new object[] { 0 });
+            weapon.DropForFists();
+            if (!nearGun) return;
+            var rifle = AssetDatabase.LoadAssetAtPath<WeaponData>("Assets/FPSKit_Generated/Store/Gun_Burst.asset");
+            var motor = player.GetComponent<PlayerMotor>();
+            Vector3 ahead = Vector3.ProjectOnPlane(player.transform.forward, Vector3.up).normalized;
+            Vector3 at = player.transform.position + ahead * 1.5f + Vector3.up * 0.4f;
+            GroundGun.SpawnDropped(rifle, 30, 60, at, Quaternion.LookRotation(Vector3.Cross(ahead, Vector3.up)), Vector3.zero, false);
+            if (motor != null) motor.TurnTowards(at, 1f);
+        }
+
         static void StagePunch()
         {
             var player = GameObject.FindGameObjectWithTag("Player");
@@ -377,6 +403,10 @@ namespace FPSKit.EditorTools
                         else if (shot.Open == "punch")
                         {
                             StagePunch();
+                        }
+                        else if (shot.Open == "fists" || shot.Open == "fists_pickup")
+                        {
+                            StageFists(shot.Open == "fists_pickup");
                         }
                         else if ((shot.Open ?? "").StartsWith("hudedit"))
                         {

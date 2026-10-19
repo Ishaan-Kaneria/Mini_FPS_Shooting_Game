@@ -32,7 +32,7 @@ public class SmoothProbe : MonoBehaviour
 
     struct Part { public string name; public float seconds; public Vector2 move; public bool sprint, fire, turn; }
 
-    static readonly Part[] Script =
+    readonly Part[] Script =
     {
         new Part { name = "standing", seconds = 3f },
         new Part { name = "walk", seconds = 4f, move = new Vector2(0f, 0.5f) },

@@ -42,6 +42,7 @@ public static class KeyBindings
         new Binding("crouch", "Crouch", c => c.crouch, (c, k) => c.crouch = k),
         new Binding("bomb", "Grenade", c => c.bomb, (c, k) => c.bomb = k),
         new Binding("item", "Medkit", c => c.useItem, (c, k) => c.useItem = k),
+        new Binding("interact", "Pick up a gun", c => c.interact, (c, k) => c.interact = k),
         new Binding("melee", "Punch", c => c.melee, (c, k) => c.melee = k),
         new Binding("melee2", "Punch (second key)", c => c.altMelee, (c, k) => c.altMelee = k),
         new Binding("kick", "Kick", c => c.kick, (c, k) => c.kick = k),

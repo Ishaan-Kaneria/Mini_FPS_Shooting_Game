@@ -3194,3 +3194,33 @@ It failed about one run in two on "the player took no damage in 14s under fire".
 
 After: 8 of 8 runs passed, cool; the counts per enemy (rounds fired, what its line met, its hit chance) are in the
 report when it does fail.
+
+## Fists when out of ammo (2026-10-19, combat audit Part B)
+
+Out of rounds altogether (none in the magazine, none carried: only in a level that limits the reserve, since a gun with
+an endless reserve never gets there), the gun goes to the ground and the fists come up. With rounds carried it reloads
+as before. The player carries one gun, so the brief's "switch to another weapon with ammo" has nothing to switch to.
+
+- **Once.** `Weapon` schedules the drop 0.3 s after the last round (or the dry trigger) and does it once
+  (`DropForFists`); held on automatic, the trigger fires the last rounds and nothing more. Disarmed, nothing answers
+  the trigger, the sights or the reload, and `MeleeStrike` keeps the fists up (no rifle butt: the punch key throws
+  the jab and the cross).
+- **The gun on the ground** is `GroundGun`: the player's own (`SpawnDropped`: the view model's gun, shaped by
+  `GunColliders` as A2's enemy rifles are), or an enemy's rifle as it falls (`EnemyRifle`, `EnemyBody.DropGun`; which
+  gun it is, by its meshes against the store's, and its rounds: three magazines less what that enemy fired,
+  `EnemyAI.RoundsFired`). Taken while its owner lives, the rifle is lost to it for good.
+- **Picking up** is `GunPickup`: the nearest gun in reach that the player is looking towards (empty ones only when
+  rounds were kept for them), taken with `GameAction.Interact`: E (`ControlSettings.interact`, rebindable), the pad's
+  D-pad up (every face button, bumper, trigger and stick click was taken), and on a phone the RELOAD button, which
+  reads PICK UP with the hand icon while disarmed with a gun in reach: the one cell with nothing to do then, so no
+  button moves under the thumb. Armed, picking up swaps: the gun in the hands goes down with what is left in it.
+  An enemy's gun is taken at its baseline (the store's upgrades are the player's own gun's); the player's own gun
+  taken back has its upgrades re-applied. A gun taken up empty with rounds carried is loaded once the hands are free
+  (the fists going down cancelled the reload started at the pick-up).
+- **Ammo boxes** while disarmed: the player's own gun within 12 m (`Pickup.rearmReach`) is taken back up with them;
+  further, they are kept (`Weapon.StoredRounds`) and go into it, or one like it, when it is taken up.
+- **HUD**: the weapon panel shows the fist icon, FISTS and PICK UP A GUN; a prompt below the punch prompt names the
+  gun in reach and its rounds. The instructions say how on each device.
+
+`FPSKitFistsTest` (`VerifyFists`) runs all of it through the touch inputs (the key and pad as bindings); 20 checks.
+Device shots: `FPSKitDeviceShots.Capture -fpskitOnly fists` (pc_fists, pc_fists_pickup, pixel7_fists_pickup).

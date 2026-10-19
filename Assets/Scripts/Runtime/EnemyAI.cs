@@ -375,6 +375,9 @@ public class EnemyAI : MonoBehaviour
     /// <summary>When it last fired a round, for the kick of the rifle into the shoulder.</summary>
     public float LastShotTime { get; private set; } = -999f;
 
+    /// <summary>Rounds it has fired: what comes off the load its rifle is picked up with (GroundGun.EnemyLoad).</summary>
+    public int RoundsFired { get; private set; }
+
     NavMeshAgent _agent;
     Health _health;
     Health _targetHealth;
@@ -1166,6 +1169,7 @@ public class EnemyAI : MonoBehaviour
 
         PlayMuzzleEffects();
         LastShotTime = Time.time;
+        RoundsFired++;
 
         // The shot is resolved before the visuals are sent anywhere, so the tracer can be
         // drawn to the real impact point. Note the early return is gone: a shot that hits

@@ -420,11 +420,13 @@ public class InstructionsPanel : OverlayPanel
                     L("bomb", "Hold to aim the bomb, let go to throw.", K(c.bomb)),
                     More("Or tap to raise the ring and tap again to throw. The mouse moves the ring."),
                     L("flask", "Drink. Restores health and shield.", K(c.useItem)),
+                    L("hand-finger", "Out of ammo, the gun drops and the fists come up. Pick up any gun on the ground.", K(c.interact)),
                 }
                 : new List<Line>
                 {
                     L("lock", BombLockLine, "BOMB"),
                     L("flask", "Drink. Restores health and shield.", K(c.useItem)),
+                    L("hand-finger", "Out of ammo, the gun drops and the fists come up. Pick up any gun on the ground.", K(c.interact)),
                 }),
 
             new Page("Level", "player-pause", new List<Line>
@@ -463,11 +465,13 @@ public class InstructionsPanel : OverlayPanel
                     L("bomb", "Tap to aim the bomb, tap again to throw.", P(GameAction.Bomb)),
                     More("The right stick moves the ring while you aim."),
                     L("flask", "Drink. Restores health and shield.", P(GameAction.UseItem)),
+                    L("hand-finger", "Out of ammo, the gun drops and the fists come up. Pick up any gun on the ground.", P(GameAction.Interact)),
                 }
                 : new List<Line>
                 {
                     L("lock", BombLockLine, "BOMB"),
                     L("flask", "Drink. Restores health and shield.", P(GameAction.UseItem)),
+                    L("hand-finger", "Out of ammo, the gun drops and the fists come up. Pick up any gun on the ground.", P(GameAction.Interact)),
                 }),
 
             new Page("Level", "player-pause", new List<Line>
@@ -494,6 +498,7 @@ public class InstructionsPanel : OverlayPanel
                 L("bullet", "Fire. Keep dragging to aim while it fires.", T(GameAction.Fire)),
                 L("crosshair", "Spread two fingers to aim down sights, pinch to stop.", "PINCH"),
                 L("magazine", "Reload", T(GameAction.Reload)),
+                L("hand-finger", "Out of ammo, the gun drops. Near a gun, RELOAD reads PICK UP.", T(GameAction.Reload)),
                 L("fist", "Punch, up close. Tap again quickly for a second punch.", T(GameAction.Melee)),
                 L("kick", "Kick, up close. Knocks an enemy back.", T(GameAction.Kick)),
                 L("arrow-up", "Jump", T(GameAction.Jump)),

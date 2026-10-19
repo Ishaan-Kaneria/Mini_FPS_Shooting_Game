@@ -107,7 +107,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Bomb: flies its own solved parabola with its own gravity; indicator draws the same equation;
   clamp range from the player; flight time scales with distance; touch uses `RangeFromPitch`.
   Blast damages each `Health` once. Audible reach is `maxRange`.
-- Reserve ammo is per level (`LevelSet.Level.reserveMagazines`), a runtime flag on `Weapon`.
+- Reserve ammo is per level (`LevelSet.Level.reserveMagazines`), a runtime flag on `Weapon`. Out of rounds altogether,
+  the gun drops once (`Weapon.DropForFists`, a `GroundGun`) and the fists stay up until a gun is picked up (`GunPickup`:
+  `GameAction.Interact`, E / D-pad up / RELOAD reads PICK UP on touch). One gun is carried. Check: `VerifyFists`.
 - Wounds (`EnemyWounds`) only slow or loosen an enemy; thresholds stretch by archetype
   `woundResistance`; bosses never crawl, disarm or die to one headshot. Lethal headshots are
   raised damage in `Hitbox.Receive`, never a side-channel kill. **A limb hit never kills**:

@@ -24,6 +24,9 @@ public class Pickup : MonoBehaviour
     [Tooltip("Health or shield points restored. Ignored for ammo.")]
     public float amount = 30f;
 
+    [Tooltip("Out of ammo with the gun on the ground: metres within which an ammo pickup takes the player's own gun back up.")]
+    [Min(0f)] public float rearmReach = 12f;
+
     [Tooltip("Rounds added to the reserve. Ignored unless this is an ammo pickup.")]
     public int ammoAmount = 60;
 
@@ -150,6 +153,9 @@ public class Pickup : MonoBehaviour
 
             case Kind.Ammo:
                 if (_playerWeapon == null) return false;
+                // Disarmed (out of ammo, the gun on the ground): the player's own gun near by is taken up with these
+                // rounds; otherwise they are kept for when it, or one like it, is.
+                if (_playerWeapon.Disarmed) return _playerWeapon.RearmWithAmmo(ammoAmount, _player.position, rearmReach);
                 return _playerWeapon.AddReserveAmmo(ammoAmount) > 0;
 
             default:

@@ -64,6 +64,38 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     Color _idleColor;
     bool _on;
 
+    // RELOAD as PICK UP: its own label put back after.
+    bool _pickUp;
+    string _reloadLabel;
+    TMPro.TMP_Text _label;
+    Image _icon;
+    Sprite _reloadIcon;
+
+    /// <summary>The RELOAD button reads PICK UP, lit, while the player is disarmed and a gun is in reach (MobileInput.PickUpReady).</summary>
+    void UpdatePickUp()
+    {
+        bool want = MobileInput.PickUpReady;
+        if (want == _pickUp) return;
+        _pickUp = want;
+        if (_label == null) _label = GetComponentInChildren<TMPro.TMP_Text>(true);
+        if (_label != null)
+        {
+            if (_reloadLabel == null) _reloadLabel = _label.text;
+            _label.text = want ? "PICK UP" : _reloadLabel;
+        }
+        // The icon too (a phone's buttons are icons): the hand the prompt shows, instead of the reload arrows.
+        if (_icon == null) { var t = transform.Find("Icon"); _icon = t != null ? t.GetComponent<Image>() : null; }
+        if (_icon != null && UITheme.Active != null)
+        {
+            if (_reloadIcon == null) _reloadIcon = _icon.sprite;
+            _icon.sprite = want ? UITheme.Active.IconSprite(InputPrompts.TouchIcon(GameAction.Interact)) : _reloadIcon;
+        }
+        if (target == null || _on) return;
+        var theme = UITheme.Active;
+        Color accent = theme != null ? theme.accent : new Color(0.91f, 0.64f, 0.24f);
+        target.color = want ? new Color(accent.r * 0.6f, accent.g * 0.6f, accent.b * 0.6f, Mathf.Max(_idleColor.a, 0.85f)) : _idleColor;
+    }
+
     /// <summary>The finger that pressed this button, so a second one cannot release it.</summary>
     int _pointerId = int.MinValue;
 
@@ -84,6 +116,7 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     /// </summary>
     void Update()
     {
+        if (action == ActionKind.Reload) { UpdatePickUp(); return; }
         if (action != ActionKind.Melee && action != ActionKind.Kick) return;
         if (target == null || _on) return;
 
@@ -140,7 +173,13 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
         // Edge-triggered actions fire on press only.
         if (action == ActionKind.Jump) MobileInput.QueueJump();
-        else if (action == ActionKind.Reload) MobileInput.QueueReload();
+        else if (action == ActionKind.Reload)
+        {
+            // Disarmed with a gun in reach, this is PICK UP: the one cell that has nothing to do then, in the
+            // same place, so no button moves under the thumb.
+            if (_pickUp) MobileInput.QueueInteract();
+            else MobileInput.QueueReload();
+        }
         else if (action == ActionKind.Pause) MobileInput.QueuePause();
         else if (action == ActionKind.UseItem) MobileInput.QueueUseItem();
         else if (action == ActionKind.Melee) MobileInput.QueueMelee();

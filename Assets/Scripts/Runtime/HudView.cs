@@ -43,6 +43,11 @@ public class HudView : MonoBehaviour
     BombThrower _bombs;
     ConsumableBelt _belt;
     MeleeStrike _melee;
+    GunPickup _pickup;
+    Image _weaponIcon;
+    GameObject _pickUpPrompt;
+    TMP_Text _pickUpText;
+    bool _pickUpDirty = true;
     GameObject _punchPrompt;
     TMP_Text _punchText;
     Canvas _canvas;
@@ -124,6 +129,7 @@ public class HudView : MonoBehaviour
         _bombs = _hud.bombs;
         _belt = _hud.belt;
         _melee = _health != null ? _health.GetComponent<MeleeStrike>() : FindAnyObjectByType<MeleeStrike>();
+        _pickup = _health != null ? _health.GetComponent<GunPickup>() : FindAnyObjectByType<GunPickup>();
 
         // What this replaces goes, and stops updating. What stays is HUDController's.
         _hud.legacyReadouts = false;
@@ -146,6 +152,7 @@ public class HudView : MonoBehaviour
         if (DeviceProfile.Touched) ArrangeForTouch();
         BuildHitMarker();
         BuildPunchPrompt();
+        BuildPickUpPrompt();
         BuildBriefingCard();
         BuildPauseMenu();
 
@@ -250,7 +257,9 @@ public class HudView : MonoBehaviour
             _weapon.ReloadStarted += OnAmmo;
             _weapon.ReloadFinished += OnAmmo;
             _weapon.DealtDamage += OnHit;
+            _weapon.ArmedChanged += OnAmmo;
         }
+        if (_pickup != null) _pickup.CandidateChanged += OnPickUp;
         if (_health != null)
         {
             _health.Changed += OnHealth;
@@ -291,7 +300,9 @@ public class HudView : MonoBehaviour
             _weapon.ReloadStarted -= OnAmmo;
             _weapon.ReloadFinished -= OnAmmo;
             _weapon.DealtDamage -= OnHit;
+            _weapon.ArmedChanged -= OnAmmo;
         }
+        if (_pickup != null) _pickup.CandidateChanged -= OnPickUp;
         if (_health != null)
         {
             _health.Changed -= OnHealth;
@@ -656,7 +667,7 @@ public class HudView : MonoBehaviour
         var lcol = UIKit.Column(left, 2f, null, TextAnchor.MiddleLeft);
         lcol.childForceExpandHeight = false;
         lcol.childControlHeight = true;
-        Icon(left, "rifle", 60f, _t.textPrimary);
+        _weaponIcon = Icon(left, "rifle", 60f, _t.textPrimary);
         _weaponName = Label(left, "Name", "", UIKit.TextRole.Caption, _t.textSecondary);
 
         Divider(panel.transform, 44f);
@@ -787,6 +798,50 @@ public class HudView : MonoBehaviour
         _punchText.alignment = TextAlignmentOptions.Center;
         _punchPrompt = panel.gameObject;
         _punchPrompt.SetActive(false);
+    }
+
+    /// <summary>
+    /// "E  PICK UP BURST RIFLE · 72 ROUNDS" below the punch prompt while a gun on the ground is in reach (GunPickup).
+    /// Only then, like the punch prompt.
+    /// </summary>
+    void BuildPickUpPrompt()
+    {
+        var panel = HudPanel(transform, "PickUpPrompt");
+        Corner(panel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -124f));
+        UIKit.Row(panel, 0f, new RectOffset(12, 12, 4, 4), TextAnchor.MiddleCenter);
+        Hug(panel);
+        _pickUpText = Label(panel.transform, "Text", "", UIKit.TextRole.Label, _t.textPrimary);
+        _pickUpText.alignment = TextAlignmentOptions.Center;
+        _pickUpPrompt = panel.gameObject;
+        _pickUpPrompt.SetActive(false);
+    }
+
+    void OnPickUp(GunPickup p) => _pickUpDirty = true;
+
+    InputScheme _pickUpScheme;
+
+    void UpdatePickUpPrompt()
+    {
+        if (_pickUpPrompt == null) return;
+        // The motor adds GunPickup in its Awake, which may run after this view was built: asked again until found.
+        if (_pickup == null)
+        {
+            _pickup = _health != null ? _health.GetComponent<GunPickup>() : FindAnyObjectByType<GunPickup>();
+            if (_pickup == null) return;
+            _pickup.CandidateChanged += OnPickUp;
+            _pickUpDirty = true;
+        }
+        if (!_pickUpDirty && GameInput.Scheme == _pickUpScheme) return;
+        _pickUpDirty = false;
+        _pickUpScheme = GameInput.Scheme;
+        var gun = _pickup != null ? _pickup.Candidate : null;
+        _pickUpPrompt.SetActive(gun != null && gun.data != null);
+        if (gun == null || gun.data == null) return;
+        int rounds = gun.magazine + gun.reserve;
+        string what = $"{InputPrompts.For(GameAction.Interact)}  PICK UP {gun.data.weaponName.ToUpperInvariant()}";
+        _pickUpText.text = UIText.Row(what, rounds > 0 ? $"{rounds} ROUNDS" : "EMPTY");
+        bool disarmed = _weapon != null && _weapon.Disarmed;
+        _pickUpText.color = disarmed ? _t.accent : _t.textPrimary;
     }
 
     GameObject _briefCard;
@@ -1088,6 +1143,17 @@ public class HudView : MonoBehaviour
     void OnAmmo(Weapon w)
     {
         if (w == null) return;
+        _pickUpDirty = true;
+        // Out of ammo, the gun on the ground: the fists are the weapon.
+        if (_weaponIcon != null) _weaponIcon.sprite = _t.IconSprite(w.Disarmed ? "fist" : "rifle");
+        if (w.Disarmed)
+        {
+            _weaponName.text = "FISTS";
+            _magText.text = "";
+            _reserveText.text = "";
+            _modeText.text = "PICK UP A GUN";
+            return;
+        }
         var data = w.Data;
         _weaponName.text = data != null ? data.weaponName.ToUpperInvariant() : "";
         _modeText.text = data != null ? data.fireMode.ToString().ToUpperInvariant() : "";
@@ -1360,6 +1426,7 @@ public class HudView : MonoBehaviour
 
         UpdateBriefingCard();
         UpdatePunchPrompt();
+        UpdatePickUpPrompt();
 
         float now = Time.unscaledTime;
 

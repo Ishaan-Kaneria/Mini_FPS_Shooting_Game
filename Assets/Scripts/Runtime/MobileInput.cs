@@ -82,6 +82,24 @@ public static class MobileInput
     public static bool MeleeReady;
 
     /// <summary>
+    /// Disarmed with a gun in reach to pick up (GunPickup): the RELOAD button is PICK UP while it is true.
+    /// Read by TouchButton every frame; set by GunPickup.
+    /// </summary>
+    public static bool PickUpReady;
+
+    static bool _interactQueued;
+
+    /// <summary>The PICK UP button (the RELOAD button, while disarmed by a gun).</summary>
+    public static void QueueInteract() => _interactQueued = true;
+
+    public static bool ConsumeInteract()
+    {
+        bool queued = _interactQueued;
+        _interactQueued = false;
+        return queued;
+    }
+
+    /// <summary>
     /// A touch player has no Escape key, so without this there is no way to pause --
     /// and therefore no way to reach the dashboard or leave a run at all.
     /// </summary>
@@ -189,7 +207,8 @@ public static class MobileInput
         _sprintButton = _sprintStick = false;
         _fireButton = _fireTap = _autoFire = false;
         _fireHolds = 0;
-        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = _meleeQueued = _kickQueued = false;
+        _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = _meleeQueued = _kickQueued = _interactQueued = false;
+        PickUpReady = false;
         MeleeReady = false;
     }
 }

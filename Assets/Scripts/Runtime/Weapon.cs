@@ -416,6 +416,17 @@ public class Weapon : MonoBehaviour
     {
         if (data == null || fpsCamera == null) return;
 
+        // Out of ammo, the gun went to the ground and the fists came up: nothing here answers the trigger,
+        // the sights or the reload until a gun is picked up (GunPickup).
+        if (_dropAt > 0f && Time.time >= _dropAt) { _dropAt = -1f; if (OutOfAmmo) DropForFists(); }
+        if (Disarmed)
+        {
+            IsAiming = false;
+            _mobileFireWasDown = MobileInput.Fire;
+            UpdateAimAndKick();
+            return;
+        }
+
         // A bomb being aimed takes the hands. Without this the aim key would pull the
         // sights up at the same time as it locked the throw range, and the fire button
         // would empty a magazine into the floor the player is placing a ring on.
@@ -429,6 +440,7 @@ public class Weapon : MonoBehaviour
                    (ControlSettings.Held(controls.aim) || MobileInput.Aim || GameInput.PadHeld(GameAction.Aim));
 
         if (inputAllowed) HandleFireInput(controls);
+        if (_reloadWhenFree && !IsLowered && !IsReloading) { _reloadWhenFree = false; TryReload(); }
 
         if (inputAllowed && (ControlSettings.Pressed(controls.reload) || MobileInput.ConsumeReload() || GameInput.PadPressed(GameAction.Reload)))
             TryReload();
@@ -530,6 +542,8 @@ public class Weapon : MonoBehaviour
 
         if (!data.infiniteAmmo && CurrentAmmo <= 0)
         {
+            // Nothing left at all: one dry click, and the gun goes (once, however long the trigger is held).
+            if (OutOfAmmo) { if (_dropAt < 0f) { PlayClip(data.emptyClip, 0.5f); _dropAt = Time.time + DropDelay; } _nextFireTime = Time.time + 0.25f; return; }
             PlayClip(data.emptyClip, 0.5f);
             _nextFireTime = Time.time + 0.25f;
             if (data.autoReloadWhenEmpty) TryReload();
@@ -564,6 +578,8 @@ public class Weapon : MonoBehaviour
         Fired?.Invoke(this);
 
         if (!data.infiniteAmmo && CurrentAmmo == 0 && data.autoReloadWhenEmpty) TryReload();
+        // That was the last round there is: the gun goes a moment after it, so the shot is seen.
+        if (OutOfAmmo && _dropAt < 0f) _dropAt = Time.time + DropDelay;
     }
 
     void FireRay()
@@ -644,8 +660,9 @@ public class Weapon : MonoBehaviour
     // ======================================================================
     public void TryReload()
     {
-        if (reloadLocked || IsReloading || data.infiniteAmmo) return;
+        if (Disarmed || reloadLocked || IsReloading || data.infiniteAmmo) return;
         if (CurrentAmmo >= MagazineSize) return;
+        if (OutOfAmmo) { if (_dropAt < 0f) _dropAt = Time.time + DropDelay; return; }
         if (ReserveAmmo <= 0 && !InfiniteReserve) return;
 
         _reloadRoutine = StartCoroutine(ReloadRoutine());
@@ -1018,6 +1035,135 @@ public class Weapon : MonoBehaviour
         }
 
         if (tracer != null) Destroy(tracer.gameObject);
+    }
+
+    // ======================================================================
+    // Out of ammo: the gun is dropped and the fists come up (Part B)
+    // ======================================================================
+
+    /// <summary>
+    /// The gun has gone to the ground and the fists are up: no round left in it or carried. Nothing fires, aims
+    /// or reloads; MeleeStrike holds the fists up; GunPickup takes a gun from the ground to end it.
+    /// </summary>
+    public bool Disarmed { get; private set; }
+
+    /// <summary>Raised when the gun goes to the ground, and when one is taken up again.</summary>
+    public event Action<Weapon> ArmedChanged;
+
+    /// <summary>Not a round left: none in the magazine and none carried (a gun with an endless reserve never gets here).</summary>
+    public bool OutOfAmmo => data != null && !data.infiniteAmmo && CurrentAmmo <= 0 && ReserveAmmo <= 0 && !InfiniteReserve;
+
+    /// <summary>Seconds after the last round (or the dry trigger) that the gun goes: long enough for the shot to be seen.</summary>
+    const float DropDelay = 0.3f;
+    float _dropAt = -1f;
+    bool _reloadWhenFree;
+
+    /// <summary>The gun the player brought into the level (PlayerLoadout's): taken up again, its upgrades come back.</summary>
+    WeaponData _ownData;
+
+    /// <summary>Rounds picked up while disarmed with the player's own gun nowhere near: loaded into it, or one like it, when it is taken up.</summary>
+    public int StoredRounds { get; private set; }
+    WeaponData _storedFor;
+
+    /// <summary>The gun the <see cref="StoredRounds"/> are kept for.</summary>
+    public WeaponData StoredFor => _storedFor;
+
+    /// <summary>
+    /// Out of ammo with nothing else carried (the player has one gun): the gun goes to the ground as a real object,
+    /// empty, and the hands are free for the fists. Once: the trigger held through it does nothing more.
+    /// </summary>
+    public void DropForFists()
+    {
+        if (Disarmed || data == null) return;
+        if (_ownData == null) _ownData = data;
+        CancelReload();
+        IsAiming = false;
+
+        Transform eye = fpsCamera != null ? fpsCamera.transform : transform;
+        Vector3 at = eye.position + eye.forward * 0.45f - eye.up * 0.3f + eye.right * 0.12f;
+        Vector3 carried = _motor != null ? _motor.Velocity : Vector3.zero;
+        Vector3 toss = carried + Vector3.ProjectOnPlane(eye.forward, Vector3.up).normalized * 1.2f + Vector3.up * 0.6f;
+        GroundGun.SpawnDropped(data, 0, 0, at, eye.rotation, toss, playersOwn: data == _ownData);
+
+        Disarmed = true;
+        _dropAt = -1f;
+        AmmoChanged?.Invoke(this);
+        ArmedChanged?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Takes a gun from the ground (GunPickup): this gun, with the rounds in it. Armed already, the gun in the hands
+    /// goes down where that one lay, with what is left in it. Rounds stored while disarmed go into it when it is the
+    /// player's own kind. False when it cannot be taken.
+    /// </summary>
+    public bool TakeUp(GroundGun ground)
+    {
+        if (ground == null || !ground.Available) return false;
+        if (_ownData == null) _ownData = data;
+        var taking = ground.data;
+        int magazine = ground.magazine, reserve = ground.reserve;
+
+        if (!Disarmed && data != null)
+        {
+            CancelReload();
+            GroundGun.SpawnDropped(data, CurrentAmmo, ReserveAmmo, ground.Centre + Vector3.up * 0.15f,
+                                   Quaternion.LookRotation(Vector3.ProjectOnPlane(transform.forward, Vector3.up), Vector3.up),
+                                   Vector3.up * 0.3f, playersOwn: data == _ownData);
+        }
+        ground.Take();
+
+        if (taking != data)
+        {
+            Equip(taking);
+            // The player's own gun again: its upgrades back on (they were cleared for the other one).
+            if (taking == _ownData)
+            {
+                var progression = GetComponentInParent<PlayerProgression>();
+                if (progression != null) progression.Apply();
+            }
+        }
+        else Draw();
+
+        CurrentAmmo = Mathf.Clamp(magazine, 0, MagazineSize);
+        ReserveAmmo = Mathf.Max(0, reserve);
+        reserveLimited = true;
+        if (StoredRounds > 0 && taking == _storedFor)
+        {
+            ReserveAmmo += StoredRounds;
+            StoredRounds = 0;
+            _storedFor = null;
+        }
+        Disarmed = false;
+        _dropAt = -1f;
+        _spreadBonus = 0f;
+        AmmoChanged?.Invoke(this);
+        ArmedChanged?.Invoke(this);
+        // Empty, with rounds carried: loaded as soon as the hands are free (the fists going down cancel any reload
+        // started before they are; one started here was lost, and the gun stayed empty with 60 rounds carried).
+        _reloadWhenFree = CurrentAmmo <= 0 && ReserveAmmo > 0;
+        if (OutOfAmmo) _dropAt = Time.time + DropDelay;
+        return true;
+    }
+
+    /// <summary>
+    /// An ammo pickup while disarmed (Pickup): the player's own gun lying within <paramref name="reach"/> metres is
+    /// taken up with it; otherwise the rounds are kept for when it, or one like it, is. Returns true when they were used.
+    /// </summary>
+    public bool RearmWithAmmo(int rounds, Vector3 from, float reach)
+    {
+        if (!Disarmed || rounds <= 0) return false;
+        GroundGun own = null;
+        float best = reach;
+        foreach (var g in GroundGun.All)
+        {
+            if (g == null || !g.playersOwn || !g.Available) continue;
+            float d = Vector3.Distance(g.Centre, from);
+            if (d <= best) { best = d; own = g; }
+        }
+        _storedFor = own != null ? own.data : (_storedFor != null ? _storedFor : (_ownData != null ? _ownData : data));
+        StoredRounds += rounds;
+        if (own != null) TakeUp(own);
+        return true;
     }
 
     // ======================================================================

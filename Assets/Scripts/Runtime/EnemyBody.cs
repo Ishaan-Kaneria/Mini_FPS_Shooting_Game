@@ -1717,6 +1717,11 @@ public class EnemyBody : MonoBehaviour
         }
         body.linearVelocity = push;
         body.angularVelocity = Random.insideUnitSphere * 3f;
+
+        // The player can take it from the ground, with the rounds this enemy had left (GroundGun).
+        var dropped = gun;
+        GroundGun.MarkEnemyRifle(dropped.gameObject, GroundGun.EnemyLoad(GroundGun.DataFor(dropped)) - (_ai != null ? _ai.RoundsFired : 0),
+                                 null, () => dropped.gameObject.SetActive(false));
     }
 
     // ======================================================================

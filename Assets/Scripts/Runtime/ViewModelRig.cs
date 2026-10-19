@@ -572,6 +572,21 @@ public class ViewModelRig : MonoBehaviour
         gun.localPosition = basePos + delta;
         gun.localRotation = baseTurn * turn;
 
+        // Firing from the hip and the rifle butt: the rifle comes up and in so it is seen, eased in and out
+        // over PlayerBodySettings.fightBlend; never down the sights.
+        float blend = (Application.isPlaying ? Time.deltaTime : 1f) / Mathf.Max(0.01f, Body.fightBlend);
+        bool hipFiring = s.sinceShot >= 0f && s.sinceShot < Body.fireHold && s.aim < 0.5f && s.fistsUp < 0.01f;
+        bool butting = s.strike == MeleeStrike.Strike.Butt || (s.strike == MeleeStrike.Strike.Takedown && !s.takedownWithFists);
+        _fireFrame = Mathf.MoveTowards(_fireFrame, hipFiring ? 1f : 0f, blend);
+        _buttFrame = Mathf.MoveTowards(_buttFrame, butting ? 1f : 0f, blend);
+        _punchFrame = Mathf.MoveTowards(_punchFrame, s.fistsUp > 0.01f ? 1f : 0f, blend);
+        float atHip = 1f - aimed;
+        float fire = Smooth01(_fireFrame) * atHip, butt = Smooth01(_buttFrame) * atHip;
+        // On a phone the rifle goes left and down through a kick, out from under the fire button.
+        _kickFrame = Mathf.MoveTowards(_kickFrame, s.strike == MeleeStrike.Strike.Kick && DeviceProfile.Handheld ? 1f : 0f, blend);
+        gun.localPosition += Body.hipFireLift * fire + Body.buttLift * butt + Body.handsetKickGun * Smooth01(_kickFrame);
+        gun.localRotation = gun.localRotation * Quaternion.Euler(Body.hipFireTurn * fire);
+
         // The movement clips: the rifle (and both hands with it) through the stride.
         PlayMoves(out Vector3 moveOffset, out Vector3 moveTurn);
         gun.localPosition += moveOffset;
@@ -698,6 +713,9 @@ public class ViewModelRig : MonoBehaviour
     const float ArmsLag = 0.17f;
 
     float _aimWas = -1f, _aimDir = 1f;
+
+    // The fighting framing's weights (PlayerBodySettings "Fighting"), each eased over fightBlend.
+    float _fireFrame, _buttFrame, _punchFrame, _kickFrame;
     readonly float[] _shots = new float[6];
     float _lastShotSeen = -99f;
     int _shotNext;
@@ -888,7 +906,13 @@ public class ViewModelRig : MonoBehaviour
         float drive = 0f;
         if (s.strike == MeleeStrike.Strike.Jab || s.strike == MeleeStrike.Strike.Cross || (s.strike == MeleeStrike.Strike.Takedown && s.takedownWithFists))
             drive = Mathf.Clamp01(Extension(s.strikeProgress, MeleeStrike.ImpactAt(s.strike)));
-        _arms.localPosition = _spec.armsOffset - _headLocal + new Vector3(0f, -0.02f, 0.14f) * drive * Mathf.Clamp01(s.fistsUp);
+        float pf = Smooth01(_punchFrame);
+        _arms.localPosition = _spec.armsOffset - _headLocal + new Vector3(0f, -0.02f, 0.14f) * drive * Mathf.Clamp01(s.fistsUp)
+                            + Body.punchArms * pf;
+        // Each fist thrown a little wider to its own side and lower while fighting, so the whole forearm is seen at the
+        // blow; the guard only half as wide and no lower (lowered, the fist held back at the chin left the frame).
+        Vector3 Wide(Vector3 v, float side) => v + new Vector3(side * Body.punchWiden, -Body.punchLower, 0f) * pf;
+        Vector3 Guard(Vector3 v, float side) => v + new Vector3(side * Body.punchWiden * 0.5f, 0f, 0f) * pf;
 
         Reset(_left);
         Reset(_right);
@@ -927,8 +951,8 @@ public class ViewModelRig : MonoBehaviour
             }
 
             // The off hand pulls back to the chin as the other is thrown.
-            Vector3 lFist = Vector3.LerpUnclamped(LeftGuard, JabReach, jab) + new Vector3(0.02f, 0.02f, -0.06f) * Mathf.Clamp01(cross);
-            Vector3 rFist = Vector3.LerpUnclamped(RightGuard, CrossReach, cross) + new Vector3(-0.01f, 0.02f, -0.05f) * Mathf.Clamp01(jab);
+            Vector3 lFist = Vector3.LerpUnclamped(Guard(LeftGuard, -1f), Wide(JabReach, -1f), jab) + new Vector3(0.02f, 0.02f, -0.06f) * Mathf.Clamp01(cross);
+            Vector3 rFist = Vector3.LerpUnclamped(Guard(RightGuard, 1f), Wide(CrossReach, 1f), cross) + new Vector3(-0.01f, 0.02f, -0.05f) * Mathf.Clamp01(jab);
 
             // A guard holds the fists knuckles-up, facing in; the punch turns them over
             // flat, knuckles to the target.
@@ -942,7 +966,7 @@ public class ViewModelRig : MonoBehaviour
             // its own guard at the crosshair, and the left stays on the rifle.
             if (carry > 0f)
             {
-                Vector3 single = Vector3.LerpUnclamped(Body.rightGuard, Body.rightReach, jab);
+                Vector3 single = Vector3.LerpUnclamped(Guard(Body.rightGuard, 1f), Wide(Body.rightReach, 1f), jab);
                 rFist = Vector3.Lerp(rFist, single, carry);
                 rFistRot = Quaternion.Slerp(rFistRot, Quaternion.Slerp(
                     Look(view, new Vector3(-0.25f, 0.55f, 0.8f), new Vector3(0.8f, 0.1f, 0.2f)),

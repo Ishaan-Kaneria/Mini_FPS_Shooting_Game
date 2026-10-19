@@ -86,6 +86,32 @@ public class PlayerBodySettings : ScriptableObject
     [Tooltip("In the double punch, how far the left jab goes before the right cross (share of a full reach).")]
     [Range(0f, 1f)] public float doubleJabReach = 0.75f;
 
+    [Header("Fighting: more of the body and the gun in view (only while it happens)")]
+    [Tooltip("Seconds each of these blends in as the action starts, and out again after it.")]
+    [Range(0.02f, 0.5f)] public float fightBlend = 0.1f;
+    [Tooltip("Metres the rifle comes up and in while firing from the hip (right, up, ahead), so the gun and its kick are " +
+             "seen. Never down the sights. It also lifts the stock off the ability slots.")]
+    public Vector3 hipFireLift = new Vector3(-0.035f, 0.04f, -0.01f);
+    [Tooltip("Degrees the rifle turns with that lift (muzzle down, right, rolled right).")]
+    public Vector3 hipFireTurn = new Vector3(0f, -2f, 0f);
+    [Tooltip("Seconds after the last shot the rifle stays lifted, so a burst is one lift, not one per round.")]
+    [Range(0f, 1.5f)] public float fireHold = 0.4f;
+    [Tooltip("Metres the rifle comes up and in for the rifle-butt strike.")]
+    public Vector3 buttLift = new Vector3(-0.025f, 0.035f, 0f);
+    [Tooltip("Metres the shoulders drop and come forward while the fists are up (right, up, ahead): more forearm in view.")]
+    public Vector3 punchArms = new Vector3(0f, -0.04f, 0.05f);
+    [Tooltip("Metres each fist is thrown wider, to its own side, and lower: it comes in from the edge of the view and the " +
+             "whole forearm is seen at the blow. The guard is held half as wide and no lower.")]
+    [Range(0f, 0.12f)] public float punchWiden = 0.045f;
+    [Range(0f, 0.12f)] public float punchLower = 0.035f;
+    [Tooltip("Metres the rifle slides through a kick on a phone (right, up, ahead): carried flat along the bottom, its stock " +
+             "lay under the touch fire button (31% of it on a Pixel 7).")]
+    public Vector3 handsetKickGun = new Vector3(-0.12f, -0.05f, 0f);
+    [Tooltip("Extra degrees the body leans back for a kick, on top of kickLean: the leg rises higher into view.")]
+    [Range(0f, 15f)] public float kickRise = 4f;
+    [Tooltip("Metres the body comes forward under the eye through a kick: more of the leg in view.")]
+    [Range(0f, 0.3f)] public float kickReach = 0.08f;
+
     [System.Serializable]
     public struct StrikeClip
     {

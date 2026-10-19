@@ -374,7 +374,7 @@ public class PlayerBody : MonoBehaviour
     void PlaceBody(float dt)
     {
         if (_head == null) return;
-        _body.rotation = transform.rotation * Quaternion.AngleAxis(-S.kickLean * Smooth(_kickW), Vector3.right)
+        _body.rotation = transform.rotation * Quaternion.AngleAxis(-(S.kickLean + S.kickRise) * Smooth(_kickW), Vector3.right)
                                             * Quaternion.AngleAxis(-_turn, Vector3.up);
 
         Vector3 flat = Flat(_cam.transform.forward);
@@ -392,7 +392,8 @@ public class PlayerBody : MonoBehaviour
         _lift = _placed ? Mathf.Lerp(_lift, lift, 1f - Mathf.Exp(-S.liftRate * dt)) : lift;
         _offset.y = _lift;
         _placed = true;
-        _body.position = transform.position + _offset;
+        // Forward under the eye through a kick, so more of the leg is in view (kickReach).
+        _body.position = transform.position + _offset + flat * (S.kickReach * Smooth(_kickW));
     }
 
     void PlaceShadowGun()

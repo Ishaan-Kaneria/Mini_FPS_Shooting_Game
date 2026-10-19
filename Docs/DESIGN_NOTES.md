@@ -3150,3 +3150,25 @@ speed (1.17 walking, 0.92 jogging, 0.81 sprinting): their feet do not move at th
 planted foot slid back 1.1 m/s at a jog and 1.9 at a sprint; now -0.19, +0.01 and +0.08 m/s along the travel.
 The left arm is about 78 mm short of its place on the handguard at rest (as built: the hand sits further back on
 it); the clips add at most 13 mm to that.
+
+## More of the body and the gun in a fight (2026-10-19)
+
+Ishaan's ask after the play-test: a little more of the arms, legs and rifle in view while fighting, only then, eased
+in and out over 0.1 s, never down the sights. All in `PlayerBodySettings` "Fighting": firing from the hip lifts the
+rifle up and in (`hipFireLift`, held `fireHold` after the last shot so a burst is one lift), the rifle butt the
+same (`buttLift`), the punches drop the shoulders and bring them forward (`punchArms`) and throw each fist wider and
+lower (`punchWiden`/`punchLower`; the guard half as wide and no lower, since a lowered guard put the double punch's
+returning fist off the corner), and the kick leans further and slides the body forward under the eye
+(`kickRise`/`kickReach`): VerifyKickView still finds no frame with the boot over half of the target.
+
+`FPSKitPlayerShots.BatchFight` / `BatchFightPhone` (with `-fpskitTag`) shoot hip fire, rifle butt, punch, double punch
+and kick at impact, on a desktop and as a Pixel 7 with the touch controls, and measure what of the HUD the player's own
+body and gun cover (the frame drawn again without them). On the phone the kick carried the rifle flat along the bottom
+with its stock under the fire button (31% of it); `handsetKickGun` slides it left and down through a kick: nothing of
+the player's is under the fire button in any of them now. The ability slots sit over the left forearm at the hip in
+every pose, fighting or not, as built; the right hand is clear of them by 30 px or more.
+
+`Tools/unity-batch.sh` now keeps the laptop under 100 C: it waits for the CPU to cool below 80 C before starting,
+pins Unity and everything it starts to the eight efficient cores (threads 8-15; on the performance cores' 0-7 a compile
+check still went over 95 C three times), with as many job workers, and freezes the job above 95 C until it is under 80
+(UNITY_CPUS, UNITY_START_BELOW, UNITY_HOT, UNITY_COOL).

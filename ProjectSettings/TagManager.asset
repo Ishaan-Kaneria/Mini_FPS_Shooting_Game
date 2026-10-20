@@ -28,9 +28,9 @@ TagManager:
   - Environment
   - Backdrop
   - FirstPerson
-  - 
-  - 
-  - 
+  - Civilian
+  - PlayerBounds
+  - Vehicle
   - 
   - 
   - 

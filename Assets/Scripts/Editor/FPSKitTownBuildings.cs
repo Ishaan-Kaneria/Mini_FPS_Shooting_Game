@@ -647,6 +647,9 @@ namespace FPSKit.EditorTools
             go.transform.SetParent(_volumes, false);
             go.transform.position = new Vector3(r.center.x, (y0 + y1) * 0.5f, r.center.y);
             var v = go.AddComponent<Unity.AI.Navigation.NavMeshModifierVolume>();
+            // The component's centre defaults to (0, 1, 0): left there, every volume sat a metre above where it was
+            // placed, under roofs it was meant to cover and over wall-walks it was meant to stop short of.
+            v.center = Vector3.zero;
             v.size = new Vector3(Mathf.Max(0.5f, r.width - inset * 2f), y1 - y0, Mathf.Max(0.5f, r.height - inset * 2f));
             v.area = 1;
         }
@@ -1089,7 +1092,8 @@ namespace FPSKit.EditorTools
         {
             var r = lot.r;
             int f = lot.front;
-            float front = Rand(rng, 4f, 6.5f), sideGap = Rand(rng, 1.6f, 2.6f), rear = Rand(rng, 1.5f, 2.5f);
+            // The side gaps take the outside stair (1.6 m) with room to spare before the compound wall.
+            float front = Rand(rng, 4f, 6.5f), sideGap = Rand(rng, 2.0f, 2.8f), rear = Rand(rng, 1.5f, 2.5f);
             Rect house = f == 0 ? Rect.MinMaxRect(r.xMin + sideGap, r.yMin + rear, r.xMax - sideGap, r.yMax - front)
                        : f == 1 ? Rect.MinMaxRect(r.xMin + sideGap, r.yMin + front, r.xMax - sideGap, r.yMax - rear)
                        : f == 2 ? Rect.MinMaxRect(r.xMin + rear, r.yMin + sideGap, r.xMax - front, r.yMax - sideGap)
@@ -1127,7 +1131,9 @@ namespace FPSKit.EditorTools
         /// for the flight's run plus its landing. Sets the parapet gap on the mass (BuildMass cuts it), or leaves the roof
         /// off the bake when no wall is long enough.
         /// </summary>
-        private const float TownStairWidth = 1.2f, TownTread = 0.28f, TownRiser = 0.18f, TownStairStart = 0.4f, TownLandingLen = 1.4f;
+        // 1.6 m wide with a 1.8 m gap in the parapet: at 1.2 and 1.4 an agent (0.5 m radius) had a strip of one voxel up the
+        // flight, and every villa roof with a stair baked as an island nothing could reach.
+        private const float TownStairWidth = 1.6f, TownTread = 0.28f, TownRiser = 0.18f, TownStairStart = 0.4f, TownLandingLen = 1.8f;
 
         private static void PlanStair(Mass b, int front)
         {

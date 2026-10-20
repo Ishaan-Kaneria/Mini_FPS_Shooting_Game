@@ -236,13 +236,13 @@ namespace FPSKit.EditorTools
                 for (float d = 0f; d <= len; d += 3f)
                 {
                     var p = a0 + u * d;
-                    if (s == 0 && Mathf.Abs(p.x - (-275f)) < 4f) continue;
+                    if (s == 0 && Mathf.Abs(p.x - JunkGateX) < 4f) continue;
                     float g = GroundHeightAt(p.x, p.z);
                     m.BoxMinMax(_fence, new Vector3(p.x - 0.04f, g - 0.3f, p.z - 0.04f), new Vector3(p.x + 0.04f, g + 2.4f, p.z + 0.04f));
                     if (d + 3f <= len + 0.01f)
                     {
                         var q = a0 + u * (d + 3f);
-                        if (s == 0 && Mathf.Abs((p.x + q.x) * 0.5f - (-275f)) < 4.5f) continue;
+                        if (s == 0 && Mathf.Abs((p.x + q.x) * 0.5f - JunkGateX) < 4.5f) continue;
                         float g2 = GroundHeightAt(q.x, q.z);
                         m.Quad(_corrugatedRust, new Vector3(p.x, g + 0.1f, p.z), new Vector3(q.x, g2 + 0.1f, q.z), new Vector3(q.x, g2 + 2.3f, q.z), new Vector3(p.x, g + 2.3f, p.z), n);
                         m.Quad(_corrugatedRust, new Vector3(p.x, g + 0.1f, p.z), new Vector3(q.x, g2 + 0.1f, q.z), new Vector3(q.x, g2 + 2.3f, q.z), new Vector3(p.x, g + 2.3f, p.z), -n);

@@ -100,7 +100,15 @@ namespace FPSKit.EditorTools
                 if (!NavMesh.SamplePosition(at, out var hit, 3f, NavMesh.AllAreas))
                 { problems.Add($"{name} at {at} has no navmesh within 3 m"); continue; }
                 if (!NavMesh.CalculatePath(home.position, hit.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
-                { problems.Add($"{name} at {hit.position} cannot be reached from the start (path {path.status})"); continue; }
+                {
+                    // Where it got to, both ways: the gap is between the two ends.
+                    var back = new NavMeshPath();
+                    NavMesh.CalculatePath(hit.position, home.position, NavMesh.AllAreas, back);
+                    string fwd = path.corners.Length > 0 ? path.corners[path.corners.Length - 1].ToString() : "nowhere";
+                    string rev = back.corners.Length > 0 ? back.corners[back.corners.Length - 1].ToString() : "nowhere";
+                    problems.Add($"{name} at {hit.position} cannot be reached from the start (path {path.status}; from the start it gets to {fwd}, from there to {rev})");
+                    continue;
+                }
                 reached++;
                 notes.Append($"\n  {name}: reached ({PathLength(path):0} m)");
             }
@@ -108,6 +116,7 @@ namespace FPSKit.EditorTools
 
             // ---- closed roofs stay off the navmesh ----
             int roofs = 0, bad = 0;
+            var islands = new List<string>();
             foreach (var r in UnityEngine.Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
             {
                 if (!r.name.StartsWith("Block_")) continue;
@@ -120,11 +129,14 @@ namespace FPSKit.EditorTools
                     roofs++;
                     if (NavMesh.SamplePosition(h.point, out var nh, 0.6f, NavMesh.AllAreas) &&
                         (!NavMesh.CalculatePath(home.position, nh.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete))
+                    {
                         bad++;
+                        if (islands.Count < 12) islands.Add($"({nh.position.x:0},{nh.position.y:0.0},{nh.position.z:0})");
+                    }
                 }
             }
             if (roofs > 0 && bad > roofs * 0.03f) problems.Add($"{bad} of {roofs} sampled roof points carry navmesh that cannot be reached (a closed building baked an island)");
-            notes.Append($"\n  roofs: {roofs} points sampled, {bad} unreachable islands");
+            notes.Append($"\n  roofs: {roofs} points sampled, {bad} unreachable islands" + (islands.Count > 0 ? ": " + string.Join(" ", islands) : ""));
 
             // ---- life ----
             var civ = UnityEngine.Object.FindAnyObjectByType<CivilianDirector>();
@@ -157,6 +169,72 @@ namespace FPSKit.EditorTools
             foreach (var t in techs)
                 if (t.route == null || t.route.Length < 5 || t.gunner == null || t.muzzle == null) problems.Add($"{t.name} is missing its route, gunner or gun");
             notes.Append($"\n  {drivable.Length} drivable cars, {techs.Length} technicals");
+        }
+
+        /// <summary>Diagnosis: what stands at given points (every collider down a vertical ray, the navmesh near each, the volumes
+        /// over it), and character maps of the navmesh round awkward places (R reached from the start, o navmesh not reached).</summary>
+        public static void Probe()
+        {
+            EditorSceneManager.OpenScene(Scene, OpenSceneMode.Single);
+            var sb = new StringBuilder();
+            var player = GameObject.FindWithTag("Player");
+            NavMesh.SamplePosition(player.transform.position, out var home, 4f, NavMesh.AllAreas);
+            var pts = new[] { new Vector3(208f, 0, 170f), new Vector3(199f, 0, 162f), new Vector3(-257f, 0, -253f), new Vector3(-344f, 0, -323f),
+                              new Vector3(-451f, 0, -177f), new Vector3(-256f, 0, -177f), new Vector3(-267f, 0, -177f) };
+            var vols = UnityEngine.Object.FindObjectsByType<Unity.AI.Navigation.NavMeshModifierVolume>(FindObjectsSortMode.None);
+            foreach (var p in pts)
+            {
+                sb.AppendLine($"== {p.x},{p.z}");
+                foreach (var h in Physics.RaycastAll(new Vector3(p.x, 300f, p.z), Vector3.down, 700f).OrderBy(h => -h.point.y))
+                    sb.AppendLine($"  hit {h.collider.name} ({h.collider.transform.parent?.name}) y={h.point.y:0.00}");
+                for (float y = -5f; y < 40f; y += 0.5f)
+                    if (NavMesh.SamplePosition(new Vector3(p.x, y, p.z), out var nh, 0.3f, NavMesh.AllAreas))
+                    { sb.AppendLine($"  navmesh at y={nh.position.y:0.00} ({nh.position.x:0.0},{nh.position.z:0.0})"); y = nh.position.y + 1.5f; }
+                foreach (var v in vols)
+                {
+                    var c = v.transform.TransformPoint(v.center); var e = v.size * 0.5f;
+                    if (Mathf.Abs(p.x - c.x) <= e.x && Mathf.Abs(p.z - c.z) <= e.z)
+                        sb.AppendLine($"  volume y {c.y - e.y:0.0}..{c.y + e.y:0.0} x {c.x - e.x:0.0}..{c.x + e.x:0.0} z {c.z - e.z:0.0}..{c.z + e.z:0.0}");
+                }
+            }
+            void Map(string name, float x0, float z0, float x1, float z1, float y, float step)
+            {
+                sb.AppendLine($"== map {name} x {x0}..{x1} (left to right), z {z1}..{z0} (top to bottom), y {y}");
+                var path = new NavMeshPath();
+                for (float z = z1; z >= z0 - 0.01f; z -= step)
+                {
+                    var line = new StringBuilder($"{z,7:0.0} ");
+                    for (float x = x0; x <= x1 + 0.01f; x += step)
+                    {
+                        if (!NavMesh.SamplePosition(new Vector3(x, y, z), out var nh, step * 0.5f, NavMesh.AllAreas) || Mathf.Abs(nh.position.y - y) > 1f) { line.Append('#'); continue; }
+                        bool ok = NavMesh.CalculatePath(home.position, nh.position, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
+                        line.Append(ok ? 'R' : 'o');
+                    }
+                    sb.AppendLine(line.ToString());
+                }
+            }
+            // Down the keep's west lane to the south-west landing, every 10 cm: the navmesh height found, and whether a
+            // path from the lane's middle gets there.
+            {
+                var mid = new Vector3(312.3f, 28.3f, 368f);
+                NavMesh.SamplePosition(mid, out var mh, 1f, NavMesh.AllAreas);
+                var pth = new NavMeshPath();
+                for (float z = 366f; z >= 361.4f; z -= 0.1f)
+                {
+                    float expect = z > 363.4f ? 26.2f + (372.6f - z) / 9.2f * 3.905f : 30.1f;
+                    bool f = NavMesh.SamplePosition(new Vector3(312.3f, expect, z), out var nh, 0.15f, NavMesh.AllAreas);
+                    string st = "-";
+                    if (f) { NavMesh.CalculatePath(mh.position, nh.position, NavMesh.AllAreas, pth); st = pth.status.ToString(); }
+                    sb.AppendLine($"  z {z:0.00} expect {expect:0.00} navmesh {(f ? nh.position.y.ToString("0.00") + " at z " + nh.position.z.ToString("0.00") : "none")} {st}");
+                }
+                foreach (var h in Physics.RaycastAll(new Vector3(312.3f, 60f, 363.3f), Vector3.down, 60f).OrderBy(h => -h.point.y))
+                    sb.AppendLine($"  above the junction: {h.collider.name} y={h.point.y:0.00}");
+                foreach (var h in Physics.RaycastAll(new Vector3(312.3f, 31f, 368f), Vector3.up, 30f).OrderBy(h => h.point.y))
+                    sb.AppendLine($"  over the lane: {h.collider.name} y={h.point.y:0.00}");
+            }
+            System.IO.File.WriteAllText("Build/TownProbePoints.txt", sb.ToString());
+            Debug.Log("[FPSKit] probe points written");
+            FPSKitBatch.Exit(0);
         }
 
         static float Ground(Vector3 p)

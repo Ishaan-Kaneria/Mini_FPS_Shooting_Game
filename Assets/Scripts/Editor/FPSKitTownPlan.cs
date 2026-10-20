@@ -104,6 +104,8 @@ namespace FPSKit.EditorTools
         private const float OasisRadius = 42f;
         private static readonly Rect GasStationRect = Rect.MinMaxRect(22f, -392f, 92f, -342f);
         private static readonly Rect JunkyardRect = Rect.MinMaxRect(-335f, -486f, -215f, -428f);
+        /// <summary>The junkyard's gate (north side), where its track comes in, and the drive south from it.</summary>
+        private const float JunkGateX = -275f;
         private static readonly Vector2 WaterTowerAt = new Vector2(-196f, -330f);
         private static readonly Vector2 CheckpointAt = new Vector2(0f, -368f);
         private static readonly Vector2 BusStopAt = new Vector2(11f, -205f);
@@ -156,7 +158,7 @@ namespace FPSKit.EditorTools
 
             // Dirt tracks: out to the farms past the mosque, down to the junkyard, and the ramp up to the citadel.
             Road("FarmTrack", RoadKind.Track, -470f, 205f, -58f, 205f, 6f, 0f);
-            Road("JunkTrack", RoadKind.Track, -275f, -428f, -275f, -400f, 6f, 0f);
+            Road("JunkTrack", RoadKind.Track, JunkGateX, -428f, JunkGateX, -400f, 6f, 0f);
             _townTracks.Add(("CitadelRamp", new[] { new Vector2(200f, 200f + 6.5f), new Vector2(232f, 246f), new Vector2(300f, 268f), new Vector2(300f, 300f) }, 7f));
 
             // Sites.

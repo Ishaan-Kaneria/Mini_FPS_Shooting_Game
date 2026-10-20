@@ -175,6 +175,9 @@ namespace FPSKit.EditorTools
             foreach (var row in _junkRows)
                 for (float x = row.x; x < row.w; x += Rand(rng, 4.8f, 6f))
                 {
+                    // A drive runs south from the gate between the rows, and a second gap further east: nose to tail, each
+                    // row was a wall across the yard and the aisles between them could not be reached.
+                    if (Mathf.Abs(x - JunkGateX) < 4.5f || Mathf.Abs(x - (row.x + row.w) * 0.5f - 30f) < 3f) continue;
                     var mat = rng.NextDouble() < 0.5 ? Burnt() : RustBody();
                     var p = new Vector3(x, GroundHeightAt(x, row.z), row.z + Rand(rng, -0.6f, 0.6f));
                     var car = PlaceCar(parked, SedanNames[rng.Next(SedanNames.Length)], p, 90f + Rand(rng, -12f, 12f), mat, wreck: true);

@@ -269,8 +269,9 @@ namespace FPSKit.EditorTools
                 m.BoxMinMax(_stucco, Vector3.Min(a, b - n * depth) + Vector3.up * (y0 + 6.2f), Vector3.Max(a, b - n * depth) + Vector3.up * (y0 + 6.6f));
                 // Ceiling under it, the walk under it is marble (the courtyard floor runs under).
             }
-            Arcade(new Vector3(x0 + 7f, 0, zc0 + 7f), new Vector3(x1 - 7f, 0, zc0 + 7f), Vector3.forward, 6f);         // south (faces courtyard north)
-            Arcade(new Vector3(x1 - 7f, 0, zc0 + 7f), new Vector3(x1 - 7f, 0, zc1), Vector3.left, 6f);                 // east
+            // The minaret stands in the south-east corner (x1-9..x1-1, zc0+1..zc0+9): the south and east arcades stop at it.
+            Arcade(new Vector3(x0 + 7f, 0, zc0 + 7f), new Vector3(x1 - 9f, 0, zc0 + 7f), Vector3.forward, 6f);         // south (faces courtyard north)
+            Arcade(new Vector3(x1 - 7f, 0, zc0 + 9f), new Vector3(x1 - 7f, 0, zc1), Vector3.left, 6f);                 // east
             Arcade(new Vector3(x0 + 7f, 0, zc1), new Vector3(x0 + 7f, 0, zc0 + 7f), Vector3.right, 6f);                // west
 
             // Ablution fountain: octagonal basin with water, a little domed canopy on columns.
@@ -344,7 +345,7 @@ namespace FPSKit.EditorTools
 
             var go = m.Build(group, "GrandMosque", layer, "Concrete");
 
-            BuildMinaret(group, layer, new Vector3(x1 - 3.2f, y0, zc0 + 3.2f), y0, bottom);
+            BuildMinaret(group, layer, new Vector3(x1 - T - 4f, y0, zc0 + T + 4f), y0, bottom);
 
             // Lanterns hung in the arcades and hall.
             for (float x = x0 + 12f; x < x1 - 8f; x += 12f)
@@ -355,10 +356,10 @@ namespace FPSKit.EditorTools
 
             // Off the bake: the roofs (no way up) -- volumes over the hall roof, arcade roofs and the dome drum.
             NoEntryBox(Rect.MinMaxRect(x0, zc1, x1, zh1), y0 + 10.2f, y0 + 40f, 0f);
-            // The minaret's corner (x1-7..x1, zc0..zc0+7) is left out: its ramps climb through that height.
-            NoEntryBox(Rect.MinMaxRect(x0, zc0, x1 - 7.2f, zc0 + 7f), y0 + 6f, y0 + 20f, 0f);
+            // The minaret's corner (x1-9..x1, zc0..zc0+9) is left out: its ramps climb through that height.
+            NoEntryBox(Rect.MinMaxRect(x0, zc0, x1 - 9.1f, zc0 + 7f), y0 + 6f, y0 + 20f, 0f);
             NoEntryBox(Rect.MinMaxRect(x0, zc0, x0 + 7f, zc1), y0 + 6f, y0 + 20f, 0f);
-            NoEntryBox(Rect.MinMaxRect(x1 - 7f, zc0 + 7.2f, x1, zc1), y0 + 6f, y0 + 20f, 0f);
+            NoEntryBox(Rect.MinMaxRect(x1 - 7f, zc0 + 9.1f, x1, zc1), y0 + 6f, y0 + 20f, 0f);
             NoEntryBox(Rect.MinMaxRect(-8f, zc0 - 2.4f, 8f, zc0), y0 + 11f, y0 + 25f, 0f);
             NoEntryBox(Rect.MinMaxRect(fc.x - 3.3f, fc.z - 3.3f, fc.x + 3.3f, fc.z + 3.3f), y0 + 3.3f, y0 + 9f, 0f);
             NoEntryBox(Rect.MinMaxRect(fc.x - 3.0f, fc.z - 3.0f, fc.x + 3.0f, fc.z + 3.0f), y0 - 1f, y0 + 1f, 0f);
@@ -369,29 +370,35 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The minaret: a square stone shaft to 30 m, a balcony, an octagonal stage to 39 m, a second balcony, the
-        /// lantern and its onion cap with the crescent. Inside, a square helix of ramps round a central core (each side
-        /// a ramp under 26 degrees, each corner a landing) climbs to a door onto the lower balcony.
+        /// The minaret: a square stone shaft to 30 m, a balcony, an octagonal stage above it with a second balcony, the
+        /// lantern and its onion cap with the crescent. Inside, the Maghreb way: a square helix of ramps round a solid
+        /// core (each side a ramp of about 24 degrees, each corner a landing) climbs to a door onto the balcony.
+        ///
+        /// Sized so an agent fits: 8 m square, lanes 2.25 m between core and wall. At 6 m with 1.75 m lanes the ramps
+        /// baked as slivers a few voxels wide, each under the small-region cull, and nothing inside was on the navmesh.
+        /// The shaft stands 2.8 m above the balcony with a ceiling, and the upper stage sits on that: built straight off
+        /// the balcony, the stage's own walls stood across the doorway.
         /// </summary>
         private static void BuildMinaret(Transform group, int layer, Vector3 c, float y0, float bottom)
         {
             var m = new TownMesh();
-            const float Half = 3.0f, T = 0.6f, Shaft = 30f, Core = 0.6f;
+            const float Half = 4.0f, T = 0.8f, Shaft = 30f, Core = 0.9f, Head = 2.8f;
             float top = y0 + Shaft;
-            // Shaft: four walls with a door at the base (west, onto the courtyard) and a door at the balcony (south).
+            var r = Rect.MinMaxRect(c.x - Half, c.z - Half, c.x + Half, c.z + Half);
+            // Shaft: four walls with a door at the base (west, at its south end, out of the arcade) and a door at the
+            // balcony (south, centre).
             for (int s = 0; s < 4; s++)
             {
-                var r = Rect.MinMaxRect(c.x - Half, c.z - Half, c.x + Half, c.z + Half);
                 var (a0, b0) = FaceRun(r, s);
                 var nrm = SideOut3(s);
                 var holes = new List<Vector4>();
                 float pv = y0 - bottom;
-                if (s == 3) holes.Add(new Vector4(Half - 0.7f, Half + 0.7f, pv, pv + 2.4f));
-                if (s == 1) holes.Add(new Vector4(Half - 0.6f, Half + 0.6f, pv + Shaft + 0.05f, pv + Shaft + 2.3f));
+                if (s == 3) holes.Add(new Vector4(Half * 2f - 3.0f, Half * 2f - 1.4f, pv, pv + 2.5f));
+                if (s == 1) holes.Add(new Vector4(Half - 0.75f, Half + 0.75f, pv + Shaft + 0.05f, pv + Shaft + 2.35f));
                 // Slit windows climbing the shaft.
                 for (float h = 5f; h < Shaft - 2f; h += 4.5f) holes.Add(new Vector4(Half - 0.15f, Half + 0.15f, pv + h, pv + h + 1.2f));
-                m.WallWithHoles(_stone, a0 + Vector3.up * bottom, b0 + Vector3.up * bottom, top - bottom + 0.4f, nrm, holes);
-                m.WallWithHoles(_stone, a0 - nrm * T + Vector3.up * bottom, b0 - nrm * T + Vector3.up * bottom, top - bottom + 0.4f, -nrm, holes);
+                m.WallWithHoles(_stone, a0 + Vector3.up * bottom, b0 + Vector3.up * bottom, top + Head - bottom, nrm, holes);
+                m.WallWithHoles(_stone, a0 - nrm * T + Vector3.up * bottom, b0 - nrm * T + Vector3.up * bottom, top + Head - bottom, -nrm, holes);
                 var u = (b0 - a0).normalized;
                 foreach (var h in holes)
                 {
@@ -403,23 +410,25 @@ namespace FPSKit.EditorTools
                     m.Quad(_stone, a0 + u * h.x + Vector3.up * (bottom + h.z), a0 + u * h.y + Vector3.up * (bottom + h.z),
                            a0 + u * h.y - nrm * T + Vector3.up * (bottom + h.z), a0 + u * h.x - nrm * T + Vector3.up * (bottom + h.z), Vector3.up);
                 }
-                // Carved bands every 6 m.
+                // Carved bands every 6 m, and the coping at the shaft's head.
                 for (float h = 6f; h < Shaft; h += 6f)
                     m.Box(_coping, (a0 + b0) * 0.5f + nrm * 0.05f + Vector3.up * (y0 + h), new Vector3(Half * 2f + 0.1f, 0.3f, 0.12f), Quaternion.LookRotation(nrm));
+                m.Box(_coping, (a0 + b0) * 0.5f - nrm * (T * 0.5f - 0.05f) + Vector3.up * (top + Head + 0.1f), new Vector3(Half * 2f + 0.2f, 0.2f, T + 0.2f), Quaternion.LookRotation(nrm));
             }
-            // Floor inside, and the helix.
+            // The shaft's ceiling, and its roof terrace under the upper stage.
             float inner = Half - T;
+            m.BoxMinMax(_stone, new Vector3(c.x - inner, top + Head - 0.3f, c.z - inner), new Vector3(c.x + inner, top + Head, c.z + inner));
+            // Floor inside, and the helix.
             m.Quad(_marble, new Vector3(c.x - inner, y0, c.z - inner), new Vector3(c.x + inner, y0, c.z - inner), new Vector3(c.x + inner, y0, c.z + inner), new Vector3(c.x - inner, y0, c.z + inner), Vector3.up);
-            m.BoxMinMax(_stone, new Vector3(c.x - Core, y0, c.z - Core), new Vector3(c.x + Core, top, c.z + Core));
+            m.BoxMinMax(_stone, new Vector3(c.x - Core, y0, c.z - Core), new Vector3(c.x + Core, top + Head - 0.3f, c.z + Core));
             float laneMid = (Core + inner) * 0.5f, laneW = inner - Core - 0.05f;
             float y = y0;
-            // Corners walked anticlockwise from the south-west; each side is a ramp between two corner landings. The rise
-            // per side is set so a full turn clears an agent's height under the turn above (3.1 m), and the count is a
-            // multiple of four so the last ramp comes up the west side onto the landing at the balcony door, not under it.
+            // Corners walked anticlockwise from the south-west; each side is a ramp between two corner landings. The count
+            // is a multiple of four so the last ramp comes up the west side onto the south-west landing, beside the lane
+            // that runs to the balcony door; a turn rises 3.3 m, so the turn above always clears an agent.
             var corners = new[] { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) };
             int k = 0;
-            float horizontal = 2f * laneMid - laneW;
-            int ramps = Mathf.CeilToInt(Shaft / 0.8f);
+            int ramps = Mathf.CeilToInt(Shaft / 0.85f);
             while (ramps % 4 != 0) ramps++;
             float rise = Shaft / ramps;
             for (int i = 0; i < ramps; i++)
@@ -432,35 +441,49 @@ namespace FPSKit.EditorTools
                 Ramp(m, _stone, pa + dir * (laneW * 0.5f), pb - dir * (laneW * 0.5f), laneW, y - 0.3f, walls: false);
                 y += rise; k++;
             }
-            _ = horizontal;
-            // The last landing to the balcony door (south side, centre) at the shaft top.
-            m.BoxMinMax(_stone, new Vector3(c.x - inner, top - 0.25f, c.z - inner), new Vector3(c.x + inner, top + 0.05f, c.z - Core));
-            // Lower balcony: a ring platform with a parapet.
-            m.BoxMinMax(_stone, new Vector3(c.x - Half - 1.9f, top - 0.3f, c.z - Half - 1.9f), new Vector3(c.x + Half + 1.9f, top + 0.05f, c.z + Half + 1.9f));
-            foreach (var (a, b, o) in new[] { (new Vector2(-1, -1), new Vector2(1, -1), Vector2.down), (new Vector2(1, -1), new Vector2(1, 1), Vector2.right),
-                                              (new Vector2(1, 1), new Vector2(-1, 1), Vector2.up), (new Vector2(-1, 1), new Vector2(-1, -1), Vector2.left) })
+            // The last landing, the whole south lane at the shaft top, to the balcony door.
+            m.BoxMinMax(_stone, new Vector3(c.x - inner, top - 0.25f, c.z - inner), new Vector3(c.x + inner, top, c.z - Core));
+            // The balcony: a ring platform round the shaft (four slabs outside its walls), with a parapet.
+            float ro = Half + 2.0f;
+            m.BoxMinMax(_stone, new Vector3(c.x - ro, top - 0.3f, c.z - ro), new Vector3(c.x + ro, top, c.z - Half));
+            m.BoxMinMax(_stone, new Vector3(c.x - ro, top - 0.3f, c.z + Half), new Vector3(c.x + ro, top, c.z + ro));
+            m.BoxMinMax(_stone, new Vector3(c.x - ro, top - 0.3f, c.z - Half), new Vector3(c.x - Half, top, c.z + Half));
+            m.BoxMinMax(_stone, new Vector3(c.x + Half, top - 0.3f, c.z - Half), new Vector3(c.x + ro, top, c.z + Half));
+            // Corbels under it, the way a balcony is carried out from a shaft.
+            for (int s = 0; s < 4; s++)
             {
-                var pa = new Vector2(c.x, c.z) + a * (Half + 1.8f); var pb = new Vector2(c.x, c.z) + b * (Half + 1.8f);
-                SolidWall(m, _stone, pa, pb, top, top + 1.05f, 0.2f);
-                _ = o;
+                var (a0, b0) = FaceRun(r, s);
+                var nrm = SideOut3(s); var u = (b0 - a0).normalized;
+                for (float e = 0.5f; e < Half * 2f; e += 1.0f)
+                    m.Box(_stone, a0 + u * e + nrm * 0.5f + Vector3.up * (top - 0.75f), new Vector3(0.35f, 0.9f, 1.0f), Quaternion.LookRotation(nrm));
             }
-            // Octagonal upper stage, upper balcony, lantern, cap.
-            var oc = new Vector3(c.x, top + 0.05f, c.z);
-            m.Cylinder(_stone, oc, Half * 0.92f, 9f, 8, true);
-            m.Cylinder(_coping, oc + Vector3.up * 9f, Half * 0.92f + 1.0f, 0.3f, 8, true, true);
-            m.Cylinder(_stone, oc + Vector3.up * 9.3f, Half * 0.92f + 0.95f, 0.9f, 8, false);
-            m.Cylinder(_stucco, oc + Vector3.up * 9.3f, 1.6f, 4f, 12, true);
+            // The doorway's floor through the wall's thickness, joining the inner landing to the balcony.
+            m.BoxMinMax(_stone, new Vector3(c.x - 0.75f, top - 0.25f, c.z - Half), new Vector3(c.x + 0.75f, top, c.z - inner));
+            foreach (var (a, b) in new[] { (new Vector2(-1, -1), new Vector2(1, -1)), (new Vector2(1, -1), new Vector2(1, 1)),
+                                           (new Vector2(1, 1), new Vector2(-1, 1)), (new Vector2(-1, 1), new Vector2(-1, -1)) })
+            {
+                var pa = new Vector2(c.x, c.z) + a * (ro - 0.1f); var pb = new Vector2(c.x, c.z) + b * (ro - 0.1f);
+                SolidWall(m, _stone, pa, pb, top, top + 1.05f, 0.2f);
+            }
+            // Octagonal upper stage on the shaft's head, upper balcony, lantern, cap.
+            var oc = new Vector3(c.x, top + Head, c.z);
+            float stage = Half * 0.8f;
+            m.Cylinder(_stone, oc, stage, 8f, 8, true);
+            m.Cylinder(_coping, oc + Vector3.up * 8f, stage + 1.0f, 0.3f, 8, true, true);
+            m.Cylinder(_stone, oc + Vector3.up * 8.3f, stage + 0.95f, 0.9f, 8, false);
+            m.Cylinder(_stucco, oc + Vector3.up * 8.3f, 1.8f, 4f, 12, true);
             for (int i = 0; i < 8; i++)
             {
                 float a = i * Mathf.PI / 4f;
-                m.Box(_glassDark, oc + Vector3.up * 11.3f + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 1.61f, new Vector3(0.5f, 1.4f, 0.04f), Quaternion.LookRotation(new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a))));
+                m.Box(_glassDark, oc + Vector3.up * 10.3f + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 1.81f, new Vector3(0.5f, 1.4f, 0.04f), Quaternion.LookRotation(new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a))));
+                m.Box(_glassDark, oc + Vector3.up * 4.5f + new Vector3(Mathf.Cos(a + Mathf.PI / 8f), 0, Mathf.Sin(a + Mathf.PI / 8f)) * (stage * 0.93f), new Vector3(0.45f, 1.8f, 0.04f),
+                      Quaternion.LookRotation(new Vector3(Mathf.Cos(a + Mathf.PI / 8f), 0, Mathf.Sin(a + Mathf.PI / 8f))));
             }
-            Dome(m, _domeTile, oc + Vector3.up * 13.3f, 1.9f, 3.2f, true, 20);
-            Finial(m, oc + Vector3.up * 16.4f, 1.2f);
-            var go = m.Build(group, "Minaret", layer, "Concrete");
-            _ = go;
-            // The upper stage and the shaft's solid core and walls: off the bake. The balcony stays walkable.
-            NoEntryBox(Rect.MinMaxRect(c.x - Half, c.z - Half, c.x + Half, c.z + Half), top + 0.3f, top + 30f, -1.2f);
+            Dome(m, _domeTile, oc + Vector3.up * 12.3f, 2.1f, 3.4f, true, 20);
+            Finial(m, oc + Vector3.up * 15.6f, 1.3f);
+            m.Build(group, "Minaret", layer, "Concrete");
+            // The shaft's head, the upper stage and its balcony: off the bake. The lower balcony stays walkable.
+            NoEntryBox(Rect.MinMaxRect(c.x - ro, c.z - ro, c.x + ro, c.z + ro), top + 1.2f, top + 40f, 0f);
         }
 
         // ==================================================================
@@ -500,8 +523,10 @@ namespace FPSKit.EditorTools
                     SolidWall(m, _castle, p + inset, q + inset, bottom, y0 + H, T, noEntryTop: y0 + H - 0.4f);
                     Merlons(m, _castle, p + inset, q + inset, y0 + H, T, o);
                 }
-                // A batter at the foot: the lowest course stepped out.
-                SolidWall(m, _castle, a + inset - o * 0.6f, b + inset - o * 0.6f, bottom, y0 + 1.2f, T + 1.2f, noEntryTop: y0 + 1.6f);
+                // A batter at the foot: the lowest course stepped out -- outside only, and broken where the walls are (at the
+                // gate it was a 1.2 m step across the only way in, and the citadel could not be reached).
+                foreach (var (p, q) in segs)
+                    SolidWall(m, _castle, p + o * 0.55f, q + o * 0.55f, bottom, y0 + 1.2f, 1.2f, noEntryTop: y0 + 1.6f);
             }
             // The breach: rubble where the east wall came down.
             for (int i = 0; i < 6; i++)
@@ -525,6 +550,10 @@ namespace FPSKit.EditorTools
                 {
                     float a = i * Mathf.PI * 2f / 14f;
                     var p = new Vector3(tc.x + Mathf.Cos(a) * 5.9f, y0 + H + 0.55f, tc.y + Mathf.Sin(a) * 5.9f);
+                    // None across a wall-walk where it runs onto the tower: one there left a gap of a metre, too
+                    // narrow for an agent, and cut every stretch of walk off from the next.
+                    bool inside = p.x > r.xMin && p.x < r.xMax && p.z > r.yMin && p.z < r.yMax;
+                    if (inside && (p.x < r.xMin + T + 0.9f || p.x > r.xMax - T - 0.9f || p.z < r.yMin + T + 0.9f || p.z > r.yMax - T - 0.9f)) continue;
                     m.Box(_castle, p, new Vector3(1.3f, 1.1f, 0.6f), Quaternion.LookRotation(new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a))));
                 }
                 // Arrow slits.
@@ -618,7 +647,8 @@ namespace FPSKit.EditorTools
                 var n = SideOut3(s);
                 var holes = new List<Vector4>();
                 float pv = y0 - bottom;
-                if (s == 1) holes.Add(new Vector4(Half - 0.9f, Half + 0.9f, pv, pv + 2.6f));
+                // The door faces the courtyard (west): on the south face it opened into the side of the first flight.
+                if (s == 3) holes.Add(new Vector4(Half - 0.9f, Half + 0.9f, pv, pv + 2.6f));
                 for (float h = 5f; h < Hk - 2f; h += 5f)
                     for (float u0 = 3f; u0 < Half * 2f - 2f; u0 += 5f) holes.Add(new Vector4(u0, u0 + 0.35f, pv + h, pv + h + 1.4f));
                 m.WallWithHoles(_castle, a0 + Vector3.up * bottom, b0 + Vector3.up * bottom, y0 + Hk - bottom, n, holes);

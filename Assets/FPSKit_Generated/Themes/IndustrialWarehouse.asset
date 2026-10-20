@@ -103,6 +103,10 @@ MonoBehaviour:
   cityParkedCars: 70
   cityTowerShare: 0.2
   subwayZone: 0
+  desertTownZone: 0
+  townCivilians: 60
+  townTrafficCars: 15
+  townParkedCars: 110
   floorDetail: Concrete
   wallDetail: Concrete
   floorDetailSize: 4

@@ -260,6 +260,7 @@ public class HudView : MonoBehaviour
             _weapon.ArmedChanged += OnAmmo;
         }
         if (_pickup != null) _pickup.CandidateChanged += OnPickUp;
+        DrivableCar.Changed += OnDriveChanged;
         if (_health != null)
         {
             _health.Changed += OnHealth;
@@ -303,6 +304,7 @@ public class HudView : MonoBehaviour
             _weapon.ArmedChanged -= OnAmmo;
         }
         if (_pickup != null) _pickup.CandidateChanged -= OnPickUp;
+        DrivableCar.Changed -= OnDriveChanged;
         if (_health != null)
         {
             _health.Changed -= OnHealth;
@@ -817,6 +819,7 @@ public class HudView : MonoBehaviour
     }
 
     void OnPickUp(GunPickup p) => _pickUpDirty = true;
+    void OnDriveChanged() => _pickUpDirty = true;
 
     InputScheme _pickUpScheme;
 
@@ -835,6 +838,14 @@ public class HudView : MonoBehaviour
         _pickUpDirty = false;
         _pickUpScheme = GameInput.Scheme;
         var gun = _pickup != null ? _pickup.Candidate : null;
+        // A car in reach, or the one being driven (DrivableCar), when there is no gun on offer.
+        if ((gun == null || gun.data == null) && (DrivableCar.Offered != null || DrivableCar.Driving != null))
+        {
+            _pickUpPrompt.SetActive(true);
+            _pickUpText.text = $"{InputPrompts.For(GameAction.Interact)}  {(DrivableCar.Driving != null ? "GET OUT" : "DRIVE")}";
+            _pickUpText.color = _t.textPrimary;
+            return;
+        }
         _pickUpPrompt.SetActive(gun != null && gun.data != null);
         if (gun == null || gun.data == null) return;
         int rounds = gun.magazine + gun.reserve;

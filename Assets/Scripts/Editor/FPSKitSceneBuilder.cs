@@ -609,14 +609,16 @@ namespace FPSKit.EditorTools
             // light back up and sideways; a second, weak, shadowless directional light from the opposite
             // side stands in for it. It lifts every shaded face by the same amount and leaves the sunlit
             // ones, and the shadows, as they were.
-            if (IsDesertArena())
+            if (_theme.desertTownZone) AimTownSun(sun);
+
+            if (IsDesertArena() || _theme.desertTownZone)
             {
                 var bounce = new GameObject("Bounce Light").AddComponent<Light>();
                 bounce.type = LightType.Directional;
                 bounce.shadows = LightShadows.None;
                 bounce.color = new Color(1f, 0.78f, 0.58f);
                 bounce.intensity = 0.4f;
-                bounce.transform.rotation = Quaternion.Euler(_theme.sunAngles.x * 0.6f, _theme.sunAngles.y + 180f, 0f);
+                bounce.transform.rotation = Quaternion.Euler(sun.transform.eulerAngles.x * 0.6f, sun.transform.eulerAngles.y + 180f, 0f);
             }
         }
 
@@ -627,6 +629,7 @@ namespace FPSKit.EditorTools
             // Painted rather than simulated: see VolcanicSky for why a red sky cannot be
             // asked of the procedural shader.
             if (_theme.volcanicZone) return UnknownSky();
+            if (_theme.desertTownZone && TownSky() is Material townSky) return townSky;
             if (_theme.rooftopZone) return NightCitySky();
             if (_theme.snowZone) return SnowSky();   // a painted arctic sky (FPSKitSnowSky)
 
@@ -768,6 +771,7 @@ namespace FPSKit.EditorTools
         {
             // The industrial zone is asked about first: a theme that sets both is asking
             // for a factory, and a factory cannot also be a river valley.
+            if (_theme.desertTownZone) { BuildDesertTown(); return; }
             if (_theme.rooftopZone) { BuildCityZone(); return; }
             if (_theme.industrialZone) { BuildIndustrialZone(); return; }
             if (_theme.parkZone && FairgroundRealisticActive) { BuildFairgroundRealistic(); return; }
@@ -1888,6 +1892,8 @@ namespace FPSKit.EditorTools
             cam.farClipPlane = WideArena
                 ? Mathf.Max(1200f, _theme.backdropDistance.y * 1.7f)
                 : 1000f;
+            // The town's far mountains stand up to 2.5 km out (FPSKitTownGround.BuildTownMountains).
+            if (_theme.desertTownZone) cam.farClipPlane = 3400f;
 
             var motor = player.AddComponent<PlayerMotor>();
             motor.cameraHolder = holder.transform;
@@ -1947,6 +1953,8 @@ namespace FPSKit.EditorTools
             weapon.audioSource = model.AddComponent<AudioSource>();
             weapon.audioSource.playOnAwake = false;
             weapon.hitMask = ~(1 << LayerMask.NameToLayer("Player"));
+            int boundsLayer = LayerMask.NameToLayer("PlayerBounds");
+            if (boundsLayer >= 0) weapon.hitMask &= ~(1 << boundsLayer);
 
             // The rifle's own curve, to sit against the level curve. Everything it does is
             // a multiplier held on the Weapon component -- nothing is written back to
@@ -2714,6 +2722,7 @@ namespace FPSKit.EditorTools
         private static Transform[] BuildSpawnPoints()
         {
             if (FairgroundRealisticActive) return BuildFairgroundSpawnPoints();
+            if (_theme.desertTownZone) return BuildTownSpawnPoints();
             if (DesertLife) return BuildDesertSpawnPoints();
             if (_theme.rooftopZone || _theme.industrialZone) return BuildZoneSpawnPoints();
             if (_theme.parkZone) return BuildOpenZoneSpawnPoints();
@@ -2907,6 +2916,7 @@ namespace FPSKit.EditorTools
 
             if (FairgroundRealisticActive) WireFairgroundLevelManager(manager);
             if (DesertLife) WireDesertLevelManager(manager, spawns);
+            if (_theme.desertTownZone) WireTownLevelManager(manager, spawns);
 
             manager.levelClearBonus = 400;
             manager.timeBonusPerSecond = 25;
@@ -4282,6 +4292,12 @@ namespace FPSKit.EditorTools
                        SnowTag, IceTag);
             // FirstPerson: the player's own arms and gun, drawn by their own camera (PlayerBody).
             EnsureLayers("Player", "Enemy", "Environment", "Backdrop", "FirstPerson");
+            // Civilian: the desert town's people -- shot like anyone, never an enemy to the aim assist or a melee sweep.
+            // PlayerBounds: the town's edge, a wall only the player's body meets (bullets, bombs and enemies pass).
+            EnsureLayers("Civilian", "PlayerBounds", "Vehicle");
+            int bounds = LayerMask.NameToLayer("PlayerBounds"), player = LayerMask.NameToLayer("Player");
+            if (bounds >= 0)
+                for (int i = 0; i < 32; i++) Physics.IgnoreLayerCollision(bounds, i, i != player);
         }
 
         private static void EnsureTags(params string[] tags)

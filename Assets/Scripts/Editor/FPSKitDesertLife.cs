@@ -35,7 +35,7 @@ namespace FPSKit.EditorTools
     {
         /// <summary>A layout that gets all this: an open zone with a river, not the volcanic one.</summary>
         private static bool DesertLife =>
-            _theme != null && _theme.openZone && !_theme.volcanicZone && _theme.hazard == LevelTheme.Hazard.River;
+            _theme != null && _theme.openZone && !_theme.volcanicZone && !_theme.desertTownZone && _theme.hazard == LevelTheme.Hazard.River;
 
         private static Vector2 _townCentre, _planeSite;
         private static float _townRadius;

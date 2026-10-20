@@ -1,0 +1,156 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &57317635183350934
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 828788472457743916}
+  - component: {fileID: 6408655217656707509}
+  - component: {fileID: 4670509438862154973}
+  m_Layer: 0
+  m_Name: vintage_oil_lamp
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 22
+  m_IsActive: 1
+--- !u!4 &828788472457743916
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 57317635183350934}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 867729920903948744}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &6408655217656707509
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 57317635183350934}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.22000112, y: 0.8016386, z: 0.2200012}
+  m_Center: {x: -0.000000029802322, y: 0.40081874, z: 0.000000059604645}
+--- !u!205 &4670509438862154973
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 57317635183350934}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.000000022351742, y: 0.40081882, z: 0.000000059604645}
+  m_Size: 0.80163884
+  m_FadeMode: 0
+  m_AnimateCrossFading: 0
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.015
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 1298161761207917606}
+    - renderer: {fileID: 6693187011630779147}
+    - renderer: {fileID: 7449500682605106165}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
+--- !u!1001 &867729920903948743
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 828788472457743916}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+      propertyPath: m_Name
+      value: vintage_oil_lamp
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+--- !u!4 &867729920903948744 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+  m_PrefabInstance: {fileID: 867729920903948743}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1298161761207917606 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7059052690738891295, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+  m_PrefabInstance: {fileID: 867729920903948743}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &6693187011630779147 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 5829964573019988684, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+  m_PrefabInstance: {fileID: 867729920903948743}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7449500682605106165 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1483027181259965902, guid: dfe80b0fd6cf82198a5a7fced779f37b, type: 3}
+  m_PrefabInstance: {fileID: 867729920903948743}
+  m_PrefabAsset: {fileID: 0}

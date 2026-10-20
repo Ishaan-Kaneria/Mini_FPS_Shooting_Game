@@ -1,0 +1,3 @@
+Every model, texture and HDRI under this folder is from Poly Haven (https://polyhaven.com) and is
+released under CC0 1.0 (public domain). No attribution is required; this note records the source.
+Maps were repacked for URP by Tools/polyhaven (mask = metal, AO, height, smoothness).

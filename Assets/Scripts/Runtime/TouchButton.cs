@@ -74,14 +74,17 @@ public class TouchButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     /// <summary>The RELOAD button reads PICK UP, lit, while the player is disarmed and a gun is in reach (MobileInput.PickUpReady).</summary>
     void UpdatePickUp()
     {
-        bool want = MobileInput.PickUpReady;
-        if (want == _pickUp) return;
+        // PICK UP wins over DRIVE / GET OUT (DrivableCar): a disarmed player beside a gun wants the gun.
+        string drive = MobileInput.DriveLabel;
+        bool want = MobileInput.PickUpReady || !string.IsNullOrEmpty(drive);
+        string text = MobileInput.PickUpReady ? "PICK UP" : drive;
+        if (want == _pickUp && (!want || _label == null || _label.text == text)) return;
         _pickUp = want;
         if (_label == null) _label = GetComponentInChildren<TMPro.TMP_Text>(true);
         if (_label != null)
         {
             if (_reloadLabel == null) _reloadLabel = _label.text;
-            _label.text = want ? "PICK UP" : _reloadLabel;
+            _label.text = want ? text : _reloadLabel;
         }
         // The icon too (a phone's buttons are icons): the hand the prompt shows, instead of the reload arrows.
         if (_icon == null) { var t = transform.Find("Icon"); _icon = t != null ? t.GetComponent<Image>() : null; }

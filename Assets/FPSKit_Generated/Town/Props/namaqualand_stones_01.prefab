@@ -1,0 +1,168 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &51312255730147517
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 864018867789969927}
+  - component: {fileID: 7922073407523355700}
+  - component: {fileID: 5607243846551272220}
+  m_Layer: 0
+  m_Name: namaqualand_stones_01
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 22
+  m_IsActive: 1
+--- !u!4 &864018867789969927
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 51312255730147517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 898228330713996781}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7922073407523355700
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 51312255730147517}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.021899, y: 0.08396615, z: 0.112061344}
+  m_Center: {x: -0.43062758, y: 0.03968537, z: 0.0013380982}
+--- !u!205 &5607243846551272220
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 51312255730147517}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.43062755, y: 0.03968537, z: 0.0013380982}
+  m_Size: 1.0218989
+  m_FadeMode: 0
+  m_AnimateCrossFading: 0
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.025
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 181150259671780353}
+    - renderer: {fileID: 2102342036379574944}
+    - renderer: {fileID: 4236701358632896442}
+    - renderer: {fileID: 770178115225740317}
+    - renderer: {fileID: 9023800395554945433}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
+--- !u!1001 &898228330713996780
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 864018867789969927}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+      propertyPath: m_Name
+      value: namaqualand_stones_01
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+--- !u!23 &181150259671780353 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -8145684770302291475, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+  m_PrefabInstance: {fileID: 898228330713996780}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &770178115225740317 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -8734981057152468495, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+  m_PrefabInstance: {fileID: 898228330713996780}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &898228330713996781 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+  m_PrefabInstance: {fileID: 898228330713996780}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &2102342036379574944 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 1250348241592057676, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+  m_PrefabInstance: {fileID: 898228330713996780}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4236701358632896442 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 3944287512051898966, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+  m_PrefabInstance: {fileID: 898228330713996780}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &9023800395554945433 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1058944810482490251, guid: f5f997fc808c497c69a8b581a7f89d1b, type: 3}
+  m_PrefabInstance: {fileID: 898228330713996780}
+  m_PrefabAsset: {fileID: 0}

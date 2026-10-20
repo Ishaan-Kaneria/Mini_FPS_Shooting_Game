@@ -61,6 +61,9 @@ namespace FPSKit.EditorTools
             if (!AssetDatabase.IsValidFolder($"{parent}/{child}")) AssetDatabase.CreateFolder(parent, child);
         }
 
+        /// <summary>Reduces an open scene in place (the caller saves it). Used by the phone and web builds for the desert town.</summary>
+        public static void ReduceScene(UnityEngine.SceneManagement.Scene scene, StringBuilder sb) => Reduce(scene, sb);
+
         static void Reduce(UnityEngine.SceneManagement.Scene scene, StringBuilder sb)
         {
             // ---- shadows: casters off, receivers off (no pass to receive from), camera pass off ----

@@ -25,7 +25,7 @@ namespace FPSKit.EditorTools
     {
         private static bool IsDesertArena()
             => _theme.openZone && _theme.floorDetail == "Sand" && !_theme.volcanicZone
-               && !_theme.snowZone && !_theme.parkZone && _theme.hazard == LevelTheme.Hazard.River;
+               && !_theme.snowZone && !_theme.parkZone && !_theme.desertTownZone && _theme.hazard == LevelTheme.Hazard.River;
 
         private static void BuildRiverLife(Transform root, int layer, System.Random rng, float half)
         {

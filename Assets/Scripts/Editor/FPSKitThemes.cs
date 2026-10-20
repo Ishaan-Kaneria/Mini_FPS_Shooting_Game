@@ -254,55 +254,49 @@ namespace FPSKit.EditorTools
 
                 // ----------------------------------------------------------
                 case "Desert Outpost":
-                    t.description = "A mud-brick village, a forward base and walled farms on a river of sand. Heat haze and blowing dust.";
-                    // Heat and dust (2026-09-23): a hotter, hazier sky than the clean blue it was, which
-                    // read as a mild day rather than a desert. Thicker air scatters the blue out
-                    // towards the horizon, and the fog is warmer and a little denser so the far
-                    // rock sits in haze -- still well short of hiding it.
-                    // A dusty violet-rose tint, not orange: the procedural sky multiplies its blue
-                    // atmosphere by this, and an orange tint turned the zenith a muddy green.
+                    // Rebuilt from scratch as a lived-in Middle East town (2026-10-20, his brief): a kilometre square,
+                    // the souk off a clock-tower roundabout, the grand mosque at the end of the avenue, the citadel on its
+                    // hill, the palace, palm farms round an oasis, the highway out past the gas station and checkpoint.
+                    // Built by FPSKitTown*; the save key stays "Desert Outpost" so every star already earned is kept.
+                    t.description = "A desert town: the souk, the grand mosque, the citadel on its hill, the palace, " +
+                                    "palm farms round an oasis, and the highway out.";
+                    t.desertTownZone = true;
+                    // openZone stays on: the camera, post and checks treat this as a big outdoor arena. Its river is not
+                    // built (the town layout runs first and owns the whole arena).
+                    t.openZone = true;
+                    t.floorDetail = "Sand";
+                    t.arenaSize = 1000f;
+                    t.apronSize = 600f;
+                    t.wallHeight = 5f;
+                    t.hazard = LevelTheme.Hazard.River;
+                    t.hazardWidth = 0f;
+                    t.duneHeight = 6f;
+                    t.duneWavelength = 105f;
+                    t.duneWindAngle = 38f;
+                    t.backdropDistance = new Vector2(1300f, 2500f);
+
+                    // Golden afternoon (his pick). The sky is a photographed HDRI (Poly Haven, qwantani late afternoon) and
+                    // the sun is aimed at that sky's own sun at build time (FPSKitTownGround.AimTownSun), so shadows and sky
+                    // agree. These are the fallbacks if the sky is missing, and the colours the light itself carries.
                     t.skyTint = new Color(0.66f, 0.52f, 0.62f);
                     t.skyGroundColor = new Color(0.52f, 0.38f, 0.26f);
-                    // Back to 1.5 (2026-10-03): 1.15 turned the golden horizon blue. The mountains' yellow came from
-                    // the fog colour, which stays greyer; the sky keeps its glow.
                     t.atmosphereThickness = 1.5f;
                     t.skyExposure = 1.45f;
-                    t.sunColor = new Color(1f, 0.84f, 0.62f);
-                    t.sunIntensity = 1.55f;
-                    // Mid-afternoon rather than noon, and this is a terrain decision more
-                    // than a lighting one. A dune is read entirely through the shading
-                    // across its own slope, and a sun sixty-eight degrees up puts almost
-                    // the same amount of light on the windward face, the crest and the
-                    // slipface -- so a field of eleven-metre dunes came back looking like
-                    // a flat plane with a texture on it. Dropped to forty-two the slopes
-                    // separate, the crests throw a shadow down their lee side, and the
-                    // shape of the ground becomes something the player can actually see
-                    // from a distance and navigate by.
-                    // Golden hour (2026-10-03, "make it sexier"): thirty-eight degrees, down from
-                    // forty-two. (Twenty-six was tried and put the rooftops and the player's hands
-                    // in shadow, and read too orange and too dark, worse still on a phone.) The lower the sun the longer the lee-side shadow of every dune,
-                    // and the shape of the ground is the one thing the player reads at range.
-                    // Ambient is lifted so no face goes black.
-                    t.sunAngles = new Vector2(33f, 140f);
-                    // An amber haze (2026-10-03, matched to Ishaan's reference screenshot, milder): the real colour
-                    // grade only works now that the PostFX asset is saved properly, so this is tuned against the
-                    // in-game view, not the editor camera.
-                    t.fogColor = new Color(0.90f, 0.68f, 0.45f);
-                    t.fogDensity = 0.004f;
-                    // Lifted for the open zone. One hard sun over a map with
-                    // hundred-metre rock on it puts whole faces in shadow, and at the
-                    // walled arena's ambient those faces came back near black -- which
-                    // is a place an enemy can stand and not be seen.
-                    // Shade is where a fight happens here: a dune's lee side, the foot of a wall,
-                    // a roof's shadow. At the old ambient those places came back near black
-                    // with the sun behind them (2026-10-03 screenshot), so the shadow side is
-                    // lifted to well over half of what the sunlit side gets.
-                    t.shadowStrength = 0.55f;
-                    t.ambientSky = new Color(0.94f, 0.88f, 0.78f);
-                    t.ambientEquator = new Color(0.86f, 0.76f, 0.63f);
-                    t.ambientGround = new Color(0.68f, 0.58f, 0.44f);
+                    t.sunColor = new Color(1f, 0.91f, 0.80f);
+                    t.sunIntensity = 1.65f;
+                    t.sunAngles = new Vector2(30f, 225f);
+                    // Desert haze: thin enough that the citadel is clear from the souk, thick enough that the far mountains
+                    // sit back in pale air (exponential-squared: ~15% at 500 m, ~50% at 1 km). Pale and only slightly warm:
+                    // the first build's orange haze turned the whole town one colour from above.
+                    t.fogColor = new Color(0.82f, 0.79f, 0.73f);
+                    t.fogDensity = 0.00065f;
+                    // Shade lifted (his 2026-10-03 rule: no black faces), cooler from above as a clear sky is.
+                    t.shadowStrength = 0.6f;
+                    t.ambientSky = new Color(0.76f, 0.81f, 0.89f);
+                    t.ambientEquator = new Color(0.86f, 0.78f, 0.66f);
+                    t.ambientGround = new Color(0.66f, 0.56f, 0.44f);
                     t.floorColor = new Color(0.62f, 0.54f, 0.38f);
-                    t.wallColor = new Color(0.70f, 0.62f, 0.46f);
+                    t.wallColor = new Color(0.82f, 0.76f, 0.66f);
                     t.coverColors = new[]
                     {
                         new Color(0.66f, 0.58f, 0.42f),
@@ -311,82 +305,11 @@ namespace FPSKit.EditorTools
                     };
                     t.coverTag = "Concrete";
 
-                    // The open zone. Four hundred and fifty metres of ground with a
-                    // river cut through it, rather than a hundred and fifty metres of
-                    // floor with walls at the edge -- see FPSKitOpenZone.
-                    t.openZone = true;
+                    t.townCivilians = 60;
+                    t.townTrafficCars = 15;
+                    t.townParkedCars = 110;
 
-                    // Explicit now that BuildDuneField reads this. It was getting Sand from
-                    // a hard-coded string; the default on LevelTheme is Concrete, which
-                    // would have quietly turned the dunes to pavement.
-                    t.floorDetail = "Sand";
-                    t.arenaSize = 450f;
-                    t.apronSize = 1100f;
-                    t.wallHeight = 5f;
-
-                    // Thin, because the whole point of this arena is that you can see to
-                    // the horizon. At the walled arena's 0.004 the mesas are solid fog.
-                    t.fogDensity = 0.0022f;
-
-                    t.hazard = LevelTheme.Hazard.River;
-                    t.hazardWidth = 58f;
-                    t.hazardDepth = 22f;
-                    t.hazardOffset = 92f;
-                    t.hazardMeander = 30f;
-                    // Silt, not lagoon. A river that has crossed a desert to get here is
-                    // carrying the desert with it, and the blue it started at read as
-                    // tropical water in a canyon.
-                    t.hazardColor = new Color(0.30f, 0.43f, 0.36f);
-                    t.bankColor = new Color(0.52f, 0.44f, 0.31f);
-                    t.bridgeColor = new Color(0.50f, 0.45f, 0.38f);
-                    t.bridgeWidth = 9f;
-                    t.bridgeCount = 2;
-
-                    // Dunes. The wavelength is deliberately short enough that the primary
-                    // train overshoots the angle of repose and gets cut back to it by the
-                    // relaxation pass, because that is what a slipface *is* -- sand piled
-                    // until it slides. Long enough not to overshoot and the field comes
-                    // back as smooth swells with no crest anywhere in it, which is a
-                    // landscape but not a dune field.
-                    //
-                    // The height is the amplitude of the *primary* train only,
-                    // and the basin and hill octaves are scaled off it, so eleven metres
-                    // of dune sits on twenty-five-odd metres of broad relief across the
-                    // whole map. A crest has to hide a standing enemy from a standing
-                    // player or it changes nothing about how the level is fought; a
-                    // hundred and twenty metres of wavelength is what keeps that height
-                    // drivable, since a dune's slope is the one over the other. Together
-                    // they put about four ranges of dune across the arena -- enough that
-                    // there is always one between you and somewhere, and few enough that
-                    // the map still reads as open ground rather than as a maze with sand
-                    // walls.
-                    t.duneHeight = 11f;
-                    t.duneWavelength = 95f;
-                    t.duneWindAngle = 34f;
-
-                    t.backdropCount = 14;
-                    t.backdropDistance = new Vector2(640f, 1180f);
-                    t.backdropHeight = new Vector2(60f, 210f);
-                    t.backdropWidth = new Vector2(80f, 280f);
-                    t.backdropColor = new Color(0.50f, 0.40f, 0.30f);
-                    t.landmarkCount = 12;
-
-                    // Six rather than ten since the desert was made full (2026-09-26): the farms,
-                    // camps and checkpoints are the compounds now, and the generic ones were
-                    // taking the ground they need.
-                    t.outpostCount = 6;
-                    t.vantageCount = 10;
-                    t.coverLineCount = 22;
-
-                    // Raised with the rocks shrunk, not instead of it. A scatter cluster
-                    // used to be two to four boulders eleven metres across, which is one
-                    // landmark pretending to be cover; it is now four rocks a player can
-                    // crouch behind, and it takes more of them to keep the ground between
-                    // two places from being a field.
-                    t.scatterClusterCount = 58;
-
-                    // Unused while openZone is on -- kept tuned so that turning it off
-                    // gives back the arena this used to be rather than an empty field.
+                    // Unused by the town layout -- kept tuned so the walled fallback is still an arena.
                     t.roomCount = 2;
                     t.platformCount = 3;
                     t.coverWallCount = 6;
@@ -394,15 +317,15 @@ namespace FPSKit.EditorTools
                     t.pillarCount = 8;
                     t.propCount = 14;
 
-                    // Graded warm and punchy rather than drained: the desaturated pass read as
-                    // a dull photograph of a desert, not somewhere you want to look at.
-                    t.bloomIntensity = 0.6f;
+                    // The grade he signed off on in 2026-10-03, a touch less warm: the photographed sky and textures
+                    // carry their own colour now and do not need pushing.
+                    t.bloomIntensity = 0.45f;
                     t.postExposure = 0.05f;
-                    t.saturation = 9f;
-                    t.colorFilter = new Color(1f, 0.93f, 0.84f);
-                    t.vignetteIntensity = 0.26f;
-                    t.contrast = 14f;
-                    t.filmGrain = 0.12f;
+                    t.saturation = 0f;
+                    t.colorFilter = new Color(1f, 0.975f, 0.94f);
+                    t.vignetteIntensity = 0.2f;
+                    t.contrast = 10f;
+                    t.filmGrain = 0.08f;
                     t.randomSeed = 21;
                     break;
 

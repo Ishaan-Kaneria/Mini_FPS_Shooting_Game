@@ -1,0 +1,686 @@
+{
+ "models": {
+  "wicker_basket_01": {
+   "wicker_basket_01": {
+    "alpha": false
+   }
+  },
+  "wicker_basket_02": {
+   "wicker_basket_02": {
+    "alpha": false
+   }
+  },
+  "wooden_crate_01": {
+   "wooden_crate_01": {
+    "alpha": false
+   }
+  },
+  "wooden_crate_02": {
+   "wooden_crate_02": {
+    "alpha": false
+   }
+  },
+  "plastic_crate_01": {
+   "plastic_crate_01": {
+    "alpha": false
+   }
+  },
+  "plastic_crate_02": {
+   "plastic_crate_02": {
+    "alpha": false
+   }
+  },
+  "plastic_crate_03": {
+   "plastic_crate_03": {
+    "alpha": false
+   }
+  },
+  "brass_pot_01": {
+   "brass_pot_01": {
+    "alpha": false
+   }
+  },
+  "brass_pot_02": {
+   "brass_pot_02": {
+    "alpha": false
+   }
+  },
+  "brass_vase_01": {
+   "brass_vase_01": {
+    "alpha": false
+   }
+  },
+  "brass_vase_02": {
+   "brass_vase_02": {
+    "alpha": false
+   }
+  },
+  "brass_vase_03": {
+   "brass_vase_03": {
+    "alpha": false
+   }
+  },
+  "ceramic_vase_01": {
+   "ceramic_vase_01": {
+    "alpha": false
+   }
+  },
+  "ceramic_vase_02": {
+   "ceramic_vase_02": {
+    "alpha": false
+   }
+  },
+  "ceramic_vase_03": {
+   "ceramic_vase_03": {
+    "alpha": false
+   }
+  },
+  "ceramic_vase_04": {
+   "ceramic_vase_04": {
+    "alpha": false
+   }
+  },
+  "antique_ceramic_vase_01": {
+   "antique_ceramic_vase_01": {
+    "alpha": false
+   }
+  },
+  "ceramic_pot": {
+   "ceramic_pot": {
+    "alpha": false
+   }
+  },
+  "jug_01": {
+   "jug_01": {
+    "alpha": false
+   }
+  },
+  "pot_enamel_01": {
+   "pot_enamel_01": {
+    "alpha": false
+   }
+  },
+  "tea_set_01": {
+   "tea_set_01": {
+    "alpha": false
+   }
+  },
+  "wooden_bowl_01": {
+   "wooden_bowl_01": {
+    "alpha": false
+   }
+  },
+  "carved_wooden_plate": {
+   "carved_wooden_plate": {
+    "alpha": false
+   }
+  },
+  "bananas": {
+   "bananas": {
+    "alpha": false
+   }
+  },
+  "food_pomegranate_01": {
+   "food_pomegranate_01": {
+    "alpha": false
+   }
+  },
+  "food_lime_01": {
+   "food_lime_01": {
+    "alpha": false
+   }
+  },
+  "food_apple_01": {
+   "food_apple_01": {
+    "alpha": false
+   }
+  },
+  "yellow_onion": {
+   "yellow_onion": {
+    "alpha": false
+   }
+  },
+  "sweet_potato": {
+   "sweet_potato": {
+    "alpha": false
+   }
+  },
+  "brass_diya_lantern": {
+   "brass_diya_lantern": {
+    "alpha": false
+   }
+  },
+  "Lantern_01": {
+   "Lantern_01_brass": {
+    "alpha": false
+   }
+  },
+  "vintage_oil_lamp": {
+   "vintage_oil_lamp": {
+    "alpha": false
+   },
+   "vintage_oil_lamp_glass": {
+    "alpha": true
+   },
+   "vintage_oil_lamp_flame": {
+    "alpha": true
+   }
+  },
+  "wooden_display_shelves_01": {
+   "wooden_display_shelves_01": {
+    "alpha": false
+   }
+  },
+  "painted_wooden_table": {
+   "painted_wooden_table": {
+    "alpha": false
+   }
+  },
+  "folding_wooden_stool": {
+   "folding_wooden_stool": {
+    "alpha": false
+   }
+  },
+  "plastic_monobloc_chair_01": {
+   "plastic_monobloc_chair_01": {
+    "alpha": false
+   }
+  },
+  "wooden_stool_01": {
+   "wooden_stool_01": {
+    "alpha": false
+   }
+  },
+  "wooden_stool_02": {
+   "wooden_stool_02": {
+    "alpha": false
+   }
+  },
+  "outdoor_table_chair_set_01": {
+   "outdoor_table_chair_set_01_chair": {
+    "alpha": false
+   },
+   "outdoor_table_chair_set_01_table": {
+    "alpha": false
+   }
+  },
+  "CashRegister_01": {
+   "CashRegister_01": {
+    "alpha": false
+   },
+   "CashRegister_01_glass": {
+    "alpha": false
+   }
+  },
+  "steel_frame_shelves_01": {
+   "steel_frame_shelves_01": {
+    "alpha": false
+   }
+  },
+  "cardboard_box_01": {
+   "cardboard_box_01": {
+    "alpha": false
+   }
+  },
+  "brass_goblets": {
+   "brass_goblet_01": {
+    "alpha": false
+   },
+   "brass_goblet_02": {
+    "alpha": false
+   },
+   "brass_goblet_03": {
+    "alpha": false
+   }
+  },
+  "wooden_barrels_01": {
+   "wooden_barrels_01_barrel02": {
+    "alpha": false
+   },
+   "wooden_barrels_01_pieces": {
+    "alpha": false
+   },
+   "wooden_barrels_01_barrel01": {
+    "alpha": false
+   }
+  },
+  "exterior_aircon_unit": {
+   "exterior_aircon_unit_rusted_02": {
+    "alpha": false
+   },
+   "exterior_aircon_unit_rusted_01": {
+    "alpha": false
+   },
+   "exterior_aircon_unit_02": {
+    "alpha": false
+   },
+   "exterior_aircon_unit_01": {
+    "alpha": false
+   }
+  },
+  "modular_electricity_poles": {
+   "modular_electricity_poles": {
+    "alpha": false
+   },
+   "modular_electricity_poles_pieces": {
+    "alpha": false
+   }
+  },
+  "street_lamp_01": {
+   "street_lamp_01": {
+    "alpha": false
+   }
+  },
+  "street_lamp_02": {
+   "street_lamp_02": {
+    "alpha": false
+   }
+  },
+  "utility_box_01": {
+   "utility_box_01": {
+    "alpha": false
+   }
+  },
+  "utility_box_02": {
+   "utility_box_02": {
+    "alpha": false
+   }
+  },
+  "metal_trash_can": {
+   "metal_trash_can": {
+    "alpha": false
+   },
+   "metal_trash_can_rust": {
+    "alpha": false
+   }
+  },
+  "trashbag": {
+   "trashbag": {
+    "alpha": false
+   }
+  },
+  "old_tyre": {
+   "old_tyre": {
+    "alpha": false
+   }
+  },
+  "rusted_wheel_rim_01": {
+   "rusted_wheel_rim_01": {
+    "alpha": false
+   }
+  },
+  "concrete_road_barrier": {
+   "concrete_road_barrier": {
+    "alpha": false
+   }
+  },
+  "concrete_road_barrier_02": {
+   "concrete_road_barrier_02": {
+    "alpha": false
+   }
+  },
+  "water_manhole_cover": {
+   "water_manhole_cover": {
+    "alpha": false
+   }
+  },
+  "security_light": {
+   "security_light": {
+    "alpha": true
+   }
+  },
+  "Barrel_01": {
+   "Barrel_01_explosive": {
+    "alpha": false
+   }
+  },
+  "barrel_03": {
+   "barrel_03": {
+    "alpha": false
+   }
+  },
+  "plastic_jerrycan": {
+   "plastic_jerrycan": {
+    "alpha": false
+   }
+  },
+  "propane_tank": {
+   "propane_tank": {
+    "alpha": false
+   }
+  },
+  "small_lpg_tank": {
+   "small_lpg_tank": {
+    "alpha": false
+   }
+  },
+  "portable_generator": {
+   "portable_generator": {
+    "alpha": true
+   }
+  },
+  "cement_bag": {
+   "cement_bag": {
+    "alpha": false
+   }
+  },
+  "hand_truck": {
+   "hand_truck": {
+    "alpha": false
+   }
+  },
+  "wooden_ladder": {
+   "wooden_ladder": {
+    "alpha": false
+   }
+  },
+  "rollershutter_door": {
+   "rollershutter_door_graffiti": {
+    "alpha": false
+   },
+   "rollershutter_door": {
+    "alpha": false
+   }
+  },
+  "rollershutter_window_01": {
+   "rollershutter_window_01_graffiti": {
+    "alpha": false
+   },
+   "rollershutter_window_01": {
+    "alpha": false
+   }
+  },
+  "rollershutter_window_02": {
+   "rollershutter_window_02": {
+    "alpha": false
+   },
+   "rollershutter_window_02_graffiti": {
+    "alpha": false
+   }
+  },
+  "covered_car": {
+   "covered_car": {
+    "alpha": false
+   }
+  },
+  "modular_chainlink_fence": {
+   "modular_chainlink_fence_wire": {
+    "alpha": true
+   },
+   "modular_chainlink_fence_posts": {
+    "alpha": false
+   }
+  },
+  "modular_street_seating": {
+   "modular_street_seating_armrests": {
+    "alpha": false
+   },
+   "modular_street_seating_supports": {
+    "alpha": false
+   },
+   "modular_street_seating_connectors": {
+    "alpha": false
+   },
+   "modular_street_seating_timber": {
+    "alpha": false
+   }
+  },
+  "barrel_stove": {
+   "barrel_stove": {
+    "alpha": false
+   }
+  },
+  "plastic_bottle_gallon": {
+   "plastic_bottle_gallon": {
+    "alpha": false
+   }
+  },
+  "security_camera_01": {
+   "security_camera_01": {
+    "alpha": false
+   }
+  },
+  "painted_wooden_bench": {
+   "painted_wooden_bench": {
+    "alpha": false
+   }
+  },
+  "wooden_picnic_table": {
+   "wooden_picnic_table_top": {
+    "alpha": false
+   },
+   "wooden_picnic_table_bottom": {
+    "alpha": false
+   }
+  },
+  "namaqualand_boulder_02": {
+   "namaqualand_boulder_02": {
+    "alpha": false
+   }
+  },
+  "namaqualand_boulder_03": {
+   "namaqualand_boulder_03": {
+    "alpha": false
+   }
+  },
+  "namaqualand_boulder_04": {
+   "namaqualand_boulder_04": {
+    "alpha": false
+   }
+  },
+  "namaqualand_boulder_05": {
+   "namaqualand_boulder_05": {
+    "alpha": false
+   }
+  },
+  "namaqualand_boulder_06": {
+   "namaqualand_boulder_06": {
+    "alpha": false
+   }
+  },
+  "namaqualand_rocks_01": {
+   "namaqualand_rocks_01": {
+    "alpha": false
+   }
+  },
+  "namaqualand_stones_01": {
+   "namaqualand_stones_01": {
+    "alpha": false
+   }
+  },
+  "namaqualand_cliff_01": {
+   "namaqualand_cliff_01": {
+    "alpha": false
+   }
+  },
+  "namaqualand_cliff_02": {
+   "namaqualand_cliff_02": {
+    "alpha": false
+   }
+  },
+  "dead_quiver_trunk": {
+   "dead_quiver_trunk": {
+    "alpha": false
+   }
+  },
+  "dead_quiver_branch_01": {
+   "dead_quiver_branch_01": {
+    "alpha": false
+   }
+  },
+  "searsia_lucida": {
+   "searsia_lucida": {
+    "alpha": true
+   }
+  },
+  "wild_rooibos_bush": {
+   "wild_rooibos_bush": {
+    "alpha": true
+   }
+  },
+  "cheiridopsis_succulent": {
+   "cheiridopsis_succulent": {
+    "alpha": true
+   }
+  },
+  "didelta_spinosa": {
+   "didelta_spinosa": {
+    "alpha": true
+   }
+  },
+  "dry_branches_medium_01": {
+   "dry_branches_medium_01": {
+    "alpha": false
+   }
+  },
+  "dead_tree_trunk_02": {
+   "dead_tree_trunk_02": {
+    "alpha": false
+   }
+  },
+  "ammo_box": {
+   "ammo_box": {
+    "alpha": false
+   }
+  },
+  "old_military_crate": {
+   "old_military_crate": {
+    "alpha": false
+   }
+  },
+  "wooden_military_crate": {
+   "wooden_military_crate": {
+    "alpha": false
+   }
+  },
+  "portable_searchlight": {
+   "portable_searchlight": {
+    "alpha": true
+   }
+  },
+  "painted_wooden_cabinet": {
+   "painted_wooden_cabinet": {
+    "alpha": false
+   }
+  },
+  "painted_wooden_shelves": {
+   "painted_wooden_shelves": {
+    "alpha": false
+   }
+  },
+  "WoodenChair_01": {
+   "WoodenChair_01": {
+    "alpha": false
+   }
+  },
+  "WoodenTable_01": {
+   "WoodenTable_01": {
+    "alpha": false
+   }
+  },
+  "old_bed_frame": {
+   "old_bed_frame": {
+    "alpha": false
+   }
+  },
+  "Television_01": {
+   "Television_01": {
+    "alpha": false
+   }
+  },
+  "ceiling_fan": {
+   "ceiling_fan": {
+    "alpha": false
+   }
+  },
+  "sofa_02": {
+   "sofa_02": {
+    "alpha": false
+   }
+  },
+  "throw_pillows_01": {
+   "throw_pillows_01": {
+    "alpha": false
+   }
+  },
+  "wooden_bookshelf_worn": {
+   "wooden_bookshelf_worn": {
+    "alpha": false
+   }
+  },
+  "vintage_cabinet_01": {
+   "vintage_cabinet_01_a": {
+    "alpha": false
+   },
+   "vintage_cabinet_01_b": {
+    "alpha": false
+   }
+  },
+  "painted_wooden_chair_01": {
+   "painted_wooden_chair_01": {
+    "alpha": false
+   }
+  },
+  "Shelf_01": {
+   "Shelf_01": {
+    "alpha": false
+   }
+  },
+  "steel_frame_shelves_02": {
+   "steel_frame_shelves_02": {
+    "alpha": false
+   }
+  },
+  "vintage_suitcase": {
+   "vintage_suitcase_01": {
+    "alpha": false
+   },
+   "vintage_suitcase_02": {
+    "alpha": false
+   }
+  }
+ },
+ "textures": {
+  "gravelly_sand": true,
+  "dense_sand": true,
+  "dry_ground_rocks": true,
+  "mud_cracked_dry_03": true,
+  "rock_ground": true,
+  "farm_soil": true,
+  "asphalt_02": true,
+  "worn_asphalt": true,
+  "square_concrete_pavers": true,
+  "concrete_pavers": true,
+  "sandstone_blocks_08": true,
+  "pavement_02": true,
+  "white_plaster_rough_01": true,
+  "white_plaster_rough_02": true,
+  "white_stucco": true,
+  "beige_wall_002": true,
+  "painted_plaster_wall": true,
+  "yellow_plaster": true,
+  "worn_plaster_wall": true,
+  "damaged_plaster": true,
+  "plastered_wall_02": true,
+  "concrete_block_wall": true,
+  "clay_plaster": true,
+  "patterned_clay_plaster": true,
+  "white_sandstone_bricks": true,
+  "castle_wall_varriation": true,
+  "rubble": true,
+  "rusty_corrugated_iron": true,
+  "corrugated_iron_02": true,
+  "painted_metal_shutter": true,
+  "rusted_shutter": true,
+  "wood_shutter": true,
+  "weathered_planks": true,
+  "rough_pine_door": true,
+  "wooden_gate": true,
+  "marble_mosaic_tiles": true,
+  "patterned_terracotta_tiling": true,
+  "old_mosaic_floor": true,
+  "terrazzo_tiles": true,
+  "concrete_wall_008": true
+ },
+ "hdri": "qwantani_late_afternoon_puresky_4k.hdr"
+}

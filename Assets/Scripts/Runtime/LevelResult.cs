@@ -70,6 +70,9 @@ public struct LevelResult
     /// <summary>Coins this level paid, kills plus stars plus score. Banked by GameSession.</summary>
     public int coins;
 
+    /// <summary>Civilians killed in the level (the desert town). Any caps the stars; see CivilianCasualties.</summary>
+    public int civiliansKilled;
+
     /// <summary>A level with a star is a level passed, and the next one opens.</summary>
     public bool Passed => stars > 0;
 
@@ -104,6 +107,17 @@ public struct LevelResult
 
     /// <summary>One line of plain English under it.</summary>
     public string Summary
+    {
+        get
+        {
+            string summary = BaseSummary;
+            if (civiliansKilled <= 0) return summary;
+            string civ = civiliansKilled == 1 ? "1 civilian killed" : $"{civiliansKilled} civilians killed";
+            return UIText.Row(summary, civ);
+        }
+    }
+
+    string BaseSummary
     {
         get
         {

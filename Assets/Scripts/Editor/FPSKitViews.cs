@@ -127,6 +127,7 @@ namespace FPSKit.EditorTools
         /// </summary>
         static IEnumerable<Shot> Frame(LevelTheme theme)
         {
+            if (theme != null && theme.desertTownZone) return FrameTown();
             if (theme != null && theme.parkZone) return FramePark();
             if (theme != null && theme.snowZone) return System.Linq.Enumerable.Concat(FrameSnow(), FrameSnowLife());
             if (theme != null && theme.industrialZone) return FrameIndustrial();
@@ -134,6 +135,36 @@ namespace FPSKit.EditorTools
                 return System.Linq.Enumerable.Concat(FrameDesert(theme), FrameDesertLife());
 
             return FrameDesert(theme);
+        }
+
+        /// <summary>
+        /// The desert town (FPSKitTown): the player's first view, each landmark from the street and from above, the
+        /// souk inside, a residential street, the edge of town and the whole thing from the air. Heights are above
+        /// the ground under each point, as the park's are.
+        /// </summary>
+        static IEnumerable<Shot> FrameTown()
+        {
+            // A step behind and beside the player's start (the start itself is inside the player's own body).
+            yield return ParkShot("01_start", new Vector3(12.5f, 1.65f, -58f), new Vector3(0f, 12f, 60f), 75f);
+            yield return ParkShot("02_roundabout_air", new Vector3(55f, 45f, -55f), new Vector3(0f, 0f, 22f), 62f);
+            yield return ParkShot("03_bazaar_gate", new Vector3(-12f, 1.7f, 4f), new Vector3(-50f, 5f, 20f), 72f);
+            yield return ParkShot("04_souk_inside", new Vector3(-62f, 1.7f, 20f), new Vector3(-160f, 3f, 20f), 75f);
+            yield return ParkShot("05_old_town", new Vector3(-200f, 40f, -40f), new Vector3(-150f, 0f, 60f), 62f);
+            yield return ParkShot("06_mosque_plaza", new Vector3(0f, 1.7f, 140f), new Vector3(0f, 16f, 240f), 75f);
+            yield return ParkShot("07_mosque_air", new Vector3(95f, 70f, 135f), new Vector3(0f, 8f, 240f), 60f);
+            yield return ParkShot("08_citadel_street", new Vector3(215f, 1.7f, 196f), new Vector3(300f, 20f, 350f), 70f);
+            yield return ParkShot("09_citadel_air", new Vector3(430f, 105f, 230f), new Vector3(300f, 12f, 350f), 60f);
+            yield return ParkShot("10_palace_gate", new Vector3(-385f, 1.7f, -136f), new Vector3(-385f, 6f, -40f), 72f);
+            yield return ParkShot("11_avenue_south", new Vector3(5f, 1.7f, -300f), new Vector3(0f, 6f, -120f), 72f);
+            yield return ParkShot("12_gas_station", new Vector3(112f, 1.7f, -404f), new Vector3(57f, 3f, -366f), 72f);
+            yield return ParkShot("13_checkpoint", new Vector3(4f, 1.7f, -394f), new Vector3(0f, 3f, -348f), 72f);
+            yield return ParkShot("14_east_street", new Vector3(134f, 1.7f, -70f), new Vector3(130f, 4f, 60f), 72f);
+            yield return ParkShot("15_farms_oasis", new Vector3(-210f, 28f, 290f), new Vector3(-318f, 0f, 345f), 64f);
+            yield return ParkShot("16_junkyard", new Vector3(-275f, 1.7f, -412f), new Vector3(-275f, 2f, -456f), 72f);
+            yield return ParkShot("17_highway", new Vector3(300f, 1.7f, -396f), new Vector3(-200f, 3f, -400f), 70f);
+            yield return ParkShot("18_town_air", new Vector3(380f, 260f, -460f), new Vector3(-40f, 0f, 60f), 58f);
+            yield return ParkShot("19_dunes_edge", new Vector3(300f, 1.7f, -470f), new Vector3(470f, 5f, -485f), 70f);
+            yield return ParkShot("20_water_tower", new Vector3(-126f, 1.7f, -300f), new Vector3(-196f, 15f, -330f), 70f);
         }
 
         /// <summary>

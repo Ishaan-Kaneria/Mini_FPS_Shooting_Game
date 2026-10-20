@@ -627,6 +627,7 @@ public class LevelManager : MonoBehaviour
     IEnumerator RunLevel()
     {
         Killed = 0;
+        CivilianCasualties.Reset();
         ProgressChanged?.Invoke(this);
         _killedWeight = 0f;
         BossKilled = false;
@@ -821,6 +822,15 @@ public class LevelManager : MonoBehaviour
         float fraction = ScoreFraction;
         int stars = LevelResult.StarsFor(fraction, cleared, Level);
 
+        // The desert town's rule: killing civilians caps the stars (one or two: two stars at most, three or more: one)
+        // and costs score. Never raises a failure into a pass.
+        int civilians = CivilianCasualties.Count;
+        if (civilians > 0)
+        {
+            stars = Mathf.Min(stars, CivilianCasualties.StarCap(civilians));
+            Director?.AddScore(-CivilianCasualties.ScorePenalty * civilians);
+        }
+
         float taken = Mathf.Min(TimeLimit, Mathf.Max(0f, Time.time - _startedAt));
 
         // Banked before the result is built, so the score on the results screen is the
@@ -864,7 +874,8 @@ public class LevelManager : MonoBehaviour
             // built: LevelResult is a struct, so every consumer downstream gets a copy.
             bombKills = director != null ? director.BombKills : 0,
             bestCombo = director != null ? director.BestCombo : 0,
-            damageTaken = director != null ? director.DamageTaken : 0f
+            damageTaken = director != null ? director.DamageTaken : 0f,
+            civiliansKilled = civilians
         };
 
         Result = result;

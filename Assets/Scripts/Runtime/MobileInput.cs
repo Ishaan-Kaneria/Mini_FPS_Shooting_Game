@@ -87,6 +87,12 @@ public static class MobileInput
     /// </summary>
     public static bool PickUpReady;
 
+    /// <summary>
+    /// "DRIVE" beside a car that can be driven, "GET OUT" while driving one (DrivableCar), null otherwise: the RELOAD
+    /// button reads it, as it reads PICK UP. Set by DrivableCar every frame.
+    /// </summary>
+    public static string DriveLabel;
+
     static bool _interactQueued;
 
     /// <summary>The PICK UP button (the RELOAD button, while disarmed by a gun).</summary>
@@ -209,6 +215,7 @@ public static class MobileInput
         _fireHolds = 0;
         _jumpQueued = _reloadQueued = _pauseQueued = _useItemQueued = _meleeQueued = _kickQueued = _interactQueued = false;
         PickUpReady = false;
+        DriveLabel = null;
         MeleeReady = false;
     }
 }

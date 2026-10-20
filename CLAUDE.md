@@ -175,6 +175,12 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Rooftop (`rooftopZone`) is a city district (`FPSKitCity*.cs`, `Docs/DESIGN_NOTES.md` "Night Rooftop is a city district"): every building shell needs a
   `NoEnter` volume (a closed box bakes an inside), fire-escape lanes stay 2.2 m wide, every walkable roof keeps two escapes, emissive materials need
   `RealtimeEmissive`. Check with `Tools > MiniFPS > Rooftop > Check Reach` after any change.
+- Desert Outpost is a **town** (`desertTownZone`, `FPSKitTown*.cs`, `Docs/DESIGN_NOTES.md` "The desert is a town"): a fixed plan
+  (axis-aligned roads, one roundabout), a real `Terrain` whose heights are `_ground`, roads draped on `_townBase` over terrain sunk 18 cm,
+  every mesh through `TownMesh` (world-metre UVs, winding from a stated normal). Interiors cut the outer wall's recorded openings; solid masses
+  and hollow walls get Not Walkable volumes; outside stairs are planned before walls (parapet gap). Poly Haven props (CC0, `Assets/ThirdParty/PolyHaven`,
+  `Tools/polyhaven`) are stood upright and LOD-culled by `FPSKitTownAssets`; never place the 200k+ triangle plant scans. Signs come from
+  `Tools/town/make_signs.py` (real Arabic via raqm). Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired).
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

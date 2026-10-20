@@ -1,0 +1,14 @@
+stop
+giveway
+noentry
+speed50
+speed80
+roundabout
+crossing
+parking
+busstop
+keepright
+notraffic
+hump
+danger
+back

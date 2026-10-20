@@ -53,8 +53,9 @@ public class GunPickup : MonoBehaviour
 
         // Read every frame, so a press made with nothing in reach is not kept and spent later.
         var keys = _motor.controls;
+        // The phone's queued press is only taken while the button reads PICK UP; otherwise it may be a DRIVE (DrivableCar).
         bool press = (keys != null && ControlSettings.Pressed(keys.interact))
-                     | GameInput.PadPressed(GameAction.Interact) | MobileInput.ConsumeInteract();
+                     | GameInput.PadPressed(GameAction.Interact) | (MobileInput.PickUpReady && MobileInput.ConsumeInteract());
         if (press && able && Candidate != null && _weapon.TakeUp(Candidate))
         {
             Candidate = null;

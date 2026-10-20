@@ -346,6 +346,20 @@ namespace FPSKit.EditorTools
         /// <summary>Writes any missing tuning asset under FPSKit_Generated/Resources (FPSKit > Settings > Ensure Runtime Settings).</summary>
         public static void EnsureRuntimeSettings() => Run(FPSKitRuntimeSettings.Ensure);
 
+        /// <summary>The desert town: famous locations reachable, no roof islands, civilians/traffic/cars/technicals wired (FPSKitTownTest).</summary>
+        public static void VerifyTown() => FPSKitTownTest.VerifyTown();
+
+        /// <summary>The desert town's assets made ready for URP (FPSKitTownAssets). -fpskitApply rebuilds every prefab.</summary>
+        public static void PrepareTownAssets() => Run(() => FPSKitTownAssets.Prepare(HasFlag("-fpskitApply")));
+
+        /// <summary>Sizes of every prefab the town places, to Build/TownProbe.txt (FPSKitTownAssets.Probe).</summary>
+        public static void ProbeTownAssets() => Run(() =>
+        {
+            FPSKitTownAssets.DumpVehicleApi("Build/VehicleApi.txt");
+            FPSKitTownAssets.Prepare();
+            FPSKitTownAssets.Probe("Build/TownProbe.txt");
+        });
+
         /// <summary>
         /// A dead enemy's gun rests on the ground: rigged and plain bodies, concrete, wood, sand and
         /// slopes, six orientations; mesh-to-surface gap and jitter once settled. Report and (with
@@ -920,6 +934,15 @@ namespace FPSKit.EditorTools
 
                 var scene = EditorSceneManager.OpenScene(source, OpenSceneMode.Single);
                 FPSKitMobileControls.AddMobileControls(askFirst: false);
+                // The desert town ships full on PC and reduced on phones and in the browser (his pick, 2026-10-20): the
+                // staged copy is the one reduced, the real scene is untouched.
+                var theme = FPSKitThemes.GetOrCreate(themeName);
+                if (theme != null && theme.desertTownZone)
+                {
+                    var sb = new System.Text.StringBuilder();
+                    FPSKitReducedCopy.ReduceScene(scene, sb);
+                    Debug.Log($"[FPSKitBatch] {themeName} reduced for the touch build:\n{sb}");
+                }
                 EditorSceneManager.SaveScene(scene, copy, saveAsCopy: true);
 
                 staged.Add(copy);

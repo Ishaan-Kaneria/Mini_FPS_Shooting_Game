@@ -100,10 +100,12 @@ namespace FPSKit.EditorTools
                 return;
             }
 
+            // The desert town has no river: its spawn points and rocks are checked, the gorge checks do not apply.
+            bool town = theme.desertTownZone;
             float startOffset = Mathf.Abs(player.transform.position.x -
                                           GorgeCentre(theme, player.transform.position.z));
 
-            if (startOffset < edge + 4f)
+            if (!town && startOffset < edge + 4f)
                 problems.Add($"{name}: the player starts {startOffset:0} m from the middle of a " +
                              $"{theme.hazardWidth:0} m gorge, which is in it");
 
@@ -126,6 +128,14 @@ namespace FPSKit.EditorTools
             else if (onMesh < total)
                 problems.Add($"{name}: {total - onMesh} of {total} spawn points are off the navmesh, " +
                              "so the level has fewer directions to arrive from than it was built with");
+
+            if (town)
+            {
+                CheckRocksAreBuried(name, problems, notes);
+                CheckRocksFaceOutward(name, problems, notes);
+                notes.Append($"\n  {name}: {onMesh}/{total} spawn points on the navmesh (town: no gorge)");
+                return;
+            }
 
             // ---- the water is not walkable ----
             float waterY = -theme.hazardDepth + 2f;

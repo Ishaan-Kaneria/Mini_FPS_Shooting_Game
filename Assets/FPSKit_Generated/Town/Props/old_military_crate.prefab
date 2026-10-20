@@ -1,0 +1,198 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4659949603347017172
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5467554481166677870}
+  - component: {fileID: 2982297613742659250}
+  - component: {fileID: 8096325472863405868}
+  m_Layer: 0
+  m_Name: old_military_crate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 22
+  m_IsActive: 1
+--- !u!4 &5467554481166677870
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4659949603347017172}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 5506247203174584454}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2982297613742659250
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4659949603347017172}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.815387, y: 0.30093443, z: 0.9790976}
+  m_Center: {x: -0.005342841, y: 0.15045212, z: 0.1809271}
+--- !u!205 &8096325472863405868
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4659949603347017172}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.0053428113, y: 0.15045214, z: 0.18092708}
+  m_Size: 1.815387
+  m_FadeMode: 0
+  m_AnimateCrossFading: 0
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 4691909128853782061}
+    - renderer: {fileID: 6189336138233148751}
+    - renderer: {fileID: 6539841879219551813}
+    - renderer: {fileID: 1854316192963403177}
+    - renderer: {fileID: 2452915654684077295}
+    - renderer: {fileID: 3880232433390670989}
+    - renderer: {fileID: 4063394611036980567}
+    - renderer: {fileID: 4862965771413583585}
+    - renderer: {fileID: 3731972973931314081}
+    - renderer: {fileID: 7982878448255767242}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
+--- !u!1001 &5506247203174584453
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 5467554481166677870}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f3f7f09b122894687a866832020cd030, type: 3}
+      propertyPath: m_Name
+      value: old_military_crate
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f3f7f09b122894687a866832020cd030, type: 3}
+--- !u!23 &1854316192963403177 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6183939717808196908, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &2452915654684077295 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1269839847975682966, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &3731972973931314081 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 9196560505676573476, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &3880232433390670989 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -453943827052968952, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4063394611036980567 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -860735674638330414, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4691909128853782061 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 970275950187540136, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4862965771413583585 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -8136131839559932316, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &5506247203174584454 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &6189336138233148751 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7381700210605791798, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &6539841879219551813 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 1632608888307003072, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7982878448255767242 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -6727534452377025969, guid: f3f7f09b122894687a866832020cd030, type: 3}
+  m_PrefabInstance: {fileID: 5506247203174584453}
+  m_PrefabAsset: {fileID: 0}

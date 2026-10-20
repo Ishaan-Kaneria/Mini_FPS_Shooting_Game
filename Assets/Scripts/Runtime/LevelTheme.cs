@@ -324,6 +324,28 @@ public class LevelTheme : ScriptableObject
              "than silently losing the field; nothing reads it.")]
     public bool subwayZone;
 
+    // ==================================================================
+    // Desert town
+    // ==================================================================
+    [Header("Desert Town")]
+    [Tooltip("Build this arena as a lived-in Middle East town on real terrain: a fixed street plan " +
+             "with junctions and a clock-tower roundabout, a covered souk, houses and apartment " +
+             "blocks, the grand mosque, the citadel, the palace, a gas station and checkpoint, " +
+             "palm farms, an oasis, a junkyard and a highway out to the dunes. Takes precedence " +
+             "over every other layout. Built by FPSKitTown*.")]
+    public bool desertTownZone;
+
+    [Tooltip("Civilians walking about at once on the highest quality tier. The lower tiers take " +
+             "a share of this. They shop, sit and talk, and run for cover when shooting starts.")]
+    [Min(0)] public int townCivilians = 60;
+
+    [Tooltip("Cars driving the streets at once on the highest quality tier. They keep to the " +
+             "right, wait at junctions and stop for anyone in the road.")]
+    [Min(0)] public int townTrafficCars = 15;
+
+    [Tooltip("Cars parked along the kerbs, in yards and at the gas station. Cover on the street.")]
+    [Min(0)] public int townParkedCars = 110;
+
     [Header("Surface detail")]
     [Tooltip("Which generated detail map this arena's floor wears: Concrete, Metal, Snow, " +
              "Tile, Sand, Rock, Timber or Adobe. Empty means flat colour, which is what " +

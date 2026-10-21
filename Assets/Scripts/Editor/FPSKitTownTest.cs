@@ -66,6 +66,20 @@ namespace FPSKit.EditorTools
             else notes.AppendLine($"  light probes: {baked} baked of {placed} placed");
             if (LightmapSettings.lightmaps.Length > 0) problems.Add($"{LightmapSettings.lightmaps.Length} lightmaps baked (probes only wanted)");
 
+            // ---- cover outside the shops (FPSKitTownCover): there, and each piece with a place to crouch beside it on
+            // the navmesh, where EnemyBrain.FindCover looks ----
+            var covers = UnityEngine.Object.FindObjectsByType<CoverSpot>(FindObjectsSortMode.None);
+            int crouchable = 0;
+            foreach (var c in covers)
+            {
+                var t = c.transform;
+                if (NavMesh.SamplePosition(t.position - t.right * (c.halfLength + 0.45f), out _, 0.6f, NavMesh.AllAreas) ||
+                    NavMesh.SamplePosition(t.position + t.right * (c.halfLength + 0.45f), out _, 0.6f, NavMesh.AllAreas)) crouchable++;
+            }
+            if (covers.Length < 100) problems.Add($"only {covers.Length} cover spots outside the shops (100 or more wanted)");
+            else if (crouchable < covers.Length * 0.9f) problems.Add($"cover with nowhere to crouch beside it on the navmesh: {covers.Length - crouchable} of {covers.Length}");
+            else notes.AppendLine($"  cover outside the shops: {covers.Length} spots, {crouchable} with a place to crouch beside them");
+
             // ---- famous locations ----
             var places = new List<(string name, Vector3 at)>
             {

@@ -1215,6 +1215,40 @@ public class EnemyBrain : MonoBehaviour
             cover = hit.position;
             found = true;
         }
+
+        // Cover set down in the arena (CoverSpot): beside each piece near it and in front of it, wherever the threat
+        // cannot see -- behind low cover at crouched height, which is how it is used: head down under fire, up to shoot.
+        var spots = CoverSpot.All;
+        int tried = 0;
+        for (int i = 0; i < spots.Count && tried < 24; i++)
+        {
+            var spot = spots[i];
+            var st = spot.transform;
+            if ((st.position - transform.position).sqrMagnitude > 14f * 14f) continue;
+            for (int k = 0; k < 3; k++, tried++)
+            {
+                Vector3 candidate = k == 0 ? st.position - st.right * (spot.halfLength + 0.45f)
+                                  : k == 1 ? st.position + st.right * (spot.halfLength + 0.45f)
+                                  : st.position + st.forward * (spot.halfDepth + 0.45f);
+                if (!NavMesh.SamplePosition(candidate, out var hit, 0.6f, NavMesh.AllAreas)) continue;
+
+                float range = Vector3.Distance(hit.position, threat);
+                if (range < minRange || range > maxRange) continue;
+                if ((hit.position - transform.position).sqrMagnitude < 3f * 3f) continue;
+
+                float body = spot.Low ? CrouchedBody : 1.2f;
+                if (!Physics.Linecast(threatEye, hit.position + Vector3.up * body, _ai.sightBlockers, QueryTriggerInteraction.Ignore)) continue;
+
+                float cost = (hit.position - transform.position).sqrMagnitude;
+                if (cost >= best) continue;
+                best = cost;
+                cover = hit.position;
+                found = true;
+            }
+        }
         return found;
     }
+
+    /// <summary>Where a crouched body's head and shoulders are, for judging low cover.</summary>
+    const float CrouchedBody = 0.95f;
 }

@@ -191,6 +191,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired); `FPSKitTownTest.Probe` maps what fails.
   Light probes (`FPSKitTownProbes`) need the probes-only bake at save (`BakeTownProbes`: no lightmaps, sun Mixed/Baked Indirect);
   realtime reflection probes stay out of it (captured headless they drew everything flat white).
+  Shops (`FPSKitTownShopfront`): storefront 0.35 m behind the piers, frames 5 cm out of glass/shutter, sign plates 10 cm off the
+  wall under a hood, retail cornice, foundation course; `ShopFront` keeps the old draws from the building's random sequence (new
+  choices from its own) so the town does not reshuffle. Cover outside shops (`SpinShopCover`) carries `CoverSpot` for EnemyBrain.
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

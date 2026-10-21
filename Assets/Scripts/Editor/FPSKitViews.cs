@@ -172,6 +172,11 @@ namespace FPSKit.EditorTools
             yield return ParkShot("23_facade_up", new Vector3(10.5f, 1.6f, -180f), new Vector3(16f, 12f, -176f), 70f);
             yield return ParkShot("24_street_north", new Vector3(140f, 1.7f, 150f), new Vector3(140f, 6f, 260f), 66f);
             yield return ParkShot("25_parked_car", new Vector3(110.5f, 1.6f, -301f), new Vector3(115.9f, 0.4f, -306.2f), 60f);
+            // Shop fronts (FPSKitTownShopfront) and the cover outside them (FPSKitTownCover), from the pavement.
+            yield return ParkShot("26_shopfronts_avenue", new Vector3(10.2f, 1.6f, -214f), new Vector3(13.4f, 2.3f, -204f), 60f);
+            yield return ParkShot("27_shopfront_close", new Vector3(11.0f, 1.55f, -186f), new Vector3(13.4f, 2.4f, -181f), 62f);
+            yield return ParkShot("28_shop_cover_street", new Vector3(135.2f, 1.6f, -62f), new Vector3(137.4f, 1.0f, -44f), 62f);
+            yield return ParkShot("29_shop_base", new Vector3(10.4f, 1.1f, -184.5f), new Vector3(13.4f, 0.7f, -181f), 64f);
         }
 
         /// <summary>

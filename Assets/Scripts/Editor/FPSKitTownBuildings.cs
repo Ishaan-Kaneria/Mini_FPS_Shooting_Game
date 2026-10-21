@@ -50,7 +50,7 @@ namespace FPSKit.EditorTools
 
         private static void ResetTownBuildings()
         {
-            _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear();
+            _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
             _volumes = null; _signNames = null; _roadSignNames = null;
             _oldSquares.Clear(); _vacantLots.Clear();
         }
@@ -565,7 +565,7 @@ namespace FPSKit.EditorTools
                         if (f == 0 && kind == FaceKind.Shops)
                         {
                             float w = bayW - 0.6f;
-                            holes.Add(new Vector4(cu - w * 0.5f, cu + w * 0.5f, fy, fy + Mathf.Min(3.1f, b.groundH - 0.5f))); floorOf.Add(f);
+                            holes.Add(new Vector4(cu - w * 0.5f, cu + w * 0.5f, fy, fy + ShopOpeningH(b))); floorOf.Add(f);
                             continue;
                         }
                         if (f == 0 && side == b.door && k == bays / 2)
@@ -610,29 +610,41 @@ namespace FPSKit.EditorTools
                 else m.WallWithOpenings(b.wall, wa, wb, top - bottom, nrm, holes, rises);
 
                 // ---- reveals, glass, frames, sills ----
+                var shopFace = kind == FaceKind.Shops ? new ShopFace { a0 = a0, u = u, nrm = nrm, len = len, floorY = b.FloorY(0) } : null;
+                if (shopFace != null) _shopFaces.Add(shopFace);
                 for (int i = 0; i < holes.Count; i++)
                 {
                     var h = holes[i];
                     if (side == b.stairSide && h.z > b.Top - bottom) continue;     // the parapet gap: no reveal, no glass
                     float rise = rises.TryGetValue(i, out float holeRise) ? holeRise : 0f;
                     bool groundFloor = h.z - (b.FloorY(0) - bottom) < 0.5f;
-                    float depth = b.enterable && groundFloor ? 0.25f : (b.oldStyle ? 0.2f : b.reveal);
+                    bool isShop = groundFloor && kind == FaceKind.Shops;
+                    // A shop's storefront stands 0.35 m behind the piers' faces (FPSKitTownShopfront).
+                    float depth = isShop ? ShopRecess : b.enterable && groundFloor ? 0.25f : (b.oldStyle ? 0.2f : b.reveal);
                     Vector3 p0 = wa + u * h.x + Vector3.up * h.z, p1 = wa + u * h.y + Vector3.up * h.z;
                     Vector3 q0 = wa + u * h.x + Vector3.up * h.w, q1 = wa + u * h.y + Vector3.up * h.w;
                     Vector3 inn = -nrm * depth;
                     bool isDoor = groundFloor && kind != FaceKind.Shops && h.y - h.x < 1.5f && h.w - h.z > 2f && floorOf[i] == 0 && h.z - floorV < 0.1f;
-                    bool isShop = groundFloor && kind == FaceKind.Shops;
                     Material revealMat = b.oldStyle ? b.wall
                                        : h.z < baseTop ? b.baseMat
                                        : b.style == FacadeStyle.Ashlar ? b.trim : b.wall;
                     Reveals(m, revealMat, wa, u, nrm, h, rise, depth);
 
-                    if (isShop) { ShopFront(m, b, side, p0, p1, q0, q1, inn, nrm, props); continue; }
+                    if (isShop)
+                    {
+                        var state = ShopFront(m, det, b, p0, p1, q0, nrm, props);
+                        shopFace?.bays.Add((h.x, h.y, state));
+                        continue;
+                    }
                     if (isDoor)
                     {
                         if (b.enterable) { OpenDoor(m, b, p0, p1, q0, inn, nrm); _townDoors.Add((p0 + p1) * 0.5f + nrm * 0.8f); }
                         else m.Quad(rng.NextDouble() < 0.5 ? _doorMetal : _doorWood, p0 + inn, p1 + inn, q1 + inn, q0 + inn, nrm);
-                        if (!b.oldStyle) DoorDressing(det, b, p0, p1, h.w - h.z, nrm);
+                        if (!b.oldStyle)
+                        {
+                            DoorFrame(det, b.frame, p0, p1, h.w - h.z, depth, nrm);
+                            DoorDressing(det, b, p0, p1, h.w - h.z, nrm);
+                        }
                         continue;
                     }
                     if (b.oldStyle) WindowIn(m, b, p0, p1, q0, q1, inn, nrm, groundFloor && b.enterable, h.w - h.z > 2f);
@@ -644,16 +656,26 @@ namespace FPSKit.EditorTools
                 if (!b.oldStyle && kind != FaceKind.Blank)
                 {
                     bool rich = streetFace || side == b.door;
+                    bool shops = kind == FaceKind.Shops && b.floors >= 2;      // the cornice between the shops and the flats
                     if (side == b.stairSide)
                     {
                         // Not across the outside stair: the cornice stood out 0.44 m across its landing.
-                        FaceDressings(m, det, b, a0, a0 + u * Mathf.Max(0f, TownStairStart - 0.15f), nrm, side, quoinEnd: false, rich: rich);
-                        FaceDressings(m, det, b, a0 + u * Mathf.Min(len, b.stairU1 + 0.15f), b0, nrm, side, quoinStart: false, rich: rich);
+                        FaceDressings(m, det, b, a0, a0 + u * Mathf.Max(0f, TownStairStart - 0.15f), nrm, side, quoinEnd: false, rich: rich, shopCornice: shops);
+                        FaceDressings(m, det, b, a0 + u * Mathf.Min(len, b.stairU1 + 0.15f), b0, nrm, side, quoinStart: false, rich: rich, shopCornice: shops);
                     }
-                    else FaceDressings(m, det, b, a0, b0, nrm, side, rich: rich);
+                    else FaceDressings(m, det, b, a0, b0, nrm, side, rich: rich, shopCornice: shops);
+
+                    // The concrete foundation course where the pavement meets the building, broken at every opening down
+                    // to the floor and at an outside stair.
+                    var gaps = new List<Vector2>();
+                    for (int i = 0; i < holes.Count; i++)
+                        if (floorOf[i] == 0 && holes[i].z - floorV < 0.15f) gaps.Add(new Vector2(holes[i].x, holes[i].y));
+                    if (side == b.stairSide) gaps.Add(new Vector2(TownStairStart - 0.3f, b.stairU1 + 0.3f));
+                    FoundationTrim(m, b, a0, u, len, nrm, side, bottom, gaps);
                 }
-                m.Box(b.oldStyle ? b.wall : b.trim, (a0 + b0) * 0.5f + Vector3.up * (b.baseY - 0.25f) + nrm * 0.03f,
-                      new Vector3(len + 0.06f, Mathf.Max(0.5f, b.baseY - bottom + 0.25f) , 0.06f) , Quaternion.LookRotation(nrm));
+                else
+                    m.Box(b.oldStyle ? b.wall : b.trim, (a0 + b0) * 0.5f + Vector3.up * (b.baseY - 0.25f) + nrm * 0.03f,
+                          new Vector3(len + 0.06f, Mathf.Max(0.5f, b.baseY - bottom + 0.25f) , 0.06f) , Quaternion.LookRotation(nrm));
             }
 
             // ---- roof, parapet, coping ----
@@ -800,64 +822,6 @@ namespace FPSKit.EditorTools
             if (b.baseY - g > 0.12f)
                 m.Box(_coping, (p0 + p1) * 0.5f + nrm * 0.35f + Vector3.up * ((g - p0.y) * 0.5f - 0.02f),
                       new Vector3(w + 0.6f, Mathf.Max(0.05f, b.baseY - g), 0.7f), Quaternion.LookRotation(nrm));
-        }
-
-        // ------------------------------------------------------------------
-        private static void ShopFront(TownMesh m, Mass b, int side, Vector3 p0, Vector3 p1, Vector3 q0, Vector3 q1, Vector3 inn, Vector3 nrm, Transform props)
-        {
-            var rng = b.rng;
-            Vector3 u = (p1 - p0).normalized;
-            float w = Vector3.Distance(p0, p1), h = Vector3.Distance(p0, q0);
-            var rot = Quaternion.LookRotation(nrm);
-            double state = rng.NextDouble();       // < .35 open, < .55 half, else shut
-            Vector3 back = -nrm * 3.2f;
-            if (state < 0.55)
-            {
-                // The shop behind: dark floor, walls and ceiling three metres deep.
-                Vector3 a = p0 + inn, c = p1 + inn;
-                m.Quad(_terrazzo, a, c, c + back, a + back, Vector3.up);
-                m.Quad(_shopDark, a + back, c + back, c + back + Vector3.up * h, a + back + Vector3.up * h, nrm);
-                m.Quad(_shopDark, a, a + back, a + back + Vector3.up * h, a + Vector3.up * h, u);
-                m.Quad(_shopDark, c, c + back, c + back + Vector3.up * h, c + Vector3.up * h, -u);
-                m.Quad(_shopDark, a + Vector3.up * h, c + Vector3.up * h, c + back + Vector3.up * h, a + back + Vector3.up * h, Vector3.down);
-                if (state < 0.35)
-                {
-                    var centre = (p0 + p1) * 0.5f;
-                    _shopFronts.Add(new Vector4(centre.x + nrm.x * 1.2f, centre.y, centre.z + nrm.z * 1.2f, Mathf.Atan2(nrm.x, nrm.z) * Mathf.Rad2Deg));
-                    // Shelves inside, facing out.
-                    PlaceTown(props, Prop("steel_frame_shelves_01"), (p0 + p1) * 0.5f + back * 0.85f - u * w * 0.25f, Mathf.Atan2(-nrm.x, -nrm.z) * Mathf.Rad2Deg + 180f, 2.0f);
-                    PlaceTown(props, Prop(rng.NextDouble() < 0.5 ? "cardboard_box_01" : "plastic_crate_02"), (p0 + p1) * 0.5f + back * 0.5f + u * w * 0.25f, (float)rng.NextDouble() * 360f, 0.45f);
-                }
-                if (state >= 0.35)
-                    m.Quad(rng.NextDouble() < 0.4 ? _shutterRust : _shutterPaint, q0 + inn * 0.3f - Vector3.up * h * 0.45f, q1 + inn * 0.3f - Vector3.up * h * 0.45f, q1 + inn * 0.3f, q0 + inn * 0.3f, nrm);
-            }
-            else
-                m.Quad(rng.NextDouble() < 0.4 ? _shutterRust : _shutterPaint, p0 + inn * 0.3f, p1 + inn * 0.3f, q1 + inn * 0.3f, q0 + inn * 0.3f, nrm);
-            // The shutter box above the opening.
-            m.Box(_frameAlu, (q0 + q1) * 0.5f + nrm * 0.12f + Vector3.up * 0.15f, new Vector3(w, 0.3f, 0.3f), rot);
-
-            // Sign above, on a backing board.
-            var cell = SignCell(ShopSigns[rng.Next(ShopSigns.Length)]);
-            float sh = Mathf.Min(1.0f, w * 0.25f), sw = sh * 4f;
-            if (sw > w) { sw = w; sh = w * 0.25f; }
-            Vector3 sc = (q0 + q1) * 0.5f + Vector3.up * (0.45f + sh * 0.5f) + nrm * 0.07f;
-            m.Box(_steel, sc - nrm * 0.03f, new Vector3(sw + 0.08f, sh + 0.08f, 0.04f), rot);
-            Vector3 s0 = sc - u * sw * 0.5f - Vector3.up * sh * 0.5f, s1 = sc + u * sw * 0.5f - Vector3.up * sh * 0.5f;
-            m.QuadUV(_townSignMat, s0, s1, s1 + Vector3.up * sh, s0 + Vector3.up * sh, nrm,
-                     new Vector2(cell.xMin, cell.yMin), new Vector2(cell.xMax, cell.yMin), new Vector2(cell.xMax, cell.yMax), new Vector2(cell.xMin, cell.yMax));
-
-            // An awning on some.
-            if (rng.NextDouble() < 0.35)
-            {
-                int k = rng.Next(4);
-                var uv0 = new Vector2((k % 2) * 0.5f, (k / 2) * 0.5f);
-                float d = 1.3f, drop = 0.6f;
-                Vector3 top0 = q0 + Vector3.up * 0.05f + nrm * 0.05f, top1 = q1 + Vector3.up * 0.05f + nrm * 0.05f;
-                Vector3 bot0 = top0 + nrm * d - Vector3.up * drop, bot1 = top1 + nrm * d - Vector3.up * drop;
-                var an = Vector3.Cross(top1 - top0, bot0 - top0).normalized; if (an.y < 0f) an = -an;
-                m.QuadUV(_awningMat, top0, top1, bot1, bot0, an, uv0, uv0 + new Vector2(0.5f, 0f), uv0 + new Vector2(0.5f, 0.5f), uv0 + new Vector2(0f, 0.5f));
-                m.QuadUV(_awningMat, top0, top1, bot1, bot0, -an, uv0, uv0 + new Vector2(0.5f, 0f), uv0 + new Vector2(0.5f, 0.5f), uv0 + new Vector2(0f, 0.5f));
-            }
         }
 
         // ------------------------------------------------------------------

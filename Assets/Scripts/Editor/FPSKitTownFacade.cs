@@ -48,6 +48,7 @@ namespace FPSKit.EditorTools
             _frameWood = TownMat("FrameWood", "rough_pine_door", new Color(0.62f, 0.42f, 0.28f), 1.2f, 0.3f);
             _iron = TownFlat("WroughtIron", new Color(0.045f, 0.045f, 0.05f), 0.35f, 0.55f);
             _shutterBoxMat = TownFlat("ShutterBox", new Color(0.78f, 0.76f, 0.72f), 0.3f);
+            ResolveShopfrontMaterials();
         }
 
         /// <summary>The detail mesh for whatever stands at <paramref name="p"/> (its 64 m chunk, like <see cref="Chunk"/>).</summary>
@@ -275,10 +276,10 @@ namespace FPSKit.EditorTools
                 H -= box;                                                  // the window proper is below the box
             }
 
-            // ---- frame: the outer frame round the opening, 6 cm, standing 6 cm proud of the glass ----
+            // ---- frame: the outer frame round the opening, 6 cm, its front standing 5 cm out of the glass ----
             var fm = b.frame;
             const float fw = 0.06f, fd = 0.07f;
-            Vector3 fo = nrm * 0.035f;                                    // frame front, from the glass plane
+            Vector3 fo = nrm * FrameProud;                                // frame front, from the glass plane
             Bar(det, fm, G(fw * 0.5f, 0f) + fo, G(fw * 0.5f, H) + fo, nrm, fw, fd);
             Bar(det, fm, G(W - fw * 0.5f, 0f) + fo, G(W - fw * 0.5f, H) + fo, nrm, fw, fd);
             Bar(det, fm, G(0f, fw * 0.5f) + fo, G(W, fw * 0.5f) + fo, nrm, fw, fd);
@@ -484,21 +485,24 @@ namespace FPSKit.EditorTools
         // The whole face: base course, string courses, cornice, quoins
         // ------------------------------------------------------------------
         /// <summary>The dressings that run along a face (not a blank party wall): the plinth course over a rusticated
-        /// base, a string course at each floor, the cornice under the parapet with dentils and brackets, and quoins.</summary>
+        /// base, a string course at each floor, the cornice under the parapet with dentils and brackets, and quoins.
+        /// Over shops (<paramref name="shopCornice"/>) the first floor's band or course gives way to the retail cornice.</summary>
         private static void FaceDressings(TownMesh shell, TownMesh det, Mass b, Vector3 a0, Vector3 b0, Vector3 nrm, int side,
-                                          bool quoinStart = true, bool quoinEnd = true, bool rich = true)
+                                          bool quoinStart = true, bool quoinEnd = true, bool rich = true, bool shopCornice = false)
         {
             float len = Vector3.Distance(a0, b0);
             Vector3 u = (b0 - a0) / Mathf.Max(0.01f, len), up = Vector3.up;
             Vector3 mid = (a0 + b0) * 0.5f;
             var rot = Quaternion.LookRotation(nrm);
             Material t = b.trim;
+            if (shopCornice) RetailCornice(shell, det, b, a0, b0, nrm, side, quoinStart, quoinEnd);
 
             if (b.style == FacadeStyle.Plaster)
             {
                 // Plaster blocks: a slab band at each floor and a deeper one at the roof.
                 for (int f = 1; f <= b.floors; f++)
                 {
+                    if (f == 1 && shopCornice && b.floors > 1) continue;
                     float y = f == b.floors ? b.Top : b.FloorY(f);
                     float hh = f == b.floors ? 0.3f : 0.2f;
                     shell.Box(t, mid + up * (y - hh * 0.5f) + nrm * 0.035f, new Vector3(len + 0.07f, hh, 0.07f), rot);
@@ -509,6 +513,7 @@ namespace FPSKit.EditorTools
             // Plinth course on top of a rusticated ground floor; string courses at the floors above.
             for (int f = 1; f < b.floors; f++)
             {
+                if (f == 1 && shopCornice) continue;
                 float y = b.FloorY(f);
                 bool course = f == 1 && b.baseMat != null;
                 float hh = course ? 0.24f : 0.15f, pr = course ? 0.08f : 0.05f;

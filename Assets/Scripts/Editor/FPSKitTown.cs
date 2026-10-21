@@ -117,6 +117,9 @@ namespace FPSKit.EditorTools
             Lap("edge");
             BuildTownStreet(root, layer, rng);
             Lap("street");
+            // Cover outside the shops, from a sequence of its own (the life placed next comes out as before).
+            SpinShopCover(root, new System.Random(_theme.randomSeed ^ 0x5EED));
+            Lap("cover");
             BuildTownLife(root, layer, rng);
             Lap("life");
             PlaceStreetProbes(root);

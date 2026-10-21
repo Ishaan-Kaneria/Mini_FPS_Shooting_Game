@@ -3597,3 +3597,53 @@ Moved out of the project, not deleted, to `~/FPSKit_removed_packs/2026-10-21/`: 
 (481 MB) and `ProjectSettings/EntitiesClientSettings.asset`. With them went the packages only they pulled in: Entities,
 Visual Scripting, Scriptable Build Pipeline (72 packages resolved before, 65 after; `packages-lock.json`). The desert's
 play test peaks at 3.85 GB instead of 3.99. `FPSKitTownAssets.DumpVehicleApi` (an API dump of MVC's DLLs) is gone.
+
+## Shop fronts in depth, the retail cornice, the foundation course, cover outside the shops (2026-10-21)
+
+Asked for (a pasted brief): "the shops are too flat and look like texture cards" -- storefronts recessed 0.35 m with a
+5 cm frame round every door, window and shutter; signs as plates of their own 10 cm off the wall under a concrete trim
+that shadows them; a stone ledge between the shops and the flats; a concrete foundation at the pavement; and cover
+outside the shops for the fighting. Before: a shop was a hole with a 0.2-0.32 m reveal, the shutter 6 cm behind the
+face, no glass or door, the sign a quad on a 4 cm board, a 6 cm plinth strip.
+
+* **How it is layered** (`FPSKitTownShopfront.cs`, called from `BuildMass`): the wall is cut as before
+  (`WallWithOpenings`), the reveals (`Reveals`) are now `ShopRecess` (0.35 m) deep for a shop, and everything of the
+  shop is built on the storefront line 0.35 m in, outward in planes: glass at 0, frame fronts +0.05 (`FrameProud`),
+  the shutter's curtain +0.10, its guides' fronts +0.15, its box's front +0.25 (still 0.10 behind the piers). Big
+  pieces (glass, stallriser, shutter and box, sign plate and hood, cornice, foundation) go in the 64 m chunk mesh, which
+  has a collider and is in the navmesh bake; thin members (frames, mullions, door stiles and rails, push bar, shutter
+  guides and bottom bars, sign brackets, drips) go in the detail mesh (no collider, culled at a distance), as for the
+  rest of the facade.
+* **States**: open behind glass, open to the street, half shut (glass below the shutter), shut. A glazed front is a
+  granite stallriser (0.45 m) under display glass with mullions every ~1.3 m, a glazed door a metre wide at one end or
+  the middle with a kick panel, stiles and a push bar, a transom at the door's head and a fanlight over it.
+* **Shop glass** is its own material (`ShopGlass`): alpha-blended with Preserve Specular off, so its reflections fade
+  with its alpha. With the windows' premultiplied glass (reflections at full strength, right for a window with a dark
+  room behind it) every pane reflected the bright street and read as milky grey. Open shops' insides are a lit
+  painted wall (`ShopInsideLit`), half-shut ones dark.
+* **Opening and fascia**: the opening is now `ShopOpeningH` (2.7 m on a 4 m ground floor, 2.9 on 4.2), leaving the
+  fascia for the sign and its hood under the cornice. The sign plate is as big as the fascia allows at the atlas's 4:1.
+* **Retail cornice** (`RetailCornice`, from `FaceDressings` with `shopCornice`): architrave, bed moulding, a corona
+  0.34 m out with a drip, a weathered top; its top 10 cm under the first floor so a balcony slab sits on it; it replaces
+  that floor's band or string course on the shop face, runs on past a free corner, stops flush at a party wall.
+* **Foundation course** (`FoundationTrim`) on every modern face but party walls: 0.45 m over the floor, 9 cm proud,
+  weathered top, run past free corners; under an opening down to the floor it rises only to the threshold (a step's
+  nosing, and the wall under a raised shop floor in concrete). Concrete grey from the render texture
+  (`concrete_wall_008` is green). Old houses and party walls keep the thin plinth.
+* **Door and window frames**: every modern door has a frame 5 cm out of its leaf (`DoorFrame`); window frames now
+  stand 5 cm out of the glass (was 3.5).
+* **Random sequence**: `ShopFront` makes the same draws from the building's sequence, in the same order, as the old
+  flat front (state, shutter, goods, sign, awning); its new choices come from a sequence seeded by its position. The
+  rest of the town comes out exactly as before.
+* **Cover outside the shops** (`FPSKitTownCover.cs`, `SpinShopCover`, after the street furniture, before the bake, on a
+  sequence of its own): crates three high, a generator on its crate with a jerrycan, a street electrical cabinet, a
+  commercial bin, against the wall in front of piers, face ends and shut shutters only; never at a door or stair, on
+  anything already there (a box check against the colliders), within 6 m of another, or leaving under 1.6 m to the
+  kerb. 215 groups along 207 shop faces, 0.91-1.28 m high. The pavement is judged at a group's front edge: lots begin
+  0.4 m beyond the road's corridor (`Edge`), and a shallow group's middle is over that strip (every cabinet was
+  rejected until this was found: crates, generators and bins came out exactly 40:22:20).
+* **Cover nodes**: each group a metre high or more has a `CoverSpot` (runtime, registry reset on load) with its
+  measured size; `EnemyBrain.FindCover` also tries the spots beside and in front of near ones, judging low cover
+  (< 1.3 m) at crouched height (0.95 m) -- how it is used: head down under fire, up to shoot. A first step towards the
+  Stage 4 cover bake (Docs/ENEMY_AI_PLAN.md), which can take these over.
+* See it: `CaptureViews` shots 26-29 (shop fronts, a side street's pavement, a shop row's base).

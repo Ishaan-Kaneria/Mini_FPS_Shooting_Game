@@ -105,6 +105,11 @@ namespace FPSKit.EditorTools
             foreach (var q in Object.FindObjectsByType<FairgroundQuality>(FindObjectsSortMode.None)) { Object.DestroyImmediate(q.gameObject); rigs++; }
             sb.AppendLine($"  tier rigs removed: {rigs}");
 
+            // ---- reflection probes: none (the desert town's street probes render the town six times as it loads) ----
+            int probes = 0;
+            foreach (var rp in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) { Object.DestroyImmediate(rp.gameObject); probes++; }
+            sb.AppendLine($"  reflection probes removed: {probes}");
+
             // ---- particles off ----
             int ps = 0;
             foreach (var p in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) { p.gameObject.SetActive(false); ps++; }

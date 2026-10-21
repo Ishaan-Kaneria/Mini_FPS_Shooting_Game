@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace FPSKit.EditorTools
 {
@@ -761,6 +762,17 @@ namespace FPSKit.EditorTools
         {
             var rig = new GameObject("CaptureCamera");
             var camera = rig.AddComponent<Camera>();
+            // As the game camera renders: post-processing (the grade, tonemapping, bloom, and the SSAO pass of the High
+            // renderer). A bare camera skipped the grade, so the captures never showed the game's look. (Sun shadows
+            // still do not appear in these edit-mode captures, by either render path; they do in play. Judge shadows
+            // from FPSKitPlayerShots, which plays the scene.)
+            var urp = camera.GetUniversalAdditionalCameraData();
+            if (urp != null)
+            {
+                urp.renderPostProcessing = true;
+                urp.renderShadows = true;
+                urp.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            }
 
             RenderTexture target = null;
 

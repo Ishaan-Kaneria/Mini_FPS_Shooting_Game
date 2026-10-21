@@ -32,7 +32,7 @@ MonoBehaviour:
   sunColor: {r: 1, g: 0.91, b: 0.8, a: 1}
   sunIntensity: 1.65
   sunAngles: {x: 30, y: 225}
-  shadowStrength: 0.6
+  shadowStrength: 0.8
   fogEnabled: 1
   fogColor: {r: 0.82, g: 0.79, b: 0.73, a: 1}
   fogDensity: 0.00065

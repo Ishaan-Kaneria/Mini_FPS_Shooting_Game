@@ -31,11 +31,50 @@ namespace FPSKit.EditorTools
         /// <summary>Farm plots inside FarmsRect, planned before the ground so the soil can be painted.</summary>
         private static readonly List<Rect> _farmPlots = new List<Rect>();
 
+        /// <summary>
+        /// Box-projected reflection probes down the town's main streets (the avenue, north and south, and the boulevard),
+        /// rendered once when the level loads: windows and car paint reflect the street they face, not only the sky.
+        /// Realtime and refreshed on awake rather than baked, because the scene is rebuilt from code (a bake would have
+        /// to follow every build) and it needs no lightmapping pass. 128 per face; the phone copy removes them.
+        /// </summary>
+        private static void PlaceStreetProbes(Transform root)
+        {
+            var group = new GameObject("StreetProbes").transform;
+            group.SetParent(root, false);
+            int n = 0;
+            void Probe(Vector3 at, Vector3 box)
+            {
+                var go = new GameObject("StreetProbe");
+                go.transform.SetParent(group, false);
+                go.transform.position = at;
+                var p = go.AddComponent<ReflectionProbe>();
+                p.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
+                p.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.OnAwake;
+                p.timeSlicingMode = UnityEngine.Rendering.ReflectionProbeTimeSlicingMode.NoTimeSlicing;
+                p.resolution = 128;
+                p.hdr = true;
+                p.boxProjection = true;
+                p.size = box;
+                p.center = Vector3.zero;
+                p.blendDistance = 6f;
+                p.farClipPlane = 220f;
+                p.shadowDistance = 0f;
+                p.cullingMask = ~LayerMask.GetMask("Civilian", "Enemy", "Player", "FirstPerson", "PlayerBounds");
+                n++;
+            }
+            // Every 150 m down the avenue (x = 0) and the boulevard (z = 20), the box spanning street and pavements to
+            // the building fronts either side and as high as the blocks.
+            for (float z = -330f; z <= 170f; z += 150f) Probe(new Vector3(0f, GroundHeightAt(0f, z) + 4f, z), new Vector3(52f, 36f, 150f));
+            for (float x = -300f; x <= 300f; x += 150f)
+                if (Mathf.Abs(x) > 40f) Probe(new Vector3(x, GroundHeightAt(x, 20f) + 4f, 20f), new Vector3(150f, 36f, 46f));
+            Debug.Log($"[FPSKit] town: {n} street reflection probes");
+        }
+
         private static void ResetTown()
         {
             _townRoads.Clear(); _townTracks.Clear(); _townSites.Clear(); _townJunctions.Clear();
             _townSolids.Clear(); _farmPlots.Clear(); _townMats.Clear(); _townZones.Clear();
-            _townBase = null; _devDist = null; _townTerrain = null;
+            _townBase = null; _devDist = null; _townTerrain = null; _townSkyRotation = float.NaN;
             ResetTownBuildings();
             ResetTownLife();
         }
@@ -80,6 +119,7 @@ namespace FPSKit.EditorTools
             Lap("street");
             BuildTownLife(root, layer, rng);
             Lap("life");
+            PlaceStreetProbes(root);
 
             // Nothing past the edge is anybody's to stand on.
             SealNavMeshOutside(root, half - 2f, half + 700f);

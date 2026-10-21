@@ -3487,3 +3487,29 @@ The editor baseline for this project is 1.7 GB (before any scene): the store pac
 packages. Opening the town adds about 2.7 GB of loaded objects on top of its assets. Check the peak after any change
 that adds objects or colliders by the thousand.
 
+## Lighting pass: a 43-degree sun, 4096 shadows, SSAO, street probes (2026-10-21)
+
+Asked for (a pasted checklist): linear colour, crisp shadows close to the player, SSAO and ACES with +10 contrast, a
+diagonal 45-degree sun putting one side of each street in shadow, baked GI, and a reflection probe on the main street.
+
+* Already so, and left: linear colour space; ACES (`CreateVolumeProfile`) and contrast +10 (the desert theme); soft
+  shadows on the sun; shadow distance 50 m (High) / 60 m (Medium), already under the 100 asked for.
+* **Sun**: the late-afternoon sky had its sun at 19 degrees, and the light is aimed at the sky's own sun so shadows and
+  sky agree. Swinging the light to 45 alone would have put them at odds, so the sky changed: Poly Haven
+  `kloofendal_43d_clear_puresky` (`FPSKitTownAssets.TownSkyId`), turned (`TownSkyRotation`, from its brightest pixel)
+  so the sun stands at yaw 45, diagonal to the street grid: elevation 42.9, azimuth 45.0. Shadow strength 0.6 -> 0.8
+  in the theme (deep, still not black: bounce light and sky ambient stay).
+* **Shadow maps** 4096 on High (`FPSKitQualityTiers`), 2048 on Medium (as it was).
+* **SSAO** back on, High only: half resolution, 8 samples, bilateral blur, depth+normals, radius 0.35, intensity 0.65,
+  direct-lighting 0.25. It was off since 2026-10-03 for black grain on the old desert's rounded mud brick (4 samples,
+  Gaussian); straight walls and the edge-preserving blur do not show it. Watch the other arenas for it.
+* **Reflection probes**: 8 box-projected realtime probes down the avenue and the boulevard, refreshed once on load
+  (`PlaceStreetProbes`), 128 a face. Not baked: the scene is rebuilt from code. The phone copy removes them.
+* **Not done: baked GI** (Mixed sun, Contribute GI statics, Progressive GPU). The town is regenerated on every build,
+  so every build would need a lightmap bake after it; a kilometre of town with ~4 M triangles needs lightmap UVs
+  generated for every procedural mesh and a long GPU bake on a laptop that throttles at 95 C; and lightmaps go to
+  the phone and web copies. The SSAO, the probes and the bounce light carry what baked bounce light would.
+* `CaptureViews` now renders with post-processing (grade, ACES, SSAO), but edit-mode captures still show no sun
+  shadows by either render path: judge shadows from `FPSKitPlayerShots` (it plays the scene). Its batch runs do not
+  exit on their own: stop the Unity process when the shots are written, or it holds the project lock.
+

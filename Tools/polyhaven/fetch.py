@@ -35,7 +35,7 @@ rubble rusty_corrugated_iron corrugated_iron_02 painted_metal_shutter rusted_shu
 wooden_gate marble_mosaic_tiles patterned_terracotta_tiling old_mosaic_floor terrazzo_tiles concrete_wall_008
 brick_wall_003 brown_brick_02 seaworn_sandstone_brick plaster_brick_pattern sandstone_blocks_05 concrete_brick_wall_001""".split()
 
-HDRI = "qwantani_late_afternoon_puresky"
+HDRI = "kloofendal_43d_clear_puresky"   # clear sky, the sun 43 degrees up (was qwantani_late_afternoon_puresky, 19)
 
 def get(url, path):
     last = None

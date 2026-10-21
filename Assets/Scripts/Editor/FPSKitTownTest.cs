@@ -187,6 +187,23 @@ namespace FPSKit.EditorTools
             notes.Append($"\n  buildings: {shell / 1000}k triangles in the chunks, {detail / 1000}k in their detail");
         }
 
+        /// <summary>What the editor renders the town with (batch: FPSKit.EditorTools.FPSKitTownTest.RenderInfo).</summary>
+        public static void RenderInfo()
+        {
+            EditorSceneManager.OpenScene(Scene, OpenSceneMode.Single);
+            var sb = new StringBuilder();
+            var rp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+            sb.AppendLine($"quality level {QualitySettings.GetQualityLevel()} ({QualitySettings.names[QualitySettings.GetQualityLevel()]}), build target {EditorUserBuildSettings.activeBuildTarget}");
+            sb.AppendLine($"pipeline {(rp != null ? AssetDatabase.GetAssetPath(rp) : "none")}: main light shadows {rp?.supportsMainLightShadows}, distance {rp?.shadowDistance}, resolution {rp?.mainLightShadowmapResolution}, cascades {rp?.shadowCascadeCount}");
+            foreach (var l in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (l.type == LightType.Directional) sb.AppendLine($"directional {l.name}: intensity {l.intensity}, shadows {l.shadows}, strength {l.shadowStrength}, euler {l.transform.eulerAngles}, enabled {l.enabled}, mode {l.lightmapBakeType}");
+            sb.AppendLine($"RenderSettings.sun {(RenderSettings.sun != null ? RenderSettings.sun.name : "none")}");
+            sb.AppendLine($"device {SystemInfo.graphicsDeviceType} '{SystemInfo.graphicsDeviceName}', supportsShadows {SystemInfo.supportsShadows}, " +
+                          $"QualitySettings.shadows {QualitySettings.shadows}, batch {Application.isBatchMode}");
+            System.IO.File.WriteAllText("Build/TownRenderInfo.txt", sb.ToString());
+            FPSKitBatch.Exit(0);
+        }
+
         /// <summary>What the built town costs in memory, by kind (batch: FPSKit.EditorTools.FPSKitTownTest.Memory).</summary>
         public static void Memory()
         {

@@ -217,12 +217,18 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>The town's sky: a clear Poly Haven sky with its sun 43 degrees up (2026-10-21, for a sun that
+        /// leaves one side of a street in shadow and lights the other; the late-afternoon sky had it at 19).</summary>
+        public const string TownSkyId = "kloofendal_43d_clear_puresky";
+
+        /// <summary>The HDR skies on disk, the town's own first.</summary>
         public static IEnumerable<string> SkyPaths()
         {
             string dir = PolyHavenRoot + "/HDRI";
             if (!Directory.Exists(dir)) yield break;
-            foreach (var f in Directory.GetFiles(dir, "*.hdr"))
-                yield return f.Replace('\\', '/');
+            var files = Directory.GetFiles(dir, "*.hdr").Select(f => f.Replace('\\', '/')).ToList();
+            foreach (var f in files.Where(f => Path.GetFileName(f).StartsWith(TownSkyId))) yield return f;
+            foreach (var f in files.Where(f => !Path.GetFileName(f).StartsWith(TownSkyId))) yield return f;
         }
 
         // ==================================================================

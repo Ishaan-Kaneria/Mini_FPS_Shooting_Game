@@ -727,8 +727,30 @@ namespace FPSKit.EditorTools
             return mat;
         }
 
-        /// <summary>Degrees the sky is turned so its sun stands where the town wants the light from (south-west, over the souk).</summary>
-        private const float TownSkyRotation = 0f;
+        /// <summary>Which way the light points, as a yaw: 45 degrees to the street grid (from the south-west), so on every
+        /// street one side stands in shadow and the other in sun.</summary>
+        private const float TownSunYaw = 45f;
+
+        /// <summary>
+        /// Degrees the sky is turned so its own sun stands at <see cref="TownSunYaw"/>: found from the sky's brightest
+        /// pixel, so the light, the shadows and the sun in the sky agree. Cached per build (cleared in ResetTown).
+        /// </summary>
+        private static float TownSkyRotation
+        {
+            get
+            {
+                if (!float.IsNaN(_townSkyRotation)) return _townSkyRotation;
+                _townSkyRotation = 0f;
+                foreach (var p in FPSKitTownAssets.SkyPaths())
+                {
+                    var d = HdrSunDirection(p, 0f);
+                    if (d != null) _townSkyRotation = Mathf.Repeat(Mathf.Atan2(-d.Value.x, -d.Value.z) * Mathf.Rad2Deg - TownSunYaw, 360f);
+                    break;
+                }
+                return _townSkyRotation;
+            }
+        }
+        private static float _townSkyRotation = float.NaN;
 
         /// <summary>
         /// Where the sun is in a Radiance .hdr sky, as a world direction towards it under Skybox/Panoramic with the
@@ -804,7 +826,7 @@ namespace FPSKit.EditorTools
                 var dir = HdrSunDirection(p, TownSkyRotation);
                 if (dir == null) return;
                 var d = dir.Value.normalized;
-                // A sun at the horizon lights nothing; hold it at a golden-hour minimum the town was tuned for.
+                // A sun at the horizon lights nothing; hold it at a minimum, in case a lower sky is ever chosen.
                 float el = Mathf.Max(Mathf.Asin(Mathf.Clamp(d.y, -1f, 1f)) * Mathf.Rad2Deg, 24f);
                 float az = Mathf.Atan2(-d.x, -d.z) * Mathf.Rad2Deg;
                 sun.transform.rotation = Quaternion.Euler(el, az, 0f);

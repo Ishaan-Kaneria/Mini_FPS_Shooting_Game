@@ -19,9 +19,10 @@ namespace FPSKit.EditorTools
     ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 60m on two
     ///             cascades, 2x MSAA, full resolution, and the cheaper renderer, with no
     ///             ambient occlusion.
-    ///   High   -- PC_RPAsset: shadows to 50m on three cascades, 2x MSAA, rendered at 85% and upscaled with FSR 1,
-    ///             and ambient occlusion at half resolution with four samples. Measured on the Intel Arc laptop: MSAA
-    ///             4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass was ~4.7 ms.
+    ///   High   -- PC_RPAsset: shadows to 50m on three cascades at 4096, 2x MSAA, rendered at 85% and upscaled with
+    ///             FSR 1, and ambient occlusion at half resolution with eight samples and a bilateral blur. Measured on
+    ///             the Intel Arc laptop: MSAA 4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass
+    ///             was ~4.7 ms.
     ///
     /// Post-processing and particles are cut at runtime by <see cref="QualityTiers"/>,
     /// because they belong to the camera and the scene rather than to the pipeline.
@@ -63,19 +64,21 @@ namespace FPSKit.EditorTools
                 changed = true;
             }
 
+            // Shadow maps: 4096 on High over its 50 m (a texel about 1.5 cm in the nearest cascade), 2048 on Medium.
             changed |= Configure(high, shadows: true, distance: 50f, cascades: 3, msaa: 2, hdr: true, scale: 0.85f, soft: true,
-                                 renderer: null, upscaling: 3);                               // 3 = FSR 1
-            changed |= CheapSsao(high);
+                                 renderer: null, upscaling: 3, shadowResolution: 4096);       // 3 = FSR 1
+            changed |= Ssao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
             changed |= Configure(medium, shadows: true, distance: 60f, cascades: 2, msaa: 2, hdr: true, scale: 1f, soft: false,
-                                 renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer));
+                                 renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer), shadowResolution: 2048);
             changed |= Levels(low, medium, high);
             if (changed) AssetDatabase.SaveAssets();
             return changed;
         }
 
         static bool Configure(UniversalRenderPipelineAsset asset, bool shadows, float distance, int cascades,
-                              int msaa, bool hdr, float scale, bool soft, ScriptableRendererData renderer, int upscaling = 0)
+                              int msaa, bool hdr, float scale, bool soft, ScriptableRendererData renderer, int upscaling = 0,
+                              int shadowResolution = 0)
         {
             var so = new SerializedObject(asset);
             bool changed = false;
@@ -85,6 +88,7 @@ namespace FPSKit.EditorTools
             {
                 changed |= SetFloat(so, "m_ShadowDistance", distance);
                 changed |= SetInt(so, "m_ShadowCascadeCount", cascades);
+                if (shadowResolution > 0) changed |= SetInt(so, "m_MainLightShadowmapResolution", shadowResolution);
             }
             changed |= SetInt(so, "m_MSAA", msaa);
             changed |= SetBool(so, "m_SupportsHDR", hdr);
@@ -112,10 +116,11 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// Half-resolution, four-sample, Gaussian-blurred SSAO on the High renderer. The feature keeps its settings in an
-        /// internal class, so they are written through the serialized path, which also re-runs the feature's Create().
+        /// SSAO on the High renderer: half resolution, eight samples, the edge-preserving (bilateral) blur, from depth and
+        /// normals. The feature keeps its settings in an internal class, so they are written through the serialized
+        /// path, which also re-runs the feature's Create().
         /// </summary>
-        static bool CheapSsao(UniversalRenderPipelineAsset high)
+        static bool Ssao(UniversalRenderPipelineAsset high)
         {
             var list = new SerializedObject(high).FindProperty("m_RendererDataList");
             bool changed = false;
@@ -130,21 +135,19 @@ namespace FPSKit.EditorTools
                     var m = so.FindProperty("m_Settings");
                     if (m == null) continue;
                     bool c = false;
+                    // History: on 2026-10-03, at four samples with a Gaussian blur, it was a dithered black grain on the old
+                    // desert's rounded mud brick ("black grime") and was switched off. On again (2026-10-21, asked for, to
+                    // ground the town's walls where they meet the road): eight samples and the bilateral blur, which
+                    // keeps the occlusion off the far side of an edge, a radius that reaches the foot of a wall, and a
+                    // moderate strength. Half resolution keeps the pass about 2 ms on the laptop.
                     c |= SetBool(m.FindPropertyRelative("Downsample"), true);
-                    c |= SetInt(m.FindPropertyRelative("Samples"), 2);        // Low = 4 samples
-                    c |= SetInt(m.FindPropertyRelative("BlurQuality"), 1);    // Gaussian
-                    // Softer (2026-10-03): at 1.25 with four samples the occlusion was a black grain on every
-                    // rounded wall and prop in the desert. Lighter, and a touch less contact darkening.
-                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.45f);
-                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.1f);
-                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.18f);
-
-                    // And off, in the end (2026-10-03). Even softened, four-sample SSAO leaves a dithered dark
-                    // fringe on every wall edge and a mottled darkening on any wall close to the camera,
-                    // which on the desert's rounded mud brick read as black grime. The scene lighting
-                    // (ambient, bounce light, shadow strength) carries the shading instead, and it saves
-                    // the pass's cost on the laptop.
-                    c |= SetBool(so.FindProperty("m_Active"), false);
+                    c |= SetInt(m.FindPropertyRelative("Samples"), 1);        // Medium = 8 samples
+                    c |= SetInt(m.FindPropertyRelative("BlurQuality"), 0);    // High = bilateral
+                    c |= SetInt(m.FindPropertyRelative("Source"), 1);         // depth and normals
+                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.65f);
+                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.25f);
+                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.35f);
+                    c |= SetBool(so.FindProperty("m_Active"), true);
                     if (c) { so.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(f); EditorUtility.SetDirty(data); changed = true; }
                 }
             }

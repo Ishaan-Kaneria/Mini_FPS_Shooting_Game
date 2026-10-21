@@ -290,8 +290,10 @@ namespace FPSKit.EditorTools
                     // the first build's orange haze turned the whole town one colour from above.
                     t.fogColor = new Color(0.82f, 0.79f, 0.73f);
                     t.fogDensity = 0.00065f;
-                    // Shade lifted (his 2026-10-03 rule: no black faces), cooler from above as a clear sky is.
-                    t.shadowStrength = 0.6f;
+                    // Shade lifted (his 2026-10-03 rule: no black faces), cooler from above as a clear sky is. Deeper since
+                    // 2026-10-21 (asked for: one side of a street in deep shadow under the 43-degree sun); the bounce
+                    // light and the sky ambient still keep shaded faces off black.
+                    t.shadowStrength = 0.8f;
                     t.ambientSky = new Color(0.76f, 0.81f, 0.89f);
                     t.ambientEquator = new Color(0.86f, 0.78f, 0.66f);
                     t.ambientGround = new Color(0.66f, 0.56f, 0.44f);

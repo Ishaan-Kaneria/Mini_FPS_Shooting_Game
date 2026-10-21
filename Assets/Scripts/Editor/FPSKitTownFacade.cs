@@ -58,13 +58,20 @@ namespace FPSKit.EditorTools
             return m;
         }
 
-        /// <summary>The detail meshes: no collider, out of the navmesh bake, culled when the chunk is small on screen.</summary>
+        /// <summary>
+        /// The detail meshes: no collider, out of the navmesh bake, culled when the chunk is small on screen, and drawn
+        /// with copies of their materials that have no normal map, so the meshes carry no tangents. (With them, and
+        /// joinery everywhere, the detail took 864 MB in the editor and Unity was killed for memory entering play.)
+        /// </summary>
         private static void BuildDetailChunks(Transform group, int layer)
         {
+            var plain = new Dictionary<Material, Material>();
             foreach (var kv in _details)
             {
+                foreach (var mat in new List<Material>(kv.Value.Materials))
+                    if (mat != null && mat.IsKeywordEnabled("_NORMALMAP")) kv.Value.Swap(mat, PlainCopy(mat, plain));
                 var go = kv.Value.Build(group, $"Detail_{kv.Key.x}_{kv.Key.y}", layer, "Concrete", collider: false,
-                                        compression: UnityEditor.ModelImporterMeshCompression.Medium);
+                                        compression: UnityEditor.ModelImporterMeshCompression.Medium, tangents: false);
                 if (go == null) continue;
                 var mod = go.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
                 mod.ignoreFromBuild = true;
@@ -72,6 +79,23 @@ namespace FPSKit.EditorTools
                 lod.SetLODs(new[] { new LOD(0.3f, new Renderer[] { go.GetComponent<Renderer>() }) });
                 lod.RecalculateBounds();
             }
+        }
+
+        /// <summary>A copy of <paramref name="m"/> without its normal map (and its mask), saved beside it as *_Plain.</summary>
+        private static Material PlainCopy(Material m, Dictionary<Material, Material> cache)
+        {
+            if (cache.TryGetValue(m, out var c)) return c;
+            string path = UnityEditor.AssetDatabase.GetAssetPath(m);
+            string plainPath = string.IsNullOrEmpty(path) ? null : path.Replace(".mat", "_Plain.mat");
+            c = plainPath != null ? UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(plainPath) : null;
+            bool create = c == null;
+            if (create) c = new Material(m);
+            else c.CopyPropertiesFromMaterial(m);
+            c.SetTexture("_BumpMap", null); c.DisableKeyword("_NORMALMAP");
+            if (create && plainPath != null) UnityEditor.AssetDatabase.CreateAsset(c, plainPath);
+            else if (plainPath != null) UnityEditor.EditorUtility.SetDirty(c);
+            cache[m] = c;
+            return c;
         }
 
         /// <summary>Gives a new (not old-town) mass its style: wall, trim, base, joinery, arches.</summary>
@@ -171,7 +195,8 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>A prism between two points on a face (a frame member, an arch segment), <paramref name="t"/> across.</summary>
-        /// Only its front and long sides: its ends butt into other members, and a window has dozens of bars.
+        /// Only its front and long sides: its ends butt into other members, and a window has dozens of bars. A thin
+        /// member (glazing bars, sash rails, iron bars, 4.5 cm or less) is its front face alone.
         private static void Bar(TownMesh m, Material mat, Vector3 from, Vector3 to, Vector3 n, float t, float d)
         {
             var along = to - from; float len = along.magnitude;
@@ -181,6 +206,7 @@ namespace FPSKit.EditorTools
             Vector3 back = -n * d;
             Vector3 a = from - across, b = to - across, c = to + across, e = from + across;
             m.Quad(mat, a, b, c, e, n);
+            if (t <= 0.045f) return;
             m.Quad(mat, a, b, b + back, a + back, -across);
             m.Quad(mat, e, c, c + back, e + back, across);
         }
@@ -192,7 +218,7 @@ namespace FPSKit.EditorTools
         /// the opening's bottom corners on the wall face, <paramref name="H"/> its height to the springing.
         /// </summary>
         private static void FacadeWindow(TownMesh shell, TownMesh det, Mass b, Vector3 p0, Vector3 p1, float H, float rise, float depth,
-                                         Vector3 nrm, int floor, bool open, bool tall)
+                                         Vector3 nrm, int floor, bool open, bool tall, bool rich = true)
         {
             var rng = b.rng;
             Vector3 u = (p1 - p0).normalized, up = Vector3.up;
@@ -266,17 +292,17 @@ namespace FPSKit.EditorTools
                     Bar(det, fm, G(x0, H + Arch(x0) - fw * 0.5f) + fo, G(x1, H + Arch(x1) - fw * 0.5f) + fo, nrm, fw, fd);
                 }
                 // The fanlight's glazing: a bar up the middle, and two raking ones in a round head.
-                Bar(det, fm, G(half, H) + fo * 0.7f, G(half, H + rise - fw) + fo * 0.7f, nrm, 0.03f, 0.04f);
-                if (rise > half * 0.6f)
+                if (rich) Bar(det, fm, G(half, H) + fo * 0.7f, G(half, H + rise - fw) + fo * 0.7f, nrm, 0.03f, 0.04f);
+                if (rich && rise > half * 0.6f)
                 {
                     Bar(det, fm, G(half, H) + fo * 0.7f, G(half - half * 0.7f, H + Arch(half - half * 0.7f) - fw) + fo * 0.7f, nrm, 0.025f, 0.04f);
                     Bar(det, fm, G(half, H) + fo * 0.7f, G(half + half * 0.7f, H + Arch(half + half * 0.7f) - fw) + fo * 0.7f, nrm, 0.025f, 0.04f);
                 }
             }
 
-            // ---- sashes and glazing bars ----
+            // ---- sashes and glazing bars (on faces over a street: the back and the yard get the frame alone) ----
             Vector3 so = nrm * 0.02f;
-            switch (b.joinery)
+            switch (rich ? b.joinery : -1)
             {
                 case 0:   // double-hung sash: the meeting rail a little above the middle, lights in each sash
                 {
@@ -310,6 +336,7 @@ namespace FPSKit.EditorTools
                     }
                     break;
                 }
+                case -1: break;
                 default:  // modern sliding: two panes, the meeting stiles side by side
                 {
                     Bar(det, fm, G(half - 0.025f, fw) + so, G(half - 0.025f, H - fw) + so, nrm, 0.05f, 0.04f);
@@ -318,9 +345,9 @@ namespace FPSKit.EditorTools
                 }
             }
 
-            // ---- sill and head ----
+            // ---- sill and head (the head's dressing on faces over a street only) ----
             Sill(det, b, p0, p1, depth, nrm);
-            switch (b.style)
+            switch (rich ? b.style : (FacadeStyle)(-1))
             {
                 case FacadeStyle.Brick:
                     if (rise > 0f) ArchRing(det, b, F(0f, H), u, nrm, W, rise, 0.24f);
@@ -344,7 +371,7 @@ namespace FPSKit.EditorTools
                     else Prism(det, b.trim, F(half, H + 0.2f) + nrm * 0.04f, u, up, nrm, W + 0.26f, 0.14f, 0.04f);
                     break;
                 default:
-                    if (b.surround) Surround(det, b.trim, p0, u, nrm, W, openingH, rise, 0.09f, 0.018f);
+                    if (b.surround && rich) Surround(det, b.trim, p0, u, nrm, W, openingH, rise, 0.09f, 0.018f);
                     break;
             }
 
@@ -459,7 +486,7 @@ namespace FPSKit.EditorTools
         /// <summary>The dressings that run along a face (not a blank party wall): the plinth course over a rusticated
         /// base, a string course at each floor, the cornice under the parapet with dentils and brackets, and quoins.</summary>
         private static void FaceDressings(TownMesh shell, TownMesh det, Mass b, Vector3 a0, Vector3 b0, Vector3 nrm, int side,
-                                          bool quoinStart = true, bool quoinEnd = true)
+                                          bool quoinStart = true, bool quoinEnd = true, bool rich = true)
         {
             float len = Vector3.Distance(a0, b0);
             Vector3 u = (b0 - a0) / Mathf.Max(0.01f, len), up = Vector3.up;
@@ -494,14 +521,26 @@ namespace FPSKit.EditorTools
             shell.Box(t, mid + up * (top + 0.05f) + nrm * 0.06f, new Vector3(len + 0.12f, 0.1f, 0.12f), rot);
             shell.Box(t, mid + up * (top + 0.18f) + nrm * 0.2f, new Vector3(len + 0.4f, 0.16f, 0.4f), rot);
             shell.Box(t, mid + up * (top + 0.29f) + nrm * 0.22f, new Vector3(len + 0.44f, 0.06f, 0.44f), rot);
-            for (float s = 0.12f; s < len - 0.06f; s += 0.24f)
-                Prism(det, t, a0 + u * s + up * (top - 0.02f) + nrm * 0.13f, u, up, nrm, 0.09f, 0.1f, 0.1f);
+            // (Dentils: front and underside only; brackets: one block, no back. Repeated round every masonry face these
+            // were most of the detail mesh's triangles; on a face that is not over a street there are none, nor quoins.)
+            if (!rich) return;
+            for (float s = 0.12f; s < len - 0.06f; s += 0.3f)
+            {
+                Vector3 c = a0 + u * s + up * (top - 0.02f) + nrm * 0.13f;
+                Vector3 hu = u * 0.045f, hv = up * 0.05f, back = -nrm * 0.1f;
+                det.Quad(t, c - hu - hv, c + hu - hv, c + hu + hv, c - hu + hv, nrm);
+                det.Quad(t, c - hu - hv, c + hu - hv, c + hu - hv + back, c - hu - hv + back, -up);
+            }
             int brackets = Mathf.Max(2, Mathf.RoundToInt(len / 0.95f));
             for (int i = 0; i <= brackets; i++)
             {
                 var at = a0 + u * Mathf.Lerp(0.2f, len - 0.2f, i / (float)brackets);
-                Prism(det, t, at + up * (top + 0.04f) + nrm * 0.38f, u, up, nrm, 0.12f, 0.16f, 0.34f);
-                Prism(det, t, at + up * (top - 0.1f) + nrm * 0.16f, u, up, nrm, 0.1f, 0.14f, 0.12f);
+                Vector3 c = at + up * (top + 0.02f) + nrm * 0.36f;
+                Vector3 hu = u * 0.06f, hv = up * 0.08f, back = -nrm * 0.34f;
+                det.Quad(t, c - hu - hv, c + hu - hv, c + hu + hv, c - hu + hv, nrm);
+                det.Quad(t, c - hu - hv, c + hu - hv, c + hu - hv + back, c - hu - hv + back, -up);
+                det.Quad(t, c - hu - hv, c - hu + hv, c - hu + hv + back, c - hu - hv + back, -u);
+                det.Quad(t, c + hu - hv, c + hu + hv, c + hu + hv + back, c + hu - hv + back, u);
             }
 
             // Quoins at both ends of the face: long and short blocks in turn, the faces at a corner out of step so they lock.
@@ -515,8 +554,12 @@ namespace FPSKit.EditorTools
                 int k = course0;
                 for (float y = q0; y + 0.3f < top - 0.38f; y += 0.33f, k++)
                 {
+                    // Each block a face 2.5 cm proud of the wall (its sides are a sliver; a full block each was 75 000 of them).
                     float wq = k % 2 == 0 ? 0.56f : 0.34f;
-                    Prism(det, t, edge + inward * (wq * 0.5f) + up * (y + 0.15f) + nrm * 0.025f, u, up, nrm, wq, 0.3f, 0.025f);
+                    Vector3 c = edge + inward * (wq * 0.5f) + up * (y + 0.15f) + nrm * 0.025f;
+                    Vector3 hu = u * (wq * 0.5f), hv = up * 0.15f;
+                    det.Quad(t, c - hu - hv, c + hu - hv, c + hu + hv, c - hu + hv, nrm);
+                    det.Quad(t, c - hu + hv, c + hu + hv, c + hu + hv - nrm * 0.025f, c - hu + hv - nrm * 0.025f, up);
                 }
             }
         }

@@ -37,6 +37,20 @@ namespace FPSKit.EditorTools
             public Vector2 UVOffset;
 
             public int Triangles { get { int c = 0; foreach (var p in _parts.Values) c += p.t.Count / 3; return c; } }
+
+            /// <summary>The materials drawn so far, in order.</summary>
+            public IReadOnlyList<Material> Materials => _order;
+
+            /// <summary>Moves everything drawn with <paramref name="from"/> onto <paramref name="to"/> (merged if both are used).</summary>
+            public void Swap(Material from, Material to)
+            {
+                if (from == to || !_parts.TryGetValue(from, out var src)) return;
+                var dst = P(to);
+                int s = dst.v.Count;
+                dst.v.AddRange(src.v); dst.n.AddRange(src.n); dst.uv.AddRange(src.uv);
+                foreach (int i in src.t) dst.t.Add(i + s);
+                _parts.Remove(from); _order.Remove(from);
+            }
             public bool Empty => _parts.Count == 0;
 
             private Part P(Material m)
@@ -407,7 +421,8 @@ namespace FPSKit.EditorTools
             /// </summary>
             public GameObject Build(Transform parent, string name, int layer, string tag, bool collider = true,
                                     ShadowCastingMode shadows = ShadowCastingMode.On,
-                                    UnityEditor.ModelImporterMeshCompression compression = UnityEditor.ModelImporterMeshCompression.Off)
+                                    UnityEditor.ModelImporterMeshCompression compression = UnityEditor.ModelImporterMeshCompression.Off,
+                                    bool tangents = true)
             {
                 if (_parts.Count == 0) return null;
                 var mesh = new Mesh { name = name };
@@ -429,7 +444,8 @@ namespace FPSKit.EditorTools
                 mesh.subMeshCount = sub.Count;
                 for (int i = 0; i < sub.Count; i++) mesh.SetTriangles(sub[i], i);
                 mesh.RecalculateBounds();
-                mesh.RecalculateTangents();
+                // Tangents only where a material has a normal map to use them: a third of each vertex otherwise wasted.
+                if (tangents) mesh.RecalculateTangents();
                 // The town's meshes live in its scene: compressed there, or the scene is the better part of a gigabyte.
                 if (compression != UnityEditor.ModelImporterMeshCompression.Off) UnityEditor.MeshUtility.SetMeshCompression(mesh, compression);
 

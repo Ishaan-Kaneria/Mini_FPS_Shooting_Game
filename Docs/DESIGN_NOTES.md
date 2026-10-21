@@ -3458,3 +3458,32 @@ ground floor under shops; iron balconettes and balconies on French windows over 
 * New Poly Haven textures (CC0): `Tools/polyhaven/fetch.py <dir> <id> ...` fetches just those, `pack.py` merges them
   into the staged manifest. Facade textures get anisotropic 16 and the high-quality format.
 
+## The town must fit in the editor's memory (2026-10-21)
+
+Ishaan: "I can't able to play the dessert scene. The unity got closed automatically." Not a crash: **earlyoom** (the
+system's low-memory guard) killed the editor at 6.6 GB resident when it reloaded the desert scene leaving play mode,
+with swap full (journalctl: `earlyoom ... sending SIGTERM to process ... "Unity Main Thre"`). Measured with
+`FPSKitTownTest.Memory` (batch) and `/usr/bin/time -v` round `VerifyDesertSpawns` (open the scene, play, leave play):
+
+| | before | after |
+|---|---|---|
+| peak resident, play and leave | 5.7 GB | 4.0 GB |
+| GameObjects | 92 062 | 29 050 |
+| facade detail meshes | 864 MB | 243 MB |
+| textures | 797 MB | 552 MB |
+
+What it was, largest first:
+* **Mesh colliders on dense props: 17 M collider triangles**, cooked by PhysX at load. A prop over 2.2 m got a
+  non-convex `MeshCollider` on *every* mesh filter, every level of detail included; a boulder scan is 60-110k
+  triangles. Now: the coarsest level only, convex when it is over 3000 triangles (a hull of at most 255 faces).
+* **Parked cars: 224 objects each** (fifty parts at five levels of detail), 63 000 in all. A parked car is now its
+  pack car with each kept level (0 and 2) merged into one mesh, a submesh per material, shared by every copy
+  (`ParkedCarPrefab`, FPSKit_Generated/Town/Parked): 3 objects. Traffic and drivable cars keep the full prefab.
+* **Facade detail**: joinery and dressings only on faces over a street; thin members a single face; no tangents
+  (detail materials are normal-map-free copies, `*_Plain`); dentils, brackets and quoins as faces, not boxes.
+* **Textures**: normal maps 1K and masks 512 for walls and ground, albedo 2K in the standard compressed format.
+
+The editor baseline for this project is 1.7 GB (before any scene): the store packs, Entities and Burst from the BxB
+packages. Opening the town adds about 2.7 GB of loaded objects on top of its assets. Check the peak after any change
+that adds objects or colliders by the thousand.
+

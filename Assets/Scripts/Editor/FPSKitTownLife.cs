@@ -23,6 +23,7 @@ namespace FPSKit.EditorTools
         private static void ResetTownLife()
         {
             _routes.Clear(); _civicSpots.Clear(); _signalHeads.Clear(); _gasPumps.Clear(); _junkRows.Clear();
+            _parkedPrefabs.Clear(); _parkedMade.Clear(); _wreckHole = null;
             _palaceCar = Vector4.zero; _garageBay = Vector4.zero; _busStop = Vector4.zero; _campSpot = Vector4.zero;
             _soukStreet = default; _oasisWater = 0f;
         }
@@ -70,9 +71,95 @@ namespace FPSKit.EditorTools
         /// A car from the pack placed with its length along its own z: measured from its bounds, turned a quarter if the
         /// pack modelled it along x, its base on the ground and centred. Returned as a parent holding the body.
         /// </summary>
+        /// <summary>
+        /// A parked car's prefab: the pack car with each level of detail merged into one mesh (a submesh per material),
+        /// shared by every parked copy, and only two levels kept. The pack's car is 224 objects (some fifty parts, each at
+        /// five levels); 282 of them made 63 000 objects, the largest single share of the town's memory. Cached per kind
+        /// under FPSKit_Generated/Town/Parked.
+        /// </summary>
+        private static GameObject ParkedCarPrefab(string packName)
+        {
+            string dir = FPSKitTownAssets.Out + "/Parked";
+            string path = $"{dir}/Parked_{packName}.prefab";
+            if (_parkedPrefabs.TryGetValue(packName, out var cached) && cached != null) return cached;
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null && _parkedMade.Contains(packName)) { _parkedPrefabs[packName] = existing; return existing; }
+            var src = PackPrefab(packName);
+            if (src == null) return null;
+            if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder(FPSKitTownAssets.Out, "Parked");
+
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(src);
+            inst.transform.position = Vector3.zero; inst.transform.rotation = Quaternion.identity;
+            var group = inst.GetComponentInChildren<LODGroup>();
+            var levels = new List<Renderer[]>();
+            float[] heights;
+            if (group != null)
+            {
+                var lods = group.GetLODs();
+                // The first level and the middle one (LOD2 when there is one), and where each hands over.
+                int mid = Mathf.Min(2, lods.Length - 1);
+                levels.Add(lods[0].renderers);
+                if (mid > 0) levels.Add(lods[mid].renderers);
+                heights = mid > 0 ? new[] { lods[mid - 1].screenRelativeTransitionHeight, lods[lods.Length - 1].screenRelativeTransitionHeight }
+                                  : new[] { lods[lods.Length - 1].screenRelativeTransitionHeight };
+            }
+            else { levels.Add(inst.GetComponentsInChildren<Renderer>()); heights = new[] { 0.01f }; }
+
+            var root = new GameObject("Parked_" + packName);
+            var lodList = new List<LOD>();
+            for (int li = 0; li < levels.Count; li++)
+            {
+                var byMat = new Dictionary<Material, List<CombineInstance>>();
+                foreach (var r in levels[li])
+                {
+                    if (r == null || !(r is MeshRenderer)) continue;
+                    var mf = r.GetComponent<MeshFilter>();
+                    if (mf == null || mf.sharedMesh == null) continue;
+                    var mats = r.sharedMaterials;
+                    for (int sm = 0; sm < mf.sharedMesh.subMeshCount && sm < mats.Length; sm++)
+                    {
+                        if (mats[sm] == null) continue;
+                        if (!byMat.TryGetValue(mats[sm], out var list)) byMat[mats[sm]] = list = new List<CombineInstance>();
+                        list.Add(new CombineInstance { mesh = mf.sharedMesh, subMeshIndex = sm, transform = r.transform.localToWorldMatrix });
+                    }
+                }
+                var parts = new List<Mesh>(); var partMats = new List<Material>();
+                foreach (var kv in byMat)
+                {
+                    var part = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                    part.CombineMeshes(kv.Value.ToArray(), true, true);
+                    parts.Add(part); partMats.Add(kv.Key);
+                }
+                var merged = new Mesh { name = $"Parked_{packName}_LOD{li}", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                merged.CombineMeshes(parts.Select(m => new CombineInstance { mesh = m, transform = Matrix4x4.identity }).ToArray(), false, false);
+                foreach (var m in parts) Object.DestroyImmediate(m);
+                UnityEditor.MeshUtility.SetMeshCompression(merged, ModelImporterMeshCompression.Low);
+                string meshPath = $"{dir}/Parked_{packName}_LOD{li}.asset";
+                var old = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+                if (old != null) { EditorUtility.CopySerialized(merged, old); Object.DestroyImmediate(merged); merged = old; }
+                else AssetDatabase.CreateAsset(merged, meshPath);
+                var child = new GameObject("LOD" + li);
+                child.transform.SetParent(root.transform, false);
+                child.AddComponent<MeshFilter>().sharedMesh = merged;
+                var mr = child.AddComponent<MeshRenderer>();
+                mr.sharedMaterials = partMats.ToArray();
+                lodList.Add(new LOD(heights[Mathf.Min(li, heights.Length - 1)], new Renderer[] { mr }));
+            }
+            Object.DestroyImmediate(inst);
+            var lg = root.AddComponent<LODGroup>();
+            lg.SetLODs(lodList.ToArray());
+            lg.RecalculateBounds();
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            _parkedPrefabs[packName] = prefab; _parkedMade.Add(packName);
+            return prefab;
+        }
+        private static readonly Dictionary<string, GameObject> _parkedPrefabs = new Dictionary<string, GameObject>();
+        private static readonly HashSet<string> _parkedMade = new HashSet<string>();
+
         private static GameObject PlaceCar(Transform parent, string packName, Vector3 pos, float yaw, Material overrideAll = null, bool wreck = false)
         {
-            var prefab = packName.StartsWith("PH:") ? Prop(packName.Substring(3)) : PackPrefab(packName);
+            var prefab = packName.StartsWith("PH:") ? Prop(packName.Substring(3)) : (ParkedCarPrefab(packName) ?? PackPrefab(packName));
             if (prefab == null) return null;
             var holder = new GameObject(packName.Replace("PH:", ""));
             holder.transform.SetParent(parent, false);
@@ -88,10 +175,14 @@ namespace FPSKit.EditorTools
             if (overrideAll != null || wreck)
                 foreach (var r in body.GetComponentsInChildren<Renderer>())
                 {
+                    // Per material (a parked car is one renderer with every material): a wreck's glass is gone, so the
+                    // window openings read as the dark inside of the shell.
                     var mats = r.sharedMaterials;
-                    bool glass = mats.Any(m => m != null && (m.name.ToLowerInvariant().Contains("glass") || m.name.ToLowerInvariant().Contains("window")));
-                    if (wreck && glass) { r.enabled = false; continue; }
-                    for (int i = 0; i < mats.Length; i++) mats[i] = overrideAll;
+                    for (int i = 0; i < mats.Length; i++)
+                    {
+                        bool glass = mats[i] != null && (mats[i].name.ToLowerInvariant().Contains("glass") || mats[i].name.ToLowerInvariant().Contains("window"));
+                        mats[i] = wreck && glass ? WreckHole() : overrideAll ?? mats[i];
+                    }
                     r.sharedMaterials = mats;
                 }
             if (holder.GetComponentInChildren<Collider>() == null)
@@ -110,6 +201,8 @@ namespace FPSKit.EditorTools
             return holder;
         }
 
+        private static Material _wreckHole;
+        private static Material WreckHole() => _wreckHole != null ? _wreckHole : (_wreckHole = TownFlat("WreckHole", new Color(0.03f, 0.028f, 0.026f), 0.05f));
         private static Material _burnt;
         private static Material Burnt() => _burnt != null ? _burnt : (_burnt = TownFlat("BurntWreck", new Color(0.09f, 0.075f, 0.065f), 0.12f, 0.3f));
         private static Material RustBody() => TownMat("RustBody", "rusty_corrugated_iron", new Color(0.85f, 0.7f, 0.6f), 1.5f, 0.5f);

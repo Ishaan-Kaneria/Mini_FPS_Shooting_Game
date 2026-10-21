@@ -636,19 +636,21 @@ namespace FPSKit.EditorTools
                         continue;
                     }
                     if (b.oldStyle) WindowIn(m, b, p0, p1, q0, q1, inn, nrm, groundFloor && b.enterable, h.w - h.z > 2f);
-                    else FacadeWindow(m, det, b, p0, p1, h.w - h.z, rise, depth, nrm, floorOf[i], groundFloor && b.enterable, h.w - h.z + rise > 2f);
+                    else FacadeWindow(m, det, b, p0, p1, h.w - h.z, rise, depth, nrm, floorOf[i], groundFloor && b.enterable, h.w - h.z + rise > 2f,
+                                      rich: streetFace || side == b.door);
                 }
 
                 // ---- string courses, cornice, quoins; plinth ----
                 if (!b.oldStyle && kind != FaceKind.Blank)
                 {
+                    bool rich = streetFace || side == b.door;
                     if (side == b.stairSide)
                     {
                         // Not across the outside stair: the cornice stood out 0.44 m across its landing.
-                        FaceDressings(m, det, b, a0, a0 + u * Mathf.Max(0f, TownStairStart - 0.15f), nrm, side, quoinEnd: false);
-                        FaceDressings(m, det, b, a0 + u * Mathf.Min(len, b.stairU1 + 0.15f), b0, nrm, side, quoinStart: false);
+                        FaceDressings(m, det, b, a0, a0 + u * Mathf.Max(0f, TownStairStart - 0.15f), nrm, side, quoinEnd: false, rich: rich);
+                        FaceDressings(m, det, b, a0 + u * Mathf.Min(len, b.stairU1 + 0.15f), b0, nrm, side, quoinStart: false, rich: rich);
                     }
-                    else FaceDressings(m, det, b, a0, b0, nrm, side);
+                    else FaceDressings(m, det, b, a0, b0, nrm, side, rich: rich);
                 }
                 m.Box(b.oldStyle ? b.wall : b.trim, (a0 + b0) * 0.5f + Vector3.up * (b.baseY - 0.25f) + nrm * 0.03f,
                       new Vector3(len + 0.06f, Mathf.Max(0.5f, b.baseY - bottom + 0.25f) , 0.06f) , Quaternion.LookRotation(nrm));

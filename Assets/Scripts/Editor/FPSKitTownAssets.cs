@@ -86,12 +86,15 @@ namespace FPSKit.EditorTools
 
                 Set(imp.textureType, normal ? TextureImporterType.NormalMap : TextureImporterType.Default, v => imp.textureType = v);
                 Set(imp.sRGBTexture, !normal && !mask, v => imp.sRGBTexture = v);
-                Set(imp.maxTextureSize, ground ? 2048 : 1024, v => imp.maxTextureSize = v);
+                // Albedo at 2K for walls and ground (it is what reads as sharp); their normal maps at 1K and the masks
+                // (occlusion, roughness) at 512 -- 428 textures at full size took 800 MB with the town open.
+                Set(imp.maxTextureSize, !ground ? 1024 : normal ? 1024 : mask ? 512 : 2048, v => imp.maxTextureSize = v);
                 Set(imp.mipmapEnabled, true, v => imp.mipmapEnabled = v);
-                // Walls and ground are seen at grazing angles down a street: full anisotropic filtering, and the
-                // high-quality block format, or brick courses and stone joints blur into mush a few metres away.
+                // Walls and ground are seen at grazing angles down a street: full anisotropic filtering, or brick courses
+                // and stone joints blur into mush a few metres away. (The high-quality block format doubled the albedo's
+                // memory for little that shows; with the town open the editor was killed for memory.)
                 Set(imp.anisoLevel, ground ? 16 : 4, v => imp.anisoLevel = v);
-                Set(imp.textureCompression, ground ? TextureImporterCompression.CompressedHQ : TextureImporterCompression.Compressed, v => imp.textureCompression = v);
+                Set(imp.textureCompression, TextureImporterCompression.Compressed, v => imp.textureCompression = v);
                 Set(imp.wrapMode, TextureWrapMode.Repeat, v => imp.wrapMode = v);
                 // An albedo with alpha is a plant's leaf cut-out: keep the alpha and stop it bleeding at the edge.
                 if (!normal && !mask && path.EndsWith(".png"))
@@ -333,8 +336,28 @@ namespace FPSKit.EditorTools
                         box.size = b.size;
                     }
                     else
-                        foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
-                            mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    {
+                        // From the coarsest level of detail only (every level used to get its own), and convex for a dense
+                        // scan: a boulder is 60-110k triangles, and cooking those as triangle meshes took the better part
+                        // of a gigabyte when the town loaded (17 M collider triangles in all).
+                        var lodGroup = go.GetComponentInChildren<LODGroup>();
+                        var filters = new List<MeshFilter>();
+                        if (lodGroup != null)
+                        {
+                            var lods = lodGroup.GetLODs();
+                            foreach (var r in lods[lods.Length - 1].renderers) if (r != null && r.GetComponent<MeshFilter>() != null) filters.Add(r.GetComponent<MeshFilter>());
+                        }
+                        if (filters.Count == 0) filters.AddRange(go.GetComponentsInChildren<MeshFilter>());
+                        int colliderTris = 0;
+                        foreach (var mf in filters) if (mf.sharedMesh != null) colliderTris += mf.sharedMesh.triangles.Length / 3;
+                        foreach (var mf in filters)
+                        {
+                            if (mf.sharedMesh == null) continue;
+                            var mc = mf.gameObject.AddComponent<MeshCollider>();
+                            mc.sharedMesh = mf.sharedMesh;
+                            mc.convex = colliderTris > 3000;
+                        }
+                    }
                 }
 
                 // Culled when it covers less than this share of the screen's height.

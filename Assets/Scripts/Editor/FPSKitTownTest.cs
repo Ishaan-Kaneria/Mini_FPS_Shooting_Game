@@ -187,6 +187,89 @@ namespace FPSKit.EditorTools
             notes.Append($"\n  buildings: {shell / 1000}k triangles in the chunks, {detail / 1000}k in their detail");
         }
 
+        /// <summary>What the built town costs in memory, by kind (batch: FPSKit.EditorTools.FPSKitTownTest.Memory).</summary>
+        public static void Memory()
+        {
+            EditorSceneManager.OpenScene(Scene, OpenSceneMode.Single);
+            var sb = new StringBuilder();
+            var byKind = new Dictionary<string, (long bytes, int count, long tris)>();
+            void Add(string k, long b, long t = 0) { byKind.TryGetValue(k, out var v); byKind[k] = (v.bytes + b, v.count + 1, v.tris + t); }
+            var seenMesh = new HashSet<Mesh>();
+            foreach (var mf in UnityEngine.Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+            {
+                var mesh = mf.sharedMesh;
+                if (mesh == null || !seenMesh.Add(mesh)) continue;
+                string k = mf.name.StartsWith("Block_") ? "mesh: building chunks" : mf.name.StartsWith("Detail_") ? "mesh: building detail"
+                         : AssetDatabase.Contains(mesh) ? "mesh: assets (props, cars, palms)" : "mesh: other scene-built";
+                Add(k, UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(mesh), mesh.triangles.LongLength / 3);
+            }
+            foreach (var mc in UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None)) Add("mesh colliders", 0);
+            var seenTex = new HashSet<Texture>();
+            foreach (var r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null) continue;
+                    foreach (var name in m.GetTexturePropertyNames())
+                    {
+                        var t = m.GetTexture(name);
+                        if (t != null && seenTex.Add(t)) Add("textures (materials)", UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(t));
+                    }
+                }
+            foreach (var t in UnityEngine.Object.FindObjectsByType<Terrain>(FindObjectsSortMode.None))
+                if (t.terrainData != null) Add("terrain data", UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(t.terrainData));
+            foreach (var t in seenTex.OrderByDescending(t => UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(t)).Take(25))
+                sb.AppendLine($"  tex {UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(t) / 1048576f:0.0} MB {t.width}x{t.height} {AssetDatabase.GetAssetPath(t)}");
+            // Colliders and objects by the top-level group they sit under.
+            var colByGroup = new Dictionary<string, (int n, long tris)>();
+            foreach (var mc in UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
+            {
+                var t = mc.transform; while (t.parent != null && t.parent.parent != null) t = t.parent;
+                string g = t.name;
+                colByGroup.TryGetValue(g, out var v);
+                colByGroup[g] = (v.n + 1, v.tris + (mc.sharedMesh != null ? mc.sharedMesh.triangles.LongLength / 3 : 0));
+            }
+            foreach (var kv in colByGroup.OrderByDescending(k => k.Value.tris).Take(12)) sb.AppendLine($"  mesh colliders under {kv.Key}: {kv.Value.n}, {kv.Value.tris / 1000}k triangles");
+            var byMesh = new Dictionary<string, (int n, long tris)>();
+            foreach (var mc in UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
+            {
+                if (mc.sharedMesh == null) continue;
+                string k = mc.sharedMesh.name + (mc.convex ? " (convex)" : "");
+                byMesh.TryGetValue(k, out var v);
+                byMesh[k] = (v.n + 1, v.tris + mc.sharedMesh.triangles.LongLength / 3);
+            }
+            foreach (var kv in byMesh.OrderByDescending(k => k.Value.tris).Take(15)) sb.AppendLine($"    collider mesh {kv.Key}: {kv.Value.n} x, {kv.Value.tris / 1000}k triangles");
+            var goByGroup = new Dictionary<string, int>();
+            foreach (var go in UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
+            {
+                var t = go.transform; while (t.parent != null && t.parent.parent != null) t = t.parent;
+                goByGroup.TryGetValue(t.name, out int n); goByGroup[t.name] = n + 1;
+            }
+            foreach (var kv in goByGroup.OrderByDescending(k => k.Value).Take(12)) sb.AppendLine($"  objects under {kv.Key}: {kv.Value}");
+            var surf = UnityEngine.Object.FindAnyObjectByType<Unity.AI.Navigation.NavMeshSurface>();
+            if (surf != null && surf.navMeshData != null) sb.AppendLine($"  navmesh data: {UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(surf.navMeshData) / 1048576} MB ({AssetDatabase.GetAssetPath(surf.navMeshData)})");
+            int parked = 0; Bounds pb = default; string first = "";
+            foreach (var t in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+                if (t.name.StartsWith("Parked_"))
+                {
+                    if (parked++ == 0)
+                    {
+                        var rs = t.GetComponentsInChildren<Renderer>();
+                        pb = rs.Length > 0 ? rs[0].bounds : default;
+                        foreach (var r in rs) pb.Encapsulate(r.bounds);
+                        first = $"{t.name} at {t.position}, {rs.Length} renderers, mats {string.Join(",", rs.Select(r => r.sharedMaterials.Length))}, verts {string.Join(",", t.GetComponentsInChildren<MeshFilter>().Select(f => f.sharedMesh != null ? f.sharedMesh.vertexCount : -1))}";
+                    }
+                }
+            sb.AppendLine($"  parked cars: {parked}; first: {first}, bounds size {pb.size}");
+            int gos = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
+            sb.AppendLine($"GameObjects: {gos}");
+            foreach (var kv in byKind.OrderByDescending(k => k.Value.bytes))
+                sb.AppendLine($"{kv.Key}: {kv.Value.bytes / 1048576} MB, {kv.Value.count} items, {kv.Value.tris / 1000}k triangles");
+            sb.AppendLine($"total allocated: {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, reserved {UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / 1048576} MB");
+            System.IO.File.WriteAllText("Build/TownMemory.txt", sb.ToString());
+            Debug.Log("[FPSKit] memory written");
+            FPSKitBatch.Exit(0);
+        }
+
         /// <summary>
         /// Diagnosis for a failure here (batch: <c>FPSKit.EditorTools.FPSKitTownTest.Probe</c>, writes Build/TownProbePoints.txt).
         /// Height maps of the navmesh round given places: per 0.5 m cell the highest navmesh, its height band as a letter

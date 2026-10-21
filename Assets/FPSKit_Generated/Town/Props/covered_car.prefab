@@ -115,7 +115,7 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: -1892422896168899638, guid: 2f241505307af50289565cd59ce81716, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 2410318583747003955}
+      addedObject: {fileID: 7362424060191601910}
     - targetCorrespondingSourceObject: {fileID: 5119048372944291378, guid: 2f241505307af50289565cd59ce81716, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6365527419110564586}
@@ -153,7 +153,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -165265993452289788, guid: 2f241505307af50289565cd59ce81716, type: 3}
 --- !u!1 &2273200272393501187 stripped
@@ -180,7 +180,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 7739532310637833719, guid: 2f241505307af50289565cd59ce81716, type: 3}
 --- !u!1 &2682661142734805647 stripped
@@ -207,7 +207,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 2505672286311115637, guid: 2f241505307af50289565cd59ce81716, type: 3}
 --- !u!23 &2735071465211413974 stripped
@@ -220,7 +220,7 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: -1892422896168899638, guid: 2f241505307af50289565cd59ce81716, type: 3}
   m_PrefabInstance: {fileID: 6378931903897484337}
   m_PrefabAsset: {fileID: 0}
---- !u!64 &2410318583747003955
+--- !u!64 &7362424060191601910
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -239,7 +239,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -497236576989781075, guid: 2f241505307af50289565cd59ce81716, type: 3}
 --- !u!23 &5056115757275512483 stripped
@@ -276,7 +276,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4532967174991897111, guid: 2f241505307af50289565cd59ce81716, type: 3}
 --- !u!4 &6378931903897484338 stripped

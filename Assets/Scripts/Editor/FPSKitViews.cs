@@ -170,6 +170,7 @@ namespace FPSKit.EditorTools
             yield return ParkShot("22_facade_east", new Vector3(127f, 1.7f, -40f), new Vector3(146f, 7f, -24f), 62f);
             yield return ParkShot("23_facade_up", new Vector3(10.5f, 1.6f, -180f), new Vector3(16f, 12f, -176f), 70f);
             yield return ParkShot("24_street_north", new Vector3(140f, 1.7f, 150f), new Vector3(140f, 6f, 260f), 66f);
+            yield return ParkShot("25_parked_car", new Vector3(110.5f, 1.6f, -301f), new Vector3(115.9f, 0.4f, -306.2f), 60f);
         }
 
         /// <summary>

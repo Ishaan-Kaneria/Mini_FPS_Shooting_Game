@@ -184,6 +184,8 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   again). `NavMeshModifierVolume.center` defaults to (0,1,0): set it. `CalculatePath` gives up on long routes: prove reachability in short legs.
   Facades (`FPSKitTownFacade`): brick / limestone / plaster with real dressings; fine work in per-chunk `Detail_` meshes (no collider,
   out of the bake, LOD-culled); scene meshes compressed. Tile textures by the courses in them, tint = wanted colour / image mean.
+  Memory: the editor was killed (earlyoom) at 6.6 GB playing it. Props collide on their coarsest LOD (convex if dense), parked cars are
+  merged meshes (`ParkedCarPrefab`); measure with `FPSKitTownTest.Memory` and `/usr/bin/time -v` round VerifyDesertSpawns (now 4.0 GB peak).
   Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired); `FPSKitTownTest.Probe` maps what fails.
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.

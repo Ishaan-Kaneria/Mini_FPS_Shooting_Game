@@ -16,6 +16,8 @@ public class Weapon : MonoBehaviour
     public Camera fpsCamera;
     public Transform muzzlePoint;
     public Light muzzleLight;
+    [Tooltip("The flash's light (on the muzzle point): fired once per shot. Without one, muzzleLight is simply switched on for the data's flash duration.")]
+    public FPSMuzzleFlashLight muzzleFlashLight;
     [Tooltip("Draws the crossed-blade flash prefab at the player's own muzzle. Off: it showed as a white plus sign beside the rifle.")]
     public bool drawMuzzleFlash = false;
     public AudioSource audioSource;
@@ -935,7 +937,8 @@ public class Weapon : MonoBehaviour
     {
         PlayClip(data.fireClip, 1f);
 
-        if (muzzleLight != null)
+        if (muzzleFlashLight != null) muzzleFlashLight.Flash();
+        else if (muzzleLight != null)
         {
             muzzleLight.enabled = true;
             _muzzleLightOffTime = Time.time + data.muzzleFlashDuration;
@@ -994,6 +997,7 @@ public class Weapon : MonoBehaviour
 
     void UpdateMuzzleLight()
     {
+        if (muzzleFlashLight != null) return;    // it puts itself out
         if (muzzleLight != null && muzzleLight.enabled && Time.time >= _muzzleLightOffTime)
             muzzleLight.enabled = false;
     }

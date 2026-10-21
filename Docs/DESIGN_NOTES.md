@@ -3513,3 +3513,57 @@ diagonal 45-degree sun putting one side of each street in shadow, baked GI, and 
   shadows by either render path: judge shadows from `FPSKitPlayerShots` (it plays the scene). Its batch runs do not
   exit on their own: stop the Unity process when the shots are written, or it holds the project lock.
 
+
+## Muzzle-flash light, the gun's shadows, light probes (2026-10-21)
+
+Asked for, after the lighting pass: a muzzle flash that lights the street for a split second and casts shadows; the
+first-person gun shadowed like the world round it, with ambient occlusion in its parts; light probes so the civilians,
+cars and the player's body take the light of where they stand; and reflection probe blending on.
+
+* **The flash's light** is `FPSMuzzleFlashLight` (runtime, global namespace): a warm amber point light (1, 0.70, 0.40)
+  switched on for one shot, 0.04-0.05 s, full at the shot and falling as 1 - t^3, brightness and reach jittered 15% so a
+  burst does not strobe evenly. The player's gun fires it from `Weapon.PlayFireEffects` (`Weapon.muzzleFlashLight`;
+  the old plain `muzzleLight` path stays for a weapon without one). The enemies' rifles replay the generated
+  `MuzzleFlash.prefab` once per shot, so its `FlashLight` child has `flashOnEnable` and flashes whenever it is switched
+  on (dimmer: 7 against 10, 9 m against 11).
+* **Only the player's flash casts shadows**, and only on High: a point light's shadow draws the scene six times, and a
+  squad firing together would be a dozen of them. `FPSKitQualityTiers` turns additional-light shadows on for High only
+  (2048 atlas); the flash asks for the lowest per-light tier (256 a face). Elsewhere it lights without shadows. URP
+  refuses `additionalLightsShadowResolutionTier` outside play mode, so the builder writes the saved field
+  (`m_AdditionalLightsShadowResolutionTier`) through a `SerializedObject`.
+* **The gun was uniformly lit** because its overlay arms camera (`ViewModelRig.BuildArmsCamera`) had shadows off and the
+  view-model renderers neither cast nor received. Now the arms camera renders its own shadow pass and the view model
+  casts and receives in it: that camera sees only the FirstPerson layer and ten metres, so the sun's cascades are spent
+  on the gun and hands alone and they shadow each other crisply. No bias was changed: URP's bias is in shadow texels,
+  and the texels here are a fraction of a centimetre. The main camera culls the FirstPerson layer, so the gun's shadow
+  never lands on the world it is not in.
+* **The town's shade on the gun**: the arms camera's shadow pass holds nothing of the town, so in the shade of a building
+  the gun stayed in full sun. `FirstPersonShade` (added by `ViewModelRig` to the arms camera) casts three rays from the
+  gun towards the sun every 0.05 s; the blocked share, eased at 14 a second, dims the sun by that share times its
+  shadow strength while the arms camera renders (`RenderPipelineManager.beginCameraRendering`) and puts it back after.
+* **SSAO on the gun**: URP 17 (Render Graph) runs the renderer's features per camera in the stack, so the arms camera
+  gets the SSAO pass on its own depth and normals; nothing to add.
+* **Light probes** (`FPSKitTownProbes`): one `LightProbeGroup` of about 2250 probes, two heights each (0.7 and 2.4 m):
+  the avenue's and boulevard's pavements every 8 m, carriageways every 16 m; three columns 1.5 m apart wherever the
+  sun meets the shade along them (found by casting towards the sun every 2 m); every doorway; every civilian spot; a
+  40 m grid over the rest. None inside anything or walled and roofed in (a probe inside a building is black and bleeds
+  through its wall).
+* **Probes are empty until baked**, so the build ends with a bake of probes only (`BakeTownProbes`, after the scene is
+  saved, then saved again): the building chunks, landmarks, roads and edge structures are Contribute GI (they block
+  the sky and bounce the sun) with Receive GI from probes and probe usage off (they keep the ambient they had, and get
+  no lightmap); everything else has Contribute GI cleared (the terrain and some prop prefabs come static, and the first
+  bake made two lightmaps of them). The sun is Mixed and the bake Baked Indirect: its direct light and shadows stay
+  realtime. CPU lightmapper (it runs headless), about 25 s, 0 lightmaps. Output: `Scenes/DesertOutpost/LightingData.asset`
+  and `Scenes/DesertOutpost_Lighting.lighting`. The phone copy keeps the probes (they are cheap) and drops the
+  reflection probes.
+* **Bug: everything flat white.** The first bake took the 8 realtime street reflection probes in with it and captured
+  them headless, with no graphics device, into blank cubemaps (`ReflectionProbe-N.exr`); the lighting data then
+  handed those to the probes in play, and everything inside their boxes (roads, near buildings, palms, the gun) drew
+  flat white. Either alone was fine (proved by building without each). The bake now switches the reflection probes off
+  while it runs and deletes any `ReflectionProbe-*` capture in the scene's lighting folder.
+* **Clamped skybox**: the sky is drawn from `<sky>_display.exr`, the HDR with its sun disc clamped as the reflection
+  cube's is (the raw disc is 65 504 times white and blows out any probe that renders the sky). Not the cause of the
+  white, but kept.
+* **Reflection probe blending and box projection** were already on in all three pipeline assets; `FPSKitQualityTiers`
+  now writes them, so they cannot drift. (`PC_Renderer.asset` has no such setting: it lives on the pipeline asset.) The
+  street probes blend over 6 m at their ends.

@@ -1610,6 +1610,19 @@ namespace FPSKit.EditorTools
             flash.startScale = 1f;
             flash.endScale = 0.2f;
 
+            // Its light, flashing each time the prefab is replayed (every enemy shot): a little less than the player's,
+            // and no shadows (a squad firing together would be a point-light shadow each).
+            var lightGo = new GameObject("FlashLight");
+            lightGo.transform.SetParent(root.transform, false);
+            lightGo.transform.localPosition = new Vector3(0f, 0f, 0.15f);
+            var light = lightGo.AddComponent<Light>();
+            var flashLight = lightGo.AddComponent<FPSMuzzleFlashLight>();
+            flashLight.intensity = 7f;
+            flashLight.range = 9f;
+            flashLight.castShadows = false;
+            flashLight.flashOnEnable = true;
+            flashLight.Configure(light);
+
             return SaveGeneratedPrefab(root, AssetFolder + "/MuzzleFlash.prefab");
         }
 
@@ -1938,19 +1951,29 @@ namespace FPSKit.EditorTools
             // through the same authoring scale the parts use.
             muzzle.transform.localPosition = new Vector3(0f, 0.005f, 0.47f) * GunScale;
 
+            // The flash's light: hot amber, a twentieth of a second, and the one light in the game whose flash casts
+            // shadows (FPSMuzzleFlashLight; point-light shadows exist on the High tier only), so a shot fired in the
+            // shade of a street throws the walls and pavement round the player into light for a frame or two.
             var muzzleLight = muzzle.AddComponent<Light>();
-            muzzleLight.type = LightType.Point;
-            muzzleLight.color = new Color(1f, 0.85f, 0.5f);
-            muzzleLight.intensity = 6f;
-            muzzleLight.range = 8f;
-            muzzleLight.shadows = LightShadows.None;
-            muzzleLight.enabled = false;
+            var flashLight = muzzle.AddComponent<FPSMuzzleFlashLight>();
+            flashLight.castShadows = true;
+            flashLight.flashOnEnable = false;
+            flashLight.Configure(muzzleLight);
+            // Its shadow at the pipeline's lowest per-light resolution (URP refuses the property outside play mode).
+            var lightData = muzzle.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();
+            if (lightData != null)
+            {
+                var so = new SerializedObject(lightData);
+                var tier = so.FindProperty("m_AdditionalLightsShadowResolutionTier");
+                if (tier != null) { tier.intValue = UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow; so.ApplyModifiedPropertiesWithoutUndo(); }
+            }
 
             var weapon = model.AddComponent<Weapon>();
             weapon.data = weaponData;
             weapon.fpsCamera = cam;
             weapon.muzzlePoint = muzzle.transform;
             weapon.muzzleLight = muzzleLight;
+            weapon.muzzleFlashLight = flashLight;
             weapon.audioSource = model.AddComponent<AudioSource>();
             weapon.audioSource.playOnAwake = false;
             weapon.hitMask = ~(1 << LayerMask.NameToLayer("Player"));
@@ -4211,6 +4234,8 @@ namespace FPSKit.EditorTools
         {
             string path = $"{SceneFolder}/{SafeName(themeName)}.unity";
             EditorSceneManager.SaveScene(scene, path);
+            // The town's light probes are baked on the saved scene (probes only: FPSKitTownProbes), then saved again.
+            if (_theme != null && _theme.desertTownZone) BakeTownProbes(scene, path);
 
             // Register in Build Settings so the in-game restart can reload it.
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);

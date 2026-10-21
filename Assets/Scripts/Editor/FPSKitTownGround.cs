@@ -700,7 +700,9 @@ namespace FPSKit.EditorTools
             string hdr = null;
             foreach (var p in FPSKitTownAssets.SkyPaths()) { hdr = p; break; }
             if (hdr == null) return null;
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(hdr);
+            // Drawn from the clamped copy (the raw sun disc blew out every reflection probe that caught it); the raw HDR
+            // is still what the sun is aimed from.
+            var tex = FPSKitTownAssets.DisplaySky() ?? AssetDatabase.LoadAssetAtPath<Texture2D>(hdr);
             if (tex == null) return null;
             string path = $"{FPSKitTownAssets.MatFolder}/TownSky.mat";
             var mat = AssetDatabase.LoadAssetAtPath<Material>(path);

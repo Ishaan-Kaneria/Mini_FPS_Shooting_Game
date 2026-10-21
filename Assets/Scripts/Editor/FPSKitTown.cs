@@ -74,7 +74,7 @@ namespace FPSKit.EditorTools
         {
             _townRoads.Clear(); _townTracks.Clear(); _townSites.Clear(); _townJunctions.Clear();
             _townSolids.Clear(); _farmPlots.Clear(); _townMats.Clear(); _townZones.Clear();
-            _townBase = null; _devDist = null; _townTerrain = null; _townSkyRotation = float.NaN;
+            _townBase = null; _devDist = null; _townTerrain = null; _townSkyRotation = float.NaN; _townProbeCount = 0;
             ResetTownBuildings();
             ResetTownLife();
         }
@@ -120,6 +120,7 @@ namespace FPSKit.EditorTools
             BuildTownLife(root, layer, rng);
             Lap("life");
             PlaceStreetProbes(root);
+            PlaceTownLightProbes(root);
 
             // Nothing past the edge is anybody's to stand on.
             SealNavMeshOutside(root, half - 2f, half + 700f);

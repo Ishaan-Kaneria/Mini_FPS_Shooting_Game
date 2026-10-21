@@ -139,7 +139,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   the FirstPerson layer under a stacked arms camera (own FOV, post-processing ON, set back `eyeBack`
   except when aiming); `PlayerBody` is legs, kick and shadow only (upper body shadow-only). Mixamo
   clips never drive the first-person arms. Values in `PlayerBodySettings`. The camera never moves for a
-  strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting). See it in a real
+  strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting). The arms camera renders its own shadows (gun
+  self-shadowing); the world's shade reaches the gun only through `FirstPersonShade`. Muzzle light: `FPSMuzzleFlashLight` (player's casts
+  shadows, High tier only). See it in a real
   arena: `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.Batch` (Build/PlayerShots).
 - Reload is animated by the `FirstPersonClips` reload track (`Weapon.ReloadPose` only without them) with
   three `WeaponData` clips on its beats (`Weapon.MagOutBeat`/`MagInBeat`/`BoltBeat`, from the pack's rifle rig); keep them in step.
@@ -187,6 +189,8 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Memory: the editor was killed (earlyoom) at 6.6 GB playing it. Props collide on their coarsest LOD (convex if dense), parked cars are
   merged meshes (`ParkedCarPrefab`); measure with `FPSKitTownTest.Memory` and `/usr/bin/time -v` round VerifyDesertSpawns (now 4.0 GB peak).
   Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired); `FPSKitTownTest.Probe` maps what fails.
+  Light probes (`FPSKitTownProbes`) need the probes-only bake at save (`BakeTownProbes`: no lightmaps, sun Mixed/Baked Indirect);
+  realtime reflection probes stay out of it (captured headless they drew everything flat white).
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

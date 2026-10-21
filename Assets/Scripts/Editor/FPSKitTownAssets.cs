@@ -146,7 +146,7 @@ namespace FPSKit.EditorTools
             foreach (var sky in SkyPaths())
             {
                 string cube = sky.Replace(".hdr", "_reflections.exr");
-                if (!File.Exists(cube)) WriteClampedSky(sky, cube);
+                if (!File.Exists(cube)) WriteClampedSky(sky, cube, sky.Replace(".hdr", "_display.exr"));
                 if (!File.Exists(cube)) return null;
                 if (AssetImporter.GetAtPath(cube) is TextureImporter imp &&
                     (imp.textureShape != TextureImporterShape.TextureCube || imp.maxTextureSize != 512 || !imp.mipmapEnabled))
@@ -163,7 +163,37 @@ namespace FPSKit.EditorTools
             return null;
         }
 
-        static void WriteClampedSky(string sky, string cube)
+        /// <summary>
+        /// The sky the skybox draws: the HDR at full size with its sun clamped like the reflection cube's (and no ground or
+        /// town band). The raw sun disc is 65 504 times white; every reflection probe that rendered the sky caught it, and
+        /// anything inside the street probes' boxes reflected it and drew pure white (2026-10-21, after the probe bake).
+        /// The disc stays the brightest thing in the sky, a few times white, and still blooms.
+        /// </summary>
+        public static Texture2D DisplaySky()
+        {
+            foreach (var sky in SkyPaths())
+            {
+                string display = sky.Replace(".hdr", "_display.exr");
+                if (!File.Exists(display)) WriteClampedSky(sky, sky.Replace(".hdr", "_reflections.exr"), display);
+                if (!File.Exists(display)) return null;
+                if (AssetImporter.GetAtPath(display) is TextureImporter imp &&
+                    (imp.textureShape != TextureImporterShape.Texture2D || imp.mipmapEnabled || imp.maxTextureSize != 4096 ||
+                     imp.wrapModeV != TextureWrapMode.Clamp || imp.textureCompression != TextureImporterCompression.CompressedHQ))
+                {
+                    imp.textureShape = TextureImporterShape.Texture2D;
+                    imp.mipmapEnabled = false;          // mipmaps draw a seam where the image wraps
+                    imp.maxTextureSize = 4096;
+                    imp.wrapModeU = TextureWrapMode.Repeat;
+                    imp.wrapModeV = TextureWrapMode.Clamp;
+                    imp.textureCompression = TextureImporterCompression.CompressedHQ;
+                    imp.SaveAndReimport();
+                }
+                return AssetDatabase.LoadAssetAtPath<Texture2D>(display);
+            }
+            return null;
+        }
+
+        static void WriteClampedSky(string sky, string cube, string display = null)
         {
             if (!(AssetImporter.GetAtPath(sky) is TextureImporter imp)) return;
             bool readable = imp.isReadable; var compression = imp.textureCompression; int max = imp.maxTextureSize;
@@ -208,6 +238,17 @@ namespace FPSKit.EditorTools
                 File.WriteAllBytes(cube, tex.EncodeToEXR(Texture2D.EXRFlags.CompressZIP));
                 Object.DestroyImmediate(tex);
                 AssetDatabase.ImportAsset(cube);
+                if (display != null)
+                {
+                    // The sky as drawn: full size, the sun clamped, nothing else changed (half-float EXR).
+                    var shown = new Color[px.Length];
+                    for (int k = 0; k < px.Length; k++) { var p = px[k]; if (lum[k] > cap) p *= cap / lum[k]; p.a = 1f; shown[k] = p; }
+                    var full = new Texture2D(w, h, TextureFormat.RGBAFloat, false, true);
+                    full.SetPixels(shown);
+                    File.WriteAllBytes(display, full.EncodeToEXR(Texture2D.EXRFlags.CompressZIP));
+                    Object.DestroyImmediate(full);
+                    AssetDatabase.ImportAsset(display);
+                }
                 Debug.Log($"[FPSKit] reflection sky written: {cube} (clamped at {cap:0.00}, brightest was {sorted[sorted.Length - 1]:0})");
             }
             finally

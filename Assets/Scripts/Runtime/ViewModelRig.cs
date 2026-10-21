@@ -242,7 +242,11 @@ public class ViewModelRig : MonoBehaviour
         _armsCam.farClipPlane = 10f;
         var data = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(_armsCam);
         data.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
-        data.renderShadows = false;
+        // Its own shadow pass: it sees only the FirstPerson layer and ten metres, so the sun's cascades are spent on
+        // the gun and hands alone and they shadow each other crisply (a hand over the receiver, the sight on the top).
+        // The town's shade on the gun comes from FirstPersonShade, which dims the sun for this camera in shadow.
+        data.renderShadows = true;
+        if (go.GetComponent<FirstPersonShade>() == null) go.AddComponent<FirstPersonShade>();
         // Post-processing on: the stack's tonemapping and grading are applied after its last camera,
         // so without it the arms and gun were drawn untonemapped over a graded world (white gloves,
         // a flat grey rifle).
@@ -278,15 +282,18 @@ public class ViewModelRig : MonoBehaviour
         _weapon.muzzlePoint.SetPositionAndRotation(at, _spec.muzzle.rotation);
     }
 
-    /// <summary>A view model is drawn, never hit and never casts a shadow onto the world it is not really in.</summary>
+    /// <summary>
+    /// A view model is drawn, never hit, and shadows only itself: it casts and receives in the arms camera's own shadow
+    /// pass, and the main camera (which culls the FirstPerson layer) never puts its shadow on the world it is not in.
+    /// </summary>
     static void Prepare(GameObject go, int layer)
     {
         foreach (var t in go.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
         foreach (var c in go.GetComponentsInChildren<Collider>(true)) Destroy(c);
         foreach (var r in go.GetComponentsInChildren<Renderer>(true))
         {
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            r.receiveShadows = false;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            r.receiveShadows = true;
             r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.BlendProbes;
             if (r is SkinnedMeshRenderer s) s.updateWhenOffscreen = true;
         }

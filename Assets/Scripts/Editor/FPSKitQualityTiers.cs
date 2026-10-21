@@ -66,7 +66,8 @@ namespace FPSKit.EditorTools
 
             // Shadow maps: 4096 on High over its 50 m (a texel about 1.5 cm in the nearest cascade), 2048 on Medium.
             changed |= Configure(high, shadows: true, distance: 50f, cascades: 3, msaa: 2, hdr: true, scale: 0.85f, soft: true,
-                                 renderer: null, upscaling: 3, shadowResolution: 4096);       // 3 = FSR 1
+                                 renderer: null, upscaling: 3, shadowResolution: 4096,        // 3 = FSR 1
+                                 additionalShadows: true);                                    // the player's muzzle flash
             changed |= Ssao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
             changed |= Configure(medium, shadows: true, distance: 60f, cascades: 2, msaa: 2, hdr: true, scale: 1f, soft: false,
@@ -78,12 +79,19 @@ namespace FPSKit.EditorTools
 
         static bool Configure(UniversalRenderPipelineAsset asset, bool shadows, float distance, int cascades,
                               int msaa, bool hdr, float scale, bool soft, ScriptableRendererData renderer, int upscaling = 0,
-                              int shadowResolution = 0)
+                              int shadowResolution = 0, bool additionalShadows = false)
         {
             var so = new SerializedObject(asset);
             bool changed = false;
             changed |= SetBool(so, "m_MainLightShadowsSupported", shadows);
-            changed |= SetBool(so, "m_AdditionalLightShadowsSupported", false);
+            // Point and spot shadows: High only, for the one light that asks for them (the player's muzzle flash,
+            // FPSMuzzleFlashLight, at the lowest per-light tier in the 2048 atlas). Off elsewhere: the flash still lights.
+            changed |= SetBool(so, "m_AdditionalLightShadowsSupported", additionalShadows);
+            if (additionalShadows) changed |= SetInt(so, "m_AdditionalLightsShadowmapResolution", 2048);
+            // Reflection probes blend across their edges (and box-project) on every tier, so a car or a window passing
+            // from one street probe to the next fades between them instead of snapping.
+            changed |= SetBool(so, "m_ReflectionProbeBlending", true);
+            changed |= SetBool(so, "m_ReflectionProbeBoxProjection", true);
             if (shadows)
             {
                 changed |= SetFloat(so, "m_ShadowDistance", distance);

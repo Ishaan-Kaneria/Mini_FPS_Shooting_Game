@@ -521,6 +521,10 @@ namespace FPSKit.EditorTools
                 Vector3 u = (b0 - a0) / Mathf.Max(0.01f, len);
                 var holes = new List<Vector4>();
                 var kind = b.faces[side];
+                // Balconies only over a street: a row house built to its lot line hung them 1.15 m into the villa yard
+                // next door, over the outside stair there, and cut the flight off the navmesh.
+                Vector2 faceMid = new Vector2((a0.x + b0.x) * 0.5f, (a0.z + b0.z) * 0.5f);
+                bool streetFace = side == b.door || RoadAt(faceMid + SideOut(side) * 3f) != null;
 
                 // ---- openings ----
                 int bays = Mathf.Max(1, Mathf.FloorToInt(len / b.bay));
@@ -546,7 +550,7 @@ namespace FPSKit.EditorTools
                         float ww = b.oldStyle ? Rand(rng, 0.6f, 0.9f) : b.windowW;
                         float wh = b.oldStyle ? Rand(rng, 0.8f, 1.1f) : b.windowH;
                         if (b.oldStyle && rng.NextDouble() < 0.35) continue;            // old walls have fewer windows
-                        bool balcony = b.balconies && f > 0 && rng.NextDouble() < 0.4;
+                        bool balcony = b.balconies && streetFace && f > 0 && rng.NextDouble() < 0.4;
                         float sill = balcony ? 0.05f : (b.oldStyle ? 1.3f : 0.95f);
                         float h = balcony ? 2.2f : wh;
                         holes.Add(new Vector4(cu - ww * 0.5f, cu + ww * 0.5f, fy + sill, fy + sill + h));
@@ -839,12 +843,17 @@ namespace FPSKit.EditorTools
             var rng = b.rng;
             var r = b.r;
             Vector3 P(float fx, float fz) => new Vector3(Mathf.Lerp(r.xMin + 1.2f, r.xMax - 1.2f, fx), roofY, Mathf.Lerp(r.yMin + 1.2f, r.yMax - 1.2f, fz));
+            // Nothing stands in the way in from the stair: behind its parapet gap the roof is kept clear for 3.5 m. A course
+            // of block 1.2 m in from the edge walled the gap off on a dozen roofs.
+            var keep = StairClearing(b);
+            bool Clear(Vector3 at, float half) => keep.width <= 0f || !keep.Overlaps(Rect.MinMaxRect(at.x - half, at.z - half, at.x + half, at.z + half));
 
             int tanks = b.oldStyle ? rng.Next(0, 2) : rng.Next(1, 4);
             for (int i = 0; i < tanks; i++)
             {
                 var at = P((float)rng.NextDouble(), (float)rng.NextDouble());
                 var mat = rng.NextDouble() < 0.55 ? _tankBlack : rng.NextDouble() < 0.6 ? _tankWhite : _tankBlue;
+                if (!Clear(at, 0.8f)) continue;
                 // On a little steel stand, with the ribbed shape of a moulded tank.
                 m.BoxMinMax(_steel, at + new Vector3(-0.7f, 0f, -0.7f), at + new Vector3(0.7f, 0.5f, 0.7f));
                 var prof = new List<Vector2> { new Vector2(0.62f, 0f), new Vector2(0.66f, 0.12f), new Vector2(0.62f, 0.3f), new Vector2(0.66f, 0.5f),
@@ -852,23 +861,41 @@ namespace FPSKit.EditorTools
                 m.Revolve(mat, at + Vector3.up * 0.5f, prof, 14);
             }
             int dishes = b.oldStyle ? rng.Next(0, 2) : rng.Next(1, b.floors >= 4 ? 6 : 3);
-            for (int i = 0; i < dishes; i++) Dish(m, P((float)rng.NextDouble(), (float)rng.NextDouble()), (float)rng.NextDouble() * 60f + 120f);
-            if (!b.oldStyle && rng.NextDouble() < 0.35) SolarHeater(m, P((float)rng.NextDouble(), (float)rng.NextDouble()));
+            for (int i = 0; i < dishes; i++)
+            {
+                var at = P((float)rng.NextDouble(), (float)rng.NextDouble());
+                float yaw = (float)rng.NextDouble() * 60f + 120f;
+                if (Clear(at, 0.5f)) Dish(m, at, yaw);
+            }
+            if (!b.oldStyle && rng.NextDouble() < 0.35)
+            {
+                var at = P((float)rng.NextDouble(), (float)rng.NextDouble());
+                if (Clear(at, 1.4f)) SolarHeater(m, at);
+            }
             if (!b.oldStyle && b.floors >= 3 && r.width > 9f && r.height > 9f)
             {
                 // Stair bulkhead: a little room with a door, which is how the blocks reach their roofs.
                 var at = P(0.15f, 0.2f);
+                if (!Clear(at, 1.8f)) at = P(0.85f, 0.8f);
+                if (Clear(at, 1.8f))
+                {
                 m.BoxMinMax(b.wall, at + new Vector3(-1.4f, 0f, -1.6f), at + new Vector3(1.4f, 2.5f, 1.6f), bottom: false);
                 m.BoxMinMax(_coping, at + new Vector3(-1.5f, 2.5f, -1.7f), at + new Vector3(1.5f, 2.62f, 1.7f));
                 m.Quad(_doorMetal, at + new Vector3(-0.45f, 0.02f, 1.61f), at + new Vector3(0.45f, 0.02f, 1.61f), at + new Vector3(0.45f, 2.05f, 1.61f), at + new Vector3(-0.45f, 2.05f, 1.61f), Vector3.forward);
+                }
             }
             if (!b.oldStyle && rng.NextDouble() < 0.5)
-                PlaceTown(props, Prop("exterior_aircon_unit"), P((float)rng.NextDouble(), (float)rng.NextDouble()), rng.Next(4) * 90f, 0.75f);
+            {
+                var at = P((float)rng.NextDouble(), (float)rng.NextDouble());
+                float yaw = rng.Next(4) * 90f;
+                if (Clear(at, 0.7f)) PlaceTown(props, Prop("exterior_aircon_unit"), at, yaw, 0.75f);
+            }
             if (b.unfinished)
             {
                 // Columns started for the next floor: rebar standing out of stub columns at the corners and along the walls.
                 foreach (var c in new[] { P(0, 0), P(1, 0), P(0, 1), P(1, 1), P(0.5f, 0), P(0.5f, 1) })
                 {
+                    if (!Clear(c, 0.3f)) continue;
                     m.BoxMinMax(_band, c + new Vector3(-0.2f, 0f, -0.2f), c + new Vector3(0.2f, 0.45f, 0.2f));
                     for (int k = 0; k < 4; k++)
                     {
@@ -877,24 +904,44 @@ namespace FPSKit.EditorTools
                         m.Box(_rust, c + o + Vector3.up * (0.45f + hh * 0.5f), new Vector3(0.016f, hh, 0.016f), Quaternion.Euler(Rand(rng, -4f, 4f), 0f, Rand(rng, -4f, 4f)));
                     }
                 }
-                // A half-built course of block along one edge.
-                var s0 = P(0, 1); var s1 = P(1, 1);
-                m.BoxMinMax(_block, new Vector3(s0.x, roofY, s0.z - 0.1f), new Vector3(Mathf.Lerp(s0.x, s1.x, Rand(rng, 0.3f, 0.7f)), roofY + Rand(rng, 0.6f, 1.6f), s0.z + 0.1f));
+                // A half-built course of block along one edge (the far one, when the stair comes up the near one).
+                float reach = Rand(rng, 0.3f, 0.7f), high = Rand(rng, 0.6f, 1.6f);
+                foreach (float fz in new[] { 1f, 0f })
+                {
+                    var s0 = P(0, fz); var s1 = P(1, fz);
+                    var c0 = new Vector3(s0.x, roofY, s0.z - 0.1f); var c1 = new Vector3(Mathf.Lerp(s0.x, s1.x, reach), roofY + high, s0.z + 0.1f);
+                    if (keep.width > 0f && keep.Overlaps(Rect.MinMaxRect(c0.x, c0.z, c1.x, c1.z))) continue;
+                    m.BoxMinMax(_block, c0, c1);
+                    break;
+                }
             }
-            // Washing on a line, now and then.
+            // Washing on a line, now and then: its own mesh on the backdrop layer, without a collider. In the bake, the cloth
+            // hanging from 1 m to 1.75 m left an agent no headroom under the line, and it cut the roof in two.
             if (rng.NextDouble() < 0.3 && r.width > 6f)
             {
+                var wm = new TownMesh();
                 var a = P(0.1f, 0.6f); var c2 = P(0.9f, 0.6f);
-                m.Box(_steel, a + Vector3.up * 0.9f, new Vector3(0.04f, 1.8f, 0.04f), Quaternion.identity);
-                m.Box(_steel, c2 + Vector3.up * 0.9f, new Vector3(0.04f, 1.8f, 0.04f), Quaternion.identity);
+                wm.Box(_steel, a + Vector3.up * 0.9f, new Vector3(0.04f, 1.8f, 0.04f), Quaternion.identity);
+                wm.Box(_steel, c2 + Vector3.up * 0.9f, new Vector3(0.04f, 1.8f, 0.04f), Quaternion.identity);
                 float len = Vector3.Distance(a, c2);
                 for (float s = 0.4f; s < len - 0.4f; s += Rand(rng, 0.5f, 0.9f))
                 {
                     var p = Vector3.Lerp(a, c2, s / len) + Vector3.up * 1.75f;
-                    m.Box(Cloth(rng.Next(ClothColours.Length)), p - Vector3.up * 0.35f,
-                          new Vector3(Rand(rng, 0.3f, 0.6f), Rand(rng, 0.5f, 0.8f), 0.01f), Quaternion.LookRotation((c2 - a).normalized) * Quaternion.Euler(0, 90, 0));
+                    wm.Box(Cloth(rng.Next(ClothColours.Length)), p - Vector3.up * 0.35f,
+                           new Vector3(Rand(rng, 0.3f, 0.6f), Rand(rng, 0.5f, 0.8f), 0.01f), Quaternion.LookRotation((c2 - a).normalized) * Quaternion.Euler(0, 90, 0));
                 }
+                wm.Build(props, "Washing", LayerMask.NameToLayer("Backdrop"), "Untagged", collider: false);
             }
+        }
+
+        /// <summary>The patch of roof behind a stair's parapet gap that is kept clear (empty when the roof has no stair).</summary>
+        private static Rect StairClearing(Mass b)
+        {
+            if (b.stairSide < 0) return Rect.zero;
+            var (a0, b0) = FaceRun(b.r, b.stairSide);
+            var u = (b0 - a0).normalized; var inward = -SideOut3(b.stairSide);
+            Vector3 p = a0 + u * (b.stairU0 - 0.6f), q = a0 + u * (b.stairU1 + 0.6f) + inward * 3.5f;
+            return Rect.MinMaxRect(Mathf.Min(p.x, q.x), Mathf.Min(p.z, q.z), Mathf.Max(p.x, q.x), Mathf.Max(p.z, q.z));
         }
 
         private static readonly Color[] ClothColours =
@@ -1107,12 +1154,19 @@ namespace FPSKit.EditorTools
             if (b.enterable) PlanStair(b, f);
             BuildMass(b, props);
             BuildStair(b);
-            CompoundWall(r, f, rng, gate: true);
-            // A car in the yard, facing the gate, on some.
-            if (rng.NextDouble() < 0.55)
+            // A house that can be entered has its gate open: shut, the yard, the stair and the roof baked as one sealed island.
+            var gate = CompoundWall(r, f, rng, gate: true, canShut: !b.enterable);
+            // A car in the yard on some, parked along the wall beside the gate (on the side away from the house door in the
+            // wall). Parked across the back of the gate, it left a metre between car and wall and closed the yard off.
+            if (gate.built && rng.NextDouble() < 0.55)
             {
-                Vector2 gc = SideCentre(r, f) - SideOut(f) * (front * 0.5f);
-                _yardCars.Add(new Vector4(gc.x, 0f, gc.y, Mathf.Atan2(SideOut(f).x, SideOut(f).y) * Mathf.Rad2Deg + (rng.NextDouble() < 0.5 ? 90f : -90f)));
+                float side = gate.doorSide > 0f ? -1f : 1f;
+                float d = gate.at + side * 4.6f;
+                if (d - 2.8f > 0.3f && d + 2.8f < gate.len - 0.3f)
+                {
+                    Vector2 cp = gate.start + gate.along * d - SideOut(f) * Mathf.Min(front * 0.5f, 2.6f);
+                    _yardCars.Add(new Vector4(cp.x, 0f, cp.y, Mathf.Atan2(gate.along.x, gate.along.y) * Mathf.Rad2Deg + (rng.NextDouble() < 0.5 ? 0f : 180f)));
+                }
             }
             // A palm or two in the yard.
             if (rng.NextDouble() < 0.6)
@@ -1192,8 +1246,18 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>The wall round a plot, 2.2 m, with a car gate and a door on the street side.</summary>
-        private static void CompoundWall(Rect r, int front, System.Random rng, bool gate, Material wallMat = null)
+        /// <summary>Where a compound wall's gate went: its centre <see cref="at"/> metres along the front from
+        /// <see cref="start"/>, and the side of it the door in the wall is on.</summary>
+        private struct GateSpot { public bool built, shut; public Vector2 start, along; public float at, len, doorSide; }
+
+        /// <summary>
+        /// The wall round a plot, 2.2 m, with a car gate and a door on the street side. A shut gate (only where
+        /// <paramref name="canShut"/>) closes the plot to the navmesh altogether: everything inside the wall is put off
+        /// the bake, or the yard and anything on it would be an island no agent could reach.
+        /// </summary>
+        private static GateSpot CompoundWall(Rect r, int front, System.Random rng, bool gate, Material wallMat = null, bool canShut = true)
         {
+            var spot = new GateSpot();
             var m = Chunk(r.center);
             var wall = wallMat ?? PickPlaster(rng);
             const float H = 2.2f, T = 0.22f;
@@ -1216,8 +1280,10 @@ namespace FPSKit.EditorTools
                     var gmat = rng.NextDouble() < 0.5 ? _gateGreen : _gateBlue;
                     var gp = a0 + u * gc;
                     float gy = GroundHeightAt(gp.x, gp.z);
-                    if (rng.NextDouble() < 0.4)
+                    spot = new GateSpot { built = true, start = new Vector2(a0.x, a0.z), along = new Vector2(u.x, u.z), at = gc, len = len, doorSide = Mathf.Sign(dc - gc) };
+                    if (rng.NextDouble() < 0.4 && canShut)
                     {
+                        spot.shut = true;
                         m.Box(gmat, gp - u * 0.85f + Vector3.up * (gy + 1.1f), new Vector3(1.7f, 2.0f, 0.06f), Quaternion.LookRotation(nrm));
                         m.Box(gmat, gp + u * 0.85f + Vector3.up * (gy + 1.1f), new Vector3(1.7f, 2.0f, 0.06f), Quaternion.LookRotation(nrm));
                     }
@@ -1242,6 +1308,12 @@ namespace FPSKit.EditorTools
                 }
                 if (len > cur) m.Box(_coping, a0 + u * ((cur + len) * 0.5f) - nrm * T * 0.5f + Vector3.up * (yTop + 0.04f), new Vector3(len - cur, 0.08f, T + 0.08f), Quaternion.LookRotation(nrm));
             }
+            if (spot.shut)
+            {
+                var (low, high) = GroundRange(r);
+                NoEntryBox(r, low - 1f, high + 16f, T + 0.05f);
+            }
+            return spot;
         }
 
         /// <summary>A row house built to the pavement: two to four floors, a door in the middle. Returns whether it can be entered.</summary>

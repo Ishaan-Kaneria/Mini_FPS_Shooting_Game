@@ -91,7 +91,16 @@ namespace FPSKit.EditorTools
             foreach (var n in new[] { "GrandMosque", "Palace", "ClockTower", "BazaarGate", "Souk" })
                 if (GameObject.Find("Arena/Landmarks/" + n) == null) problems.Add($"no landmark {n}");
 
-            var path = new NavMeshPath();
+            // Reachability is proved in short legs. NavMesh.CalculatePath gives up on a long, polygon-dense route (its search
+            // has a node budget): from the start, 580 m across the town, it returned PathPartial for the citadel wall-walk
+            // and the keep roof while the same paths from the citadel courtyard were complete. So a grid of ground points is
+            // proved outward from the start, each from the nearest already proved, and every place is proved from those.
+            var reach = new Reach(home.position);
+            int hubs = 0, hubsOff = 0;
+            foreach (var g in GroundGrid(80f).OrderBy(g => (g - home.position).sqrMagnitude))
+                if (reach.Prove(g)) hubs++; else hubsOff++;
+            notes.Append($"\n  ground grid: {hubs} points proved from the start ({hubsOff} not: outside the town or inside a solid)");
+
             int reached = 0;
             foreach (var (name, at0) in places)
             {
@@ -99,18 +108,15 @@ namespace FPSKit.EditorTools
                 if (at.y == 0f) at.y = Ground(at);
                 if (!NavMesh.SamplePosition(at, out var hit, 3f, NavMesh.AllAreas))
                 { problems.Add($"{name} at {at} has no navmesh within 3 m"); continue; }
-                if (!NavMesh.CalculatePath(home.position, hit.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+                if (!reach.Prove(hit.position))
                 {
-                    // Where it got to, both ways: the gap is between the two ends.
-                    var back = new NavMeshPath();
-                    NavMesh.CalculatePath(hit.position, home.position, NavMesh.AllAreas, back);
-                    string fwd = path.corners.Length > 0 ? path.corners[path.corners.Length - 1].ToString() : "nowhere";
-                    string rev = back.corners.Length > 0 ? back.corners[back.corners.Length - 1].ToString() : "nowhere";
-                    problems.Add($"{name} at {hit.position} cannot be reached from the start (path {path.status}; from the start it gets to {fwd}, from there to {rev})");
+                    // Where it got to from the nearest proved point, and back: the gap is between the two ends.
+                    var (fwd, rev) = reach.Ends(hit.position);
+                    problems.Add($"{name} at {hit.position} cannot be reached (from the nearest proved point it gets to {fwd}, from there back to {rev})");
                     continue;
                 }
                 reached++;
-                notes.Append($"\n  {name}: reached ({PathLength(path):0} m)");
+                notes.Append($"\n  {name}: reached");
             }
             notes.Append($"\n  {reached}/{places.Count} famous locations reachable");
 
@@ -127,8 +133,7 @@ namespace FPSKit.EditorTools
                     if (!Physics.Raycast(p, Vector3.down, out var h, 60f)) continue;
                     if (h.collider.GetComponent<MeshRenderer>() != r || h.point.y < Ground(h.point) + 3f) continue;   // only roofs, not yards
                     roofs++;
-                    if (NavMesh.SamplePosition(h.point, out var nh, 0.6f, NavMesh.AllAreas) &&
-                        (!NavMesh.CalculatePath(home.position, nh.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete))
+                    if (NavMesh.SamplePosition(h.point, out var nh, 0.6f, NavMesh.AllAreas) && !reach.Prove(nh.position, remember: false))
                     {
                         bad++;
                         if (islands.Count < 12) islands.Add($"({nh.position.x:0},{nh.position.y:0.0},{nh.position.z:0})");
@@ -213,28 +218,80 @@ namespace FPSKit.EditorTools
                     sb.AppendLine(line.ToString());
                 }
             }
-            // Down the keep's west lane to the south-west landing, every 10 cm: the navmesh height found, and whether a
-            // path from the lane's middle gets there.
+            // A broken roof stair, step by step: where the wall is, the tread, the navmesh on it, and the volumes there.
             {
-                var mid = new Vector3(312.3f, 28.3f, 368f);
-                NavMesh.SamplePosition(mid, out var mh, 1f, NavMesh.AllAreas);
-                var pth = new NavMeshPath();
-                for (float z = 366f; z >= 361.4f; z -= 0.1f)
+                if (Physics.Raycast(new Vector3(-257.8f, 7.2f, -327.3f), Vector3.back, out var wallHit, 20f))
+                    sb.AppendLine($"== stair wall: {wallHit.collider.name} at z {wallHit.point.z:0.00}");
+                float wz = wallHit.point.z;
+                for (float x = -262f; x <= -253f; x += 0.25f)
                 {
-                    float expect = z > 363.4f ? 26.2f + (372.6f - z) / 9.2f * 3.905f : 30.1f;
-                    bool f = NavMesh.SamplePosition(new Vector3(312.3f, expect, z), out var nh, 0.15f, NavMesh.AllAreas);
-                    string st = "-";
-                    if (f) { NavMesh.CalculatePath(mh.position, nh.position, NavMesh.AllAreas, pth); st = pth.status.ToString(); }
-                    sb.AppendLine($"  z {z:0.00} expect {expect:0.00} navmesh {(f ? nh.position.y.ToString("0.00") + " at z " + nh.position.z.ToString("0.00") : "none")} {st}");
+                    var line = new StringBuilder($"  x {x:0.00}:");
+                    foreach (float off in new[] { 0.3f, 0.6f, 0.82f, 1.05f, 1.3f })
+                    {
+                        float z = wz + off + 0.02f;
+                        Physics.Raycast(new Vector3(x, 14f, z), Vector3.down, out var h, 20f);
+                        bool nav = NavMesh.SamplePosition(h.point, out var nh, 0.1f, NavMesh.AllAreas);
+                        line.Append($" [{off:0.00}] {h.point.y:0.00}{(nav ? "*" : " ")}");
+                    }
+                    sb.AppendLine(line.ToString());
                 }
-                foreach (var h in Physics.RaycastAll(new Vector3(312.3f, 60f, 363.3f), Vector3.down, 60f).OrderBy(h => -h.point.y))
-                    sb.AppendLine($"  above the junction: {h.collider.name} y={h.point.y:0.00}");
-                foreach (var h in Physics.RaycastAll(new Vector3(312.3f, 31f, 368f), Vector3.up, 30f).OrderBy(h => h.point.y))
-                    sb.AppendLine($"  over the lane: {h.collider.name} y={h.point.y:0.00}");
+                foreach (var v in vols)
+                {
+                    var c = v.transform.TransformPoint(v.center); var e = v.size * 0.5f;
+                    if (c.x + e.x > -262f && c.x - e.x < -253f && c.z + e.z > wz - 0.5f && c.z - e.z < wz + 2f)
+                        sb.AppendLine($"  volume y {c.y - e.y:0.0}..{c.y + e.y:0.0} x {c.x - e.x:0.0}..{c.x + e.x:0.0} z {c.z - e.z:0.00}..{c.z + e.z:0.00}");
+                }
             }
             System.IO.File.WriteAllText("Build/TownProbePoints.txt", sb.ToString());
             Debug.Log("[FPSKit] probe points written");
             FPSKitBatch.Exit(0);
+        }
+
+        /// <summary>
+        /// Points proved reachable from the start, and the proof of a new one: a complete path from one of the three proved
+        /// points nearest it. Legs stay short, inside the search's budget.
+        /// </summary>
+        sealed class Reach
+        {
+            readonly List<Vector3> _proved = new List<Vector3>();
+            readonly NavMeshPath _path = new NavMeshPath();
+            public Reach(Vector3 start) { _proved.Add(start); }
+
+            IEnumerable<Vector3> Nearest(Vector3 t) => _proved.OrderBy(p => (p - t).sqrMagnitude).Take(3);
+
+            public bool Prove(Vector3 t, bool remember = true)
+            {
+                foreach (var p in Nearest(t))
+                    if (NavMesh.CalculatePath(p, t, NavMesh.AllAreas, _path) && _path.status == NavMeshPathStatus.PathComplete)
+                    {
+                        if (remember) _proved.Add(t);
+                        return true;
+                    }
+                return false;
+            }
+
+            public (string fwd, string rev) Ends(Vector3 t)
+            {
+                var p = Nearest(t).First();
+                NavMesh.CalculatePath(p, t, NavMesh.AllAreas, _path);
+                string fwd = _path.corners.Length > 0 ? _path.corners[_path.corners.Length - 1].ToString() : "nowhere";
+                NavMesh.CalculatePath(t, p, NavMesh.AllAreas, _path);
+                string rev = _path.corners.Length > 0 ? _path.corners[_path.corners.Length - 1].ToString() : "nowhere";
+                return (fwd, rev);
+            }
+        }
+
+        /// <summary>Navmesh on the ground (not a roof) at every node of a square grid over the town.</summary>
+        static IEnumerable<Vector3> GroundGrid(float step)
+        {
+            for (float x = -480f; x <= 480f; x += step)
+                for (float z = -480f; z <= 480f; z += step)
+                {
+                    var p = new Vector3(x, 0f, z);
+                    p.y = Ground(p);
+                    if (NavMesh.SamplePosition(p, out var h, step * 0.4f, NavMesh.AllAreas) && h.position.y < Ground(h.position) + 1.5f)
+                        yield return h.position;
+                }
         }
 
         static float Ground(Vector3 p)
@@ -251,13 +308,6 @@ namespace FPSKit.EditorTools
             foreach (var h in Physics.RaycastAll(new Vector3(p.x, maxY, p.z), Vector3.down, maxY - minY, ~0, QueryTriggerInteraction.Ignore).OrderBy(h => -h.point.y))
                 return h.point + Vector3.up * 0.1f;
             return new Vector3(p.x, minY, p.z);
-        }
-
-        static float PathLength(NavMeshPath p)
-        {
-            float l = 0f;
-            for (int i = 1; i < p.corners.Length; i++) l += Vector3.Distance(p.corners[i - 1], p.corners[i]);
-            return l;
         }
     }
 }

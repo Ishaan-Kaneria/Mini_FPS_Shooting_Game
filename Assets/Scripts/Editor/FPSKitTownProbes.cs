@@ -174,8 +174,22 @@ namespace FPSKit.EditorTools
             var reflection = Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None).Where(p => p.enabled).ToList();
             foreach (var p in reflection) p.enabled = false;
             bool ok;
-            try { ok = Lightmapping.Bake(); }
+            try
+            {
+                ok = Lightmapping.Bake();
+                // Now and then (one build in five on 2026-10-21) the bake finishes and keeps no probes at all; the gun, the
+                // civilians and the cars then had no light but the sun. Baked again from a clear cache, it keeps them.
+                for (int again = 1; again <= 2 && (LightmapSettings.lightProbes?.count ?? 0) < _townProbeCount * 0.9f; again++)
+                {
+                    Debug.LogWarning($"[FPSKit] town light probes: the bake kept {LightmapSettings.lightProbes?.count ?? 0} of {_townProbeCount}; " +
+                                     $"clearing the GI cache and baking again ({again})");
+                    Lightmapping.Clear();
+                    Lightmapping.ClearDiskCache();
+                    ok = Lightmapping.Bake();
+                }
+            }
             finally { foreach (var p in reflection) p.enabled = true; }
+            if ((LightmapSettings.lightProbes?.count ?? 0) == 0) Debug.LogError("[FPSKit] town light probes: none baked (VerifyTown fails on it)");
             string dataFolder = path.Substring(0, path.Length - ".unity".Length);
             if (AssetDatabase.IsValidFolder(dataFolder))
                 foreach (var guid in AssetDatabase.FindAssets("ReflectionProbe-", new[] { dataFolder }))

@@ -57,6 +57,15 @@ namespace FPSKit.EditorTools
             if (player == null) { problems.Add("no player"); return; }
             if (!NavMesh.SamplePosition(player.transform.position, out var home, 4f, NavMesh.AllAreas)) { problems.Add("the player's start is not on the navmesh"); return; }
 
+            // ---- light probes: baked into the scene's lighting data (one bake in five or so kept none, and the gun,
+            // the civilians and the cars went dark) ----
+            var group = UnityEngine.Object.FindAnyObjectByType<LightProbeGroup>();
+            int placed = group != null ? group.probePositions.Length : 0, baked = LightmapSettings.lightProbes?.count ?? 0;
+            if (placed == 0) problems.Add("no light probes placed");
+            else if (baked < placed * 0.9f) problems.Add($"light probes not baked: {baked} of {placed} placed");
+            else notes.AppendLine($"  light probes: {baked} baked of {placed} placed");
+            if (LightmapSettings.lightmaps.Length > 0) problems.Add($"{LightmapSettings.lightmaps.Length} lightmaps baked (probes only wanted)");
+
             // ---- famous locations ----
             var places = new List<(string name, Vector3 at)>
             {

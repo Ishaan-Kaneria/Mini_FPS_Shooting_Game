@@ -1929,7 +1929,10 @@ namespace FPSKit.EditorTools
             // A soft fill on the hands and gun in the open desert-style arenas. A low sun
             // behind the player, or any roof shadow, left the rifle nearly black; no
             // shadows and a short range, so it lights the view model and nothing else.
-            if (_theme.openZone && !_theme.volcanicZone && !_theme.snowZone && !_theme.rooftopZone && !_theme.parkZone)
+            // Not in the desert town: half a metre from the gun it was ten times the sun, so the gun stayed evenly lit in
+            // sun and shade alike (2026-10-21). There the town's light probes give the gun the ambient of where it is, the
+            // bounce light lifts its far side, and FirstPersonShade puts it in the shade.
+            if (_theme.openZone && !_theme.volcanicZone && !_theme.snowZone && !_theme.rooftopZone && !_theme.parkZone && !_theme.desertTownZone)
             {
                 var fill = new GameObject("HandsFill").AddComponent<Light>();
                 fill.transform.SetParent(weaponHolder.transform, false);

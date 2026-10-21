@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Rendering;
 
 namespace FPSKit.EditorTools
@@ -16,7 +17,8 @@ namespace FPSKit.EditorTools
     ///
     ///   FPSKit > Player > Shots (Desert Outpost)  /  Shots (Fairground)
     ///
-    /// Poses: stand, walk, run, sprint, runfire, aim, reload, punch, double, kick, down.
+    /// Poses: stand, walk, run, sprint, runfire, aim, reload, punch, double, kick, down; shade, shadeoff and shadefire (in a
+    /// building's shade near the start: standing, without FirstPersonShade, and on the frame of a shot's flash).
     /// Writes &lt;folder&gt;/&lt;tag&gt;_&lt;pose&gt;.png. Game time runs at a fixed step
     /// (Time.captureDeltaTime), so a pose is the same however slowly an unfocused editor draws.
     /// Runs inside the open editor and leaves it as it was (start scene, time, inputs).
@@ -121,6 +123,18 @@ namespace FPSKit.EditorTools
         {
             _batch = new Queue<(string, string)>(new[] { Arenas[0] });
             _onlyPoses = "stand,hand_idle,hand_walk,hand_run,hand_fire,hand_aim";
+            EditorApplication.update += NextArena;
+        }
+
+        /// <summary>
+        /// Batch: the light on the gun in the Desert -- in the sun, in a building's shade (FirstPersonShade), and firing
+        /// there on the frame the muzzle flash is lit (FPSMuzzleFlashLight).
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchLight
+        /// </summary>
+        public static void BatchLight()
+        {
+            _batch = new Queue<(string, string)>(new[] { Arenas[0] });
+            _onlyPoses = System.Environment.GetEnvironmentVariable("FPSKIT_SHOT_POSES") ?? "stand,shade,shadeoff,shadefire,hand_idle";
             EditorApplication.update += NextArena;
         }
 
@@ -298,6 +312,15 @@ namespace FPSKit.EditorTools
                 case "hand_fire": MobileInput.SetFireButton(_frame >= Frames(1f)); return _frame >= Frames(1f) + 2 && Shoot(closeUp: true);
                 case "hand_aim": MobileInput.Aim = true; return _frame >= Frames(1.0f) && Shoot(closeUp: true);
                 case "down": Pitch(65f); return _frame >= Frames(1.2f) && Shoot();
+                // In a building's shade: standing, and firing (shot on a frame the flash is lit, which lasts one or two).
+                // shadeoff: the same without FirstPersonShade, to see what it does.
+                case "shade":
+                case "shadeoff":
+                case "shadefire":
+                    if (_phase == 0) { if (!IntoShade()) { Report += $"{_pose}: no shade near the start\n"; return true; } _phase = 1; _frame = 0; return false; }
+                    if (_pose != "shadefire") return _frame >= Frames(1.2f) && ShootShaded(_pose == "shade");
+                    MobileInput.SetFireButton(_frame >= Frames(1.2f));
+                    return _frame >= Frames(1.2f) && FlashLit() && ShootShaded(true);
                 case "walk": MobileInput.Move = new Vector2(0f, 0.45f); return _frame >= Frames(1.6f) && Shoot();
                 case "run": MobileInput.Move = new Vector2(0f, 1f); return _frame >= Frames(1.6f) && Shoot();
                 case "sprint":
@@ -338,6 +361,80 @@ namespace FPSKit.EditorTools
                     Report += $"no pose {_pose}\n";
                     return true;
             }
+        }
+
+        /// <summary>
+        /// Shoots with FirstPersonShade on or off, and reports how far in shade it put the gun and the sun's brightness
+        /// the arms camera was drawn with (against the sun's own).
+        /// </summary>
+        static bool ShootShaded(bool shadeOn)
+        {
+            var shade = Object.FindAnyObjectByType<FirstPersonShade>();
+            var sun = Sun();
+            float full = sun != null ? sun.intensity : 0f, seen = -1f;
+            void Begin(ScriptableRenderContext context, Camera cam) { if (shade != null && cam == shade.armsCamera && sun != null) seen = sun.intensity; }
+            if (shade != null && !shadeOn) shade.enabled = false;
+            RenderPipelineManager.beginCameraRendering += Begin;     // after FirstPersonShade's own handler: sees its change
+            try { Shoot(); }
+            finally
+            {
+                RenderPipelineManager.beginCameraRendering -= Begin;
+                if (shade != null) shade.enabled = true;
+            }
+            string line = $"{_pose}: FirstPersonShade {(shade == null ? "missing" : shadeOn ? shade.Shade.ToString("0.00") : "off")}, sun {full:0.00}, " +
+                          $"drawn on the gun at {(seen < 0f ? "(arms camera not rendered)" : seen.ToString("0.00"))}";
+            Report += line + "\n";
+            Debug.Log("[FPSKit] " + line);
+            return true;
+        }
+
+        static Light Sun()
+        {
+            if (RenderSettings.sun != null) return RenderSettings.sun;
+            foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (l.type == LightType.Directional && l.shadows != LightShadows.None) return l;
+            return null;
+        }
+
+        static bool FlashLit()
+        {
+            var flash = _weapon != null ? _weapon.muzzleFlashLight : null;
+            var light = flash != null ? flash.GetComponent<Light>() : null;
+            return light != null && light.enabled;
+        }
+
+        /// <summary>
+        /// Puts the player on the nearest open-sky navmesh spot within 30 m of the start where the body, the gun and a
+        /// little round them are all shaded from the sun; facing as at the start.
+        /// </summary>
+        static bool IntoShade()
+        {
+            var sun = Sun();
+            if (sun == null || !NavMesh.SamplePosition(_startPos, out var home, 3f, NavMesh.AllAreas)) return false;
+            float lift = _startPos.y - home.position.y;
+            Vector3 toSun = -sun.transform.forward;
+            int mask = ~LayerMask.GetMask("Player", "FirstPerson", "PlayerBounds", "Ignore Raycast", "UI", "Civilian", "Enemy");
+            var around = new[] { Vector3.zero, Vector3.right * 0.6f, Vector3.left * 0.6f, Vector3.forward * 0.6f, Vector3.back * 0.6f };
+            for (float r = 2f; r <= 30f; r += 1f)
+                for (int a = 0; a < 24; a++)
+                {
+                    float angle = a * 15f * Mathf.Deg2Rad;
+                    var at = _startPos + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * r;
+                    if (!NavMesh.SamplePosition(at, out var hit, 1f, NavMesh.AllAreas)) continue;
+                    Vector3 feet = hit.position;
+                    if (Physics.Raycast(feet + Vector3.up * 2f, Vector3.up, 100f, mask, QueryTriggerInteraction.Ignore)) continue;   // indoors
+                    bool shaded = true;
+                    foreach (float h in new[] { 0.9f, 1.3f, 1.7f })
+                        foreach (var side in around)
+                            shaded &= Physics.Raycast(feet + Vector3.up * h + side, toSun, 200f, mask, QueryTriggerInteraction.Ignore);
+                    if (!shaded) continue;
+                    var cc = _motor.GetComponent<CharacterController>();
+                    if (cc != null) cc.enabled = false;
+                    _motor.transform.SetPositionAndRotation(feet + Vector3.up * lift, _startRot);
+                    if (cc != null) cc.enabled = true;
+                    return true;
+                }
+            return false;
         }
 
         static bool AtImpact(MeleeStrike.Strike strike)

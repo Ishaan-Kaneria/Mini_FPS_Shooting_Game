@@ -3541,6 +3541,17 @@ cars and the player's body take the light of where they stand; and reflection pr
   the gun stayed in full sun. `FirstPersonShade` (added by `ViewModelRig` to the arms camera) casts three rays from the
   gun towards the sun every 0.05 s; the blocked share, eased at 14 a second, dims the sun by that share times its
   shadow strength while the arms camera renders (`RenderPipelineManager.beginCameraRendering`) and puts it back after.
+* **The hands' fill light was what kept the gun flat.** `HandsFill` (2026-10-03: a point light 0.25 m over the hands,
+  intensity 3, for the desert-style arenas, when the view model had no shadows and a low sun left the rifle black)
+  is, half a metre away, about ten times the sun. With it, the gun measured the same in the sun, in a building's
+  shade, and with the sun switched off for the arms camera altogether (`FPSKitPlayerShots` poses `shade`, `shadeoff`,
+  which report the sun's brightness the arms camera drew with). It is gone from the desert town, where the light
+  probes, the bounce light and `FirstPersonShade` light the gun as the street round it; the other open arenas keep it
+  until they have probes. Measured after (tonemapped handguard against the pavement): in the sun 106 against 122, in
+  the shade 69 against 85, the same ratio sun to shade as the street. The gun reads darker than before, most of all
+  facing into the sun (its back is what is seen) and in the near-black gloves; a weak fill can come back if that is
+  too much, but anything near the gun outshines the sun (inverse square). See it: `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchLight`
+  (stand, shade, shadeoff, shadefire; stop Unity after, it does not exit).
 * **SSAO on the gun**: URP 17 (Render Graph) runs the renderer's features per camera in the stack, so the arms camera
   gets the SSAO pass on its own depth and normals; nothing to add.
 * **Light probes** (`FPSKitTownProbes`): one `LightProbeGroup` of about 2250 probes, two heights each (0.7 and 2.4 m):
@@ -3556,6 +3567,10 @@ cars and the player's body take the light of where they stand; and reflection pr
   realtime. CPU lightmapper (it runs headless), about 25 s, 0 lightmaps. Output: `Scenes/DesertOutpost/LightingData.asset`
   and `Scenes/DesertOutpost_Lighting.lighting`. The phone copy keeps the probes (they are cheap) and drops the
   reflection probes.
+* **Bug: a bake with no probes.** One build in five or so (2026-10-21) the bake finished, said done, and kept none (the
+  lighting data 19 KB instead of 1.6 MB); the full log was lost. `BakeTownProbes` now bakes again from a cleared GI
+  cache (twice at most) when it keeps under 90% of the probes placed, and `VerifyTown` fails if the scene's light
+  probes are not baked or any lightmap was.
 * **Bug: everything flat white.** The first bake took the 8 realtime street reflection probes in with it and captured
   them headless, with no graphics device, into blank cubemaps (`ReflectionProbe-N.exr`); the lighting data then
   handed those to the probes in play, and everything inside their boxes (roads, near buildings, palms, the gun) drew

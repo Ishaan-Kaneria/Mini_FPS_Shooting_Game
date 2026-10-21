@@ -51,6 +51,7 @@ namespace FPSKit.EditorTools
         private static void ResetTownBuildings()
         {
             _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
+            _palletPrefab = null;
             _volumes = null; _signNames = null; _roadSignNames = null;
             _oldSquares.Clear(); _vacantLots.Clear();
         }
@@ -473,6 +474,8 @@ namespace FPSKit.EditorTools
             public int arches, joinery;
             public bool roundTop, hood, surround, muntins;
             public System.Random rng;
+            /// <summary>Its shops' look, chosen once per building from the layout's seed (FPSKitTownShopfront.ShopLook).</summary>
+            public ShopLookData shopLook;
             /// <summary>Ground-floor openings per side, (u0, u1, v0, v1) with v above the floor: what the interior cuts too.</summary>
             public readonly List<Vector4>[] groundHoles = { new List<Vector4>(), new List<Vector4>(), new List<Vector4>(), new List<Vector4>() };
             /// <summary>Where an outside stair reaches the roof: side and the span along it (parapet open there). -1 for none.</summary>

@@ -36,9 +36,9 @@ MonoBehaviour:
   fogEnabled: 1
   fogColor: {r: 0.82, g: 0.79, b: 0.73, a: 1}
   fogDensity: 0.00065
-  ambientSky: {r: 0.76, g: 0.81, b: 0.89, a: 1}
-  ambientEquator: {r: 0.86, g: 0.78, b: 0.66, a: 1}
-  ambientGround: {r: 0.66, g: 0.56, b: 0.44, a: 1}
+  ambientSky: {r: 0.87, g: 0.93, b: 1.02, a: 1}
+  ambientEquator: {r: 0.99, g: 0.9, b: 0.76, a: 1}
+  ambientGround: {r: 0.76, g: 0.64, b: 0.51, a: 1}
   arenaSize: 1000
   wallHeight: 5
   randomSeed: 21
@@ -130,7 +130,7 @@ MonoBehaviour:
   ambienceVolume: 0.35
   enablePostProcessing: 1
   bloomIntensity: 0.45
-  postExposure: 0.05
+  postExposure: 0.25
   saturation: 0
   contrast: 10
   colorFilter: {r: 1, g: 0.975, b: 0.94, a: 1}

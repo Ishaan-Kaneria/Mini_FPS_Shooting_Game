@@ -292,11 +292,12 @@ namespace FPSKit.EditorTools
                     t.fogDensity = 0.00065f;
                     // Shade lifted (his 2026-10-03 rule: no black faces), cooler from above as a clear sky is. Deeper since
                     // 2026-10-21 (asked for: one side of a street in deep shadow under the 43-degree sun); the bounce
-                    // light and the sky ambient still keep shaded faces off black.
+                    // light and the sky ambient still keep shaded faces off black. All three 15% brighter since the second
+                    // 2026-10-21 pass ("the game reads as too dark overall"), the shadows kept as deep.
                     t.shadowStrength = 0.8f;
-                    t.ambientSky = new Color(0.76f, 0.81f, 0.89f);
-                    t.ambientEquator = new Color(0.86f, 0.78f, 0.66f);
-                    t.ambientGround = new Color(0.66f, 0.56f, 0.44f);
+                    t.ambientSky = new Color(0.87f, 0.93f, 1.02f);
+                    t.ambientEquator = new Color(0.99f, 0.90f, 0.76f);
+                    t.ambientGround = new Color(0.76f, 0.64f, 0.51f);
                     t.floorColor = new Color(0.62f, 0.54f, 0.38f);
                     t.wallColor = new Color(0.82f, 0.76f, 0.66f);
                     t.coverColors = new[]
@@ -322,7 +323,7 @@ namespace FPSKit.EditorTools
                     // The grade he signed off on in 2026-10-03, a touch less warm: the photographed sky and textures
                     // carry their own colour now and do not need pushing.
                     t.bloomIntensity = 0.45f;
-                    t.postExposure = 0.05f;
+                    t.postExposure = 0.25f;                    // 0.05 until "too dark overall": +0.2 EV
                     t.saturation = 0f;
                     t.colorFilter = new Color(1f, 0.975f, 0.94f);
                     t.vignetteIntensity = 0.2f;

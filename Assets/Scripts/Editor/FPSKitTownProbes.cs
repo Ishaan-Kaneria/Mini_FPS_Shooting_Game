@@ -27,6 +27,8 @@ namespace FPSKit.EditorTools
     public static partial class FPSKitSceneBuilder
     {
         private static int _townProbeCount;
+        /// <summary>The probe bake's indirect strength (see BakeTownProbes); VerifyTown checks the probes against the ambient.</summary>
+        private const float TownProbeIndirect = 2.75f;
 
         private static void PlaceTownLightProbes(Transform root)
         {
@@ -161,6 +163,12 @@ namespace FPSKit.EditorTools
             settings.indirectSampleCount = 128;
             settings.environmentSampleCount = 128;
             settings.maxBounces = 2;
+            // The probes light the moving things; the static ones (walls, roads) take the sky ambient whole, unshaded by
+            // the street. At the bake's own strength the probes gave a civilian or a car two to five times less light than
+            // the wall beside it (measured 2026-10-21: probe sides 0.17 against the ambient's 0.56), so people read dark and
+            // cut out. Scaled so the probes' sides average about 0.8 of the walls' ambient (2.75: 0.46), the sky-facing top
+            // a little over it; the probes' own gradient -- a shaded street darker than a sunlit one -- is kept.
+            settings.indirectScale = TownProbeIndirect;
             settings.lightProbeSampleCountMultiplier = 2f;
             settings.ao = false;
             settings.lightmapResolution = 1f;

@@ -8,8 +8,11 @@ using UnityEngine.Rendering;
 /// the shadow it renders holds the gun's own parts and nothing of the town: in the shade of a building the gun stayed in
 /// full sun, the brightest thing on screen. This asks the world instead: a few rays from the gun towards the sun,
 /// several times a second; the share that is blocked is how much of the gun is in shade. While the arms camera renders,
-/// the sun is dimmed by that share times its shadow strength -- exactly what a shadow takes off a lit surface -- and put
-/// back for every other camera. The change eases in over a few hundredths of a second, as stepping into a shadow does.
+/// the sun is dimmed towards <see cref="shadedSunShare"/> of itself by that share, and put back for every other camera.
+/// The change eases in over a few hundredths of a second, as stepping into a shadow does.
+///
+/// The share in full shade was the sun's shadow strength (0.8, leaving 20%: 0.33 of the desert's 1.65), what a shadow
+/// takes off a lit wall; the gun is close and its detail is what the player reads, so it keeps 30% (0.50 of 1.65).
 ///
 /// Sits on the arms camera (ViewModelRig adds it). Costs three raycasts every 0.05 s.
 /// </summary>
@@ -26,6 +29,8 @@ public class FirstPersonShade : MonoBehaviour
     public float ease = 14f;
     [Tooltip("How far towards the sun to look for anything casting shade, in metres.")]
     public float reach = 160f;
+    [Tooltip("How much of the sun stays on the gun in full shade (a shadowed wall keeps 1 - the sun's shadow strength, 0.2 in the desert).")]
+    [Range(0f, 1f)] public float shadedSunShare = 0.3f;
 
     Light _sun;
     float _shade, _target, _next, _saved;
@@ -87,7 +92,7 @@ public class FirstPersonShade : MonoBehaviour
         var sun = Sun();
         if (sun == null) return;
         _saved = sun.intensity;
-        sun.intensity = _saved * Mathf.Lerp(1f, 1f - sun.shadowStrength, _shade);
+        sun.intensity = _saved * Mathf.Lerp(1f, shadedSunShare, _shade);
         _dimmed = true;
     }
 

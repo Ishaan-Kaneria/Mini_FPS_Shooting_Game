@@ -349,6 +349,9 @@ namespace FPSKit.EditorTools
         /// <summary>The desert town: famous locations reachable, no roof islands, civilians/traffic/cars/technicals wired (FPSKitTownTest).</summary>
         public static void VerifyTown() => FPSKitTownTest.VerifyTown();
 
+        /// <summary>A round's strike in the desert town is drawn for what it struck, and endless firing stays in its pools (FPSKitImpactTest).</summary>
+        public static void VerifyImpacts() => FPSKitImpactTest.VerifyImpacts();
+
         /// <summary>The desert town's assets made ready for URP (FPSKitTownAssets). -fpskitApply rebuilds every prefab.</summary>
         public static void PrepareTownAssets() => Run(() => FPSKitTownAssets.Prepare(HasFlag("-fpskitApply")));
 

@@ -51,6 +51,78 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>
+        /// The people and cars are lit as the street round them: every civilian, traffic, parked, drivable and technical
+        /// renderer receives shadows and blends the light probes on a lit URP shader; and the probes, where people walk, give
+        /// about what the walls beside them take from the sky (they gave two to five times less before the bake was scaled,
+        /// FPSKitTownProbes.TownProbeIndirect, and people read dark and cut out).
+        /// </summary>
+        static void CheckDynamicLighting(List<string> problems, StringBuilder notes)
+        {
+            int renderers = 0, wrong = 0;
+            string first = null;
+            var roots = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/FPSKit_Generated/Town" }).Select(AssetDatabase.GUIDToAssetPath)
+                .Where(p => p.Contains("Civilian_0") || p.Contains("Traffic_") || p.Contains("/Parked/"))
+                .Select(AssetDatabase.LoadAssetAtPath<GameObject>).ToList();
+            roots.AddRange(UnityEngine.Object.FindObjectsByType<DrivableCar>(FindObjectsSortMode.None).Select(c => c.gameObject));
+            roots.AddRange(UnityEngine.Object.FindObjectsByType<TechnicalTruck>(FindObjectsSortMode.None).Select(c => c.gameObject));
+            foreach (var go in roots)
+                foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer || !r.enabled) continue;
+                    renderers++;
+                    bool ok = r.receiveShadows && r.lightProbeUsage == UnityEngine.Rendering.LightProbeUsage.BlendProbes &&
+                              r.sharedMaterials.All(m => m == null || m.shader.name == "Universal Render Pipeline/Lit" || m.shader.name == "Universal Render Pipeline/Simple Lit");
+                    if (ok) continue;
+                    wrong++;
+                    first ??= $"{go.name}/{r.name} (receive {r.receiveShadows}, probes {r.lightProbeUsage})";
+                }
+            if (renderers == 0) problems.Add("no civilian or car renderers found to check");
+            else if (wrong > 0) problems.Add($"{wrong} of {renderers} civilian/car renderers not lit by the probes on a lit URP shader, e.g. {first}");
+
+            // The probes where people walk against the ambient the walls take.
+            float Side(UnityEngine.Rendering.SphericalHarmonicsL2 sh)
+            {
+                var c = new Color[4];
+                sh.Evaluate(new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right }, c);
+                return c.Average(x => 0.2126f * x.r + 0.7152f * x.g + 0.0722f * x.b);
+            }
+            if (LightmapSettings.lightProbes == null || LightmapSettings.lightProbes.count == 0) return;   // reported above
+            float ambient = Side(RenderSettings.ambientProbe), probes = 0f;
+            var walks = new[] { new Vector2(0f, -100f), new Vector2(11.5f, -60f), new Vector2(11.5f, -200f), new Vector2(135f, -60f),
+                                new Vector2(-130f, 20f), new Vector2(-200f, 0f), new Vector2(200f, 25f) };
+            foreach (var w in walks)
+            {
+                float y = Physics.Raycast(new Vector3(w.x, 300f, w.y), Vector3.down, out var hit, 600f) ? hit.point.y : 0f;
+                LightProbes.GetInterpolatedProbe(new Vector3(w.x, y + 1.2f, w.y), null, out var sh);
+                probes += Side(sh) / walks.Length;
+            }
+            float ratio = probes / Mathf.Max(0.001f, ambient);
+            if (ratio < 0.6f || ratio > 1.4f)
+                problems.Add($"light probes where people walk give {ratio:0.00} of the walls' ambient from the side (0.6-1.4 wanted: {probes:0.00} against {ambient:0.00})");
+            else notes.AppendLine($"  people and cars: {renderers} renderers on the probes; probes give {ratio:0.00} of the walls' ambient from the side");
+        }
+
+        /// <summary>Every collider of the town that a round can strike carries a surface physics material (FPSImpactManager).</summary>
+        static void CheckSurfaces(List<string> problems, StringBuilder notes)
+        {
+            var arena = GameObject.Find("Arena");
+            if (arena == null) { problems.Add("no Arena in the scene"); return; }
+            int env = LayerMask.NameToLayer("Environment"), total = 0, missing = 0;
+            var kinds = new Dictionary<string, int>();
+            foreach (var c in arena.GetComponentsInChildren<Collider>(true))
+            {
+                if (c.isTrigger || c is WheelCollider || c is CharacterController || c.CompareTag("Flesh")) continue;
+                if (c.gameObject.layer != env && !(c is TerrainCollider)) continue;
+                total++;
+                if (c.sharedMaterial == null || !c.sharedMaterial.name.StartsWith("Surface_")) { missing++; continue; }
+                kinds[c.sharedMaterial.name] = kinds.TryGetValue(c.sharedMaterial.name, out int k) ? k + 1 : 1;
+            }
+            if (total == 0) problems.Add("no colliders found in the town");
+            else if (missing > total * 0.02f) problems.Add($"{missing} of {total} town colliders without a surface physics material");
+            else notes.AppendLine($"  surfaces: {total - missing} of {total} colliders ({string.Join(", ", kinds.Select(kv => $"{kv.Value} {kv.Key.Substring(8)}"))})");
+        }
+
         static void Check(List<string> problems, StringBuilder notes)
         {
             var player = GameObject.FindWithTag("Player");
@@ -79,6 +151,9 @@ namespace FPSKit.EditorTools
             if (covers.Length < 100) problems.Add($"only {covers.Length} cover spots outside the shops (100 or more wanted)");
             else if (crouchable < covers.Length * 0.9f) problems.Add($"cover with nowhere to crouch beside it on the navmesh: {covers.Length - crouchable} of {covers.Length}");
             else notes.AppendLine($"  cover outside the shops: {covers.Length} spots, {crouchable} with a place to crouch beside them");
+
+            CheckDynamicLighting(problems, notes);
+            CheckSurfaces(problems, notes);
 
             // ---- famous locations ----
             var places = new List<(string name, Vector3 at)>

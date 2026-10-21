@@ -3647,3 +3647,45 @@ face, no glass or door, the sign a quad on a 4 cm board, a 6 cm plinth strip.
   (< 1.3 m) at crouched height (0.95 m) -- how it is used: head down under fire, up to shoot. A first step towards the
   Stage 4 cover bake (Docs/ENEMY_AI_PLAN.md), which can take these over.
 * See it: `CaptureViews` shots 26-29 (shop fronts, a side street's pavement, a shop row's base).
+
+## Brighter, shops varied, people and cars lit by the probes, bullet impacts (2026-10-21, second pass)
+
+Asked for (a pasted brief): the game too dark overall and the gun too dark in shade; too many shopfronts alike;
+the 15 cars and 60 civilians disconnected from the light of the street, the people too dark; a bullet impact system
+(marks, concrete dust, metal sparks and flash, pooled, marks gone at 30 s).
+
+* **Brighter**: the desert theme's three ambient colours 15% up, post exposure 0.05 -> 0.25 (+0.2 EV), the sky drawn
+  at exposure 1.1 (was 1.0). Shadows as deep as before (strength 0.8). Theme change: ResetThemes, then rebuild.
+* **The gun in shade**: `FirstPersonShade.shadedSunShare` (0.3): in full shade the arms camera draws the sun at 30% of
+  itself (0.50 of 1.65); it was the sun's shadow strength, leaving 20% (0.33).
+* **People and cars -- what was wrong**: their renderers already received shadows and blended probes, on URP Lit
+  (checked prefab by prefab; the car body's emission map is black but for the lamps, the civilians' metallic maps hold
+  0 for skin). The cause was the level of the light: the walls and roads take the sky ambient whole (Trilight, never
+  shaded by the street), the moving things take the baked probes, which at the bake's own strength gave a civilian or a
+  car two to five times less light than the wall beside it (sides 0.17 against 0.56; up 0.26 against 0.60). Fixed in
+  the bake (`TownProbeIndirect` 2.75, `LightingSettings.indirectScale`): measured by baking at 1, 2 and 3 (0.17, 0.33,
+  0.50 at the sides; albedo boost changed nothing), so the probes give about 0.8 of the walls' ambient at the sides,
+  their own gradient (a shaded street darker than a sunlit one) kept. The renderers' flags are now set explicitly in
+  the generators (`DynamicLighting`), and VerifyTown checks both the flags and the probe-to-ambient ratio (0.6-1.4).
+* **Shops varied** (`FPSKitTownShopfront.ShopLook`): each building, from the layout's seed and where it stands, has how
+  many of its shops trade (15-75%), a frame finish most share (of four: anodised aluminium, bronze, charcoal, painted
+  green), a shutter paint most share or none (seven paints: white, rusted, grey, green, blue, sand, brown), a stallriser
+  stone (granite, terrazzo, pale marble). Per shop: open behind glass (a third of them dark: lights off), open to the
+  street, half shut, shut; the display's height and pane width. The building's random sequence still makes exactly
+  the old draws, so the buildings are unchanged; the goods outside open shops now have a sequence of their own, so
+  how many shops are open never moves what is placed after them (the parked cars moved once, with this change).
+* **Cover varied** (`SpinShopCover`): six kinds (crates, pallet stacks -- a generated euro pallet, six or seven high --,
+  a generator on its crate, a street cabinet, a commercial bin, a pair of oil drums); each face its own density, mix
+  (market or quiet), spacing (4.5-7.5 m), distance off the wall and skew.
+* **Impacts** (`FPSImpactManager`, `ImpactSettings` in Resources, `FPSKitImpactAssets`): `HandleImpact(RaycastHit)`.
+  Surface from the struck face's material where a mesh carries many (a building chunk: a shutter in a plaster wall is
+  metal), else the collider's physics material (`Surface_*`, given to every town collider by `AssignTownSurfaces`, the
+  terrain sand, traffic cars metal), else the surface tag (the other arenas). Concrete: a hole and grey-beige dust
+  drifting down, chips; metal: a dent, sparks (additive, stretched) and a 0.03 s point light, no shadows; wood, glass,
+  sand, snow and the rest their own. Marks are quads in one mesh (192, the oldest gives way; fade over 27-30 s; one
+  draw call), dust/chips/sparks are emitted into three scene-long particle systems, the flash is one of three pooled
+  lights: nothing made or destroyed per shot. Wired into the player's gun (the library keeps the sounds, and its spark
+  for bodies), the enemies' rifles and the technical's gun (their misses mark the player's cover). No mark on anything
+  with a Rigidbody (a car driving off). Physics materials have Unity's default friction and bounce, so nothing moves
+  differently. VerifyImpacts proves the surfaces by real raycasts and runs 6000 strikes: pools bounded, no objects made,
+  no allocation on the strikes' thread, every mark gone at 30 s.

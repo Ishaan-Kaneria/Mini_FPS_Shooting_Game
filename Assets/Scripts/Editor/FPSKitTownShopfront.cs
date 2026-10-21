@@ -42,7 +42,17 @@ namespace FPSKit.EditorTools
         }
         private static readonly List<ShopFace> _shopFaces = new List<ShopFace>();
 
-        private static Material _foundation, _stallriser, _shopGlass, _shopInside;
+        private static Material _foundation, _stallriser, _shopGlass, _shopInside, _stallMarble;
+        /// <summary>The shutters' paints and the storefronts' four frame finishes (FPSKitTownShopfront.ShopLook).</summary>
+        private static Material[] _shutterPaints, _frameAccents, _risers;
+
+        /// <summary>How one building's shops look, chosen once from the layout's seed: how many are trading, the frame finish
+        /// most of them share, a shutter paint they share (or none: each its own), the stallriser stone.</summary>
+        private sealed class ShopLookData
+        {
+            public float busy;
+            public Material accent, paint, riser;
+        }
 
         private static void ResolveShopfrontMaterials()
         {
@@ -65,6 +75,40 @@ namespace FPSKit.EditorTools
             UnityEditor.EditorUtility.SetDirty(_shopGlass);
             // Inside an open shop: painted walls in its own light, darker than the street, not the black of a shut room.
             _shopInside = TownFlat("ShopInsideLit", new Color(0.34f, 0.32f, 0.29f), 0.25f);
+            // Variety (2026-10-21, "too many shopfronts look identical"): shutters in the paints they come in here, beside the
+            // white and the rusted; four frame finishes -- anodised aluminium, bronze, charcoal, a painted green; three
+            // stallriser stones.
+            _shutterPaints = new[]
+            {
+                _shutterPaint, _shutterRust,
+                TownMat("ShopShutterGrey", "painted_metal_shutter", new Color(0.62f, 0.63f, 0.64f), 2.5f),
+                TownMat("ShopShutterGreen", "painted_metal_shutter", new Color(0.40f, 0.54f, 0.44f), 2.5f),
+                TownMat("ShopShutterBlue", "painted_metal_shutter", new Color(0.38f, 0.48f, 0.62f), 2.5f),
+                TownMat("ShopShutterSand", "painted_metal_shutter", new Color(0.82f, 0.72f, 0.54f), 2.5f),
+                TownMat("ShopShutterBrown", "painted_metal_shutter", new Color(0.48f, 0.36f, 0.28f), 2.5f),
+            };
+            _frameAccents = new[] { _frameAlu, _frameBronze, _frameCharcoal, _frameGreen };
+            _stallMarble = TownFlat("StallMarble", new Color(0.74f, 0.72f, 0.69f), 0.62f);
+            _risers = new[] { _stallriser, _terrazzo, _stallMarble };
+        }
+
+        /// <summary>A seed from the layout's own and a position: the same town gives the same shops, a new seed new ones.</summary>
+        private static int LayoutSeed(Vector3 p) =>
+            unchecked((_theme != null ? _theme.randomSeed : 0) * 73856093 ^ Mathf.RoundToInt(p.x * 10f) * 19349663 ^ Mathf.RoundToInt(p.z * 10f) * 83492791);
+
+        /// <summary>The building's shops' look (made once per building, from the layout's seed and where it stands).</summary>
+        private static ShopLookData ShopLook(Mass b)
+        {
+            if (b.shopLook != null) return b.shopLook;
+            var r = new System.Random(LayoutSeed(new Vector3(b.r.center.x, 0f, b.r.center.y)));
+            b.shopLook = new ShopLookData
+            {
+                busy = Mathf.Lerp(0.15f, 0.75f, (float)r.NextDouble()),                       // a quiet row to a busy one
+                accent = _frameAccents[r.Next(_frameAccents.Length)],
+                paint = r.NextDouble() < 0.45 ? _shutterPaints[r.Next(_shutterPaints.Length)] : null,
+                riser = _risers[r.Next(_risers.Length)],
+            };
+            return b.shopLook;
         }
 
         /// <summary>The height of a shop opening. Above it: the fascia, with the sign under its hood, then the cornice
@@ -91,15 +135,23 @@ namespace FPSKit.EditorTools
         private static ShopState ShopFront(TownMesh m, TownMesh det, Mass b, Vector3 p0, Vector3 p1, Vector3 q0, Vector3 nrm, Transform props)
         {
             var rng = b.rng;
-            var own = new System.Random(Mathf.RoundToInt(p0.x * 73f) * 7919 ^ Mathf.RoundToInt(p0.z * 37f) * 104729);
+            var own = new System.Random(LayoutSeed(p0));
+            var look = ShopLook(b);
             Vector3 u = (p1 - p0).normalized, up = Vector3.up;
             float W = Vector3.Distance(p0, p1), H = q0.y - p0.y;
             Vector3 o = p0 - nrm * ShopRecess;                         // the storefront's line, at the floor
             Vector3 S(float x, float y, float off = 0f) => o + u * x + up * y + nrm * off;
 
-            double pick = rng.NextDouble();                            // < .35 open, < .55 half shut, else shut
-            var state = pick < 0.35 ? (own.NextDouble() < 0.6 ? ShopState.Glazed : ShopState.Stall)
-                      : pick < 0.55 ? ShopState.HalfShut : ShopState.Shut;
+            // The flat front's draws from the building's sequence, in its order: the state, then the goods' two (open) or
+            // the shutter paint's one. Kept so that every building after this one comes out as it did; what this shop is
+            // now comes from its own sequence and its building's look.
+            bool wasOpen = rng.NextDouble() < 0.35;
+            double goodsKind = wasOpen ? rng.NextDouble() : own.NextDouble();
+            double goodsYaw = wasOpen ? rng.NextDouble() : own.NextDouble();
+            if (!wasOpen) rng.NextDouble();
+            ShopState state = own.NextDouble() < look.busy ? (own.NextDouble() < 0.62 ? ShopState.Glazed : ShopState.Stall)
+                            : own.NextDouble() < 0.38 ? ShopState.HalfShut : ShopState.Shut;
+            bool lit = state == ShopState.Stall || (state == ShopState.Glazed && own.NextDouble() < 0.65);   // else dark glass
             const float box = 0.36f;                                   // the shutter's box, inside the head
             float hs = H - box;                                        // under it: the shutter's travel, the shopfront
             // Out from the storefront line: frame fronts +0.05, the shutter's curtain +0.10, its guides' fronts +0.15,
@@ -107,28 +159,28 @@ namespace FPSKit.EditorTools
             const float curtain = 0.10f;
 
             // ---- the shop behind (nothing of it shows behind a shut shutter) ----
-            Material shutter = null;
+            Material shutter = state == ShopState.Shut || state == ShopState.HalfShut
+                             ? (look.paint != null && own.NextDouble() < 0.8 ? look.paint : _shutterPaints[own.Next(_shutterPaints.Length)])
+                             : null;
             if (state != ShopState.Shut)
             {
                 Vector3 back = -nrm * 3.2f, a = S(0f, 0f), c = S(W, 0f), top = up * hs;
-                // Behind a half-shut shutter the shop is closed, its light off; an open one is lit.
-                var inside = state == ShopState.HalfShut ? _shopDark : _shopInside;
+                // Behind a half-shut shutter, or a shop open but not lit, the room is dark; a trading one is lit.
+                var inside = lit ? _shopInside : _shopDark;
                 m.Quad(_terrazzo, a, c, c + back, a + back, up);
                 m.Quad(inside, a + back, c + back, c + back + top, a + back + top, nrm);
                 m.Quad(inside, a, a + back, a + back + top, a + top, u);
                 m.Quad(inside, c, c + back, c + back + top, c + top, -u);
                 m.Quad(_shopDark, a + top, c + top, c + back + top, a + back + top, Vector3.down);
-                if (state == ShopState.HalfShut) shutter = rng.NextDouble() < 0.4 ? _shutterRust : _shutterPaint;
-                else
+                if (state == ShopState.Glazed || state == ShopState.Stall)
                 {
                     var centre = (p0 + p1) * 0.5f;
                     _shopFronts.Add(new Vector4(centre.x + nrm.x * 1.2f, centre.y, centre.z + nrm.z * 1.2f, Mathf.Atan2(nrm.x, nrm.z) * Mathf.Rad2Deg));
                     // Shelves inside, facing out; a box or a crate on the floor.
                     PlaceTown(props, Prop("steel_frame_shelves_01"), S(W * 0.25f, 0f) + back * 0.85f, Mathf.Atan2(-nrm.x, -nrm.z) * Mathf.Rad2Deg + 180f, 2.0f);
-                    PlaceTown(props, Prop(rng.NextDouble() < 0.5 ? "cardboard_box_01" : "plastic_crate_02"), S(W * 0.75f, 0f) + back * 0.5f, (float)rng.NextDouble() * 360f, 0.45f);
+                    PlaceTown(props, Prop(goodsKind < 0.5 ? "cardboard_box_01" : "plastic_crate_02"), S(W * 0.75f, 0f) + back * 0.5f, (float)goodsYaw * 360f, 0.45f);
                 }
             }
-            else shutter = rng.NextDouble() < 0.4 ? _shutterRust : _shutterPaint;
 
             // ---- the roller shutter: its box under the head, its guides down the jambs, its curtain and bottom bar ----
             Prism(m, _shutterBoxMat, S(W * 0.5f, hs + box * 0.5f, 0.25f), u, up, nrm, W, box, 0.25f);
@@ -144,9 +196,10 @@ namespace FPSKit.EditorTools
             // ---- behind the shutter's line: a shopfront in its frame, or the open shop ----
             if (state == ShopState.Glazed || state == ShopState.HalfShut)
             {
-                double finish = own.NextDouble();
-                var frame = finish < 0.5 ? _frameAlu : finish < 0.75 ? _frameBronze : _frameCharcoal;
-                Shopfront(m, det, frame, o, u, nrm, W, hs, own);
+                // Most of a building's shops share its frame finish and stallriser; a few are their own.
+                var frame = own.NextDouble() < 0.7 ? look.accent : _frameAccents[own.Next(_frameAccents.Length)];
+                var riser = own.NextDouble() < 0.75 ? look.riser : _risers[own.Next(_risers.Length)];
+                Shopfront(m, det, frame, riser, o, u, nrm, W, hs, own);
             }
             else if (state == ShopState.Stall)
                 // An open front: a stone threshold at the line, the shop open to the street.
@@ -176,11 +229,13 @@ namespace FPSKit.EditorTools
         /// jambs, head, sill, transom, mullions, the door's frame and its leaf's stiles and rails, standing
         /// <see cref="FrameProud"/> out of the glass -- with a push bar on the door.
         /// </summary>
-        private static void Shopfront(TownMesh m, TownMesh det, Material frame, Vector3 o, Vector3 u, Vector3 nrm, float W, float hs, System.Random rng)
+        private static void Shopfront(TownMesh m, TownMesh det, Material frame, Material riserMat, Vector3 o, Vector3 u, Vector3 nrm, float W, float hs, System.Random rng)
         {
             Vector3 up = Vector3.up;
             Vector3 S(float x, float y, float off = 0f) => o + u * x + up * y + nrm * off;
-            const float riser = 0.45f, fw = 0.07f;
+            const float fw = 0.07f;
+            float riser = Mathf.Lerp(0.32f, 0.6f, (float)rng.NextDouble());             // how high the display starts
+            float light = Mathf.Lerp(1.0f, 1.6f, (float)rng.NextDouble());              // how wide a pane is
             float doorW = W >= 2.3f ? 1.0f : 0f;
             int at = rng.Next(3);
             float d0 = at == 0 ? 0.3f : at == 2 ? W - 0.3f - doorW : (W - doorW) * 0.5f, d1 = d0 + doorW;
@@ -197,7 +252,7 @@ namespace FPSKit.EditorTools
             }
             foreach (var sp in spans)
             {
-                Prism(m, _stallriser, S((sp.x + sp.y) * 0.5f, riser * 0.5f, 0.03f), u, up, nrm, sp.y - sp.x, riser, 0.15f);
+                Prism(m, riserMat, S((sp.x + sp.y) * 0.5f, riser * 0.5f, 0.03f), u, up, nrm, sp.y - sp.x, riser, 0.15f);
                 m.Quad(_shopGlass, S(sp.x, riser), S(sp.y, riser), S(sp.y, transom), S(sp.x, transom), nrm);
             }
             m.Quad(_shopGlass, S(0f, transom), S(W, transom), S(W, hs), S(0f, hs), nrm);
@@ -217,7 +272,7 @@ namespace FPSKit.EditorTools
             foreach (var sp in spans)
             {
                 Member(sp.x, riser + fw * 0.5f, sp.y, riser + fw * 0.5f, fw);
-                int lights = Mathf.Max(1, Mathf.RoundToInt((sp.y - sp.x) / 1.3f));
+                int lights = Mathf.Max(1, Mathf.RoundToInt((sp.y - sp.x) / light));
                 for (int i = 1; i < lights; i++)
                 {
                     float x = Mathf.Lerp(sp.x, sp.y, i / (float)lights);

@@ -402,16 +402,18 @@ namespace FPSKit.EditorTools
                           Rand(rng, 0f, 360f), navBlock: false);
                 put++;
             }
-            // Goods spilled out in front of the open shops on the streets.
+            // Goods spilled out in front of the open shops on the streets: from a sequence of their own (the layout's seed
+            // and where each shop is), so how many shops are open never moves anything placed after them.
             foreach (var f in _shopFronts)
             {
-                if (rng.NextDouble() < 0.45) continue;
+                var own = new System.Random(LayoutSeed(new Vector3(f.x, 0f, f.z)) ^ 0x600D5);
+                if (own.NextDouble() < 0.45) continue;
                 var at = new Vector3(f.x, f.y, f.z);
                 var n = Quaternion.Euler(0f, f.w, 0f) * Vector3.forward;
                 var side = Vector3.Cross(Vector3.up, n);
                 string[] goods = { "plastic_crate_01", "plastic_crate_02", "wicker_basket_01", "wooden_crate_02", "cardboard_box_01", "plastic_monobloc_chair_01" };
-                for (int i = 0; i < rng.Next(1, 4); i++)
-                    PlaceTown(props, Prop(goods[rng.Next(goods.Length)]), at + side * Rand(rng, -1.5f, 1.5f) - n * Rand(rng, 0.2f, 0.8f), f.w + Rand(rng, -30f, 30f));
+                for (int i = 0, count = own.Next(1, 4); i < count; i++)
+                    PlaceTown(props, Prop(goods[own.Next(goods.Length)]), at + side * Rand(own, -1.5f, 1.5f) - n * Rand(own, 0.2f, 0.8f), f.w + Rand(own, -30f, 30f));
             }
         }
 

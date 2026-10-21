@@ -26,6 +26,7 @@ namespace FPSKit.EditorTools
             Make<PlayerBodySettings>(PlayerBodySettings.ResourcePath);
             Make<EyeCameraSettings>(EyeCameraSettings.ResourcePath);
             FPSKitFirstPersonMoves.Ensure();
+            FPSKitImpactAssets.Ensure();
             var condition = Make<ConditionSettings>(ConditionSettings.ResourcePath);
 
             bool dirty = false;

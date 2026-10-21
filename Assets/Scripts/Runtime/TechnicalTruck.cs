@@ -146,6 +146,7 @@ public class TechnicalTruck : MonoBehaviour
             end = hit.point;
             var h = hit.collider.GetComponentInParent<Health>();
             if (h != null && h != gunner) h.ApplyDamage(new DamageInfo(damage, hit.point, hit.normal, shotDir, gameObject));
+            else if (h == null && !hit.collider.transform.IsChildOf(transform)) FPSImpactManager.Instance.HandleImpact(hit);
         }
         if (audioSource != null && shot != null) audioSource.PlayOneShot(shot, 0.9f);
         NoiseSystem.Emit(muzzle.position, 90f, NoiseKind.Gunfire, gameObject);

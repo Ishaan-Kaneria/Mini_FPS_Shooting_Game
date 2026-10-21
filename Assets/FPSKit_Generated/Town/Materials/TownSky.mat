@@ -30,7 +30,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Exposure: 1
+    - _Exposure: 1.1
     - _ImageType: 0
     - _Layout: 0
     - _Mapping: 1

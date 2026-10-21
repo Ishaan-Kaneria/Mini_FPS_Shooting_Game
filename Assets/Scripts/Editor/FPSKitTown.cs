@@ -70,6 +70,31 @@ namespace FPSKit.EditorTools
             Debug.Log($"[FPSKit] town: {n} street reflection probes");
         }
 
+        /// <summary>
+        /// Every collider in the town gets the physics material of what it is made of (Surface_Concrete, _Metal, _Wood, from
+        /// its surface tag; the ground's terrain sand; anything untagged on the Environment layer concrete), which
+        /// FPSImpactManager reads for a round's mark, dust or sparks. Default friction and bounce, so nothing moves on them
+        /// differently. Bodies, wheels, triggers and the player's own colliders are left alone.
+        /// </summary>
+        private static void AssignTownSurfaces(Transform root)
+        {
+            int environment = LayerMask.NameToLayer("Environment"), done = 0;
+            var counts = new Dictionary<string, int>();
+            foreach (var c in root.GetComponentsInChildren<Collider>(true))
+            {
+                if (c.isTrigger || c is WheelCollider || c is CharacterController || c.CompareTag("Flesh")) continue;
+                string tag = c is TerrainCollider ? SandTag
+                           : c.CompareTag("Untagged") ? (c.gameObject.layer == environment ? "Concrete" : null)
+                           : c.tag;
+                var m = FPSKitImpactAssets.Surface(tag);
+                if (m == null) continue;
+                c.sharedMaterial = m;
+                counts[tag] = counts.TryGetValue(tag, out int k) ? k + 1 : 1;
+                done++;
+            }
+            Debug.Log($"[FPSKit] town surfaces: {done} colliders ({string.Join(", ", counts.Select(kv => $"{kv.Value} {kv.Key}"))})");
+        }
+
         private static void ResetTown()
         {
             _townRoads.Clear(); _townTracks.Clear(); _townSites.Clear(); _townJunctions.Clear();
@@ -124,6 +149,7 @@ namespace FPSKit.EditorTools
             Lap("life");
             PlaceStreetProbes(root);
             PlaceTownLightProbes(root);
+            AssignTownSurfaces(root);
 
             // Nothing past the edge is anybody's to stand on.
             SealNavMeshOutside(root, half - 2f, half + 700f);
@@ -349,7 +375,7 @@ namespace FPSKit.EditorTools
             if (n.Contains("wood") || n.Contains("crate") || n.Contains("table") || n.Contains("chair") || n.Contains("stool") ||
                 n.Contains("shelf") || n.Contains("shelves") || n.Contains("ladder") || n.Contains("basket") || n.Contains("bench") ||
                 n.Contains("cabinet") || n.Contains("bookshelf") || n.Contains("palm") || n.Contains("trunk") || n.Contains("branch") ||
-                n.Contains("bed")) return "Wood";
+                n.Contains("bed") || n.Contains("pallet")) return "Wood";
             if (n.Contains("barrel") || n.Contains("tank") || n.Contains("lamp") || n.Contains("pole") || n.Contains("utility") ||
                 n.Contains("aircon") || n.Contains("car") || n.Contains("can") || n.Contains("generator") || n.Contains("rim") ||
                 n.Contains("register") || n.Contains("truck") || n.Contains("shutter") || n.Contains("fence") || n.Contains("brass") ||

@@ -626,8 +626,12 @@ public class Weapon : MonoBehaviour
             if (hit.rigidbody != null)
                 hit.rigidbody.AddForceAtPosition(direction * data.impactForce, hit.point, ForceMode.Impulse);
 
+            // What the round does to what it struck (FPSImpactManager: the mark, dust or sparks), and its sound; a body
+            // keeps the library's own spark.
+            var surface = hitbox != null ? ImpactSurface.Flesh : FPSImpactManager.SurfaceOf(hit);
+            if (surface != ImpactSurface.Flesh) FPSImpactManager.Instance.HandleImpact(hit, surface);
             if (data.impacts != null)
-                data.impacts.Spawn(hit.collider.tag, hit.point, hit.normal);
+                data.impacts.Spawn(FPSImpactManager.LibraryTag(surface, hit.collider.tag), hit.point, hit.normal, effect: surface == ImpactSurface.Flesh);
 
             SpawnTracer(hit.point);
             EnemySquad.BulletPassed(origin, hit.point, hit.collider.gameObject);

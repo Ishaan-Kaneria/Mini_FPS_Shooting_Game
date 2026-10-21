@@ -18,7 +18,9 @@ namespace FPSKit.EditorTools
     ///   FPSKit > Player > Shots (Desert Outpost)  /  Shots (Fairground)
     ///
     /// Poses: stand, walk, run, sprint, runfire, aim, reload, punch, double, kick, down; shade, shadeoff and shadefire (in a
-    /// building's shade near the start: standing, without FirstPersonShade, and on the frame of a shot's flash).
+    /// building's shade near the start: standing, without FirstPersonShade, and on the frame of a shot's flash);
+    /// impacts, impactsafter, impactswall, impactsstone (a burst into the shop beside the start: its shutter, the sign over
+    /// it, the stone pier beside it).
     /// Writes &lt;folder&gt;/&lt;tag&gt;_&lt;pose&gt;.png. Game time runs at a fixed step
     /// (Time.captureDeltaTime), so a pose is the same however slowly an unfocused editor draws.
     /// Runs inside the open editor and leaves it as it was (start scene, time, inputs).
@@ -183,7 +185,7 @@ namespace FPSKit.EditorTools
         static Weapon _weapon;
         static MeleeStrike _melee;
         static Health _health;
-        static FieldInfo _pitch;
+        static FieldInfo _pitch, _yaw;
         static Vector3 _startPos;
         static Quaternion _startRot;
         static bool _started;
@@ -226,6 +228,7 @@ namespace FPSKit.EditorTools
                     _melee = _motor.GetComponent<MeleeStrike>();
                     _health = _motor.GetComponent<Health>();
                     _pitch = typeof(PlayerMotor).GetField("_pitch", BindingFlags.Instance | BindingFlags.NonPublic);
+                    _yaw = typeof(PlayerMotor).GetField("_yaw", BindingFlags.Instance | BindingFlags.NonPublic);
                     Time.captureDeltaTime = Step;
                     MobileInput.Active = true;
                     _frame = 0;
@@ -285,6 +288,13 @@ namespace FPSKit.EditorTools
             MobileInput.SetSprintButton(false);
             MobileInput.SetFireButton(false);
             Pitch(0f);
+            Turn(0f);
+        }
+
+        /// <summary>Turned <paramref name="degrees"/> from the way the player faced at the start (the motor keeps its own yaw).</summary>
+        static void Turn(float degrees)
+        {
+            if (_yaw != null && _motor != null && _started) _yaw.SetValue(_motor, _startRot.eulerAngles.y + degrees);
         }
 
         static void Pitch(float degrees)
@@ -312,6 +322,17 @@ namespace FPSKit.EditorTools
                 case "hand_fire": MobileInput.SetFireButton(_frame >= Frames(1f)); return _frame >= Frames(1f) + 2 && Shoot(closeUp: true);
                 case "hand_aim": MobileInput.Aim = true; return _frame >= Frames(1.0f) && Shoot(closeUp: true);
                 case "down": Pitch(65f); return _frame >= Frames(1.2f) && Shoot();
+                // Impacts (FPSImpactManager): turned to the shop beside the desert's start -- its shutter (metal: dents,
+                // sparks, a flash), or the stone over it -- a burst; shot while firing, or a second after (marks, dust).
+                case "impacts":
+                case "impactswall":
+                case "impactsafter":
+                case "impactsstone":
+                    Turn(_pose == "impactsstone" ? 75f : 90f);
+                    if (_pose == "impactswall") Pitch(-28f);
+                    if (_pose == "impactsstone") Pitch(-4f);
+                    MobileInput.SetFireButton(_frame >= 2 && _frame < Frames(0.6f));
+                    return (_pose == "impactsafter" ? _frame >= Frames(1.5f) : _frame >= Frames(0.5f)) && Shoot();
                 // In a building's shade: standing, and firing (shot on a frame the flash is lit, which lasts one or two).
                 // shadeoff: the same without FirstPersonShade, to see what it does.
                 case "shade":

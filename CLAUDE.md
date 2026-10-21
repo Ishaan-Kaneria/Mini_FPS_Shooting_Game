@@ -128,6 +128,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   `heavyRange`, or a blast) on a limb already crippled, with Blood on, never a boss (`EnemyBrutality`);
   pieces are capped (`SeveredPiece`). A melee blow's reaction starts on its contact frame: never slow
   `Time.timeScale` for hit-stop (VerifyCombat measures it). Stage 3 check: `FPSKitStage3Test.Batch`.
+- Bullet impacts: `FPSImpactManager.HandleImpact(RaycastHit)` from every gun (Weapon, EnemyAI, TechnicalTruck); surface = struck face's
+  material on a multi-material mesh, else the collider's `Surface_*` physics material, else the tag. Pooled only (one marks mesh, three
+  particle systems, three lights): never instantiate per shot. Physics materials keep default friction. Check: `FPSKitBatch.VerifyImpacts`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
   `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via
@@ -194,6 +197,8 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Shops (`FPSKitTownShopfront`): storefront 0.35 m behind the piers, frames 5 cm out of glass/shutter, sign plates 10 cm off the
   wall under a hood, retail cornice, foundation course; `ShopFront` keeps the old draws from the building's random sequence (new
   choices from its own) so the town does not reshuffle. Cover outside shops (`SpinShopCover`) carries `CoverSpot` for EnemyBrain.
+  Probe bake indirect is scaled (`TownProbeIndirect` 2.75) so people/cars get ~0.8 of the walls' sky ambient (VerifyTown checks the
+  ratio); never judge a dark civilian by its material first. A building's shops share a `ShopLook` (layout-seeded).
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

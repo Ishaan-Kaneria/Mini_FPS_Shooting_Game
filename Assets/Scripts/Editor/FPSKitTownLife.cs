@@ -149,6 +149,7 @@ namespace FPSKit.EditorTools
             var lg = root.AddComponent<LODGroup>();
             lg.SetLODs(lodList.ToArray());
             lg.RecalculateBounds();
+            DynamicLighting(root);
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
             Object.DestroyImmediate(root);
             _parkedPrefabs[packName] = prefab; _parkedMade.Add(packName);
@@ -193,6 +194,7 @@ namespace FPSKit.EditorTools
             }
             SetLayerRecursive(holder, LayerMask.NameToLayer("Environment"));
             SetTagRecursive(holder, "Metal");
+            DynamicLighting(holder);
             NoStanding(holder);
             GameObjectUtility.SetStaticEditorFlags(holder, StaticEditorFlags.BatchingStatic);
             foreach (Transform t in holder.GetComponentsInChildren<Transform>()) GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
@@ -302,6 +304,7 @@ namespace FPSKit.EditorTools
             var box = root.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, b.size.y * 0.5f, 0f);
             box.size = new Vector3(b.size.x * 0.95f, b.size.y * 0.9f, b.size.z * 0.97f);
+            box.sharedMaterial = FPSKitImpactAssets.Surface("Metal");      // sparks, not dust (FPSImpactManager)
             var rb = root.AddComponent<Rigidbody>();
             rb.isKinematic = true;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
@@ -314,6 +317,7 @@ namespace FPSKit.EditorTools
             car.halfWidth = b.size.x * 0.5f;
             SetLayerRecursive(root, LayerMask.NameToLayer("Vehicle") >= 0 ? LayerMask.NameToLayer("Vehicle") : 0);
             SetTagRecursive(root, "Metal");
+            DynamicLighting(root);
             var saved = PrefabUtility.SaveAsPrefabAsset(root, path);
             Object.DestroyImmediate(root);
             return saved;
@@ -403,6 +407,7 @@ namespace FPSKit.EditorTools
             holder.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             SetLayerRecursive(holder, LayerMask.NameToLayer("Vehicle") >= 0 ? LayerMask.NameToLayer("Vehicle") : 0);
             SetTagRecursive(holder, "Metal");
+            DynamicLighting(holder);
             var obs = holder.AddComponent<NavMeshObstacle>();
             obs.shape = NavMeshObstacleShape.Box; obs.center = box.center; obs.size = box.size; obs.carving = false;
             var mod = holder.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
@@ -553,6 +558,7 @@ namespace FPSKit.EditorTools
             root.transform.position = route[0];
             root.transform.rotation = Quaternion.LookRotation((route[1] - route[0]).normalized);
             foreach (var c in root.GetComponentsInChildren<Collider>()) if (c.gameObject.name != "Gunner") c.gameObject.tag = "Metal";
+            DynamicLighting(root.gameObject);
             root.AddComponent<Unity.AI.Navigation.NavMeshModifier>().ignoreFromBuild = true;
         }
 
@@ -741,6 +747,26 @@ namespace FPSKit.EditorTools
         // ==================================================================
         // Civilians
         // ==================================================================
+        /// <summary>
+        /// A moving thing's renderers as the town lights them: shadows received, light and reflections from the probes
+        /// blended where it stands (FPSKitTownProbes), so a civilian or a car takes the shade of a street as it walks or
+        /// drives into it. Said outright rather than left to the packs' defaults; anything not on a lit URP shader is
+        /// reported (VerifyTown checks the same).
+        /// </summary>
+        private static void DynamicLighting(GameObject go)
+        {
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer) continue;
+                r.receiveShadows = true;
+                r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.BlendProbes;
+                r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.BlendProbes;
+                foreach (var m in r.sharedMaterials)
+                    if (m != null && m.shader != null && m.shader.name != "Universal Render Pipeline/Lit" && m.shader.name != "Universal Render Pipeline/Simple Lit")
+                        Debug.LogWarning($"[FPSKit] town: {go.name}/{r.name} draws {m.name} with '{m.shader.name}', not a lit URP shader");
+            }
+        }
+
         private static GameObject[] CivilianPrefabs()
         {
             var controller = CivilianController();
@@ -793,6 +819,7 @@ namespace FPSKit.EditorTools
                 c.health = hp;
                 SetLayerRecursive(go, LayerMask.NameToLayer("Civilian") >= 0 ? LayerMask.NameToLayer("Civilian") : 0);
                 SetTagRecursive(go, "Flesh");
+                DynamicLighting(go);
                 list.Add(PrefabUtility.SaveAsPrefabAsset(go, path));
                 Object.DestroyImmediate(go);
             }

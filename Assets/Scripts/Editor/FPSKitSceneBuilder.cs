@@ -1669,6 +1669,8 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static ImpactLibrary CreateImpactLibrary()
         {
+            // What FPSImpactManager draws a round's mark, dust and sparks with (and the surface physics materials).
+            FPSKitImpactAssets.Ensure();
             string path = $"{AssetFolder}/ImpactLibrary.asset";
 
             var library = AssetDatabase.LoadAssetAtPath<ImpactLibrary>(path);

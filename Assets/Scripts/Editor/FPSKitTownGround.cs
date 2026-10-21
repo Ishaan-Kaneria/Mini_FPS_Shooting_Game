@@ -714,7 +714,7 @@ namespace FPSKit.EditorTools
             mat.SetFloat("_MirrorOnBack", 0f);
             mat.SetFloat("_Layout", 0f);
             mat.SetFloat("_Rotation", TownSkyRotation);
-            mat.SetFloat("_Exposure", 1.0f);
+            mat.SetFloat("_Exposure", 1.1f);       // 1.0 until "too dark overall" (2026-10-21)
             mat.SetColor("_Tint", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             if (create) AssetDatabase.CreateAsset(mat, path);
             else EditorUtility.SetDirty(mat);

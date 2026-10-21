@@ -29,13 +29,14 @@ public class ImpactLibrary : ScriptableObject
         return fallback;
     }
 
-    /// <summary>Spawns the effect oriented along the surface normal and plays a sound.</summary>
-    public void Spawn(string surfaceTag, Vector3 point, Vector3 normal)
+    /// <summary>Spawns the effect oriented along the surface normal and plays a sound. With <paramref name="effect"/>
+    /// off only the sound (FPSImpactManager draws what a round does to a surface; this keeps the spark for bodies).</summary>
+    public void Spawn(string surfaceTag, Vector3 point, Vector3 normal, bool effect = true)
     {
         var entry = Find(surfaceTag);
         if (entry == null) return;
 
-        if (entry.effectPrefab != null)
+        if (effect && entry.effectPrefab != null)
         {
             var fx = Instantiate(entry.effectPrefab, point + normal * 0.01f,
                                  Quaternion.LookRotation(normal));

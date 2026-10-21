@@ -148,6 +148,9 @@ namespace FPSKit.EditorTools
             // The oasis hollow.
             float d0 = Vector2.Distance(new Vector2(x, z), OasisCentre);
             h -= 3.4f * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((OasisRadius + 45f - d0) / 50f));
+            // And the pond's own basin in its floor, banked over its last six metres: the hollow alone is flat-bottomed,
+            // so water set below its shore lay under the ground and the oasis showed as a disc of mud.
+            h -= 1.5f * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((OasisRadius + 1f - d0) / 6f));
 
             // Dunes, by distance from the town, and bigger past the arena edge where nobody walks.
             float w = DuneWeight(x, z);

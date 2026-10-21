@@ -20,7 +20,7 @@ namespace FPSKit.EditorTools
         {
             _corrugated = TownMat("Corrugated", "corrugated_iron_02", new Color(0.95f, 0.95f, 0.93f), 2f, 0.9f);
             _corrugatedRust = TownMat("CorrugatedRust", "rusty_corrugated_iron", new Color(1f, 0.95f, 0.9f), 2f, 0.9f);
-            _concreteFloor = TownMat("ForecourtConcrete", "concrete_wall_008", new Color(0.96f, 0.95f, 0.92f), 5f, 0.3f);
+            _concreteFloor = TownMat("ForecourtConcrete", "square_concrete_pavers", new Color(1.02f, 1.00f, 0.96f), 6f, 0.2f);
             _canopy = TownFlat("CanopyWhite", new Color(0.88f, 0.88f, 0.86f), 0.35f);
             _stripeRed = TownFlat("StripeRed", new Color(0.70f, 0.10f, 0.10f), 0.35f);
             _stripeWhite = TownFlat("StripeWhite", new Color(0.90f, 0.90f, 0.88f), 0.35f);
@@ -384,13 +384,15 @@ namespace FPSKit.EditorTools
         /// <summary>The oasis: a pond in the hollow, palms crowding its shore, rocks, a stone landing, jerrycans.</summary>
         private static void BuildOasis(Transform group, int layer, Transform props, System.Random rng)
         {
-            float shore = float.MinValue;
+            // The water stands just under the lowest point of the basin's rim (FPSKitTownGround cuts the basin), so it
+            // meets the bank all round and never spills over it.
+            float shore = float.MaxValue;
             for (int i = 0; i < 24; i++)
             {
                 float a = i * Mathf.PI * 2f / 24f;
-                shore = Mathf.Max(shore, GroundHeightAt(OasisCentre.x + Mathf.Cos(a) * (OasisRadius - 2f), OasisCentre.y + Mathf.Sin(a) * (OasisRadius - 2f)));
+                shore = Mathf.Min(shore, GroundHeightAt(OasisCentre.x + Mathf.Cos(a) * (OasisRadius + 1.5f), OasisCentre.y + Mathf.Sin(a) * (OasisRadius + 1.5f)));
             }
-            float wy = shore - 0.35f;
+            float wy = shore - 0.45f;
             var m = new TownMesh();
             m.Disc(_townWater, new Vector3(OasisCentre.x, wy, OasisCentre.y), OasisRadius + 3f, 64, Vector3.up);
             // A stone landing for drawing water.

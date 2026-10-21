@@ -74,17 +74,19 @@ namespace FPSKit.EditorTools
 
         private static void ResolveBuildingMaterials()
         {
+            // No white_plaster_rough_01/02 or concrete_wall_008: in spite of the names they are green with algae and read as
+            // moss on a desert wall.
             _plasters = new[]
             {
-                TownMat("PlasterWhite", "white_plaster_rough_01", new Color(1.00f, 0.98f, 0.95f), 3f),
+                TownMat("PlasterWhite", "plastered_wall_02", new Color(1.02f, 1.00f, 0.97f), 3f),
                 TownMat("PlasterStucco", "white_stucco", new Color(0.98f, 0.95f, 0.90f), 3f),
                 TownMat("PlasterBeige", "beige_wall_002", new Color(1.00f, 0.96f, 0.90f), 3f),
                 TownMat("PlasterCream", "painted_plaster_wall", new Color(1.00f, 0.95f, 0.86f), 3f),
                 TownMat("PlasterOchre", "yellow_plaster", new Color(1.00f, 0.93f, 0.82f), 3f),
                 TownMat("PlasterWorn", "worn_plaster_wall", new Color(1.00f, 0.96f, 0.90f), 3.5f),
                 TownMat("PlasterGrey", "plastered_wall_02", new Color(0.98f, 0.96f, 0.92f), 3f),
-                TownMat("PlasterSand", "white_plaster_rough_02", new Color(0.96f, 0.88f, 0.76f), 3f),
-                TownMat("PlasterPeach", "white_plaster_rough_01", new Color(1.00f, 0.88f, 0.78f), 3f),
+                TownMat("PlasterSand", "beige_wall_002", new Color(1.04f, 0.97f, 0.86f), 3f),
+                TownMat("PlasterPeach", "painted_plaster_wall", new Color(1.00f, 0.86f, 0.74f), 3f),
                 TownMat("PlasterMint", "white_stucco", new Color(0.86f, 0.95f, 0.88f), 3f),
                 TownMat("PlasterSky", "white_stucco", new Color(0.84f, 0.92f, 0.98f), 3f),
             };
@@ -96,11 +98,11 @@ namespace FPSKit.EditorTools
                 TownMat("MudDark", "clay_plaster", new Color(0.88f, 0.78f, 0.66f), 3.5f),
                 TownMat("PlasterWornOld", "damaged_plaster", new Color(1.00f, 0.95f, 0.88f), 3.5f),
             };
-            _plasterIn = TownMat("PlasterInterior", "white_plaster_rough_02", new Color(1.00f, 0.98f, 0.95f), 2.5f);
-            _band = TownMat("ConcreteBand", "concrete_wall_008", new Color(0.92f, 0.90f, 0.86f), 2f);
+            _plasterIn = TownMat("PlasterInterior", "painted_plaster_wall", new Color(1.00f, 0.98f, 0.95f), 2.5f);
+            _band = TownMat("ConcreteBand", "plastered_wall_02", new Color(0.90f, 0.87f, 0.82f), 2f);
             _block = TownMat("CinderBlock", "concrete_block_wall", new Color(1.35f, 1.30f, 1.22f), 2.4f);
-            _roof = TownMat("RoofConcrete", "concrete_wall_008", new Color(0.85f, 0.82f, 0.78f), 4f);
-            _coping = TownMat("Coping", "concrete_wall_008", new Color(0.98f, 0.96f, 0.92f), 1.5f);
+            _roof = TownMat("RoofConcrete", "plastered_wall_02", new Color(0.86f, 0.82f, 0.76f), 4f);
+            _coping = TownMat("Coping", "plastered_wall_02", new Color(0.96f, 0.93f, 0.88f), 1.5f);
             _terrazzo = TownMat("Terrazzo", "terrazzo_tiles", new Color(1.0f, 0.98f, 0.95f), 2f);
             _stoneAshlar = TownMat("Ashlar", "white_sandstone_bricks", new Color(1.02f, 0.94f, 0.82f), 3f);
 

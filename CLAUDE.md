@@ -180,7 +180,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   every mesh through `TownMesh` (world-metre UVs, winding from a stated normal). Interiors cut the outer wall's recorded openings; solid masses
   and hollow walls get Not Walkable volumes; outside stairs are planned before walls (parapet gap). Poly Haven props (CC0, `Assets/ThirdParty/PolyHaven`,
   `Tools/polyhaven`) are stood upright and LOD-culled by `FPSKitTownAssets`; never place the 200k+ triangle plant scans. Signs come from
-  `Tools/town/make_signs.py` (real Arabic via raqm). Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired).
+  `Tools/town/make_signs.py` (real Arabic via raqm). The bake ends with `SealTownIslands` (every navmesh piece not joined to the start sealed, baked
+  again). `NavMeshModifierVolume.center` defaults to (0,1,0): set it. `CalculatePath` gives up on long routes: prove reachability in short legs.
+  Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired); `FPSKitTownTest.Probe` maps what fails.
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

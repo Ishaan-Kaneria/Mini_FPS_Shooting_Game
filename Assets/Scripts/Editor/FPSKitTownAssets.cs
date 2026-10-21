@@ -123,15 +123,21 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The sky as a cubemap for reflections: a copy of the HDR imported as a cube (from its latitude-longitude layout).
+        /// The sky as a cubemap for reflections, from the HDR (its latitude-longitude layout), with the sun taken out.
         /// Nothing in these scenes bakes a reflection probe, so without it glass, water and car paint reflect a grey default.
+        ///
+        /// A straight copy kept the sun disc, thousands of times brighter than the sky round it: even the blurred mips a
+        /// rough surface reads were dominated by it, and every road and pavement facing the low sun shone as if wet --
+        /// with the real-time sun's own highlight on top. So the copy is clamped: no pixel brighter than twice the
+        /// brightest 0.5% of the sky, written as EXR at half the HDR's size.
         /// </summary>
         public static Cubemap ReflectionCube()
         {
             foreach (var sky in SkyPaths())
             {
-                string cube = sky.Replace(".hdr", "_cube.hdr");
-                if (!File.Exists(cube)) { File.Copy(sky, cube); AssetDatabase.ImportAsset(cube); }
+                string cube = sky.Replace(".hdr", "_reflect.exr");
+                if (!File.Exists(cube)) WriteClampedSky(sky, cube);
+                if (!File.Exists(cube)) return null;
                 if (AssetImporter.GetAtPath(cube) is TextureImporter imp &&
                     (imp.textureShape != TextureImporterShape.TextureCube || imp.maxTextureSize != 512 || !imp.mipmapEnabled))
                 {
@@ -147,12 +153,59 @@ namespace FPSKit.EditorTools
             return null;
         }
 
+        static void WriteClampedSky(string sky, string cube)
+        {
+            if (!(AssetImporter.GetAtPath(sky) is TextureImporter imp)) return;
+            bool readable = imp.isReadable; var compression = imp.textureCompression; int max = imp.maxTextureSize;
+            imp.isReadable = true; imp.textureCompression = TextureImporterCompression.Uncompressed; imp.maxTextureSize = 4096;
+            imp.SaveAndReimport();
+            try
+            {
+                var src = AssetDatabase.LoadAssetAtPath<Texture2D>(sky);
+                if (src == null) return;
+                var px = src.GetPixels();
+                int w = src.width, h = src.height, ow = w / 2, oh = h / 2;
+                var lum = new float[px.Length];
+                for (int i = 0; i < px.Length; i++) lum[i] = Mathf.Max(px[i].r, Mathf.Max(px[i].g, px[i].b));
+                var sorted = (float[])lum.Clone();
+                System.Array.Sort(sorted);
+                float cap = sorted[(int)(sorted.Length * 0.995f)] * 2f;
+                var outPx = new Color[ow * oh];
+                for (int y = 0; y < oh; y++)
+                    for (int x = 0; x < ow; x++)
+                    {
+                        var c = Color.clear;
+                        for (int dy = 0; dy < 2; dy++)
+                            for (int dx = 0; dx < 2; dx++)
+                            {
+                                int k = (y * 2 + dy) * w + x * 2 + dx;
+                                var p = px[k];
+                                if (lum[k] > cap) p *= cap / lum[k];
+                                c += p;
+                            }
+                        c *= 0.25f; c.a = 1f;
+                        outPx[y * ow + x] = c;
+                    }
+                var tex = new Texture2D(ow, oh, TextureFormat.RGBAFloat, false, true);
+                tex.SetPixels(outPx);
+                File.WriteAllBytes(cube, tex.EncodeToEXR(Texture2D.EXRFlags.CompressZIP));
+                Object.DestroyImmediate(tex);
+                AssetDatabase.ImportAsset(cube);
+                Debug.Log($"[FPSKit] reflection sky written: {cube} (clamped at {cap:0.00}, brightest was {sorted[sorted.Length - 1]:0})");
+            }
+            finally
+            {
+                imp.isReadable = readable; imp.textureCompression = compression; imp.maxTextureSize = max;
+                imp.SaveAndReimport();
+            }
+        }
+
         public static IEnumerable<string> SkyPaths()
         {
             string dir = PolyHavenRoot + "/HDRI";
             if (!Directory.Exists(dir)) yield break;
             foreach (var f in Directory.GetFiles(dir, "*.hdr"))
-                if (!f.EndsWith("_cube.hdr")) yield return f.Replace('\\', '/');
+                yield return f.Replace('\\', '/');
         }
 
         // ==================================================================

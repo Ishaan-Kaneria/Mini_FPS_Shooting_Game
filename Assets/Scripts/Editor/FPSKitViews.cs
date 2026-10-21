@@ -145,7 +145,7 @@ namespace FPSKit.EditorTools
         static IEnumerable<Shot> FrameTown()
         {
             // A step behind and beside the player's start (the start itself is inside the player's own body).
-            yield return ParkShot("01_start", new Vector3(12.5f, 1.65f, -58f), new Vector3(0f, 12f, 60f), 75f);
+            yield return ParkShot("01_start", new Vector3(11f, 1.65f, -60f), new Vector3(4f, 5f, 60f), 72f);
             yield return ParkShot("02_roundabout_air", new Vector3(55f, 45f, -55f), new Vector3(0f, 0f, 22f), 62f);
             yield return ParkShot("03_bazaar_gate", new Vector3(-12f, 1.7f, 4f), new Vector3(-50f, 5f, 20f), 72f);
             yield return ParkShot("04_souk_inside", new Vector3(-62f, 1.7f, 20f), new Vector3(-160f, 3f, 20f), 75f);

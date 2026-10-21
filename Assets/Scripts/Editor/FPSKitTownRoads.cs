@@ -34,7 +34,7 @@ namespace FPSKit.EditorTools
             _asphaltWorn = TownMat("AsphaltDusty", "asphalt_02", new Color(1.02f, 0.98f, 0.92f), 6.5f, 0.2f);
             _pavers = TownMat("PaversGrey", "square_concrete_pavers", new Color(0.86f, 0.85f, 0.83f), 2.2f, 0.28f);
             _paversPlaza = TownMat("PlazaStone", "sandstone_blocks_08", new Color(1.02f, 0.96f, 0.88f), 3.5f, 0.3f);
-            _kerb = TownMat("Kerb", "concrete_wall_008", new Color(0.92f, 0.90f, 0.86f), 1.6f, 0.28f);
+            _kerb = TownMat("Kerb", "plastered_wall_02", new Color(0.88f, 0.86f, 0.82f), 1.6f, 0.2f);
             _paint = TownFlat("RoadPaint", new Color(0.88f, 0.87f, 0.82f), 0.25f);
             _paintYellow = TownFlat("RoadPaintYellow", new Color(0.86f, 0.68f, 0.18f), 0.25f);
             _medianSoil = TownMat("MedianGravel", "rock_ground", new Color(0.94f, 0.90f, 0.84f), 3f, 0.25f);

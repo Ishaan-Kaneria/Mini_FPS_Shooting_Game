@@ -3401,6 +3401,28 @@ What the reachability work found (2026-10-21), each worth knowing before touchin
   off the stair's gap: the roof behind every gap is kept clear for 3.5 m (`StairClearing`).
 * **Rows of wrecks nose to tail are walls.** The junkyard has a drive south from its gate and a second gap.
 * Roof islands went 134 -> 5 of 3030 samples; `VerifyTown` fails above 1%.
+* **After the findable causes, six per cent of the ground navmesh was still stranded** (VerifyReach: 1358 of 20817
+  samples): the hollow middles of blocks whose houses stand on their lot lines, courtyards, the space under ramps,
+  yards behind a neighbour's wall. So the town ends with `SealTownIslands` (`FPSKitTownSeal`): the baked triangles are
+  welded into connected pieces, every piece not holding the player's start is covered by Not Walkable boxes on a 1 m
+  grid (a cell only where its centre is on the island, which erosion keeps 0.5 m from every wall, so no box reaches
+  through a wall; -0.8 to +1.2 m round the island's own floor), and the navmesh is baked again (+14 s). First run: 239
+  pieces, 36 889 m2, 1569 volumes; VerifyReach then 0 of 19 743, roof islands 0 of 2987. It hides nothing a check
+  needs: VerifyTown still proves the famous places and VerifyDesertSpawns plays the town.
+* **Checks that broke on the new packs, not on the game:** the BxB vehicle packages pull in Entities, whose IL
+  post-processor injects `Unity.Entities.CodeGeneratedRegistry.AssemblyTypeRegistry` (a static) into Assembly-CSharp,
+  so the statics audit skips `Unity.Entities*` types; EasyRoads3D's import dialog and the packs' editor windows log
+  "Canceling DisplayDialog" / "No graphic device is available" in batch mode, and Burst times out, so the play tests
+  share `FPSKitPlayMode.IsEditorNoise`. VerifyTerrain measures any `TerrainCollider` as ground (the town and the
+  fairground had no "Dune" chunks and measured nothing).
+* **One press does one thing.** The touch RELOAD button reads PICK UP or DRIVE / GET OUT; `GunPickup` takes the
+  queued press every frame unless the button reads DRIVE (then `DrivableCar` does), and `DrivableCar` ignores a press
+  while PICK UP is showing. Leaving it queued (the first version) let a stale press pick a just-dropped gun back up.
+* **The reflection sky has its sun taken out** (`FPSKitTownAssets.ReflectionCube`, a clamped EXR copy): a straight copy
+  of the HDR kept a sun disc thousands of times the sky, which even the blurred mips of a rough surface reflected, and
+  every road facing the low sun shone wet. Poly Haven's `white_plaster_rough_01/02` and `concrete_wall_008` are green
+  with algae in spite of their names and read as moss: not used. The oasis hollow was flat-bottomed, so the pond lay
+  under the ground: it has its own banked basin and the water stands under the lowest point of its rim.
 * `FPSKitTownTest.Probe` (batch) writes `Build/TownProbePoints.txt`: what stands at given points, height maps of the
   navmesh round awkward places (upper case = proved reachable), and an isolated bake of a landmark with and without the
   cull. Point it at whatever fails next.

@@ -565,6 +565,7 @@ namespace FPSKit.EditorTools
             var spawnPoints = BuildSpawnPoints();
 
             BakeNavMesh();
+            if (_theme.desertTownZone) SealTownIslands(player.transform.position);
             SnapSpawnPointsToNavMesh(spawnPoints);
 
             var levels = BuildLevelManager(enemyPrefab, spawnPoints, player.transform);

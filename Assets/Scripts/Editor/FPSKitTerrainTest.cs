@@ -118,7 +118,7 @@ namespace FPSKit.EditorTools
             // elsewhere, or a snow field would have a 55m strip down the middle of it
             // excluded from the sweep for a gorge that was never cut -- the same field
             // BuildDuneField itself had to be told to stop reading.
-            float clear = theme.openZone ? theme.hazardWidth * 0.5f + 30f : 0f;
+            float clear = theme.openZone && !theme.desertTownZone ? theme.hazardWidth * 0.5f + 30f : 0f;
 
             // <b>The heightfield itself, not everything wearing its tag.</b>
             //
@@ -141,6 +141,11 @@ namespace FPSKit.EditorTools
                 var collider = filter.GetComponent<Collider>();
                 if (collider != null) chunks.Add(collider);
             }
+
+            // A layout whose ground is a Unity Terrain (the desert town) is measured on that, the same way: it is the
+            // ground. Roads, pavements and floors draped over it are not, and are stepped over like the rocks.
+            foreach (var terrain in UnityEngine.Object.FindObjectsByType<TerrainCollider>(FindObjectsSortMode.None))
+                chunks.Add(terrain);
 
             if (chunks.Count == 0)
             {

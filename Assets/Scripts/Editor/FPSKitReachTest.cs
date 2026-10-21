@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -234,20 +235,47 @@ namespace FPSKit.EditorTools
             var okMin = new Vector2(float.MaxValue, float.MaxValue);
             var okMax = new Vector2(float.MinValue, float.MinValue);
 
+            // Sampled from just above the ground, not from the sky: the search radius
+            // is measured from the point given, so a probe dropped from sixty metres
+            // up finds nothing anywhere and the whole test passes on an empty set.
+            var samples = new List<NavMeshHit>();
             for (float x = -half; x <= half; x += Step)
             for (float z = -half; z <= half; z += Step)
-            {
-                // Sampled from just above the ground, not from the sky: the search radius
-                // is measured from the point given, so a probe dropped from sixty metres
-                // up finds nothing anywhere and the whole test passes on an empty set.
-                if (!NavMesh.SamplePosition(new Vector3(x, 1.5f, z), out var hit, 3f, NavMesh.AllAreas))
-                    continue;
+                if (NavMesh.SamplePosition(new Vector3(x, 1.5f, z), out var found, 3f, NavMesh.AllAreas))
+                    samples.Add(found);
 
+            // <b>Proved in short legs, nearest the player first.</b> CalculatePath's search has
+            // a node budget: across the desert town (1 km of dense streets) it returned
+            // PathPartial for places a path from a few hundred metres nearer reached
+            // completely. So a sample is proved by a complete path to any sample already
+            // proved near it, and only failing that by the direct path to the player -- the
+            // same set the direct path alone finds on the smaller arenas, without the
+            // budget's false strandings on the large one.
+            samples.Sort((a, b) => (a.position - home.position).sqrMagnitude.CompareTo((b.position - home.position).sqrMagnitude));
+            var proved = new Dictionary<Vector2Int, List<Vector3>>();
+            Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.FloorToInt(p.x / 30f), Mathf.FloorToInt(p.z / 30f));
+            bool Reached(Vector3 p)
+            {
+                var c = CellOf(p);
+                var near = new List<Vector3>();
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dz = -1; dz <= 1; dz++)
+                        if (proved.TryGetValue(new Vector2Int(c.x + dx, c.y + dz), out var list)) near.AddRange(list);
+                foreach (var q in near.OrderBy(q => (q - p).sqrMagnitude).Take(3))
+                    if (NavMesh.CalculatePath(p, q, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete)
+                        return true;
+                return NavMesh.CalculatePath(p, home.position, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
+            }
+
+            foreach (var hit in samples)
+            {
                 on++;
 
-                if (NavMesh.CalculatePath(hit.position, home.position, NavMesh.AllAreas, path)
-                    && path.status == NavMeshPathStatus.PathComplete)
+                if (Reached(hit.position))
                 {
+                    var cell = CellOf(hit.position);
+                    if (!proved.TryGetValue(cell, out var inCell)) proved[cell] = inCell = new List<Vector3>();
+                    inCell.Add(hit.position);
                     okMin = Vector2.Min(okMin, new Vector2(hit.position.x, hit.position.z));
                     okMax = Vector2.Max(okMax, new Vector2(hit.position.x, hit.position.z));
                     continue;

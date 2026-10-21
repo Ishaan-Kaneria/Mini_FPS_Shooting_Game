@@ -1157,14 +1157,15 @@ namespace FPSKit.EditorTools
             // A house that can be entered has its gate open: shut, the yard, the stair and the roof baked as one sealed island.
             var gate = CompoundWall(r, f, rng, gate: true, canShut: !b.enterable);
             // A car in the yard on some, parked along the wall beside the gate (on the side away from the house door in the
-            // wall). Parked across the back of the gate, it left a metre between car and wall and closed the yard off.
+            // wall), close in to the wall. Parked across the back of the gate it closed the yard off; parked mid-yard in a
+            // 4.5 m yard it left 1.3 m either side, too narrow for an agent, and cut the yard in two.
             if (gate.built && rng.NextDouble() < 0.55)
             {
                 float side = gate.doorSide > 0f ? -1f : 1f;
                 float d = gate.at + side * 4.6f;
                 if (d - 2.8f > 0.3f && d + 2.8f < gate.len - 0.3f)
                 {
-                    Vector2 cp = gate.start + gate.along * d - SideOut(f) * Mathf.Min(front * 0.5f, 2.6f);
+                    Vector2 cp = gate.start + gate.along * d - SideOut(f) * 1.5f;
                     _yardCars.Add(new Vector4(cp.x, 0f, cp.y, Mathf.Atan2(gate.along.x, gate.along.y) * Mathf.Rad2Deg + (rng.NextDouble() < 0.5 ? 0f : 180f)));
                 }
             }

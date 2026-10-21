@@ -15,6 +15,9 @@ namespace FPSKit.EditorTools
     /// LevelManager's leash warning, enemies arrive, each one within a few metres of one of the zone points (or from
     /// the ring round the player, LevelManager's own fallback) and never nearer the player than the zone band's near edge,
     /// and none is removed by the leash.
+    ///
+    /// The town lives through the same run: civilians appear round the player and walk, traffic drives (until the
+    /// shooting stops it), and nothing the game does logs an error or an exception.
     ///   Tools/unity-batch.sh FPSKitBatch.VerifyDesertSpawns
     /// </summary>
     public static class FPSKitDesertSpawnTest
@@ -28,17 +31,22 @@ namespace FPSKit.EditorTools
         static LevelSet.Level _tuned;
         static float _clockBackup = -1f;
         static readonly List<string> _warnings = new List<string>();
+        static readonly List<string> _errors = new List<string>();
+        static readonly HashSet<Civilian> _walked = new HashSet<Civilian>();
+        static int _mostCivilians, _mostCars;
+        static float _driven;
         static readonly Dictionary<EnemyAI, (Vector3 at, float fromPlayer)> _seen = new Dictionary<EnemyAI, (Vector3, float)>();
         static Vector3 _playerAt;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() { _running = false; _warnings.Clear(); _seen.Clear(); }
+        static void ResetStatics() { _running = false; _warnings.Clear(); _seen.Clear(); _errors.Clear(); _walked.Clear(); }
 
         public static void Run()
         {
             if (_running || EditorApplication.isPlaying) return;
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-            _warnings.Clear(); _seen.Clear();
+            _warnings.Clear(); _seen.Clear(); _errors.Clear(); _walked.Clear();
+            _mostCivilians = _mostCars = 0; _driven = 0f;
             _lastFrame = -1; _warm = 0; _frames = 0; _tuned = null;
             _startedAt = EditorApplication.timeSinceStartup;
             _running = true;
@@ -52,6 +60,8 @@ namespace FPSKit.EditorTools
         static void Log(string message, string stack, LogType type)
         {
             if (message.Contains("[LevelManager]")) _warnings.Add(message.Split('\n')[0]);
+            if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !FPSKitPlayMode.IsEditorNoise(message) && _errors.Count < 8)
+                _errors.Add($"[{type}] {message.Split('\n')[0]}");
         }
 
         static void Tick()
@@ -84,6 +94,19 @@ namespace FPSKit.EditorTools
                     if (!_seen.ContainsKey(ai)) _seen[ai] = (ai.transform.position, Vector3.Distance(ai.transform.position, player.position));
                 }
 
+                // The town's life.
+                int civilians = 0;
+                foreach (var c in Object.FindObjectsByType<Civilian>(FindObjectsSortMode.None))
+                {
+                    if (c.Dead || c.Hidden) continue;
+                    civilians++;
+                    if (c.Current == Civilian.State.Walk) _walked.Add(c);
+                }
+                _mostCivilians = Mathf.Max(_mostCivilians, civilians);
+                var cars = Object.FindObjectsByType<TrafficCar>(FindObjectsSortMode.None);
+                _mostCars = Mathf.Max(_mostCars, cars.Length);
+                foreach (var car in cars) _driven += car.Speed * Time.deltaTime;
+
                 if (++_frames < Seconds * 60f) return;
                 Finish(level);
             }
@@ -113,6 +136,9 @@ namespace FPSKit.EditorTools
                       $"none nearer the player than the near edge ({level.zoneSpawnDistance.x:0} m): nearest {(_seen.Count > 0 ? _seen.Values.Min(s => s.fromPlayer) : 0f):0} m, farthest {(_seen.Count > 0 ? _seen.Values.Max(s => s.fromPlayer) : 0f):0} m");
                 lines.Add($"  note {atZone} of {_seen.Count} arrived at a zone point (within 8 m), the rest from the ring round the player");
                 Check(!_warnings.Any(w => w.Contains("leash") || w.Contains("Discard") || w.Contains("lost")), "none removed by the leash");
+                Check(_mostCivilians >= 10 && _walked.Count >= 5, $"civilians about: {_mostCivilians} at most at once, {_walked.Count} seen walking");
+                Check(_mostCars >= 3 && _driven >= 150f, $"traffic: {_mostCars} cars at most, {_driven:0} m driven between them");
+                Check(_errors.Count == 0, $"no game errors{(_errors.Count > 0 ? ": " + string.Join(" / ", _errors) : "")}");
             }
             else Check(false, "ran: " + error);
 

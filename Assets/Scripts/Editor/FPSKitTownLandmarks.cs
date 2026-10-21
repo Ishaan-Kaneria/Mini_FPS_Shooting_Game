@@ -603,7 +603,7 @@ namespace FPSKit.EditorTools
                     var (a0, b0) = FaceRun(room, s);
                     var n = SideOut3(s);
                     var holes = new List<Vector4>();
-                    if (s == 2) holes.Add(new Vector4(6f, 7.4f, 0.4f, 2.6f));
+                    if (s == 2) holes.Add(new Vector4(5.6f, 7.6f, 0.4f, 2.6f));   // 2 m: at 1.4 an agent could not pass
                     float h = Rand(rng, 2.2f, 3.6f);
                     m.WallWithHoles(_castle, a0 + Vector3.up * (y0 - 0.4f), b0 + Vector3.up * (y0 - 0.4f), h, n, holes);
                     m.WallWithHoles(_castle, a0 - n * 0.5f + Vector3.up * (y0 - 0.4f), b0 - n * 0.5f + Vector3.up * (y0 - 0.4f), h, -n, holes);

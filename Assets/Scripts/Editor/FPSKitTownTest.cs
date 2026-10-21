@@ -140,7 +140,7 @@ namespace FPSKit.EditorTools
                     }
                 }
             }
-            if (roofs > 0 && bad > roofs * 0.03f) problems.Add($"{bad} of {roofs} sampled roof points carry navmesh that cannot be reached (a closed building baked an island)");
+            if (roofs > 0 && bad > roofs * 0.01f) problems.Add($"{bad} of {roofs} sampled roof points carry navmesh that cannot be reached (a closed building baked an island)");
             notes.Append($"\n  roofs: {roofs} points sampled, {bad} unreachable islands" + (islands.Count > 0 ? ": " + string.Join(" ", islands) : ""));
 
             // ---- life ----
@@ -176,75 +176,69 @@ namespace FPSKit.EditorTools
             notes.Append($"\n  {drivable.Length} drivable cars, {techs.Length} technicals");
         }
 
-        /// <summary>Diagnosis: what stands at given points (every collider down a vertical ray, the navmesh near each, the volumes
-        /// over it), and character maps of the navmesh round awkward places (R reached from the start, o navmesh not reached).</summary>
+        /// <summary>
+        /// Diagnosis for a failure here (batch: <c>FPSKit.EditorTools.FPSKitTownTest.Probe</c>, writes Build/TownProbePoints.txt).
+        /// Height maps of the navmesh round given places: per 0.5 m cell the highest navmesh, its height band as a letter
+        /// (a = ground, then one letter per 1.5 m), upper case when it is proved reachable from the start; '.' = none.
+        /// A sealed yard reads as lower-case ground, a stair cut part way as upper case giving way to lower case.
+        /// </summary>
         public static void Probe()
         {
             EditorSceneManager.OpenScene(Scene, OpenSceneMode.Single);
             var sb = new StringBuilder();
             var player = GameObject.FindWithTag("Player");
             NavMesh.SamplePosition(player.transform.position, out var home, 4f, NavMesh.AllAreas);
-            var pts = new[] { new Vector3(208f, 0, 170f), new Vector3(199f, 0, 162f), new Vector3(-257f, 0, -253f), new Vector3(-344f, 0, -323f),
-                              new Vector3(-451f, 0, -177f), new Vector3(-256f, 0, -177f), new Vector3(-267f, 0, -177f) };
-            var vols = UnityEngine.Object.FindObjectsByType<Unity.AI.Navigation.NavMeshModifierVolume>(FindObjectsSortMode.None);
-            foreach (var p in pts)
+            var reach = new Reach(home.position);
+            foreach (var g in GroundGrid(80f).OrderBy(g => (g - home.position).sqrMagnitude)) reach.Prove(g);
+
+            void HeightMap(string name, float x0, float z0, float x1, float z1)
             {
-                sb.AppendLine($"== {p.x},{p.z}");
-                foreach (var h in Physics.RaycastAll(new Vector3(p.x, 300f, p.z), Vector3.down, 700f).OrderBy(h => -h.point.y))
-                    sb.AppendLine($"  hit {h.collider.name} ({h.collider.transform.parent?.name}) y={h.point.y:0.00}");
-                for (float y = -5f; y < 40f; y += 0.5f)
-                    if (NavMesh.SamplePosition(new Vector3(p.x, y, p.z), out var nh, 0.3f, NavMesh.AllAreas))
-                    { sb.AppendLine($"  navmesh at y={nh.position.y:0.00} ({nh.position.x:0.0},{nh.position.z:0.0})"); y = nh.position.y + 1.5f; }
-                foreach (var v in vols)
-                {
-                    var c = v.transform.TransformPoint(v.center); var e = v.size * 0.5f;
-                    if (Mathf.Abs(p.x - c.x) <= e.x && Mathf.Abs(p.z - c.z) <= e.z)
-                        sb.AppendLine($"  volume y {c.y - e.y:0.0}..{c.y + e.y:0.0} x {c.x - e.x:0.0}..{c.x + e.x:0.0} z {c.z - e.z:0.0}..{c.z + e.z:0.0}");
-                }
-            }
-            void Map(string name, float x0, float z0, float x1, float z1, float y, float step)
-            {
-                sb.AppendLine($"== map {name} x {x0}..{x1} (left to right), z {z1}..{z0} (top to bottom), y {y}");
-                var path = new NavMeshPath();
-                for (float z = z1; z >= z0 - 0.01f; z -= step)
+                sb.AppendLine($"== height map {name} x {x0}..{x1}, z {z1}..{z0} (top to bottom), 0.5 m cells");
+                for (float z = z1; z >= z0 - 0.01f; z -= 0.5f)
                 {
                     var line = new StringBuilder($"{z,7:0.0} ");
-                    for (float x = x0; x <= x1 + 0.01f; x += step)
+                    for (float x = x0; x <= x1 + 0.01f; x += 0.5f)
                     {
-                        if (!NavMesh.SamplePosition(new Vector3(x, y, z), out var nh, step * 0.5f, NavMesh.AllAreas) || Mathf.Abs(nh.position.y - y) > 1f) { line.Append('#'); continue; }
-                        bool ok = NavMesh.CalculatePath(home.position, nh.position, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
-                        line.Append(ok ? 'R' : 'o');
+                        float g = Ground(new Vector3(x, 0f, z));
+                        Vector3 best = Vector3.zero; bool any = false;
+                        for (float y = g - 1f; y < g + 14f; y += 0.4f)
+                            if (NavMesh.SamplePosition(new Vector3(x, y, z), out var nh, 0.25f, NavMesh.AllAreas) && Mathf.Abs(nh.position.x - x) < 0.2f && Mathf.Abs(nh.position.z - z) < 0.2f)
+                            { if (!any || nh.position.y > best.y) best = nh.position; any = true; }
+                        if (!any) { line.Append('.'); continue; }
+                        char c = (char)('a' + Mathf.Clamp(Mathf.FloorToInt((best.y - g + 0.75f) / 1.5f), 0, 25));
+                        line.Append(reach.Prove(best, remember: false) ? char.ToUpper(c) : c);
                     }
                     sb.AppendLine(line.ToString());
                 }
             }
-            // A broken roof stair, step by step: where the wall is, the tread, the navmesh on it, and the volumes there.
-            {
-                if (Physics.Raycast(new Vector3(-257.8f, 7.2f, -327.3f), Vector3.back, out var wallHit, 20f))
-                    sb.AppendLine($"== stair wall: {wallHit.collider.name} at z {wallHit.point.z:0.00}");
-                float wz = wallHit.point.z;
-                for (float x = -262f; x <= -253f; x += 0.25f)
-                {
-                    var line = new StringBuilder($"  x {x:0.00}:");
-                    foreach (float off in new[] { 0.3f, 0.6f, 0.82f, 1.05f, 1.3f })
-                    {
-                        float z = wz + off + 0.02f;
-                        Physics.Raycast(new Vector3(x, 14f, z), Vector3.down, out var h, 20f);
-                        bool nav = NavMesh.SamplePosition(h.point, out var nh, 0.1f, NavMesh.AllAreas);
-                        line.Append($" [{off:0.00}] {h.point.y:0.00}{(nav ? "*" : " ")}");
-                    }
-                    sb.AppendLine(line.ToString());
-                }
-                foreach (var v in vols)
-                {
-                    var c = v.transform.TransformPoint(v.center); var e = v.size * 0.5f;
-                    if (c.x + e.x > -262f && c.x - e.x < -253f && c.z + e.z > wz - 0.5f && c.z - e.z < wz + 2f)
-                        sb.AppendLine($"  volume y {c.y - e.y:0.0}..{c.y + e.y:0.0} x {c.x - e.x:0.0}..{c.x + e.x:0.0} z {c.z - e.z:0.00}..{c.z + e.z:0.00}");
-                }
-            }
+            ReachImage(reach, "Build/TownReach.png");
             System.IO.File.WriteAllText("Build/TownProbePoints.txt", sb.ToString());
-            Debug.Log("[FPSKit] probe points written");
+            Debug.Log("[FPSKit] probe written");
             FPSKitBatch.Exit(0);
+        }
+
+        /// <summary>
+        /// The whole town at 2 m a pixel, from the ground up to 4 m: white where the navmesh is proved reachable, red where
+        /// it is not (a stranded patch), dark where there is none. Proved outward from the start, each cell from its
+        /// neighbours already proved, so the red is exactly what VerifyReach would count.
+        /// </summary>
+        static void ReachImage(Reach reach, string file)
+        {
+            const int N = 500; const float Cell = 2f, Half = 500f;
+            var tex = new Texture2D(N, N, TextureFormat.RGB24, false);
+            var cells = new List<(int i, int j, Vector3 p)>();
+            for (int j = 0; j < N; j++)
+                for (int i = 0; i < N; i++)
+                {
+                    tex.SetPixel(i, j, new Color(0.12f, 0.1f, 0.09f));
+                    var q = new Vector3(-Half + (i + 0.5f) * Cell, 0f, -Half + (j + 0.5f) * Cell);
+                    q.y = Ground(q) + 1.5f;
+                    if (NavMesh.SamplePosition(q, out var h, 2.5f, NavMesh.AllAreas) && Mathf.Abs(h.position.x - q.x) < 1f && Mathf.Abs(h.position.z - q.z) < 1f)
+                        cells.Add((i, j, h.position));
+                }
+            foreach (var (i, j, p) in cells.OrderBy(c => (c.p - reach.Start).sqrMagnitude))
+                tex.SetPixel(i, j, reach.Prove(p, remember: i % 4 == 0 && j % 4 == 0) ? new Color(0.92f, 0.9f, 0.85f) : new Color(0.9f, 0.1f, 0.1f));
+            System.IO.File.WriteAllBytes(file, tex.EncodeToPNG());
         }
 
         /// <summary>
@@ -255,16 +249,36 @@ namespace FPSKit.EditorTools
         {
             readonly List<Vector3> _proved = new List<Vector3>();
             readonly NavMeshPath _path = new NavMeshPath();
-            public Reach(Vector3 start) { _proved.Add(start); }
+            readonly Dictionary<Vector2Int, List<Vector3>> _cells = new Dictionary<Vector2Int, List<Vector3>>();
+            public readonly Vector3 Start;
+            public Reach(Vector3 start) { Start = start; Add(start); }
 
-            IEnumerable<Vector3> Nearest(Vector3 t) => _proved.OrderBy(p => (p - t).sqrMagnitude).Take(3);
+            static Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.FloorToInt(p.x / 30f), Mathf.FloorToInt(p.z / 30f));
+            void Add(Vector3 p)
+            {
+                _proved.Add(p);
+                var c = CellOf(p);
+                if (!_cells.TryGetValue(c, out var l)) _cells[c] = l = new List<Vector3>();
+                l.Add(p);
+            }
+
+            /// <summary>The three proved points nearest <paramref name="t"/>: from its own and the neighbouring 30 m cells, or from all.</summary>
+            IEnumerable<Vector3> Nearest(Vector3 t)
+            {
+                var c = CellOf(t);
+                var near = new List<Vector3>();
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dz = -1; dz <= 1; dz++)
+                        if (_cells.TryGetValue(new Vector2Int(c.x + dx, c.y + dz), out var l)) near.AddRange(l);
+                return (near.Count > 0 ? near : _proved).OrderBy(p => (p - t).sqrMagnitude).Take(3);
+            }
 
             public bool Prove(Vector3 t, bool remember = true)
             {
                 foreach (var p in Nearest(t))
                     if (NavMesh.CalculatePath(p, t, NavMesh.AllAreas, _path) && _path.status == NavMeshPathStatus.PathComplete)
                     {
-                        if (remember) _proved.Add(t);
+                        if (remember) Add(t);
                         return true;
                     }
                 return false;

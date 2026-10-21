@@ -433,9 +433,8 @@ namespace FPSKit.EditorTools
 
         static void OnGameLog(string message, string stackTrace, LogType type)
         {
-            // The editor probes for an Android device on entering play mode with the Android
-            // module installed, and logs the failure as an exception. Nothing to do with the game.
-            if (message.Contains("Unity Remote requirements check failed")) return;
+            // The editor's own log lines (the Android device probe, store packs' windows in batch mode). Not the game.
+            if (FPSKitPlayMode.IsEditorNoise(message)) return;
             if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert)
                 Errors.Add($"[{type}] {message.Trim()}");
         }

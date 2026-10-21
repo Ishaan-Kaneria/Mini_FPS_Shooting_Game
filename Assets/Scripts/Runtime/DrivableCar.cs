@@ -100,10 +100,12 @@ public class DrivableCar : MonoBehaviour
 
     static bool InteractPressed()
     {
+        // One press does one thing: with a gun to pick up in reach (disarmed), the press is the pickup's.
+        if (MobileInput.PickUpReady && Driving == null) return false;
         var motor = Object.FindAnyObjectByType<PlayerMotor>();
         var keys = motor != null ? motor.controls : null;
         bool press = (keys != null && ControlSettings.Pressed(keys.interact)) | GameInput.PadPressed(GameAction.Interact);
-        if (!MobileInput.PickUpReady) press |= MobileInput.ConsumeInteract();
+        press |= MobileInput.ConsumeInteract();
         return press;
     }
 

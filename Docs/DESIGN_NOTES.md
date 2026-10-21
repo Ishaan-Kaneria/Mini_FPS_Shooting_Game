@@ -3312,3 +3312,95 @@ Play check: `FPSKitBatch.VerifyDesertSpawns`.
 hamlets and farms, none of the walls, yard walls or the mosque has its foot 15 cm to 1.2 m above the sand. What the
 sweep flags is meant to be off the ground: window frames, furniture, vehicles, and the shells' rounded bottom edge
 (0.2 m) over their footing.
+
+## The desert is a town (2026-10-20, rebuilt from scratch)
+
+Ishaan: "I still not feel very realistic about the scenes, houses, trees, the cars, clothes, and every single object ...
+I want a fully functional desert world with real market, people living area, roads, cars ... live people roaming".
+His answers (asked once, all locked): a **Middle East town**, **1 km x 1 km**, **golden afternoon**, fully new (reuse
+only what is realistic), **all districts** (souk + housing, landmarks, modern edge with junctions and stores, outskirts),
+landmarks **grand mosque + minaret, citadel, palace, clock-tower square + bazaar gate**, civilians who **flee in fights**
+and whose deaths **cost stars and score**, cars **parked, in traffic, drivable, and enemy technicals**, the
+**Survivalist** enemies, **a third of houses enterable**, **PC full / phone reduced**.
+
+`LevelTheme.desertTownZone` is the layout; `FPSKitTown*.cs` builds it, in this order (each reads what came before):
+
+| pass | file | what |
+|---|---|---|
+| plan | `FPSKitTownPlan` | the fixed street plan (every road axis-aligned and straight; the roundabout the one curve), districts, landmark rects, farm plots |
+| ground | `FPSKitTownGround` | a Unity Terrain 1.4 km across, roads carved in, four Poly Haven ground layers painted by rule, sky, apron, horizon mountains, edge |
+| roads | `FPSKitTownRoads` | asphalt, paver pavements on concrete kerbs, the avenue's median, markings, stop lines, zebras, the roundabout |
+| buildings | `FPSKitTownBuildings` | lots from the blocks; apartments with shops, villas with yards, row houses, the old town's alleys, courtyards and ruins |
+| landmarks | `FPSKitTownLandmarks` | mosque + minaret, citadel + keep, palace + garden, clock tower, bazaar gate, covered souk, a neighbourhood mosque |
+| edge | `FPSKitTownEdge` | gas station, checkpoint, garage, bus stop, junkyard, water tower, palm farms, oasis, highway dressing, wild desert, Bedouin camp |
+| street | `FPSKitTownStreet` | lamps, signals (live), road and street-name signs, poles and wires, palms, benches, bins, litter |
+| life | `FPSKitTownLife` | parked cars, wrecks, drivable cars, technicals, signal controllers, traffic routes, civilian prefabs and spots |
+
+Things learned building it, worth not re-deriving:
+
+* **The terrain is a real `Terrain`, and `_ground` is its heightmap** (1025^2 over 1400 m, 1.37 m), so `GroundHeightAt`
+  is the surface walked on. Town ground is gentle (+-2 m over 500 m) and pinned during relaxation; dunes rise only by
+  distance from developed land (`DuneWeight`, a chamfer distance transform on a 4 m grid); the citadel hill is a
+  smoothstep plateau under 21 degrees with its ramp graded at ~10%; the 26 degree repose cap still applies (the car).
+  Only four terrain layers: a fifth and sixth never rendered (Terrain Lit's second pass did not appear).
+* **Roads drape on the uncarved ground (`_townBase`) and the terrain under every paved corridor is sunk 18 cm**, with
+  skirts on pavement and highway edges -- so no bump of terrain ever shows through, and the step is never seen.
+  Overlapping road pieces are the same material with world-metre UVs, so junctions need no geometry of their own.
+* **Every mesh is built by `TownMesh`**: a submesh per material, world-metre UVs from each face's normal, winding from
+  a stated normal (nothing can be inside-out). Buildings are merged per 64 m chunk.
+* **Interiors cut exactly the outer wall's openings** (`Mass.groundHoles`), or the gap between the faces shows the sky.
+  An outside stair is planned before the walls so the parapet is cut for its landing.
+* **Reflections come from the sky HDR**: a cubemap made from a copy of it (`FPSKitTownAssets.ReflectionCube`), and the
+  sun is aimed from the HDR's brightest pixel. With it, glass and water read; without it they were mud. It also made
+  plaster and roads look wet, so smoothness is low everywhere (0.35 default, roads ~0.2).
+* **Poly Haven FBX disagree on the up axis**: about half import lying down. `FPSKitTownAssets` stands each one up from
+  its resting face (bounds start at y = 0, or end/start at z = 0). The scans are dense (boulders 60-110k triangles, one
+  shrub 694k): the heaviest plants are not placed, dense meshes are culled sooner (`LODGroup` by triangle count), and the
+  bulk of the stones and scrub is the kit's own light meshes. The pack's palm textures are near black: brightened
+  through `_BaseColor`. Cliff scans scaled up looked like cardboard and were taken out.
+* **Signs are real Arabic**, shaped by Pillow's raqm layout (`Tools/town/make_signs.py`); a sign's reading direction is
+  set from the viewer's left, not the quad's first corner (three were mirrored before that rule).
+* **The vehicle pack (BxB MVC) loads only with `com.unity.mathematics` in the manifest** (added), but it is a framework
+  set up through its own wizard with its own input manager; the drivable car (`DrivableCar`) is written on `GameInput`
+  instead, so it works on keyboard, pad and touch (RELOAD reads DRIVE / GET OUT).
+* **Civilians** (`Civilian`, `CivilianDirector`): the user's Adventure man with Starter Assets locomotion and Mixamo
+  idles/deaths; spawned round the player out of view, flee from gunfire/blasts into the nearest doorway (and are gone)
+  or away; a death is counted (`CivilianCasualties`): two stars at most for one or two, one for three or more, 300
+  points each, and the results line says so.
+* **Traffic** (`TrafficDirector`, `TrafficCar`, `TownSignals`): routes generated in the builder -- right-hand lanes,
+  curved turns, stop lines with their rule (signal, stop sign, give way), the roundabout anticlockwise -- driven by
+  kinematic cars that brake for anything in front and stop with hazards when shooting starts.
+* **Technicals** (`TechnicalTruck`): from level 3, 45-110 s in, a pickup with the .50 cal drives in off the highway,
+  parks and fires bursts on line of sight until its gunner is killed; not a level enemy (the clock still ends levels).
+* **Phone and web get the reduced desert**: `StageTouchScenes` runs `FPSKitReducedCopy` on the staged copy only.
+
+What the reachability work found (2026-10-21), each worth knowing before touching navigation anywhere:
+
+* **`NavMeshModifierVolume.center` defaults to (0, 1, 0).** A volume placed by its transform and sized by `size` sits a
+  metre above where it was meant to: under the roofs it should have covered (134 roof islands) and over the citadel's
+  wall-walk it should have stopped short of. `NoEntryBox` sets the centre to zero. **The City, Fairground, Industrial,
+  MeshKit and Volcanic builders do not**, so their volumes are a metre high too; not changed, as each needs its arena
+  rebuilt and re-checked.
+* **`NavMesh.CalculatePath` has a search budget.** From the player's start to the citadel (580 m of dense streets) it
+  returned `PathPartial` for the wall-walk and the keep roof; from the citadel courtyard both paths were complete.
+  `VerifyTown` therefore proves an 80 m grid of ground points outward from the start, each from the nearest already
+  proved, and proves every place and roof sample from those (`FPSKitTownTest.Reach`). A failure there is real.
+* **Small places bake as slivers and the small-region cull takes them.** The first minaret (6 m square, 1.75 m lanes)
+  baked a strip a few voxels wide up its ramps, each piece under `minRegionArea` 12, so nothing inside it was on the
+  navmesh at all (an isolated bake with the cull off showed the slivers). Now 8 m square, 2.25 m lanes, 24 degree ramps.
+  The same arithmetic set the roof stairs (1.2 m wide: one voxel left after a 0.5 m agent's erosion) to 1.6 m with a
+  1.8 m parapet gap, and a tower's ring of merlons where the wall-walk ran through it (a 1 m gap) is left out.
+* **A thing built across a doorway's way out closes it.** The minaret's upper stage stood straight off the balcony,
+  across the doorway; the keep's door opened into the side of its own first flight; a villa's yard car parked across
+  the back of the gate left a metre to the wall; 40% of gates were built shut. Enterable houses now always have an open
+  gate, a shut gate puts the whole plot off the bake, and the yard car parks beside the gate.
+* **The bake collects render meshes, so anything drawn counts.** Laundry on a roof line (cloth from 1 m to 1.75 m) left
+  an agent no headroom and cut roofs in two: it is now its own mesh on the Backdrop layer with no collider. A row house
+  built to its lot line hung side balconies 1.15 m into the villa yard next door, over that villa's roof stair:
+  balconies are only on faces over a street. A course of block left 1.2 m in from the parapet on unfinished roofs walled
+  off the stair's gap: the roof behind every gap is kept clear for 3.5 m (`StairClearing`).
+* **Rows of wrecks nose to tail are walls.** The junkyard has a drive south from its gate and a second gap.
+* Roof islands went 134 -> 5 of 3030 samples; `VerifyTown` fails above 1%.
+* `FPSKitTownTest.Probe` (batch) writes `Build/TownProbePoints.txt`: what stands at given points, height maps of the
+  navmesh round awkward places (upper case = proved reachable), and an isolated bake of a landmark with and without the
+  cull. Point it at whatever fails next.

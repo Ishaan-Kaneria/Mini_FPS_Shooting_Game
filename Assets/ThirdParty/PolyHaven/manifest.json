@@ -680,7 +680,13 @@
   "patterned_terracotta_tiling": true,
   "old_mosaic_floor": true,
   "terrazzo_tiles": true,
-  "concrete_wall_008": true
+  "concrete_wall_008": true,
+  "brick_wall_003": true,
+  "brown_brick_02": true,
+  "seaworn_sandstone_brick": true,
+  "plaster_brick_pattern": true,
+  "sandstone_blocks_05": true,
+  "concrete_brick_wall_001": true
  },
  "hdri": "qwantani_late_afternoon_puresky_4k.hdr"
 }

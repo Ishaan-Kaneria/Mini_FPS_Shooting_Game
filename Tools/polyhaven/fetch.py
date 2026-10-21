@@ -1,5 +1,6 @@
 """Download CC0 Poly Haven assets: models (fbx 1k + jpg/png maps), textures (2k), one HDRI.
-Usage: python3 -I phdl.py <outdir>"""
+Usage: python3 -I fetch.py <outdir>               everything below
+       python3 -I fetch.py <outdir> <id> [<id>...] just those textures (no models, no sky); pack.py merges them in"""
 import json, os, sys, urllib.request, concurrent.futures as cf
 UA = {"User-Agent": "FPSKit-AssetFetch/1.0 (CC0 game assets)"}
 def _open(u, t): return urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=t)
@@ -31,7 +32,8 @@ asphalt_02 worn_asphalt square_concrete_pavers concrete_pavers sandstone_blocks_
 white_plaster_rough_01 white_plaster_rough_02 white_stucco beige_wall_002 painted_plaster_wall yellow_plaster worn_plaster_wall
 damaged_plaster plastered_wall_02 concrete_block_wall clay_plaster patterned_clay_plaster white_sandstone_bricks castle_wall_varriation
 rubble rusty_corrugated_iron corrugated_iron_02 painted_metal_shutter rusted_shutter wood_shutter weathered_planks rough_pine_door
-wooden_gate marble_mosaic_tiles patterned_terracotta_tiling old_mosaic_floor terrazzo_tiles concrete_wall_008""".split()
+wooden_gate marble_mosaic_tiles patterned_terracotta_tiling old_mosaic_floor terrazzo_tiles concrete_wall_008
+brick_wall_003 brown_brick_02 seaworn_sandstone_brick plaster_brick_pattern sandstone_blocks_05 concrete_brick_wall_001""".split()
 
 HDRI = "qwantani_late_afternoon_puresky"
 
@@ -93,13 +95,18 @@ def plan_texture(id):
             files.append((d[key]["2k"][ext]["url"], local)); maps[kind] = os.path.relpath(local, OUT)
     return id, files, maps
 
+ONLY = sys.argv[2:]
+if ONLY:
+    MODELS, TEXTURES = [], ONLY
+    manifest["hdri"] = None
 with cf.ThreadPoolExecutor(8) as ex:
     for id, files, sets in ex.map(plan_model, MODELS):
         manifest["models"][id] = sets; jobs += files
     for id, files, maps in ex.map(plan_texture, TEXTURES):
         manifest["textures"][id] = maps; jobs += files
-h = api(HDRI)["hdri"]["4k"]["hdr"]["url"]
-jobs.append((h, f"{OUT}/HDRI/{HDRI}_4k.hdr"))
+if not ONLY:
+    h = api(HDRI)["hdri"]["4k"]["hdr"]["url"]
+    jobs.append((h, f"{OUT}/HDRI/{HDRI}_4k.hdr"))
 
 json.dump(manifest, open(f"{OUT}/manifest.json", "w"), indent=1)
 print("files to fetch:", len(jobs))

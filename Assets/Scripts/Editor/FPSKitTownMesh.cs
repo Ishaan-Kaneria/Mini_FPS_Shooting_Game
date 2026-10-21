@@ -252,6 +252,68 @@ namespace FPSKit.EditorTools
             }
 
             /// <summary>
+            /// A wall face with openings, any of them arched: each hole is (u0, u1, v0, v1) like
+            /// <see cref="WallWithHoles"/>, and <paramref name="rises"/> (by the hole's index; missing or zero = flat) is
+            /// how far its head rises above v1 in a segmental arch (half the width: a round one). The face is cut into
+            /// columns at the hole edges and, inside an arched hole, into thin strips, and each column is filled between
+            /// the holes stacked in it, the fill above an arch following its curve.
+            /// </summary>
+            public void WallWithOpenings(Material m, Vector3 p0, Vector3 p1, float height, Vector3 normal, List<Vector4> holes,
+                                         IDictionary<int, float> rises, int strips = 10)
+            {
+                if (rises == null || rises.Count == 0) { WallWithHoles(m, p0, p1, height, normal, holes); return; }
+                Vector3 run = p1 - p0;
+                float length = run.magnitude;
+                if (length < 0.01f || height < 0.01f) return;
+                Vector3 u = run / length;
+                Vector3 W(float a, float b) => p0 + u * a + Vector3.up * b;
+                float Rise(int i) => rises.TryGetValue(i, out float r) ? r : 0f;
+
+                var cuts = new List<float> { 0f, length };
+                for (int i = 0; i < holes.Count; i++)
+                {
+                    var h = holes[i];
+                    cuts.Add(Mathf.Clamp(h.x, 0f, length)); cuts.Add(Mathf.Clamp(h.y, 0f, length));
+                    if (Rise(i) > 0f)
+                        for (int s = 1; s < strips; s++) cuts.Add(Mathf.Clamp(Mathf.Lerp(h.x, h.y, s / (float)strips), 0f, length));
+                }
+                cuts.Sort();
+                var spans = new List<(float v0, float topA, float topB)>();
+                for (int c = 0; c + 1 < cuts.Count; c++)
+                {
+                    float a = cuts[c], b = cuts[c + 1];
+                    if (b - a < 0.002f) continue;
+                    float mid = (a + b) * 0.5f;
+                    spans.Clear();
+                    for (int i = 0; i < holes.Count; i++)
+                    {
+                        var h = holes[i];
+                        if (mid <= h.x || mid >= h.y) continue;
+                        float half = (h.y - h.x) * 0.5f, cx = (h.x + h.y) * 0.5f, r = Rise(i);
+                        spans.Add((Mathf.Max(0f, h.z), Mathf.Min(height, h.w + SegmentTop(a - cx, half, r)), Mathf.Min(height, h.w + SegmentTop(b - cx, half, r))));
+                    }
+                    spans.Sort((x, y) => x.v0.CompareTo(y.v0));
+                    float ya = 0f, yb = 0f;
+                    foreach (var sp in spans)
+                    {
+                        if (sp.v0 > Mathf.Max(ya, yb) + 0.002f) Quad(m, W(a, ya), W(b, yb), W(b, sp.v0), W(a, sp.v0), normal);
+                        ya = Mathf.Max(ya, sp.topA); yb = Mathf.Max(yb, sp.topB);
+                    }
+                    if (height > Mathf.Max(ya, yb) + 0.002f) Quad(m, W(a, ya), W(b, yb), W(b, height), W(a, height), normal);
+                }
+            }
+
+            /// <summary>How far a segmental arch of <paramref name="rise"/> over a half-span stands above its springing at
+            /// <paramref name="x"/> from its centre (zero rise: flat; rise = half-span: a semicircle).</summary>
+            public static float SegmentTop(float x, float halfSpan, float rise)
+            {
+                if (rise <= 0.001f || halfSpan <= 0.001f) return 0f;
+                float radius = (halfSpan * halfSpan + rise * rise) / (2f * rise);
+                float xx = Mathf.Min(Mathf.Abs(x), halfSpan);
+                return Mathf.Sqrt(Mathf.Max(0f, radius * radius - xx * xx)) - (radius - rise);
+            }
+
+            /// <summary>
             /// A wall face with arched openings (pointed when <paramref name="pointed"/>): each opening is
             /// (centre u, width, springing height). Built from thin vertical strips, each filled below the sill
             /// (none: arches go to the ground) and above the arch curve, so the curve is as smooth as the strip count.
@@ -344,7 +406,8 @@ namespace FPSKit.EditorTools
             /// otherwise. Returns null when nothing was built.
             /// </summary>
             public GameObject Build(Transform parent, string name, int layer, string tag, bool collider = true,
-                                    ShadowCastingMode shadows = ShadowCastingMode.On)
+                                    ShadowCastingMode shadows = ShadowCastingMode.On,
+                                    UnityEditor.ModelImporterMeshCompression compression = UnityEditor.ModelImporterMeshCompression.Off)
             {
                 if (_parts.Count == 0) return null;
                 var mesh = new Mesh { name = name };
@@ -367,6 +430,8 @@ namespace FPSKit.EditorTools
                 for (int i = 0; i < sub.Count; i++) mesh.SetTriangles(sub[i], i);
                 mesh.RecalculateBounds();
                 mesh.RecalculateTangents();
+                // The town's meshes live in its scene: compressed there, or the scene is the better part of a gigabyte.
+                if (compression != UnityEditor.ModelImporterMeshCompression.Off) UnityEditor.MeshUtility.SetMeshCompression(mesh, compression);
 
                 var go = new GameObject(name);
                 go.transform.SetParent(parent, false);

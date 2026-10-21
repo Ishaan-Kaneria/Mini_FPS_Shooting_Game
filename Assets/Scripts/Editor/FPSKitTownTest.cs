@@ -174,6 +174,17 @@ namespace FPSKit.EditorTools
             foreach (var t in techs)
                 if (t.route == null || t.route.Length < 5 || t.gunner == null || t.muzzle == null) problems.Add($"{t.name} is missing its route, gunner or gun");
             notes.Append($"\n  {drivable.Length} drivable cars, {techs.Length} technicals");
+
+            // What the buildings cost: the chunks (walls, reveals, glass, courses, cornices) and their detail (joinery,
+            // dressings, iron; culled past ~180 m).
+            long shell = 0, detail = 0;
+            foreach (var mf in UnityEngine.Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+            {
+                if (mf.sharedMesh == null) continue;
+                if (mf.name.StartsWith("Block_")) shell += mf.sharedMesh.triangles.LongLength / 3;
+                else if (mf.name.StartsWith("Detail_")) detail += mf.sharedMesh.triangles.LongLength / 3;
+            }
+            notes.Append($"\n  buildings: {shell / 1000}k triangles in the chunks, {detail / 1000}k in their detail");
         }
 
         /// <summary>

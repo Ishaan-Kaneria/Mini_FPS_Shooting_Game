@@ -50,7 +50,7 @@ namespace FPSKit.EditorTools
 
         private static void ResetTownBuildings()
         {
-            _townLots.Clear(); _chunks.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear();
+            _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear();
             _volumes = null; _signNames = null; _roadSignNames = null;
             _oldSquares.Clear(); _vacantLots.Clear();
         }
@@ -76,19 +76,21 @@ namespace FPSKit.EditorTools
         {
             // No white_plaster_rough_01/02 or concrete_wall_008: in spite of the names they are green with algae and read as
             // moss on a desert wall.
+            // Tints are the wanted colour over each image's mean (white, cream, sand, ochre, a few pastels): tinted by
+            // eye, beige_wall_002 (mean 130, 110, 85) made dark brown boxes of half the town.
             _plasters = new[]
             {
-                TownMat("PlasterWhite", "plastered_wall_02", new Color(1.02f, 1.00f, 0.97f), 3f),
-                TownMat("PlasterStucco", "white_stucco", new Color(0.98f, 0.95f, 0.90f), 3f),
-                TownMat("PlasterBeige", "beige_wall_002", new Color(1.00f, 0.96f, 0.90f), 3f),
-                TownMat("PlasterCream", "painted_plaster_wall", new Color(1.00f, 0.95f, 0.86f), 3f),
-                TownMat("PlasterOchre", "yellow_plaster", new Color(1.00f, 0.93f, 0.82f), 3f),
-                TownMat("PlasterWorn", "worn_plaster_wall", new Color(1.00f, 0.96f, 0.90f), 3.5f),
-                TownMat("PlasterGrey", "plastered_wall_02", new Color(0.98f, 0.96f, 0.92f), 3f),
-                TownMat("PlasterSand", "beige_wall_002", new Color(1.04f, 0.97f, 0.86f), 3f),
-                TownMat("PlasterPeach", "painted_plaster_wall", new Color(1.00f, 0.86f, 0.74f), 3f),
-                TownMat("PlasterMint", "white_stucco", new Color(0.86f, 0.95f, 0.88f), 3f),
-                TownMat("PlasterSky", "white_stucco", new Color(0.84f, 0.92f, 0.98f), 3f),
+                TownMat("PlasterWhite", "plastered_wall_02", new Color(1.24f, 1.28f, 1.31f), 2.23f),
+                TownMat("PlasterStucco", "white_stucco", new Color(1.06f, 1.04f, 0.99f), 2f),
+                TownMat("PlasterBeige", "painted_plaster_wall", new Color(1.32f, 1.25f, 1.10f), 2f),
+                TownMat("PlasterCream", "painted_plaster_wall", new Color(1.32f, 1.30f, 1.16f), 2f),
+                TownMat("PlasterOchre", "white_stucco", new Color(1.00f, 0.92f, 0.76f), 2f),
+                TownMat("PlasterWorn", "worn_plaster_wall", new Color(1.62f, 1.62f, 1.66f), 2.5f),
+                TownMat("PlasterGrey", "plastered_wall_02", new Color(1.10f, 1.13f, 1.16f), 2.23f),
+                TownMat("PlasterSand", "plastered_wall_02", new Color(1.15f, 1.08f, 0.93f), 2.23f),
+                TownMat("PlasterPeach", "painted_plaster_wall", new Color(1.32f, 1.20f, 1.06f), 2f),
+                TownMat("PlasterMint", "white_stucco", new Color(0.95f, 1.04f, 0.99f), 2f),
+                TownMat("PlasterSky", "white_stucco", new Color(0.93f, 1.01f, 1.09f), 2f),
             };
             _oldPlasters = new[]
             {
@@ -102,14 +104,21 @@ namespace FPSKit.EditorTools
             _band = TownMat("ConcreteBand", "plastered_wall_02", new Color(0.90f, 0.87f, 0.82f), 2f);
             _block = TownMat("CinderBlock", "concrete_block_wall", new Color(1.35f, 1.30f, 1.22f), 2.4f);
             _roof = TownMat("RoofConcrete", "plastered_wall_02", new Color(0.86f, 0.82f, 0.76f), 4f);
-            _coping = TownMat("Coping", "plastered_wall_02", new Color(0.96f, 0.93f, 0.88f), 1.5f);
+            _coping = TownMat("Coping", "plastered_wall_02", new Color(1.16f, 1.15f, 1.12f), 1.5f);
             _terrazzo = TownMat("Terrazzo", "terrazzo_tiles", new Color(1.0f, 0.98f, 0.95f), 2f);
             _stoneAshlar = TownMat("Ashlar", "white_sandstone_bricks", new Color(1.02f, 0.94f, 0.82f), 3f);
+            ResolveFacadeMaterials();
 
-            _glassDark = TownFlat("GlassDark", new Color(0.05f, 0.06f, 0.07f), 0.94f, 0.1f);
-            _glassBlue = TownFlat("GlassBlue", new Color(0.07f, 0.10f, 0.13f), 0.94f, 0.15f);
-            _glassCurtain = TownFlat("GlassCurtain", new Color(0.52f, 0.45f, 0.36f), 0.55f);
-            _glassBlinds = TownFlat("GlassBlinds", new Color(0.62f, 0.62f, 0.60f), 0.5f);
+            // Glass reflects: as a plain dark dielectric a window read as a flat navy card, and metallic over a dark
+            // albedo only tints the reflection dark (a metal reflects in its albedo's colour). A grey base at 0.9
+            // metallic reflects a share of the sky and the street, as glass in front of a dark room does (at 0.3 grey
+            // it reflected the hazy horizon so brightly that windows read as frosted panels).
+            _glassDark = TownFlat("GlassDark", new Color(0.16f, 0.17f, 0.18f), 0.96f, 0.85f);
+            _glassBlue = TownFlat("GlassBlue", new Color(0.15f, 0.19f, 0.23f), 0.96f, 0.85f);
+            // Seen through the glass: drawn curtains (dark cloth) and venetian blinds (slats, from the shutter texture at
+            // a fifth of its size). As flat colours they read as blank panels in the window.
+            _glassCurtain = TownFlat("GlassCurtain", new Color(0.30f, 0.24f, 0.19f), 0.7f, 0.2f);
+            _glassBlinds = TownMat("GlassBlinds", "painted_metal_shutter", new Color(0.92f, 0.91f, 0.88f), 0.5f, 0.6f);
             _glassClear = TownFlat("GlassClear", new Color(0.55f, 0.62f, 0.66f, 0.18f), 0.95f, 0f, transparent: true);
             _frameAlu = TownFlat("FrameAluminium", new Color(0.72f, 0.72f, 0.71f), 0.55f, 0.8f);
             _frameWhite = TownFlat("FrameWhite", new Color(0.86f, 0.86f, 0.84f), 0.35f);
@@ -229,9 +238,10 @@ namespace FPSKit.EditorTools
 
             foreach (var kv in _chunks)
             {
-                var go = kv.Value.Build(group, $"Block_{kv.Key.x}_{kv.Key.y}", layer, "Concrete");
+                var go = kv.Value.Build(group, $"Block_{kv.Key.x}_{kv.Key.y}", layer, "Concrete", compression: UnityEditor.ModelImporterMeshCompression.Low);
                 _ = go;
             }
+            BuildDetailChunks(group, layer);
             Debug.Log($"[FPSKit] town buildings: {_townLots.Count} lots, {solid} solid, {enterable} enterable, {_chunks.Count} chunks");
         }
 
@@ -454,6 +464,14 @@ namespace FPSKit.EditorTools
             public bool balconies;
             public bool oldStyle;
             public float windowW = 1.4f, windowH = 1.5f, bay = 3.3f;
+            // The facade (FPSKitTownFacade): its style, the stone of its dressings, a rusticated ground floor, how deep
+            // its windows sit, their heads (segmental on every floor, round on the top one), hoods, plain surrounds, and
+            // the joinery (0 sash, 1 casement, 2 sliding) with or without glazing bars.
+            public FacadeStyle style;
+            public Material trim, baseMat;
+            public float reveal = 0.2f;
+            public int arches, joinery;
+            public bool roundTop, hood, surround, muntins;
             public System.Random rng;
             /// <summary>Ground-floor openings per side, (u0, u1, v0, v1) with v above the floor: what the interior cuts too.</summary>
             public readonly List<Vector4>[] groundHoles = { new List<Vector4>(), new List<Vector4>(), new List<Vector4>(), new List<Vector4>() };
@@ -515,6 +533,10 @@ namespace FPSKit.EditorTools
             float top = b.Top + b.parapet;
             var rng = b.rng;
 
+            if (!b.oldStyle && b.baseMat == null) MaybeRusticBase(b, System.Array.IndexOf(b.faces, FaceKind.Shops) >= 0);
+            var det = Detail(b.r.center);
+            float baseTop = b.baseMat != null ? b.FloorY(1) - bottom : 0f;   // the rusticated ground floor's top, above the wall's foot
+
             for (int side = 0; side < 4; side++)
             {
                 var (a0, b0) = FaceRun(b.r, side);
@@ -522,11 +544,13 @@ namespace FPSKit.EditorTools
                 float len = Vector3.Distance(a0, b0);
                 Vector3 u = (b0 - a0) / Mathf.Max(0.01f, len);
                 var holes = new List<Vector4>();
+                var rises = new Dictionary<int, float>();
+                var floorOf = new List<int>();
                 var kind = b.faces[side];
                 // Balconies only over a street: a row house built to its lot line hung them 1.15 m into the villa yard
-                // next door, over the outside stair there, and cut the flight off the navmesh.
+                // next door, over the outside stair there, and cut the flight off the navmesh. Never on the stair's side.
                 Vector2 faceMid = new Vector2((a0.x + b0.x) * 0.5f, (a0.z + b0.z) * 0.5f);
-                bool streetFace = side == b.door || RoadAt(faceMid + SideOut(side) * 3f) != null;
+                bool streetFace = (side == b.door || RoadAt(faceMid + SideOut(side) * 3f) != null) && side != b.stairSide;
 
                 // ---- openings ----
                 int bays = Mathf.Max(1, Mathf.FloorToInt(len / b.bay));
@@ -541,68 +565,93 @@ namespace FPSKit.EditorTools
                         if (f == 0 && kind == FaceKind.Shops)
                         {
                             float w = bayW - 0.6f;
-                            holes.Add(new Vector4(cu - w * 0.5f, cu + w * 0.5f, fy, fy + Mathf.Min(3.1f, b.groundH - 0.5f)));
+                            holes.Add(new Vector4(cu - w * 0.5f, cu + w * 0.5f, fy, fy + Mathf.Min(3.1f, b.groundH - 0.5f))); floorOf.Add(f);
                             continue;
                         }
                         if (f == 0 && side == b.door && k == bays / 2)
                         {
-                            holes.Add(new Vector4(cu - 0.65f, cu + 0.65f, fy, fy + 2.25f));
+                            holes.Add(new Vector4(cu - 0.65f, cu + 0.65f, fy, fy + 2.25f)); floorOf.Add(f);
                             continue;
                         }
                         float ww = b.oldStyle ? Rand(rng, 0.6f, 0.9f) : b.windowW;
                         float wh = b.oldStyle ? Rand(rng, 0.8f, 1.1f) : b.windowH;
                         if (b.oldStyle && rng.NextDouble() < 0.35) continue;            // old walls have fewer windows
                         bool balcony = b.balconies && streetFace && f > 0 && rng.NextDouble() < 0.4;
+                        // Masonry fronts on a street have French windows with iron balconettes now and then.
+                        if (!balcony && !b.oldStyle && b.style != FacadeStyle.Plaster && streetFace && f > 0 && rng.NextDouble() < 0.18) balcony = true;
                         float sill = balcony ? 0.05f : (b.oldStyle ? 1.3f : 0.95f);
-                        float h = balcony ? 2.2f : wh;
-                        holes.Add(new Vector4(cu - ww * 0.5f, cu + ww * 0.5f, fy + sill, fy + sill + h));
+                        float h = balcony ? 2.3f : wh;
+                        float rise = WindowRise(b, f, ww, f == 0 && b.enterable);
+                        if (rise > 0f) rises[holes.Count] = rise;
+                        holes.Add(new Vector4(cu - ww * 0.5f, cu + ww * 0.5f, fy + sill, fy + sill + h - rise)); floorOf.Add(f);
                     }
                 }
 
-                if (side == b.stairSide) holes.Add(new Vector4(b.stairU0, b.stairU1, b.Top - bottom + 0.05f, top - bottom + 0.2f));
+                if (side == b.stairSide) { holes.Add(new Vector4(b.stairU0, b.stairU1, b.Top - bottom + 0.05f, top - bottom + 0.2f)); floorOf.Add(b.floors); }
                 float floorV = b.FloorY(0) - bottom;
                 foreach (var h in holes)
                     if (h.z - floorV < 0.5f + 1.2f && h.w - floorV < b.groundH + 0.1f) b.groundHoles[side].Add(new Vector4(h.x, h.y, h.z - floorV, h.w - floorV));
 
                 var wa = a0 + Vector3.up * bottom; var wb = b0 + Vector3.up * bottom;
-                m.WallWithHoles(b.wall, wa, wb, top - bottom, nrm, holes);
+                if (baseTop > 0f)
+                {
+                    // A rusticated stone ground floor under the wall proper; every opening lies wholly in one or the other.
+                    var low = new List<Vector4>(); var lowR = new Dictionary<int, float>();
+                    var high = new List<Vector4>(); var highR = new Dictionary<int, float>();
+                    for (int i = 0; i < holes.Count; i++)
+                    {
+                        var h = holes[i];
+                        if (h.z < baseTop) { if (rises.TryGetValue(i, out float r)) lowR[low.Count] = r; low.Add(h); }
+                        else { if (rises.TryGetValue(i, out float r)) highR[high.Count] = r; high.Add(new Vector4(h.x, h.y, h.z - baseTop, h.w - baseTop)); }
+                    }
+                    m.WallWithOpenings(b.baseMat, wa, wb, baseTop, nrm, low, lowR);
+                    m.WallWithOpenings(b.wall, wa + Vector3.up * baseTop, wb + Vector3.up * baseTop, top - bottom - baseTop, nrm, high, highR);
+                }
+                else m.WallWithOpenings(b.wall, wa, wb, top - bottom, nrm, holes, rises);
 
                 // ---- reveals, glass, frames, sills ----
-                foreach (var h in holes)
+                for (int i = 0; i < holes.Count; i++)
                 {
+                    var h = holes[i];
                     if (side == b.stairSide && h.z > b.Top - bottom) continue;     // the parapet gap: no reveal, no glass
-                    float depth = b.enterable && h.z - (b.FloorY(0) - bottom) < 0.5f ? 0.25f : 0.2f;
+                    float rise = rises.TryGetValue(i, out float holeRise) ? holeRise : 0f;
+                    bool groundFloor = h.z - (b.FloorY(0) - bottom) < 0.5f;
+                    float depth = b.enterable && groundFloor ? 0.25f : (b.oldStyle ? 0.2f : b.reveal);
                     Vector3 p0 = wa + u * h.x + Vector3.up * h.z, p1 = wa + u * h.y + Vector3.up * h.z;
                     Vector3 q0 = wa + u * h.x + Vector3.up * h.w, q1 = wa + u * h.y + Vector3.up * h.w;
                     Vector3 inn = -nrm * depth;
-                    m.Quad(b.wall, p0, p1, p1 + inn, p0 + inn, Vector3.up);          // sill reveal
-                    m.Quad(b.wall, q0, q1, q1 + inn, q0 + inn, Vector3.down);        // head
-                    m.Quad(b.wall, p0, q0, q0 + inn, p0 + inn, u);                   // jambs
-                    m.Quad(b.wall, p1, q1, q1 + inn, p1 + inn, -u);
-
-                    bool groundFloor = h.z - (b.FloorY(0) - bottom) < 0.5f;
-                    bool isDoor = groundFloor && kind != FaceKind.Shops && h.y - h.x < 1.5f && h.w - h.z > 2f;
+                    bool isDoor = groundFloor && kind != FaceKind.Shops && h.y - h.x < 1.5f && h.w - h.z > 2f && floorOf[i] == 0 && h.z - floorV < 0.1f;
                     bool isShop = groundFloor && kind == FaceKind.Shops;
+                    Material revealMat = b.oldStyle ? b.wall
+                                       : h.z < baseTop ? b.baseMat
+                                       : b.style == FacadeStyle.Ashlar ? b.trim : b.wall;
+                    Reveals(m, revealMat, wa, u, nrm, h, rise, depth);
+
                     if (isShop) { ShopFront(m, b, side, p0, p1, q0, q1, inn, nrm, props); continue; }
                     if (isDoor)
                     {
                         if (b.enterable) { OpenDoor(m, b, p0, p1, q0, inn, nrm); _townDoors.Add((p0 + p1) * 0.5f + nrm * 0.8f); }
                         else m.Quad(rng.NextDouble() < 0.5 ? _doorMetal : _doorWood, p0 + inn, p1 + inn, q1 + inn, q0 + inn, nrm);
+                        if (!b.oldStyle) DoorDressing(det, b, p0, p1, h.w - h.z, nrm);
                         continue;
                     }
-                    WindowIn(m, b, p0, p1, q0, q1, inn, nrm, groundFloor && b.enterable, h.w - h.z > 2f);
+                    if (b.oldStyle) WindowIn(m, b, p0, p1, q0, q1, inn, nrm, groundFloor && b.enterable, h.w - h.z > 2f);
+                    else FacadeWindow(m, det, b, p0, p1, h.w - h.z, rise, depth, nrm, floorOf[i], groundFloor && b.enterable, h.w - h.z + rise > 2f);
                 }
 
-                // ---- slab bands, plinth ----
-                if (!b.oldStyle)
-                    for (int f = 1; f <= b.floors; f++)
+                // ---- string courses, cornice, quoins; plinth ----
+                if (!b.oldStyle && kind != FaceKind.Blank)
+                {
+                    if (side == b.stairSide)
                     {
-                        float y = (f == b.floors ? b.Top : b.FloorY(f));
-                        m.Box(_band, (a0 + b0) * 0.5f + Vector3.up * (y - 0.11f) + nrm * 0.03f, new Vector3(len + 0.06f, 0.22f, 0.06f),
-                              Quaternion.LookRotation(nrm), bottom: true);
+                        // Not across the outside stair: the cornice stood out 0.44 m across its landing.
+                        FaceDressings(m, det, b, a0, a0 + u * Mathf.Max(0f, TownStairStart - 0.15f), nrm, side, quoinEnd: false);
+                        FaceDressings(m, det, b, a0 + u * Mathf.Min(len, b.stairU1 + 0.15f), b0, nrm, side, quoinStart: false);
                     }
-                m.Box(b.oldStyle ? b.wall : _band, (a0 + b0) * 0.5f + Vector3.up * (b.baseY - 0.25f) + nrm * 0.02f,
-                      new Vector3(len + 0.04f, Mathf.Max(0.5f, b.baseY - bottom + 0.25f) , 0.04f) , Quaternion.LookRotation(nrm));
+                    else FaceDressings(m, det, b, a0, b0, nrm, side);
+                }
+                m.Box(b.oldStyle ? b.wall : b.trim, (a0 + b0) * 0.5f + Vector3.up * (b.baseY - 0.25f) + nrm * 0.03f,
+                      new Vector3(len + 0.06f, Mathf.Max(0.5f, b.baseY - bottom + 0.25f) , 0.06f) , Quaternion.LookRotation(nrm));
             }
 
             // ---- roof, parapet, coping ----
@@ -1069,6 +1118,7 @@ namespace FPSKit.EditorTools
                 parapet = old ? Rand(rng, 0.5f, 1.0f) : Rand(rng, 0.9f, 1.2f),
             };
             for (int s = 0; s < 4; s++) b.faces[s] = old ? FaceKind.OldWindows : FaceKind.Windows;
+            if (!old) ApplyFacadeStyle(b);
             return b;
         }
 
@@ -1157,7 +1207,7 @@ namespace FPSKit.EditorTools
             BuildMass(b, props);
             BuildStair(b);
             // A house that can be entered has its gate open: shut, the yard, the stair and the roof baked as one sealed island.
-            var gate = CompoundWall(r, f, rng, gate: true, canShut: !b.enterable);
+            var gate = CompoundWall(r, f, rng, gate: true, canShut: !b.enterable, wallMat: b.style != FacadeStyle.Plaster ? b.wall : null);
             // A car in the yard on some, parked along the wall beside the gate (on the side away from the house door in the
             // wall), close in to the wall. Parked across the back of the gate it closed the yard off; parked mid-yard in a
             // 4.5 m yard it left 1.3 m either side, too narrow for an agent, and cut the yard in two.

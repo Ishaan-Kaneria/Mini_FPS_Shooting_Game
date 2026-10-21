@@ -165,6 +165,11 @@ namespace FPSKit.EditorTools
             yield return ParkShot("18_town_air", new Vector3(380f, 260f, -460f), new Vector3(-40f, 0f, 60f), 58f);
             yield return ParkShot("19_dunes_edge", new Vector3(300f, 1.7f, -470f), new Vector3(470f, 5f, -485f), 70f);
             yield return ParkShot("20_water_tower", new Vector3(-126f, 1.7f, -300f), new Vector3(-196f, 15f, -330f), 70f);
+            // Facades up close: what the walls, windows and dressings look like at the distance a fight is fought.
+            yield return ParkShot("21_facade_avenue", new Vector3(12f, 1.7f, -230f), new Vector3(30f, 7f, -212f), 62f);
+            yield return ParkShot("22_facade_east", new Vector3(127f, 1.7f, -40f), new Vector3(146f, 7f, -24f), 62f);
+            yield return ParkShot("23_facade_up", new Vector3(10.5f, 1.6f, -180f), new Vector3(16f, 12f, -176f), 70f);
+            yield return ParkShot("24_street_north", new Vector3(140f, 1.7f, 150f), new Vector3(140f, 6f, 260f), 66f);
         }
 
         /// <summary>

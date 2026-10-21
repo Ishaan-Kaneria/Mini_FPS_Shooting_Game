@@ -3426,3 +3426,35 @@ What the reachability work found (2026-10-21), each worth knowing before touchin
 * `FPSKitTownTest.Probe` (batch) writes `Build/TownProbePoints.txt`: what stands at given points, height maps of the
   navmesh round awkward places (upper case = proved reachable), and an isolated bake of a landmark with and without the
   cull. Point it at whatever fails next.
+
+## Real facades (2026-10-21)
+
+Ishaan, with two reference photos (buff brick with arched, keystoned windows; a cut-stone block with sills, string
+courses, a bracketed cornice and a rusticated base): "Current buildings are very pale and artificial ... I want very
+clean sharp real buildings ... very sharp details of the buildings, windows. Forget about the size."
+
+`FPSKitTownFacade` gives every new building one of three styles that a Middle East town really has: **buff brick**
+(Baghdad), **cut limestone** (Amman, Jerusalem) and **plaster** (the modern blocks), each with its dressings:
+windows 0.3 m deep in their reveals; joinery with thickness (frame, double-hung sashes or casements or sliding panes,
+glazing bars, fanlights in arched heads); heavy stone sills; brick arch rings with keystones and springers, stone
+surrounds, hoods on the first floor; roller-shutter boxes with the slats part way down on the plaster blocks;
+string courses, a cornice (frieze, bed moulding, corona, crown) with dentils and brackets, quoins; a rusticated
+ground floor under shops; iron balconettes and balconies on French windows over a street. Openings can be arched
+(`TownMesh.WallWithOpenings`, segmental or round, the reveal head following the arc).
+
+* **The fine work is a second mesh per chunk** (`Detail_x_z`): no collider, `NavMeshModifier.ignoreFromBuild`, a
+  `LODGroup` culling it below 0.3 of the screen (about 180 m). First build: 1.5 M triangles in the chunks, 4.2 M in
+  detail. **Scene meshes are compressed** (`MeshUtility.SetMeshCompression`: Low for chunks with colliders, Medium
+  for detail): uncompressed the scene was 852 MB, compressed 289 MB.
+* **Tile textures from what is in them, not from the stated size**: `brick_wall_003` claims 4 m and holds 16 courses
+  (75 mm courses means 1.2 m); at 4 m every brick was 25 cm. `beige_wall_002` is a 4:1 image stretched square.
+* **Tint by numbers**: the tint is the wanted colour over the image's mean (buff brick ~(195,160,110), limestone
+  ~(205,190,160), white plaster ~(232,226,214)). Tinted by eye, a dark source (beige_wall_002, mean 130,110,85) made
+  brown boxes and brick came out orange. A source needing more than ~1.6 is swapped for a lighter one.
+* **Glass reflects what is round it**: a dark dielectric is a navy card, and metallic over a dark albedo only
+  reflects dark; grey 0.16 at 0.85 metallic over a reflection sky that has the ground and a dull town band below 12
+  degrees (`ReflectionCube`) gives dark street reflections at eye level and sky when looking up. Curtains and
+  venetian blinds behind the glass are a dark cloth and slats, not flat colours.
+* New Poly Haven textures (CC0): `Tools/polyhaven/fetch.py <dir> <id> ...` fetches just those, `pack.py` merges them
+  into the staged manifest. Facade textures get anisotropic 16 and the high-quality format.
+

@@ -54,7 +54,9 @@ def stage(src, dst):
     shutil.copyfile(src, dst)
 
 
-out = {"models": {}, "textures": {}, "hdri": None}
+# Merged into what is already staged, so a partial download (fetch.py with ids) adds to the set and drops nothing.
+_prev = os.path.join(STAGE, "manifest.json")
+out = json.load(open(_prev)) if os.path.exists(_prev) else {"models": {}, "textures": {}, "hdri": None}
 
 # ---- textures (2k): diffuse, normal, packed mask ----
 for tid, maps in man["textures"].items():
@@ -98,7 +100,7 @@ for mid, sets in man["models"].items():
     out["models"][mid] = staged
 
 # ---- sky ----
-for f in os.listdir(os.path.join(DL, "HDRI")):
+for f in (os.listdir(os.path.join(DL, "HDRI")) if os.path.isdir(os.path.join(DL, "HDRI")) else []):
     if f.endswith(".hdr"):
         stage(os.path.join(DL, "HDRI", f), os.path.join(STAGE, "HDRI", f)); out["hdri"] = f
 

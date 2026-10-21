@@ -182,6 +182,8 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   `Tools/polyhaven`) are stood upright and LOD-culled by `FPSKitTownAssets`; never place the 200k+ triangle plant scans. Signs come from
   `Tools/town/make_signs.py` (real Arabic via raqm). The bake ends with `SealTownIslands` (every navmesh piece not joined to the start sealed, baked
   again). `NavMeshModifierVolume.center` defaults to (0,1,0): set it. `CalculatePath` gives up on long routes: prove reachability in short legs.
+  Facades (`FPSKitTownFacade`): brick / limestone / plaster with real dressings; fine work in per-chunk `Detail_` meshes (no collider,
+  out of the bake, LOD-culled); scene meshes compressed. Tile textures by the courses in them, tint = wanted colour / image mean.
   Check: `FPSKitBatch.VerifyTown` (famous locations reachable, no roof islands, life wired); `FPSKitTownTest.Probe` maps what fails.
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.

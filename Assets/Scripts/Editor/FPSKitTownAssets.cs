@@ -88,8 +88,10 @@ namespace FPSKit.EditorTools
                 Set(imp.sRGBTexture, !normal && !mask, v => imp.sRGBTexture = v);
                 Set(imp.maxTextureSize, ground ? 2048 : 1024, v => imp.maxTextureSize = v);
                 Set(imp.mipmapEnabled, true, v => imp.mipmapEnabled = v);
-                Set(imp.anisoLevel, ground ? 8 : 4, v => imp.anisoLevel = v);
-                Set(imp.textureCompression, TextureImporterCompression.Compressed, v => imp.textureCompression = v);
+                // Walls and ground are seen at grazing angles down a street: full anisotropic filtering, and the
+                // high-quality block format, or brick courses and stone joints blur into mush a few metres away.
+                Set(imp.anisoLevel, ground ? 16 : 4, v => imp.anisoLevel = v);
+                Set(imp.textureCompression, ground ? TextureImporterCompression.CompressedHQ : TextureImporterCompression.Compressed, v => imp.textureCompression = v);
                 Set(imp.wrapMode, TextureWrapMode.Repeat, v => imp.wrapMode = v);
                 // An albedo with alpha is a plant's leaf cut-out: keep the alpha and stop it bleeding at the edge.
                 if (!normal && !mask && path.EndsWith(".png"))
@@ -130,12 +132,17 @@ namespace FPSKit.EditorTools
         /// rough surface reads were dominated by it, and every road and pavement facing the low sun shone as if wet --
         /// with the real-time sun's own highlight on top. So the copy is clamped: no pixel brighter than twice the
         /// brightest 0.5% of the sky, written as EXR at half the HDR's size.
+        ///
+        /// And the world below the sky is put in: a pure-sky HDR is brightest at its hazy horizon, which is just what a
+        /// window at eye level reflects, so every pane read as a pale grey card. Below the horizon the copy is warm dark
+        /// ground, and over the first 12 degrees above it a band the dull colour of the town blends into the sky: glass
+        /// at street level reflects dark surroundings, and turns to sky only as you look up at it.
         /// </summary>
         public static Cubemap ReflectionCube()
         {
             foreach (var sky in SkyPaths())
             {
-                string cube = sky.Replace(".hdr", "_reflect.exr");
+                string cube = sky.Replace(".hdr", "_reflections.exr");
                 if (!File.Exists(cube)) WriteClampedSky(sky, cube);
                 if (!File.Exists(cube)) return null;
                 if (AssetImporter.GetAtPath(cube) is TextureImporter imp &&
@@ -184,6 +191,13 @@ namespace FPSKit.EditorTools
                                 c += p;
                             }
                         c *= 0.25f; c.a = 1f;
+                        // Elevation of this row (EXR rows run bottom to top): the ground and the town round the horizon.
+                        float elevation = ((y + 0.5f) / oh - 0.5f) * 180f;
+                        var ground = new Color(0.16f, 0.13f, 0.10f, 1f);
+                        var townBand = new Color(0.42f, 0.36f, 0.29f, 1f);
+                        if (elevation < 0f) c = ground;
+                        else if (elevation < 12f) c = Color.Lerp(Color.Lerp(ground, townBand, Mathf.Clamp01(elevation / 2f)), c, Mathf.SmoothStep(0f, 1f, elevation / 12f));
+                        c.a = 1f;
                         outPx[y * ow + x] = c;
                     }
                 var tex = new Texture2D(ow, oh, TextureFormat.RGBAFloat, false, true);

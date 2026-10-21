@@ -112,7 +112,7 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: -6602107004529081886, guid: 671e022f0110b5a45996b09b52734060, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 2828993566603367450}
+      addedObject: {fileID: 682504839634432468}
     - targetCorrespondingSourceObject: {fileID: -7887156210353183163, guid: 671e022f0110b5a45996b09b52734060, type: 3}
       insertIndex: -1
       addedObject: {fileID: 809350368509539211}
@@ -122,7 +122,7 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: -6602107004529081886, guid: 671e022f0110b5a45996b09b52734060, type: 3}
   m_PrefabInstance: {fileID: 3459195057517659520}
   m_PrefabAsset: {fileID: 0}
---- !u!64 &2828993566603367450
+--- !u!64 &682504839634432468
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

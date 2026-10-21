@@ -716,39 +716,6 @@ namespace FPSKit.EditorTools
         }
 
         // ==================================================================
-        // MVC (BxB Multiversal Vehicle Controller) API dump
-        // ==================================================================
-        /// <summary>
-        /// Writes the public types and members of the vehicle controller's assemblies (they ship as DLLs with no source),
-        /// so the drivable car can be wired from code against what is really there.
-        /// </summary>
-        public static void DumpVehicleApi(string outPath)
-        {
-            var sb = new StringBuilder();
-            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
-            {
-                string n = asm.GetName().Name;
-                if (!n.StartsWith("MVC") && !n.Contains("InputsManager") && !n.Contains("BxB") && !n.Contains("Utilities")) continue;
-                sb.AppendLine($"#### {n}");
-                System.Type[] types;
-                try { types = asm.GetTypes(); } catch (System.Reflection.ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
-                foreach (var t in types.Where(t => t.IsPublic).OrderBy(t => t.FullName))
-                {
-                    sb.AppendLine($"{(t.IsEnum ? "enum" : t.IsInterface ? "interface" : t.IsAbstract ? "abstract class" : "class")} {t.FullName} : {t.BaseType?.Name}");
-                    const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance |
-                                                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly;
-                    if (t.IsEnum) { sb.AppendLine("    " + string.Join(", ", System.Enum.GetNames(t))); continue; }
-                    foreach (var f in t.GetFields(F)) sb.AppendLine($"    field {(f.IsStatic ? "static " : "")}{f.FieldType.Name} {f.Name}");
-                    foreach (var pr in t.GetProperties(F)) sb.AppendLine($"    prop {pr.PropertyType.Name} {pr.Name} {(pr.CanWrite ? "{get;set;}" : "{get;}")}");
-                    foreach (var me in t.GetMethods(F).Where(me => !me.IsSpecialName))
-                        sb.AppendLine($"    method {(me.IsStatic ? "static " : "")}{me.ReturnType.Name} {me.Name}({string.Join(", ", me.GetParameters().Select(pa => pa.ParameterType.Name + " " + pa.Name))})");
-                }
-            }
-            Directory.CreateDirectory(Path.GetDirectoryName(outPath));
-            File.WriteAllText(outPath, sb.ToString());
-        }
-
-        // ==================================================================
         // Probe
         // ==================================================================
         [MenuItem("FPSKit/Town/Probe Assets", false, 61)]

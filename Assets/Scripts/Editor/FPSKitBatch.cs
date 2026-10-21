@@ -355,7 +355,6 @@ namespace FPSKit.EditorTools
         /// <summary>Sizes of every prefab the town places, to Build/TownProbe.txt (FPSKitTownAssets.Probe).</summary>
         public static void ProbeTownAssets() => Run(() =>
         {
-            FPSKitTownAssets.DumpVehicleApi("Build/VehicleApi.txt");
             FPSKitTownAssets.Prepare();
             FPSKitTownAssets.Probe("Build/TownProbe.txt");
         });

@@ -23,10 +23,10 @@ namespace FPSKit.EditorTools
     {
         /// <summary>
         /// A log line from the editor rather than the game, which a play-mode check collecting errors must not count:
-        /// the Android device probe on entering play mode with the Android profile active, and -- since the store packs
-        /// (EasyRoads3D, the BxB vehicle packages) were imported -- their editor windows and dialogs, which in batch mode
-        /// log "No graphic device is available ..." and "Canceling DisplayDialog ...", and the Burst compiler the BxB
-        /// packages' Entities dependency brings, which times out compiling in a headless run.
+        /// the Android device probe on entering play mode with the Android profile active, and store packs' editor windows
+        /// and dialogs, which in batch mode log "No graphic device is available ..." and "Canceling DisplayDialog ..."
+        /// (EasyRoads3D and the BxB vehicle packages did, until they were removed on 2026-10-21), and the Burst compiler,
+        /// which can time out compiling in a headless run.
         /// </summary>
         public static bool IsEditorNoise(string message) =>
             message.Contains("Unity Remote requirements check failed") ||

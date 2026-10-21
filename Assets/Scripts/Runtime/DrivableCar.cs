@@ -8,9 +8,9 @@ using UnityEngine;
 ///
 /// Four WheelColliders on a Rigidbody, front-wheel steering, rear-wheel drive, an anti-roll pull and a downforce so
 /// it holds the dunes' slopes. While driving the player's own body is parked and hidden, the motor's input is off
-/// (<see cref="PlayerMotor.InputEnabled"/>), and the player's camera rides a chase rig behind the car. The vehicle
-/// controller pack the user imported (BxB MVC) cannot load in this Unity version -- its DLLs need Unity.Mathematics
-/// -- so this is written on the game's own input system instead, which is also the only way it works on touch.
+/// (<see cref="PlayerMotor.InputEnabled"/>), and the player's camera rides a chase rig behind the car. Written on the
+/// game's own input system, which is also the only way it works on touch; the BxB MVC vehicle pack was tried, could
+/// not load in this Unity version, and was removed (2026-10-21).
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class DrivableCar : MonoBehaviour

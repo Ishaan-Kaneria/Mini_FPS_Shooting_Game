@@ -221,7 +221,7 @@ namespace FPSKit.EditorTools
                     continue;
 
                 // Injected into this assembly by a package's IL post-processor, not written here: Entities
-                // (pulled in by the BxB vehicle packages) adds Unity.Entities.CodeGeneratedRegistry.AssemblyTypeRegistry
+                // (pulled in by the BxB vehicle packages, removed 2026-10-21; kept in case it returns) adds Unity.Entities.CodeGeneratedRegistry.AssemblyTypeRegistry
                 // with a static registry it rebuilds itself. Gameplay code is in the global namespace.
                 if (type.Namespace != null && type.Namespace.StartsWith("Unity.Entities"))
                     continue;

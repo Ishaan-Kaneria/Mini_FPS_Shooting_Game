@@ -511,9 +511,11 @@ namespace FPSKit.EditorTools
             _foe.name = "Shots_Foe";
             FPSKitEnemyRoster.GetOrCreate("Grunt").ApplyTo(_foe);
             _foeAI = _foe.GetComponent<EnemyAI>();
-            if (_foeAI != null) _foeAI.enabled = false;
+            if (_foeAI != null) { _foeAI.enabled = false; _foeAI.target = _motor.transform; }
+            // Removed, not switched off: a switched-off mind keeps a stale look point (the world's origin) that the body
+            // goes on aiming at, twisting up to 70 degrees off the player; with none, the body aims at its target.
             var brain = _foe.GetComponent<EnemyBrain>();
-            if (brain != null) brain.enabled = false;
+            if (brain != null) Object.DestroyImmediate(brain);
             // The player to him (the navmesh near the start is cut back, so he cannot always be stood close enough).
             var cc = _motor.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
@@ -527,8 +529,10 @@ namespace FPSKit.EditorTools
                 Vector3 e = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform.position : _motor.transform.position + Vector3.up * 1.6f;
                 float gap = Vector3.ProjectOnPlane(FoeHead() - e, Vector3.up).magnitude - 0.8f;
                 if (cc != null) cc.enabled = false;
+                Vector3 was = _motor.transform.position;
                 _motor.transform.position += ahead * gap;
                 if (cc != null) cc.enabled = true;
+                Report += $"grapple: placing {i}: gap {gap:0.00} m, root moved {Vector3.Distance(was, _motor.transform.position):0.00}, eye {e}, head {FoeHead()}, foe root {_foe.transform.position}, ahead {ahead}\n";
             }
             _placedAt = _motor.transform.position;
             Physics.SyncTransforms();
@@ -620,7 +624,8 @@ namespace FPSKit.EditorTools
                     {
                         var agent = _foe.GetComponent<NavMeshAgent>();
                         Report += $"grapple: before the press the foe moved {Vector3.Distance(_foeAt, _foe.transform.position):0.00} m (agent on {agent != null && agent.enabled}, on mesh {agent != null && agent.enabled && agent.isOnNavMesh}, " +
-                                  $"root motion {(_foe.GetComponent<Animator>() != null && _foe.GetComponent<Animator>().applyRootMotion)}, spawn-to-player {Vector3.ProjectOnPlane(_foeAt - _motor.transform.position, Vector3.up).magnitude:0.00} m)\n";
+                                  $"root motion {(_foe.GetComponent<Animator>() != null && _foe.GetComponent<Animator>().applyRootMotion)}, spawn-to-player {Vector3.ProjectOnPlane(_foeAt - _motor.transform.position, Vector3.up).magnitude:0.00} m, " +
+                                  $"eye now {(_weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform.position : Vector3.zero)}, head now {FoeHead()}, player root {_motor.transform.position})\n";
                         _melee.TryPunch(); Phase(2);
                     }
                     return false;
@@ -632,7 +637,11 @@ namespace FPSKit.EditorTools
                 case 7: if (Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(8); } return false;
                 case 8: if (At(MeleeStrike.Strike.Overhand, 0.3f)) { Beat("overhand_up"); Phase(9); } return InPhase > Frames(3f) && GaveUp();
                 case 9: if (At(MeleeStrike.Strike.Overhand, MeleeStrike.ImpactAt(MeleeStrike.Strike.Overhand) - 0.02f)) { Beat("overhand"); Phase(10); } return InPhase > Frames(3f) && GaveUp();
-                case 10: if (InPhase >= Frames(0.8f)) { Beat("down"); Phase(11); } return false;
+                case 10:
+                    if (InPhase == Frames(0.6f)) Beat("down");
+                    if (InPhase == Frames(1.6f)) Beat("down_later");
+                    if (InPhase >= Frames(2.6f)) { Beat("down_last"); Phase(11); }
+                    return false;
                 // The hook to the belly: the fists up first, swung at nobody, then the hook, him doubled, taken bent.
                 case 11:
                     if (_melee.Current != MeleeStrike.Strike.None || _melee.FistsOut || Time.time < _melee.ReadyAt + 1.5f) return false;

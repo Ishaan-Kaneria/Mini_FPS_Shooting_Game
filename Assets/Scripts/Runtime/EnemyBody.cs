@@ -550,7 +550,10 @@ public class EnemyBody : MonoBehaviour
         bool doubled = _ai != null && _ai.DoubledOver;
         if (held && !_wasHeld) _heldBentPose = doubled || _foldW > 0.5f;
         _heldW = Mathf.MoveTowards(_heldW, held ? 1f : 0f, dt * (held ? 9f : 3f));
-        _foldW = Mathf.MoveTowards(_foldW, doubled || (held && _heldBentPose) ? 1f : 0f, dt * (doubled || held ? 7f : 2.2f));
+        // Taken face to face he is dragged part-way down and over by the head, as the film's hero drags his man down (and
+        // so his face is under the player's arms, in view, not hidden behind them); taken doubled over, he is held right down.
+        float foldWant = doubled ? 1f : held ? (_heldBentPose ? 1f : 0.45f) : 0f;
+        _foldW = Mathf.MoveTowards(_foldW, foldWant, dt * (doubled ? 7f : held ? 3f : 2.2f));
         if (held) _heldBy = _ai.GrappledBy;
 
         // No collisions with the holder while held: the body leaning into the hand and the hand on his forearm touched
@@ -579,7 +582,7 @@ public class EnemyBody : MonoBehaviour
         if (h > 0.001f && _heldBy != null && _chest != null && _head != null)
         {
             Vector3 forward = Vector3.ProjectOnPlane(_heldBy.forward, Vector3.up).normalized;
-            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : 0.42f) + Vector3.up * (_heldBentPose ? 1.0f : 1.3f);
+            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : 0.45f) + Vector3.up * (_heldBentPose ? 1.0f : 1.35f);
             LeanTowards(_chest, _head, pull, 0.55f * h, 28f);
             if (_neck != null) LeanTowards(_neck, _head, pull, 0.45f * h, 24f);
         }

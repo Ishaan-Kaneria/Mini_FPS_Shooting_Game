@@ -104,8 +104,11 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The houses you can enter have rooms you can walk into: every room's marker (FPSKitTownInterior) is on the navmesh
-        /// and joined to the house's front door by a complete path, upstairs rooms included (up the stair).
+        /// The houses you can enter have rooms you can walk into: every room's marker (FPSKitTownInterior), set just inside the
+        /// room's way in (its doorway; the front door; upstairs, the stair's head) where furniture is kept off, is on the
+        /// navmesh and joined to the house's front door by a complete path, upstairs rooms included (up the stair). 95% of rooms and
+        /// 90% of those upstairs (built: 99% and 99%); before the doorways, the door leaves, the stair's foot, the floors
+        /// over the stairwell, its edge and the furniture's lanes were fixed it was 21% and none (Docs/DESIGN_NOTES.md "Walls varied and weathered").
         /// </summary>
         static void CheckInteriors(List<string> problems, StringBuilder notes)
         {
@@ -138,8 +141,8 @@ namespace FPSKit.EditorTools
                 }
             }
             if (houses < 100) problems.Add($"only {houses} houses with an interior and a door on the navmesh (100 or more wanted)");
-            else if (reached < rooms * 0.75f) problems.Add($"rooms not reachable from their front door: {rooms - reached} of {rooms}, {ups - upsReached} of {ups} upstairs, {islands} sealed as islands (e.g. {string.Join("; ", lost)})");
-            else if (ups > 0 && upsReached < ups * 0.6f) problems.Add($"upstairs rooms not reachable up their stair: {ups - upsReached} of {ups} (e.g. {string.Join("; ", lost)})");
+            else if (reached < rooms * 0.95f) problems.Add($"rooms not reachable from their front door: {rooms - reached} of {rooms}, {ups - upsReached} of {ups} upstairs, {islands} sealed as islands (e.g. {string.Join("; ", lost)})");
+            else if (ups > 0 && upsReached < ups * 0.9f) problems.Add($"upstairs rooms not reachable up their stair: {ups - upsReached} of {ups} (e.g. {string.Join("; ", lost)})");
             else notes.AppendLine($"  interiors: {houses} houses, {reached}/{rooms} rooms reached from the door, {upsReached}/{ups} of them upstairs");
         }
 

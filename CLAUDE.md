@@ -199,6 +199,12 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   choices from its own) so the town does not reshuffle. Cover outside shops (`SpinShopCover`) carries `CoverSpot` for EnemyBrain.
   Probe bake indirect is scaled (`TownProbeIndirect` 2.75) so people/cars get ~0.8 of the walls' sky ambient (VerifyTown checks the
   ratio); never judge a dark civilian by its material first. A building's shops share a `ShopLook` (layout-seeded).
+  Walls vary per building (`FPSKitTownWalls`, layout-seeded); house interiors are `FPSKitTownInterior` + `FPSKitTownFurniture`
+  (`Docs/DESIGN_NOTES.md` "Walls varied and weathered"): new randomness never draws from `b.rng` (replay the old draws when
+  replacing code that did, or the town reshuffles). For the navmesh: doorways 1.8 m (1.5-1.6 m joins only sometimes), door
+  leaves folded flat against a wall, nothing (plinth, kerb) across a threshold, stair foot 1.5 m in, stairwell cut from the
+  first tread with < 2.45 m over its top, no floor or rug over the stairwell, furniture off the 1.4 m lanes to every doorway.
+  Room marks sit at each room's way in; VerifyTown `CheckInteriors` wants 95% of rooms / 90% upstairs reached.
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

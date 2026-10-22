@@ -32,7 +32,8 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static partial class FPSKitSceneBuilder
     {
-        private const float HouseWall = 0.25f, DoorWidth = 1.8f, DoorHeight = 2.2f, StairWidth = 1.6f, HouseTread = 0.26f, PartitionThick = 0.1f;
+        private const float HouseWall = 0.25f, DoorWidth = 1.8f, DoorHeight = 2.2f, StairWidth = 1.6f, HouseTread = 0.26f, PartitionThick = 0.1f,
+                             HouseDoorEnd = 0.35f;   // the least wall between a doorway and the end of its partition
 
         // The stair's foot is 1.5 m in from the front wall: an agent keeps half a metre off every wall and the rail closes the
         // flight's open side, so the first stair (its foot 0.5 m in) could only be got onto from its top and every room
@@ -73,6 +74,10 @@ namespace FPSKit.EditorTools
             /// the room with no floor: the stairwell. A room's tiles laid over the stairwell put a lid on the flight 2.8 m up,
             /// and with no headroom over its upper steps every room upstairs was an island.</summary>
             public Rect flight, open;
+            /// <summary>A point just inside the room's way in (its doorway, the front door, the stair's head): kept clear of
+            /// furniture, so it is where the room's mark goes and what VerifyTown paths to. At the room's middle the mark
+            /// was under the dining table as often as not.</summary>
+            public Vector2? entry;
         }
 
         private static Material[] _paints, _floors, _cloth;
@@ -144,8 +149,13 @@ namespace FPSKit.EditorTools
             plan.stairStart = HouseStairFoot;
             if (f.Dp < plan.stairStart + plan.run + 1.8f || f.W < StairWidth + 3.0f) return plan;
             plan.stairRight = own.NextDouble() < 0.5;
-            // The slab is cut from where a step has less than the headroom under it to the stair's head.
-            plan.holeFrom = plan.stairStart + plan.run * (rise - HouseHeadroom) / rise - 0.1f;
+            // The slab is cut from the first tread with less than the headroom over its top, a voxel early. Cut where the line
+            // of the nosings had it, the edge stood 2.27 m over that line, but a tread's top stands up to a riser above the
+            // line and a voxel column across a riser takes the higher tread: under the edge an agent had just under its
+            // 2 m, and the erosion round that one row took a metre out of the flight.
+            float riser = rise / plan.steps, ceiling = rise - 0.25f;
+            int clear = Mathf.Max(0, Mathf.FloorToInt((ceiling - HouseHeadroom) / riser));
+            plan.holeFrom = plan.stairStart + HouseTread * clear - 0.17f;
             plan.holeTo = plan.stairStart + plan.run;
             // The partition between the front and the back clear of the stair's head: across the flight (it runs on past
             // the partition into the back), or far enough past the head for a landing to turn on (half a metre off the
@@ -163,6 +173,7 @@ namespace FPSKit.EditorTools
         private static void HouseInterior(TownMesh m, TownMesh det, Mass b, Transform props)
         {
             ResolveInteriorMaterials();
+            ResolveFurnitureMaterials();
             // The single room this replaced made these draws from the building's sequence; made the same, every building after
             // this one comes out as it did (3-5 pieces: which, which wall, where; and the cushions' turn).
             var seq = b.rng;
@@ -192,6 +203,29 @@ namespace FPSKit.EditorTools
                     break;
                 }
 
+            // A wide house's front is a hall (the front door, the stair) with a sitting room off it, as such houses are: one
+            // room the house's whole width (up to 11 m) read as a hall nobody had furnished. The wall between them stands
+            // clear of the front door's folded leaves, of the stair (the hall keeps it and room to pass), and of every
+            // window in the front wall on either floor; the side room is away from the stair.
+            float px = -1f; bool sideRight = false;
+            var frontDoor = b.openings.Where(o => o.side == b.door && o.floor == 0 && o.h.w - o.h.z > 2f).Select(o => (Vector4?)o.h).FirstOrDefault();
+            float doorX = frontDoor != null ? (DoorSpan(f, b, b.door, frontDoor.Value).x + DoorSpan(f, b, b.door, frontDoor.Value).y) * 0.5f : f.W * 0.5f;
+            if (frontDoor != null && plan.split >= 3.6f)
+            {
+                var dsp = DoorSpan(f, b, b.door, frontDoor.Value);
+                var frontSpans = b.openings.Where(o => o.side == b.door).Select(o => DoorSpan(f, b, o.side, o.h)).ToList();
+                float hallMin = plan.upstairs ? StairWidth + 3.0f : 3.4f;
+                sideRight = plan.upstairs ? !plan.stairRight : f.W - dsp.y > dsp.x;
+                float start = Rand(own, 0f, 1f);
+                for (int k = 0; k < 60 && px < 0f; k++)
+                {
+                    float x = 0.5f + Mathf.Repeat(start + k * 0.1618f, 1f) * (f.W - 1f);
+                    bool ok = sideRight ? f.W - x >= 3.2f && x >= hallMin && x >= dsp.y + 1.05f
+                                        : x >= 3.2f && f.W - x >= hallMin && x <= dsp.x - 1.05f;
+                    if (ok && !frontSpans.Any(sp => x > sp.x - 0.2f && x < sp.y + 0.2f)) px = x;
+                }
+            }
+
             for (int fl = 0; fl < floors; fl++)
             {
                 float y0 = b.FloorY(fl);
@@ -202,11 +236,12 @@ namespace FPSKit.EditorTools
                 var cut = fl == 1 ? hole : Rect.zero;
                 var cutAbove = fl == 0 && plan.upstairs ? hole : Rect.zero;
                 foreach (var r in Minus(all, cut)) Slab(m, f, r, y0, null, true);
-                foreach (var r in Minus(all, cutAbove)) Slab(m, f, r, y1, _plasterIn, false);
+                foreach (var r in Minus(all, cutAbove)) Slab(m, f, r, y1, _ceilingWhite, false);
                 if (cutAbove.width > 0f) SlabEdges(m, f, cutAbove, y1, y1 + 0.25f, paint);
 
                 // The inside faces of the outer walls, cut where the outer wall's openings for this floor are.
                 OuterInnerFaces(m, det, b, f, fl, y0, y1, paint, old);
+                Curtains(det, b, f, fl, y0, y1, own);
 
                 // Rooms.
                 var rooms = new List<Room>();
@@ -218,6 +253,24 @@ namespace FPSKit.EditorTools
                 float pa1 = plan.upstairs && stairCrosses && plan.stairRight ? stairA0 : f.W;
                 var front = new Room { r = Rect.MinMaxRect(0f, 0f, f.W, split), y = y0, kind = fl == 0 ? (old ? "majlis" : "living") : "bedroom" };
                 rooms.Add(front);
+                Room sideRoom = null; float sideDoor = 0f;
+                if (px > 0f)
+                {
+                    front.r = sideRight ? Rect.MinMaxRect(0f, 0f, px, split) : Rect.MinMaxRect(px, 0f, f.W, split);
+                    sideRoom = new Room { r = sideRight ? Rect.MinMaxRect(px, 0f, f.W, split) : Rect.MinMaxRect(0f, 0f, px, split), y = y0,
+                                              kind = fl == 0 ? (old ? "bedroom" : "dining") : "bedroom" };
+                    rooms.Add(sideRoom);
+                    // Its doorway: where both leaves have wall to fold back against, else in the middle.
+                    float lo = HouseDoorEnd + DoorWidth * 0.5f, hi = split - HouseDoorEnd - DoorWidth * 0.5f;
+                    float lo2 = DoorWidth + 0.12f, hi2 = split - DoorWidth - 0.12f;
+                    float sd = hi2 > lo2 ? Rand(own, lo2, hi2) : (lo + hi) * 0.5f;
+                    Partition(m, det, f, new Vector2(px, 0f), new Vector2(px, split), y0, y1, paint, new List<float> { sd });
+                    sideDoor = sd;
+                    sideRoom.entry = new Vector2(sideRight ? px + 0.8f : px - 0.8f, sd);
+                    var walk = Rect.MinMaxRect(px - 1.1f, sd - DoorWidth * 0.5f - 0.1f, px + 1.1f, sd + DoorWidth * 0.5f + 0.1f);
+                    var folded = Rect.MinMaxRect(px - 0.45f, sd - DoorWidth - 0.1f, px, sd + DoorWidth + 0.1f);     // the leaves, on the -A side
+                    front.keep.Add(walk); front.keep.Add(folded); sideRoom.keep.Add(walk); sideRoom.keep.Add(folded);
+                }
                 var backs = new List<Room>();
                 float bw = pa1 - pa0;
                 if (bw >= 6.0f)
@@ -244,11 +297,19 @@ namespace FPSKit.EditorTools
                 var doors = new List<float>();
                 foreach (var bk in backs)
                 {
-                    float lo = bk.r.xMin + 0.35f + DoorWidth * 0.5f, hi = bk.r.xMax - 0.35f - DoorWidth * 0.5f;
-                    // Where both leaves have wall to fold back against (else, a narrow room, in its middle).
+                    float lo = bk.r.xMin + HouseDoorEnd + DoorWidth * 0.5f, hi = bk.r.xMax - HouseDoorEnd - DoorWidth * 0.5f;
+                    // Where both leaves have wall to fold back against (else, a narrow room, in its middle), and not where the
+                    // side room's wall meets this one.
                     float lo2 = bk.r.xMin + DoorWidth + 0.12f, hi2 = bk.r.xMax - DoorWidth - 0.12f;
-                    if (hi2 > lo2) doors.Add(Rand(own, lo2, hi2));
-                    else if (hi > lo) doors.Add((lo + hi) * 0.5f);
+                    bool Clear(float d) => px < 0f || Mathf.Abs(d - px) > DoorWidth * 0.5f + 0.25f;
+                    float pick = float.NaN;
+                    for (int t = 0; t < 8 && float.IsNaN(pick); t++)
+                    {
+                        float d = hi2 > lo2 ? Rand(own, lo2, hi2) : hi > lo ? Rand(own, lo, hi) : float.NaN;
+                        if (!float.IsNaN(d) && Clear(d)) pick = d;
+                    }
+                    if (float.IsNaN(pick) && hi > lo) pick = Clear(lo) ? lo : hi;
+                    if (!float.IsNaN(pick)) { doors.Add(pick); bk.entry = new Vector2(pick, split + 0.8f); }
                 }
                 Partition(m, det, f, new Vector2(pa0, split), new Vector2(pa1, split), y0, y1, paint, doors);
                 foreach (float d in doors)
@@ -298,6 +359,32 @@ namespace FPSKit.EditorTools
                             front.keep.Add(Rect.MinMaxRect(a.x - 0.4f, 0f, a.y + 0.4f, 1.6f));
                             front.keep.Add(Rect.MinMaxRect(a.x - 1.0f, 0f, a.y + 1.0f, 0.45f));                           // its leaves, folded back
                         }
+                // Lanes kept clear of furniture from the floor's way in (the front door; upstairs the stair's head) to every
+                // doorway and to the stair's foot, 1.4 m wide: furnished by its area, a hall filled up until its navmesh broke
+                // into islands between the sofa, the table and the armchairs, and the rooms behind it with it.
+                // A doorway behind the side room is got to through the side room's own doorway (its wall is shut elsewhere):
+                // a lane straight across it kept the dining table out of the middle of the room for nothing.
+                var hub = fl == 0 ? new Vector2(doorX, 0.9f) : new Vector2((stairA0 + stairA1) * 0.5f, plan.holeTo + 0.7f);
+                var hubRoom = front.r.Contains(hub) ? front : null;
+                void Lane(Vector2 a, Vector2 t, Room only)
+                {
+                    var alongA = Rect.MinMaxRect(Mathf.Min(a.x, t.x) - 0.7f, a.y - 0.7f, Mathf.Max(a.x, t.x) + 0.7f, a.y + 0.7f);
+                    var alongD = Rect.MinMaxRect(t.x - 0.7f, Mathf.Min(a.y, t.y) - 0.7f, t.x + 0.7f, Mathf.Max(a.y, t.y) + 0.7f);
+                    foreach (var r in only != null ? new List<Room> { only } : rooms) { r.keep.Add(alongA); r.keep.Add(alongD); }
+                }
+                var targets = doors.Select(d => new Vector2(d, split - 0.7f)).ToList();
+                if (fl == 0 && plan.upstairs) targets.Add(new Vector2((stairA0 + stairA1) * 0.5f, plan.stairStart - 0.6f));
+                Vector2 hallSide = new Vector2(sideRight ? px - 0.7f : px + 0.7f, sideDoor), roomSide = new Vector2(sideRight ? px + 0.7f : px - 0.7f, sideDoor);
+                if (sideRoom != null) Lane(hub, hallSide, hubRoom);
+                foreach (var t in targets)
+                {
+                    if (sideRoom != null && hubRoom != null && t.x > sideRoom.r.xMin && t.x < sideRoom.r.xMax) Lane(roomSide, t, sideRoom);
+                    else Lane(hub, t, hubRoom);
+                }
+                if (front.entry == null)
+                    front.entry = fl == 0 ? new Vector2(doorX, 1.0f)
+                                : front.r.Contains(hub) ? hub : doors.Count > 0 ? new Vector2(doors[0], split - 0.8f) : (Vector2?)null;
+
                 // Windows each room's tall furniture keeps out of the way of.
                 foreach (var o in b.openings.Where(o => o.floor == fl))
                 {
@@ -308,11 +395,13 @@ namespace FPSKit.EditorTools
 
                 foreach (var r in rooms)
                 {
-                    // The mark on the room's floor: off the stairwell, where a back room upstairs runs over it.
-                    var at = r.r.center;
+                    // The mark on the room's floor: at its way in, else its middle off the stairwell (where a back room upstairs
+                    // runs over it).
+                    var at = r.entry ?? r.r.center;
                     if (fl == 1 && hole.Contains(at))
                         at.x = r.r.xMax - hole.xMax > hole.xMin - r.r.xMin ? (hole.xMax + r.r.xMax) * 0.5f : (r.r.xMin + hole.xMin) * 0.5f;
-                    Mark(house, $"Room {r.kind} f{fl}", f.P(at.x, at.y, r.y + 0.3f));
+                    var mark = Mark(house, $"Room {r.kind} f{fl}", f.P(at.x, at.y, r.y + 0.3f));
+                    Mark(mark, "Look", f.P(r.r.center.x, r.r.center.y, r.y + 0.3f));               // the room's middle, for the views
                     r.outer[0] = r.r.yMin < 0.01f; r.outer[1] = r.r.yMax > f.Dp - 0.01f; r.outer[2] = r.r.xMin < 0.01f; r.outer[3] = r.r.xMax > f.W - 0.01f;
                     FloorFinish(m, f, r, old, own);
                     Ceiling(m, det, props, f, r, y1, own);
@@ -323,11 +412,12 @@ namespace FPSKit.EditorTools
 
         private static Transform _roomMarks;
 
-        private static void Mark(Transform parent, string name, Vector3 at)
+        private static Transform Mark(Transform parent, string name, Vector3 at)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.position = at;
+            return go.transform;
         }
 
         // ------------------------------------------------------------------
@@ -628,7 +718,9 @@ namespace FPSKit.EditorTools
                 case "bath": Bath(m, det, f, r, own); break;
                 case "majlis": Majlis(m, det, props, f, r, own); break;
                 case "oldkitchen": OldKitchen(m, props, f, r, own); break;
+                case "dining": Dining(m, det, props, f, r, own); break;
             }
+            FurnishMore(m, det, props, f, r, old, own);
             if (r.kind != "bath") Pictures(det, f, r, own, old);
         }
 
@@ -686,6 +778,7 @@ namespace FPSKit.EditorTools
                 foreach (float s in new[] { -0.38f, 0.38f })
                     m.Box(_mattressMat, c - Iw(into) * 0.75f + Iw(side) * s + Vector3.up * 0.62f, new Vector3(0.62f, 0.12f, 0.36f), rot);   // pillows
                 Rug(m, f, r, at + into * 0.4f + side * 1.25f, wall < 2 ? new Vector2(0.9f, 1.6f) : new Vector2(1.6f, 0.9f), own);
+                BedsideTables(m, f, r, at, wall, own);
             }
             if (!PropAgainstWall(props, f, r, own, "vintage_cabinet_01", 2.05f, 0.7f, true))
                 PropAgainstWall(props, f, r, own, "painted_wooden_cabinet", 1.2f, 0.64f, false);

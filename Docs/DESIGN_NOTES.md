@@ -3689,3 +3689,92 @@ the 15 cars and 60 civilians disconnected from the light of the street, the peop
   with a Rigidbody (a car driving off). Physics materials have Unity's default friction and bounce, so nothing moves
   differently. VerifyImpacts proves the surfaces by real raycasts and runs 6000 strikes: pools bounded, no objects made,
   no allocation on the strikes' thread, every mark gone at 30 s.
+
+## Walls varied and weathered; houses with real insides (2026-10-21/22)
+
+Asked for: "the architecture of the shops and the corresponding building is very artificial due to same texture of the
+wall used. Make some randomness and realness, after that, do the same for the houses. Also, the house lacks any
+physical real interior."
+
+* **Why it looked artificial**: a brick block was the same buff brick nine times in ten, a stone block one image in two
+  tints, a shop's ground floor one of two claddings, and every face of a building the front's finish.
+* **New textures** (Poly Haven, CC0, fetched with `Tools/polyhaven/fetch.py` and packed with `pack.py`; chosen from
+  thumbnails -- no moss, no red brick): yellow_brick, yellow_bricks, white_sandstone_blocks_02, sandstone_blocks_04,
+  old_sandstone_02, plaster_stone_wall_01, rough_plaster_brick, white_rough_plaster, grey_plaster_02, beige_wall_001,
+  worn_cracked_plaster, white_plaster_02, rectangular_facade_tiles, exterior_wall_cladding, granite_wall,
+  clay_block_wall; floor_tiles_06/08, large_floor_tiles_02, marble_tiles, herringbone_parquet, interior_tiles,
+  long_white_tiles. Tiled at Poly Haven's stated size (checked against counted courses: yellow_brick 26 courses in
+  2 m = 77 mm), 1 m plasters stretched to 2 m; tinted to a wanted colour over each image's mean.
+* **Walls** (`FPSKitTownWalls`): six brick, four stone, seventeen plaster, five claddings, nine old-town finishes.
+  old_sandstone_02 across a whole facade read as an orange cartoon: old town only. A masonry front has a rendered or
+  bare-block side and back about half the time (only the street face was paid for); plaster blocks with shops get a
+  cladding more often than not; the cladding shows only on street and shop faces. All from layout-seeded sequences
+  (`VaryWalls`, `VaryBase`), never the building's own, so plans and windows are unchanged.
+* **Weather** (detail mesh, no collider): grime up the wall's foot (0.6-1.6 m from the pavement; 2 m in the old town),
+  streaks under a third of the sills and from the parapet's scuppers, light or dark patches on plaster and mud; a
+  generated atlas (`TownWeather_v2.png`). The first strength was invisible (proved with an opaque red stand-in: the
+  quads were there, the alpha too faint).
+* **Interiors** (`FPSKitTownInterior`, replacing the single furnished box): planned in the house's own frame (A across,
+  D in from the front wall's inner face). `PlanHouse` runs before the walls (an upstairs changes the upper windows: cut
+  25 cm deep and square to meet the inside); `HouseInterior` runs after them and builds floors and ceilings (the slab
+  cut over the stair), the inner faces of the outer walls cut at the outer wall's own recorded openings
+  (`b.openings`), a partition with doorways between the front room and one or two back rooms, a bathroom in a big back
+  corner (0.9 m door, the player's only), the stair, finishes, furniture by room, a lamp or fan per ceiling, pictures.
+  Markers under `HouseRooms` (`House`/`OldHouse` > `Door`, `Room <kind> f<floor>`) are what VerifyTown and the views use.
+* **The town did not reshuffle.** The single room drew from the building's own sequence (`b.rng`); without those draws
+  every building after the first house came out different. `HouseInterior` replays them first (3-5 pieces of three
+  draws, then one); the new rooms take their own layout-seeded sequences. A second reshuffle came from widening the
+  front door: the door test was `width < 1.5`, so the wider doors were built as windows (161 enterable became 145).
+  The test now reads `< 1.9`.
+* **Reachability** (VerifyTown `CheckInteriors`: each room's mark sampled on the navmesh and pathed to from outside
+  its front door). Every one of these kept rooms out, and each looked like "the navmesh just stops":
+  - doorways: an agent is 0.5 m either side of its middle on a 17 cm grid and a jamb rasterises most of a voxel wide,
+    so 1.2-1.3 m doorways never joined and 1.5-1.6 m ones only now and then (which ones depends on where the voxel
+    grid falls: a local bake of one house joined rooms the whole-town bake did not). Doorways are 1.8 m double doors,
+    inside and at the front, 2.2 m high;
+  - the front door's leaves stood square to the wall, 10 cm into each side, with the foot of the stair beside them;
+    all leaves now fold right back against the wall, and only where there is wall to fold against (a partition door
+    near the end of its wall stood a leaf through the outer wall and out of the facade); a bathroom's single leaf
+    swings open into it;
+  - the old town's plinth (a 6 cm box along the foot of every face) ran straight across the threshold, 25 cm proud,
+    leaving 2.0 m under the lintel: no old house was ever entered. It is broken at every opening to the floor, as the
+    modern foundation course already was;
+  - the stair began 0.5 m in from the front wall, inside the wall's own half-metre margin, with the rail closing its
+    open side: it could be got onto only from the top. The foot is now 1.5 m in (risers 19 cm, treads 26 cm), the slab
+    is cut wherever a step has less than 2.45 m over it, and the partition either crosses the flight or stands 1.5 m
+    past its head, so the stair never arrives at a wall;
+  - and even then every room upstairs stayed an island: each room laid its tiles over its whole rectangle, stairwell
+    included, a lid 2.8 m up that left the upper steps no headroom. Floors (and rugs) skip the stairwell now;
+  - then the flight broke for a metre at the stairwell's edge: the cut started where the line of the nosings had
+    2.27 m over it, but a tread's top stands up to a riser above that line and a voxel column across a riser takes the
+    higher tread, so under the edge an agent had just under its 2 m, and the erosion round that one row emptied the
+    0.6 m strip up the flight. The cut now starts at the first tread whose top has less than 2.45 m over it, a voxel
+    early. Found by baking the house with parts of its chunk mesh taken out (a filtered copy as the source): without
+    everything above 2.4 m the flight joined; without the ceiling alone, or the slab alone, it did not (the slab's edge
+    faces reach down to the ceiling).
+  How they were found: a seal-free bake of a box round one house (`NavMeshSurface.collectObjects = Volume`), an ASCII
+  map of navmesh / walls / low solids at 25 cm, a walk up the stair's strip reporting surface, headroom and path status
+  per tread, and a 5 cm survey of floor height and headroom across a doorway. A probe that listed only the first volume
+  per point once hid the seal boxes that were the real cause; disable volumes one at a time instead.
+* **Rooms that look lived in** (`FPSKitTownFurniture`, after the first renders showed big empty boxes with tan
+  ceilings): a wide house's front is a hall (front door, stair) with a side room off it through a 1.8 m doorway -- a
+  dining room downstairs (table for six, sideboard, glass-fronted cabinet, a floor vase), a bedroom upstairs or in the old
+  town; the wall between them clears the front door's folded leaves, the stair and every front window on both floors.
+  Bedrooms get bedside tables with lamps and, over 13 m2, a wardrobe; living rooms armchairs, a sideboard and floor vases;
+  how many extra pieces grows with the floor area. Box furniture is built into the chunk mesh (physical, no object);
+  props only for what a box cannot be (chairs, pots, vases, plants) because every prop is an object with a collider.
+  Curtains (detail mesh, pleated: three strips at two depths) at most modern windows, rod above the head, hem under the
+  sill so a sofa or bed below does not cut them. Ceilings are one flat painted white with a little emission (kept out of
+  the probe bake): facing down, a ceiling is lit only by the sand-coloured light coming up off the ground, so textured
+  plaster read tan and blotchy at 0.95x its image mean and brown and blotchier at 1.58x. The "potted plants" were
+  replaced by floor vases: the succulent scan is a ground-hugging clump a metre wide at any height a pot would hold.
+* **Furniture against navigation.** Furnished by area, a hall filled until its navmesh broke into islands between the
+  sofa, the table and the armchairs (reached rooms fell from 94% to 86%), and a dining room's mark sat under its table.
+  Lanes 1.4 m wide are kept clear of furniture from each floor's way in (the front door; upstairs the stair's head) to
+  every doorway and to the stair's foot, and each room's mark is set just inside its way in (a "Look" child marks the
+  room's middle for the views), so VerifyTown proves every room can be entered, not that a table's footprint is floor.
+  A lane to a doorway behind the side room goes through the side room's own doorway (its wall is shut elsewhere): run
+  straight across it, it kept the dining table out of the room for nothing. The table then looks for room on a 40 cm grid
+  outward from the middle, and takes a table for four where six do not fit (45 of 52 dining rooms furnished; 32 before).
+* **Where it ended**: 160 houses, 924 of 933 rooms reached from the front door, 330 of 334 of them upstairs (it began
+  at 21% and none); stranded navmesh sealed 46 pieces (326 at the start of this pass). VerifyTown now asks 95% and 90%.

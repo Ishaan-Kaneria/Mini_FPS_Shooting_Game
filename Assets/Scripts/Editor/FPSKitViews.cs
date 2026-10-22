@@ -181,15 +181,18 @@ namespace FPSKit.EditorTools
             var houses = GameObject.Find("HouseRooms");
             if (houses != null)
                 foreach (var (shot, prefix) in new[] { ("30_house_living", "Room living f0"), ("31_house_kitchen", "Room kitchen f0"),
-                                                         ("32_house_upstairs", "Room bedroom f1"), ("33_old_majlis", "Room majlis f0") })
+                                                         ("32_house_upstairs", "Room bedroom f1"), ("33_old_majlis", "Room majlis f0"),
+                                                         ("34_house_dining", "Room dining f0"), ("35_house_bedroom", "Room bedroom f0") })
                 {
                     Transform room = null;
                     foreach (var t in houses.GetComponentsInChildren<Transform>()) if (t.name == prefix) { room = t; break; }
                     if (room == null) continue;
-                    var door = room.parent.Find("Door");
-                    Vector3 toDoor = door != null ? door.position - room.position : Vector3.forward;
-                    toDoor.y = 0f; toDoor = toDoor.sqrMagnitude > 0.01f ? toDoor.normalized : Vector3.forward;
-                    yield return WorldShot(shot, room.position + toDoor * 1.4f + Vector3.up * 1.3f, room.position - toDoor * 2f + Vector3.up * 0.7f, 74f);
+                    // From the room's way in (its mark) across to its middle (the mark's Look child).
+                    var look = room.Find("Look");
+                    Vector3 across = look != null ? look.position - room.position : Vector3.forward;
+                    across.y = 0f; across = across.sqrMagnitude > 0.01f ? across.normalized : Vector3.forward;
+                    var to = look != null ? look.position : room.position + across * 2f;
+                    yield return WorldShot(shot, room.position - across * 0.3f + Vector3.up * 1.3f, to + across * 1.5f + Vector3.up * 0.5f, 78f);
                 }
         }
 

@@ -3778,3 +3778,85 @@ physical real interior."
   outward from the middle, and takes a table for four where six do not fit (45 of 52 dining rooms furnished; 32 before).
 * **Where it ended**: 160 houses, 924 of 933 rooms reached from the front door, 330 of 334 of them upstairs (it began
   at 21% and none); stranded navmesh sealed 46 pieces (326 at the start of this pass). VerifyTown now asks 95% and 90%.
+
+## The grab and punch; pain, face damage and the head grab (2026-10-22)
+
+Asked for: the fight from the film *Master* (a screen recording, `~/2026-10-21 09-01-20.mp4`) as the player's and the
+enemy's animation -- "when I am close to the enemy face, then hold him from the head and make a brutal punch on his face,
+and similarly the rest"; the melee choosing the move from the body part nearest; the enemy reacting as the film's opponent
+does; then a pasted brief for the whole pipeline (Blender cleanup of captured motion, face-damage shape keys, a pain system,
+execution clips, hit-stop, FOV pulse).
+
+* **The film cannot be captured.** Every usable shot was cut out, cropped to the hero and tracked (MediaPipe, the phone
+  pipeline's own tracker): the punching arm never reached 0.6 confidence in any frame of the longest shot (2.7 s,
+  15.2-17.9 s), the tracker locked onto the opponent's back for a second, the legs are never in shot, the camera moves, some
+  shots are slow motion. Filtering under 0.5 leaves nothing to interpolate; a "cleaned" clip would be invented. So the moves
+  are keyed by hand from the film's frames (below), and the brief's Step 1 was not done. Its Step 2 (IK targets in Blender on
+  a player model in `Assets/Models/Player/`) was not either: there is no such model, and Unity's Humanoid import drops Blender
+  IK constraints -- the first-person arms reach by IK in code already.
+* **Kept from the project's rules, against the brief**: no `Time.timeScale` hit-stop (only the player's strike holds for
+  45-60 ms; the world freeze held the enemy's answer back -- VerifyCombat measures it); no clip drives the first-person arms
+  (they are posed in code, `ViewModelRig`), so there is no `Player_Execute` clip.
+
+### The moves (`MeleeGrapple`, a partial of `MeleeStrike`)
+* Picked from what is nearest: **face to face** (his head within `grabRange` 1.15 m of the eye, the crosshair on it, him
+  facing the player within 75 degrees) the press takes him by the head, the rifle swinging onto the back first; **held**,
+  each press is a punch to the face (`facePunchesBeforeFinisher` 2, never finishing him: `heldFloor`), then the **overhand**
+  from above the head (kills an ordinary enemy; an elite is floored with 5% left and gets up hurt -- it can only be grabbed
+  badly hurt, so any real share killed it every time); with the fists up, **a blow aimed at the belly** is the hook that
+  doubles him over (`doubledSeconds`), and the next press takes him **bent**, by the back of the head, as in the film.
+* Who: ordinary enemies; elites badly hurt, reeling or doubled up; never a boss. A held enemy cannot shoot or break free;
+  nobody else stops shooting. No press for `releaseAfter` (1.6 s), the player reaching for the gun, or him slipping more
+  than 0.9 m from the grip (a wall), and he is shoved off, reeling, and stumbles (the Action layer's clip).
+* The hold: `EnemyAI.Grapple` keeps him `holdDistance` (0.62 m) in front, facing the holder, drawn in at 24/s through the
+  agent or the motor (at 14/s he trailed 0.2 m into the player's face at a walk); nothing is parented. **Collisions between
+  the held body and the holder are off while held** (`EnemyBody`), given back once he is clear after the release: with them
+  on, his leaning body and his hand on the player's forearm touched the player's capsule and the motor's never-stand-on-an-
+  enemy slide moved the player 0.38 m standing still (VerifyGrapple G9 found it).
+* The player's hands (`ViewModelRig.GrapplePoses`): the left hand laid on his head each frame, through `ViewPoint` -- the
+  world point's position on the world camera's screen, at a reachable depth along the **arms camera's** own ray (its field
+  of view and set-back differ, so the same world point is elsewhere in its space); the right thrown as a hook to the face,
+  the overhand (wound up high, elbow leading, brought over the top), or the hook to the belly.
+* A face-to-face grab drags his head part-way down and over (and the keyed hold bends him from the waist): held upright at
+  arm's length his face was above the eye line and hidden behind the player's forearms.
+
+### The enemy's side
+* **Keyed clips** (`Tools/blender/enemy_grabbed_clips.py` -> `Assets/Models/Enemy/Enemy_Execute_HeadGrabbed_Impact.fbx`):
+  the hold (1.2 s loop: bent by the hand on his head, knees giving, left hand up on the holding wrist, right at his belly,
+  struggling) and the impact (0.6 s: head knocked back and round, knees buckling, hands thrown). Authored on a copy of the
+  skeleton imported with automatic bone orientation (as imported, the mannequin's tails point anywhere and Blender's IK used
+  them as the effectors), feet and hands placed by IK, spine/neck/head keyed, then baked by reading every posed bone (no UI
+  operator, so it runs headless). Imported Humanoid with an avatar of its own, retargeted by muscle (the two files' bone axes
+  need not agree). On the Action layer (`FPSKitRiggedSoldier`): Idle -> Grabbed (bool) -> GrabbedHit (trigger) -> back; not
+  from Any State (with the bool held, an Any State entry re-entered the hold every frame and cut the impact off).
+  - Blender's FBX import sets the scene's frame rate from the file (24): set 60 **after** importing, or the clips export
+    2.5 times too slow.
+  - The impact's head snap was halved: on top of the snap every blow to the head already gets, the two together turned the
+    head 75 degrees in two frames. While the clip holds him it owns the bend (the code's fold on top folded him flat).
+* **Face damage** (`Tools/blender/face_damage_keys.py`): five shape keys on the Survivalist head (`Face_Deform_Impact_L/R`:
+  cheekbone caved 11 mm, jaw shifted 7 mm; `Eye_Swollen_L/R`; `Head_Bruise_Distortion`), localised by falloffs about
+  landmarks measured from the mesh (the eyes from the eye material); a first version tore the lower lid (nothing within
+  2-3 cm of the eye now). `FPSKitFaceDamage.Bake` copies the shapes onto the game's own import of the head by vertex position
+  (every signed axis order tried; the match came out exact, 1755 vertices, 0.00 mm), so the rig, skinning and bone order are
+  never touched by the round trip. `FacialDamageHandler` (added by `EnemyBody`) swaps that head in and drives the shapes by
+  each head hit's share of the pool -- the cave-in at once, the swelling over 1.5 s, the lumps over 1 s -- and never undoes
+  them. Bruises are `EnemyGore`'s (`BloodLibrary.bruiseMaterial`, shown with Blood off too: skin, not blood); a fist to the
+  face bleeds more than one to the body (0.35 against 0.15, still short of a round's spray -- his note on kicks stands).
+* **After-pain** (`EnemyBody`; most of the brief's pain system was there: the leg kneel, the arm sag and clutch, the gut fold,
+  the head snap, the spring recoil): dazed for 2-4 s after a blow or heavy round to the head (the head lolls, the body sways,
+  the knees soften); winded for 1.5-3 s after a hard hit to the chest or belly (hunched, heaving every 0.6 s); an arm hit
+  drives the shot shoulder back along the round's line. Procedural, on the bones in world space like the rest of
+  `EnemyBody`, not Animation Rigging constraints: it works on any Humanoid.
+* **The feel** (only on a landed blow): the shake, the strike's own hit-stop, and an FOV pulse (`Weapon.FovPulse`: the view
+  narrows 1.6 degrees for a punch, 2.8 for the overhand, opening over 0.16 s; scaled by Camera Shake). The camera never moves.
+
+### Checks and the traps they caught
+* `VerifyGrapple` (G1-G9): the grab, the hold and the turn-follow, the punches (land, never finish, the head answers within
+  two frames and not past 70 degrees, the cheek caves in, he is dazed), the overhand, the idle release, elites and bosses,
+  the hook (doubled, winded, taken bent), and holding never moving the player (standing 0.0 mm; walking only as the motor says).
+* `VerifyMeleeMotion` judges a trial whose press became a grab on push only: the held body is pulled in and, in play, carried
+  by its mind (off in that test), so its speed is not the no-attack run's. `VerifyCombat`'s reaction check stands 1.6 m off:
+  at 1.3 m the butt folded the target, his head came into reach, and the next press was rightly the grab, not the jab.
+* `FPSKitPlayerShots.BatchGrapple` photographs every beat from the eyes and a side camera in Desert Outpost. A staged enemy
+  needs its mind **removed**, not switched off: switched off, its stale look point (the world origin) kept the body aiming
+  there, twisting the head 0.8 m off the root.

@@ -501,6 +501,44 @@ namespace FPSKit.EditorTools
                 back.duration = 0.2f;
             }
 
+            // Held by the head (MeleeGrapple): the hold, a loop, and a fist to the face over it -- keyed in Blender after the
+            // film Master (Tools/blender/enemy_grabbed_clips.py). Entered from Idle and left for it, never from Any State:
+            // with "Grabbed" held true, an Any State transition re-entered the hold every frame and cut the impact off.
+            controller.AddParameter("Grabbed", AnimatorControllerParameterType.Bool);
+            controller.AddParameter("GrabbedHit", AnimatorControllerParameterType.Trigger);
+            var heldClip = GrabbedClip("Enemy_HeadGrabbed_Held");
+            var hitClip = GrabbedClip("Enemy_HeadGrabbed_Impact");
+            if (heldClip != null && hitClip != null)
+            {
+                var held = actionMachine.AddState("Grabbed");
+                held.motion = heldClip;
+                var hit = actionMachine.AddState("GrabbedHit");
+                hit.motion = hitClip;
+                var take = idle.AddTransition(held);
+                take.AddCondition(AnimatorConditionMode.If, 0f, "Grabbed");
+                take.hasExitTime = false;
+                take.duration = 0.15f;
+                var punched = held.AddTransition(hit);
+                punched.AddCondition(AnimatorConditionMode.If, 0f, "GrabbedHit");
+                punched.hasExitTime = false;
+                punched.duration = 0.04f;
+                var again = hit.AddTransition(hit);
+                again.AddCondition(AnimatorConditionMode.If, 0f, "GrabbedHit");
+                again.hasExitTime = false;
+                again.duration = 0.04f;
+                var settle = hit.AddTransition(held);
+                settle.hasExitTime = true;
+                settle.exitTime = 0.9f;
+                settle.duration = 0.1f;
+                foreach (var from in new[] { held, hit })
+                {
+                    var letGo = from.AddTransition(idle);
+                    letGo.AddCondition(AnimatorConditionMode.IfNot, 0f, "Grabbed");
+                    letGo.hasExitTime = false;
+                    letGo.duration = 0.12f;
+                }
+            }
+
             var action = new AnimatorControllerLayer
             {
                 name = "Action",
@@ -691,6 +729,43 @@ namespace FPSKit.EditorTools
             foreach (var a in AssetDatabase.LoadAllAssetsAtPath($"{FPSKitMixamoImport.Root}{file}.fbx"))
                 if (a is AnimationClip c && c.name == name) return c;
             Debug.LogWarning("[FPSKit] Rigged soldier: no Mixamo clip " + path);
+            return null;
+        }
+
+        const string GrabbedClips = "Assets/Models/Enemy/Enemy_Execute_HeadGrabbed_Impact.fbx";
+
+        /// <summary>
+        /// A clip from the head-grab FBX Blender writes (Tools/blender/enemy_grabbed_clips.py): imported Humanoid with an avatar
+        /// of its own (Unity retargets it onto this body by muscle, so the two files' bone axes need not agree), the hold
+        /// looping, nothing of the root moved (the AI holds him where he is held).
+        /// </summary>
+        public static AnimationClip GrabbedClip(string name)
+        {
+            if (AssetImporter.GetAtPath(GrabbedClips) is ModelImporter mi)
+            {
+                bool dirty = mi.animationType != ModelImporterAnimationType.Human || mi.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel
+                             || mi.materialImportMode != ModelImporterMaterialImportMode.None || mi.clipAnimations.Length == 0;
+                if (dirty)
+                {
+                    mi.animationType = ModelImporterAnimationType.Human;
+                    mi.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                    mi.materialImportMode = ModelImporterMaterialImportMode.None;
+                    mi.SaveAndReimport();
+                    var clips = new List<ModelImporterClipAnimation>();
+                    foreach (var take in mi.defaultClipAnimations)
+                    {
+                        take.loopTime = take.name.EndsWith("Held");
+                        take.lockRootRotation = take.lockRootHeightY = take.lockRootPositionXZ = true;
+                        take.keepOriginalOrientation = take.keepOriginalPositionY = take.keepOriginalPositionXZ = true;
+                        clips.Add(take);
+                    }
+                    mi.clipAnimations = clips.ToArray();
+                    mi.SaveAndReimport();
+                }
+            }
+            foreach (var a in AssetDatabase.LoadAllAssetsAtPath(GrabbedClips))
+                if (a is AnimationClip c && !c.name.StartsWith("__") && c.name.EndsWith(name.Substring(name.LastIndexOf('_') + 1)) && c.name.Contains("HeadGrabbed")) return c;
+            Debug.LogWarning("[FPSKit] Rigged soldier: no head-grab clip " + name + " in " + GrabbedClips);
             return null;
         }
 

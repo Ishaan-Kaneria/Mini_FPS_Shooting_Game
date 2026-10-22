@@ -535,8 +535,31 @@ public class EnemyBody : MonoBehaviour
         if (flat.sqrMagnitude < 1e-4f) flat = -transform.forward;
         flat.Normalize();
         Vector3 away = Vector3.Cross(Vector3.up, flat);
-        Add(_head, Vector3.up, (Random.value < 0.5f ? -1f : 1f) * 12f * power, 0.45f);
+        // The keyed impact over the hold (Blender, after the film) turns the head itself, with the knees buckling: then the
+        // code adds only the chest's rock (both together wrenched the head 75 degrees in two frames).
+        bool keyed = GrabClips && _ai != null && _ai.Grappled;
+        if (!keyed) Add(_head, Vector3.up, (Random.value < 0.5f ? -1f : 1f) * 12f * power, 0.45f);
         Add(_chest, away, 5f * power, 0.55f);
+        if (keyed) animator.SetTrigger(GrabbedHitHash);
+    }
+
+    static readonly int GrabbedHash = Animator.StringToHash("Grabbed"), GrabbedHitHash = Animator.StringToHash("GrabbedHit");
+    int _grabClips;   // 0 not looked, 1 the controller has the head-grab states, -1 it has not
+
+    /// <summary>The Animator has the hold and the impact keyed in Blender (FPSKitRiggedSoldier's Action layer).</summary>
+    bool GrabClips
+    {
+        get
+        {
+            if (_grabClips == 0)
+            {
+                _grabClips = -1;
+                if (animator != null)
+                    foreach (var p in animator.parameters)
+                        if (p.nameHash == GrabbedHash) { _grabClips = 1; break; }
+            }
+            return _grabClips > 0;
+        }
     }
 
     /// <summary>
@@ -552,7 +575,20 @@ public class EnemyBody : MonoBehaviour
         _heldW = Mathf.MoveTowards(_heldW, held ? 1f : 0f, dt * (held ? 9f : 3f));
         // Taken face to face he is dragged part-way down and over by the head, as the film's hero drags his man down (and
         // so his face is under the player's arms, in view, not hidden behind them); taken doubled over, he is held right down.
-        float foldWant = doubled ? 1f : held ? (_heldBentPose ? 1f : 0.45f) : 0f;
+        // With the keyed hold playing, the clip is bent already: only the fold of a man doubled over a hook is added.
+        // (Held, the clip owns the bend even while the hook's fold would still be running: both together folded him flat.)
+        float foldWant = held && GrabClips ? 0f : doubled ? 1f : held ? (_heldBentPose ? 1f : 0.45f) : 0f;
+        if (GrabClips)
+        {
+            animator.SetBool(GrabbedHash, held);
+            if (held)
+            {
+                if (_actionLayer < 0) _actionLayer = animator.GetLayerIndex("Action");
+                _actionUntil = Mathf.Max(_actionUntil, Time.time + 0.2f);
+            }
+        }
+        // Let go alive and on his feet: a stumble away (the Action layer's), not a snap back to standing.
+        if (!held && _wasHeld && !IsDown && _health != null && !_health.IsDead) PlayAction("Stumble", 0.9f);
         _foldW = Mathf.MoveTowards(_foldW, foldWant, dt * (doubled ? 7f : held ? 3f : 2.2f));
         if (held) _heldBy = _ai.GrappledBy;
 

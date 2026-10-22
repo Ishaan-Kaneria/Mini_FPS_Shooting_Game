@@ -131,6 +131,13 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Bullet impacts: `FPSImpactManager.HandleImpact(RaycastHit)` from every gun (Weapon, EnemyAI, TechnicalTruck); surface = struck face's
   material on a multi-material mesh, else the collider's `Surface_*` physics material, else the tag. Pooled only (one marks mesh, three
   particle systems, three lights): never instantiate per shot. Physics materials keep default friction. Check: `FPSKitBatch.VerifyImpacts`.
+- Grab and punch (`MeleeGrapple`, `Docs/DESIGN_NOTES.md` "The grab and punch"): face to face (head within `grabRange`, crosshair on it,
+  facing) the press grabs the head; presses punch the face (never finishing: `heldFloor`), then the overhand (kills a standard enemy,
+  floors an elite); a hook at the belly doubles him over, the next press takes him bent. Never a boss. Held: pinned by `EnemyAI.Grapple`,
+  holder collisions off (on, the motor's enemy slide moved the player), keyed hold/impact clips on the Action layer (Blender:
+  `Tools/blender/enemy_grabbed_clips.py`; set fps after Blender's FBX import). Face damage: Blender shape keys
+  (`Tools/blender/face_damage_keys.py`) baked onto the game's head by position (`FPSKitBatch.BakeFaceDamage`), driven by
+  `FacialDamageHandler`. A staged test enemy has its `EnemyBrain` removed, not disabled. Check: `FPSKitBatch.VerifyGrapple`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
   `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via

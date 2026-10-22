@@ -488,6 +488,12 @@ namespace FPSKit.EditorTools
             float d = _foe != null ? Vector3.Distance(FoeHead(), _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform.position : _motor.transform.position) : -1f;
             float roots = _foe != null ? Vector3.ProjectOnPlane(_foe.transform.position - _motor.transform.position, Vector3.up).magnitude : -1f;
             float drift = Vector3.ProjectOnPlane(_motor.transform.position - _placedAt, Vector3.up).magnitude;
+            var cam = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform : _motor.transform;
+            float aimOff = _foe != null ? Vector3.Angle(cam.forward, FoeHead() - cam.position) : -1f;
+            Vector3 toPlayer = _foe != null ? Vector3.ProjectOnPlane(cam.position - _foe.transform.position, Vector3.up) : Vector3.zero;
+            float facing = _foe != null ? Vector3.Angle(Vector3.ProjectOnPlane(_foe.transform.forward, Vector3.up), toPlayer) : -1f;
+            string under = Physics.Raycast(cam.position, cam.forward, out var hit, 3f) ? hit.collider.name + (hit.collider.GetComponent<Hitbox>() is Hitbox hb ? " (" + hb.Part + ")" : "") : "nothing";
+            Report += $"grapple: crosshair {aimOff:0} deg off his head, he faces {facing:0} deg off the player, under the crosshair {under}, can grab {(_foe != null && _melee.CanGrab(_foe.GetComponent<Health>(), _foeAI))}\n";
             Report += $"grapple: gave up in phase {_phase} (roots {roots:0.00} m apart, player drifted {drift:0.00} m since placed, thrown {_melee.Thrown}, current {_melee.Current}, holding {_melee.Holding}, " +
                       $"target {(_melee.Target != null ? _melee.Target.name : "none")}, foe head {d:0.00} m from the eye, gun away {_melee.GunAway:0.00})\n";
             return true;

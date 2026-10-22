@@ -177,6 +177,20 @@ namespace FPSKit.EditorTools
             yield return ParkShot("27_shopfront_close", new Vector3(11.0f, 1.55f, -186f), new Vector3(13.4f, 2.4f, -181f), 62f);
             yield return ParkShot("28_shop_cover_street", new Vector3(135.2f, 1.6f, -62f), new Vector3(137.4f, 1.0f, -44f), 62f);
             yield return ParkShot("29_shop_base", new Vector3(10.4f, 1.1f, -184.5f), new Vector3(13.4f, 0.7f, -181f), 64f);
+            // Inside houses (FPSKitTownInterior), found from the room markers: from a room's end, across it at eye height.
+            var houses = GameObject.Find("HouseRooms");
+            if (houses != null)
+                foreach (var (shot, prefix) in new[] { ("30_house_living", "Room living f0"), ("31_house_kitchen", "Room kitchen f0"),
+                                                         ("32_house_upstairs", "Room bedroom f1"), ("33_old_majlis", "Room majlis f0") })
+                {
+                    Transform room = null;
+                    foreach (var t in houses.GetComponentsInChildren<Transform>()) if (t.name == prefix) { room = t; break; }
+                    if (room == null) continue;
+                    var door = room.parent.Find("Door");
+                    Vector3 toDoor = door != null ? door.position - room.position : Vector3.forward;
+                    toDoor.y = 0f; toDoor = toDoor.sqrMagnitude > 0.01f ? toDoor.normalized : Vector3.forward;
+                    yield return WorldShot(shot, room.position + toDoor * 1.4f + Vector3.up * 1.3f, room.position - toDoor * 2f + Vector3.up * 0.7f, 74f);
+                }
         }
 
         /// <summary>

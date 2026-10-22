@@ -51,7 +51,7 @@ namespace FPSKit.EditorTools
         private static void ResetTownBuildings()
         {
             _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
-            _palletPrefab = null;
+            _palletPrefab = null; _roomMarks = null;
             _volumes = null; _signNames = null; _roadSignNames = null;
             _oldSquares.Clear(); _vacantLots.Clear();
         }
@@ -457,6 +457,8 @@ namespace FPSKit.EditorTools
             public float groundH = TownFloorH;      // ground-floor height (taller with shops)
             public float parapet = 1.0f;
             public Material wall, glass, frame;
+            /// <summary>The sides' and back's finish when it is not the front's (a rendered or bare-block back), or null.</summary>
+            public Material sideWall;
             public FaceKind[] faces = new FaceKind[4];
             public int door = -1;               // side with the front door
             public bool enterable;
@@ -476,6 +478,12 @@ namespace FPSKit.EditorTools
             public System.Random rng;
             /// <summary>Its shops' look, chosen once per building from the layout's seed (FPSKitTownShopfront.ShopLook).</summary>
             public ShopLookData shopLook;
+            /// <summary>A house you can enter: where its stair goes and whether it has an upstairs (FPSKitTownInterior).</summary>
+            public HousePlan plan;
+            /// <summary>Every opening of a house you can enter: side, (u0, u1, v0, v1) from the wall's foot, floor.</summary>
+            public readonly List<(int side, Vector4 h, int floor)> openings = new List<(int, Vector4, int)>();
+            /// <summary>The height the walls start from (their foot, below the ground).</summary>
+            public float wallBottom;
             /// <summary>Ground-floor openings per side, (u0, u1, v0, v1) with v above the floor: what the interior cuts too.</summary>
             public readonly List<Vector4>[] groundHoles = { new List<Vector4>(), new List<Vector4>(), new List<Vector4>(), new List<Vector4>() };
             /// <summary>Where an outside stair reaches the roof: side and the span along it (parapet open there). -1 for none.</summary>
@@ -535,8 +543,14 @@ namespace FPSKit.EditorTools
             float bottom = b.groundMin - 0.6f;
             float top = b.Top + b.parapet;
             var rng = b.rng;
+            b.wallBottom = bottom;
+            // A house you can enter is planned first: an upstairs changes its upper windows (square, cut 25 cm deep to meet
+            // the inside face) and keeps its first floor walkable (FPSKitTownInterior).
+            if (b.enterable && b.plan == null) b.plan = PlanHouse(b);
+            bool upstairs = b.enterable && b.plan != null && b.plan.upstairs;
 
-            if (!b.oldStyle && b.baseMat == null) MaybeRusticBase(b, System.Array.IndexOf(b.faces, FaceKind.Shops) >= 0);
+            bool anyShops = System.Array.IndexOf(b.faces, FaceKind.Shops) >= 0;
+            if (!b.oldStyle && b.baseMat == null) { MaybeRusticBase(b, anyShops); VaryBase(b, anyShops); }
             var det = Detail(b.r.center);
             float baseTop = b.baseMat != null ? b.FloorY(1) - bottom : 0f;   // the rusticated ground floor's top, above the wall's foot
 
@@ -573,7 +587,11 @@ namespace FPSKit.EditorTools
                         }
                         if (f == 0 && side == b.door && k == bays / 2)
                         {
-                            holes.Add(new Vector4(cu - 0.65f, cu + 0.65f, fy, fy + 2.25f)); floorOf.Add(f);
+                            // A house you can enter has double doors 1.8 m wide: an agent is 0.5 m either side of its middle
+                            // on a 17 cm grid, and conservatively rasterised jambs take most of a voxel more each side, so
+                            // through 1.3 m the navmesh never reached the rooms behind and through 1.6 m only now and then.
+                            float half = b.enterable ? 0.9f : 0.65f;
+                            holes.Add(new Vector4(cu - half, cu + half, fy, fy + 2.25f)); floorOf.Add(f);
                             continue;
                         }
                         float ww = b.oldStyle ? Rand(rng, 0.6f, 0.9f) : b.windowW;
@@ -584,19 +602,25 @@ namespace FPSKit.EditorTools
                         if (!balcony && !b.oldStyle && b.style != FacadeStyle.Plaster && streetFace && f > 0 && rng.NextDouble() < 0.18) balcony = true;
                         float sill = balcony ? 0.05f : (b.oldStyle ? 1.3f : 0.95f);
                         float h = balcony ? 2.3f : wh;
-                        float rise = WindowRise(b, f, ww, f == 0 && b.enterable);
+                        float rise = WindowRise(b, f, ww, (f == 0 || upstairs) && b.enterable);
                         if (rise > 0f) rises[holes.Count] = rise;
                         holes.Add(new Vector4(cu - ww * 0.5f, cu + ww * 0.5f, fy + sill, fy + sill + h - rise)); floorOf.Add(f);
                     }
                 }
 
+                if (b.enterable)
+                    for (int i = 0; i < holes.Count; i++) b.openings.Add((side, holes[i], floorOf[i]));
                 if (side == b.stairSide) { holes.Add(new Vector4(b.stairU0, b.stairU1, b.Top - bottom + 0.05f, top - bottom + 0.2f)); floorOf.Add(b.floors); }
                 float floorV = b.FloorY(0) - bottom;
                 foreach (var h in holes)
                     if (h.z - floorV < 0.5f + 1.2f && h.w - floorV < b.groundH + 0.1f) b.groundHoles[side].Add(new Vector4(h.x, h.y, h.z - floorV, h.w - floorV));
 
                 var wa = a0 + Vector3.up * bottom; var wb = b0 + Vector3.up * bottom;
-                if (baseTop > 0f)
+                // The face's own finish: the front's on a street face, the sides' and back's otherwise; the cladding of the
+                // ground floor only where it shows, on the street and over shops (FPSKitTownWalls).
+                Material faceWall = streetFace || b.oldStyle || b.sideWall == null ? b.wall : b.sideWall;
+                bool clad = baseTop > 0f && (streetFace || kind == FaceKind.Shops);
+                if (clad)
                 {
                     // A rusticated stone ground floor under the wall proper; every opening lies wholly in one or the other.
                     var low = new List<Vector4>(); var lowR = new Dictionary<int, float>();
@@ -608,9 +632,9 @@ namespace FPSKit.EditorTools
                         else { if (rises.TryGetValue(i, out float r)) highR[high.Count] = r; high.Add(new Vector4(h.x, h.y, h.z - baseTop, h.w - baseTop)); }
                     }
                     m.WallWithOpenings(b.baseMat, wa, wb, baseTop, nrm, low, lowR);
-                    m.WallWithOpenings(b.wall, wa + Vector3.up * baseTop, wb + Vector3.up * baseTop, top - bottom - baseTop, nrm, high, highR);
+                    m.WallWithOpenings(faceWall, wa + Vector3.up * baseTop, wb + Vector3.up * baseTop, top - bottom - baseTop, nrm, high, highR);
                 }
-                else m.WallWithOpenings(b.wall, wa, wb, top - bottom, nrm, holes, rises);
+                else m.WallWithOpenings(faceWall, wa, wb, top - bottom, nrm, holes, rises);
 
                 // ---- reveals, glass, frames, sills ----
                 var shopFace = kind == FaceKind.Shops ? new ShopFace { a0 = a0, u = u, nrm = nrm, len = len, floorY = b.FloorY(0) } : null;
@@ -623,14 +647,14 @@ namespace FPSKit.EditorTools
                     bool groundFloor = h.z - (b.FloorY(0) - bottom) < 0.5f;
                     bool isShop = groundFloor && kind == FaceKind.Shops;
                     // A shop's storefront stands 0.35 m behind the piers' faces (FPSKitTownShopfront).
-                    float depth = isShop ? ShopRecess : b.enterable && groundFloor ? 0.25f : (b.oldStyle ? 0.2f : b.reveal);
+                    float depth = isShop ? ShopRecess : b.enterable && (groundFloor || upstairs) ? 0.25f : (b.oldStyle ? 0.2f : b.reveal);
                     Vector3 p0 = wa + u * h.x + Vector3.up * h.z, p1 = wa + u * h.y + Vector3.up * h.z;
                     Vector3 q0 = wa + u * h.x + Vector3.up * h.w, q1 = wa + u * h.y + Vector3.up * h.w;
                     Vector3 inn = -nrm * depth;
-                    bool isDoor = groundFloor && kind != FaceKind.Shops && h.y - h.x < 1.5f && h.w - h.z > 2f && floorOf[i] == 0 && h.z - floorV < 0.1f;
+                    bool isDoor = groundFloor && kind != FaceKind.Shops && h.y - h.x < 1.9f && h.w - h.z > 2f && floorOf[i] == 0 && h.z - floorV < 0.1f;   // (a 1.8 m double door too)
                     Material revealMat = b.oldStyle ? b.wall
-                                       : h.z < baseTop ? b.baseMat
-                                       : b.style == FacadeStyle.Ashlar ? b.trim : b.wall;
+                                       : clad && h.z < baseTop ? b.baseMat
+                                       : b.style == FacadeStyle.Ashlar && faceWall == b.wall ? b.trim : faceWall;
                     Reveals(m, revealMat, wa, u, nrm, h, rise, depth);
 
                     if (isShop)
@@ -655,7 +679,11 @@ namespace FPSKit.EditorTools
                                       rich: streetFace || side == b.door);
                 }
 
-                // ---- string courses, cornice, quoins; plinth ----
+                // ---- string courses, cornice, quoins; plinth; weather ----
+                var floorGaps = new List<Vector2>();                   // openings down to the floor, and an outside stair
+                for (int i = 0; i < holes.Count; i++)
+                    if (floorOf[i] == 0 && holes[i].z - floorV < 0.15f) floorGaps.Add(new Vector2(holes[i].x, holes[i].y));
+                if (side == b.stairSide) floorGaps.Add(new Vector2(TownStairStart - 0.3f, b.stairU1 + 0.3f));
                 if (!b.oldStyle && kind != FaceKind.Blank)
                 {
                     bool rich = streetFace || side == b.door;
@@ -670,15 +698,32 @@ namespace FPSKit.EditorTools
 
                     // The concrete foundation course where the pavement meets the building, broken at every opening down
                     // to the floor and at an outside stair.
-                    var gaps = new List<Vector2>();
-                    for (int i = 0; i < holes.Count; i++)
-                        if (floorOf[i] == 0 && holes[i].z - floorV < 0.15f) gaps.Add(new Vector2(holes[i].x, holes[i].y));
-                    if (side == b.stairSide) gaps.Add(new Vector2(TownStairStart - 0.3f, b.stairU1 + 0.3f));
-                    FoundationTrim(m, b, a0, u, len, nrm, side, bottom, gaps);
+                    FoundationTrim(m, b, a0, u, len, nrm, side, bottom, new List<Vector2>(floorGaps));
                 }
                 else
-                    m.Box(b.oldStyle ? b.wall : b.trim, (a0 + b0) * 0.5f + Vector3.up * (b.baseY - 0.25f) + nrm * 0.03f,
-                          new Vector3(len + 0.06f, Mathf.Max(0.5f, b.baseY - bottom + 0.25f) , 0.06f) , Quaternion.LookRotation(nrm));
+                {
+                    // The plinth, broken at every opening down to the floor: run straight across, it stood 25 cm proud of an
+                    // old house's threshold with 2.0 m under the lintel above it, and no agent fitted through any old door.
+                    var plinth = b.oldStyle ? b.wall : b.trim;
+                    float ph = Mathf.Max(0.5f, b.baseY - bottom + 0.25f), pBot = b.baseY - 0.25f - ph * 0.5f, pTop = pBot + ph;
+                    var prot = Quaternion.LookRotation(nrm);
+                    void Plinth(float x0, float x1, float y1)
+                    {
+                        if (x1 - x0 < 0.05f || y1 - pBot < 0.03f) return;
+                        m.Box(plinth, a0 + u * ((x0 + x1) * 0.5f) + Vector3.up * ((pBot + y1) * 0.5f) + nrm * 0.03f, new Vector3(x1 - x0, y1 - pBot, 0.06f), prot);
+                    }
+                    var gaps = new List<Vector2>(floorGaps);
+                    gaps.Sort((p, q) => p.x.CompareTo(q.x));
+                    float from = -0.03f;
+                    foreach (var g in gaps)
+                    {
+                        Plinth(from, Mathf.Max(from, g.x), pTop);
+                        Plinth(Mathf.Max(from, g.x), g.y, b.baseY - 0.01f);          // under the threshold, up to the floor only
+                        from = Mathf.Max(from, g.y);
+                    }
+                    Plinth(from, len + 0.03f, pTop);
+                }
+                if (kind != FaceKind.Blank) Weather(det, b, a0, u, len, nrm, holes, floorOf, bottom, floorGaps, side);
             }
 
             // ---- roof, parapet, coping ----
@@ -713,10 +758,11 @@ namespace FPSKit.EditorTools
             if (b.oldStyle && b.rng.NextDouble() < 0.55) PalmBeams(m, b);
 
             RoofClutter(m, b, roofY, props);
-            if (b.enterable) Interior(m, b, props);
+            if (b.enterable) HouseInterior(m, det, b, props);
 
             // ---- navigation: keep the closed parts of the building off the bake ----
-            float volBottom = b.enterable ? b.FloorY(0) + b.groundH - 0.35f : b.groundMin - 1f;
+            // (With an upstairs, only the roof is kept off: the first floor is walked on.)
+            float volBottom = !b.enterable ? b.groundMin - 1f : upstairs ? b.Top - 0.35f : b.FloorY(0) + b.groundH - 0.35f;
             float volTop = b.roofWalk ? roofY - 0.35f : top + 3f;
             if (volTop > volBottom + 0.3f) NoEntryBox(b.r, volBottom, volTop, b.enterable ? 0.3f : 0.5f);
             _townSolids.Add(b.r);
@@ -815,11 +861,22 @@ namespace FPSKit.EditorTools
 
         private static void OpenDoor(TownMesh m, Mass b, Vector3 p0, Vector3 p1, Vector3 q0, Vector3 inn, Vector3 nrm)
         {
-            // The leaf swung in against the inside of the reveal, so the doorway is clear.
+            // The leaves swung right back against the inside of the wall, either side of the doorway, so it is clear: stood
+            // square to the wall they took 10 cm off each side and kept an agent out of the hall behind (with the foot of a
+            // stair beside them, out of the whole house).
             Vector3 u = (p1 - p0).normalized;
             float w = Vector3.Distance(p0, p1), h = Vector3.Distance(p0, q0);
-            var leafCentre = p0 + inn + (-nrm) * (w * 0.5f - 0.05f) + Vector3.up * (h * 0.5f) + u * 0.03f;
-            m.Box(b.rng.NextDouble() < 0.5 ? _doorWood : _doorMetal, leafCentre, new Vector3(0.05f, h, w - 0.05f), Quaternion.LookRotation(nrm));
+            var leaf = b.rng.NextDouble() < 0.5 ? _doorWood : _doorMetal;
+            var rot = Quaternion.LookRotation(nrm);
+            Vector3 back = inn - nrm * 0.035f + Vector3.up * (h * 0.5f);
+            if (w > 1.4f)
+            {
+                float lw = w * 0.5f - 0.02f;
+                m.Box(leaf, p0 + back - u * (lw * 0.5f + 0.02f), new Vector3(lw, h, 0.05f), rot);
+                m.Box(leaf, p1 + back + u * (lw * 0.5f + 0.02f), new Vector3(lw, h, 0.05f), rot);
+            }
+            else
+                m.Box(leaf, p0 + back - u * (w * 0.5f), new Vector3(w - 0.04f, h, 0.05f), rot);
             // A step down to the pavement or yard if the floor stands above the ground.
             float g = GroundHeightAt((p0.x + p1.x) * 0.5f, (p0.z + p1.z) * 0.5f);
             if (b.baseY - g > 0.12f)
@@ -1016,59 +1073,6 @@ namespace FPSKit.EditorTools
             _ = tank; _ = p;
         }
 
-        // ------------------------------------------------------------------
-        /// <summary>The ground floor of a house you can enter: floor, ceiling, the inside of the walls, a partition and furniture.</summary>
-        private static void Interior(TownMesh m, Mass b, Transform props)
-        {
-            var rng = b.rng;
-            var r = b.r;
-            const float t = 0.25f;
-            float y0 = b.FloorY(0), y1 = y0 + b.groundH - 0.25f;
-            var inner = Rect.MinMaxRect(r.xMin + t, r.yMin + t, r.xMax - t, r.yMax - t);
-            m.Quad(_terrazzo, new Vector3(inner.xMin, y0, inner.yMin), new Vector3(inner.xMax, y0, inner.yMin), new Vector3(inner.xMax, y0, inner.yMax), new Vector3(inner.xMin, y0, inner.yMax), Vector3.up);
-            m.Quad(_plasterIn, new Vector3(inner.xMin, y1, inner.yMin), new Vector3(inner.xMax, y1, inner.yMin), new Vector3(inner.xMax, y1, inner.yMax), new Vector3(inner.xMin, y1, inner.yMax), Vector3.down);
-            // Inside faces of the four walls, cut exactly where the outer wall was (the openings it recorded), so every
-            // hole goes right through and nothing seen from inside is the back of a face.
-            for (int side = 0; side < 4; side++)
-            {
-                var (a0, b0) = FaceRun(inner, side);
-                var nrm = -SideOut3(side);
-                var holes = new List<Vector4>();
-                foreach (var h in b.groundHoles[side]) holes.Add(new Vector4(h.x - t, h.y - t, h.z, Mathf.Min(h.w, y1 - y0)));
-                m.WallWithHoles(_plasterIn, a0 + Vector3.up * y0, b0 + Vector3.up * y0, y1 - y0, nrm, holes);
-            }
-            // A partition with a doorway across the longer axis when the room is big.
-            if (inner.width > 7f || inner.height > 7f)
-            {
-                bool alongX = inner.width < inner.height;
-                float at = alongX ? Mathf.Lerp(inner.yMin, inner.yMax, 0.55f) : Mathf.Lerp(inner.xMin, inner.xMax, 0.55f);
-                float span = alongX ? inner.width : inner.height;
-                float door = span * 0.5f;
-                Vector3 A = alongX ? new Vector3(inner.xMin, y0, at) : new Vector3(at, y0, inner.yMin);
-                Vector3 B = alongX ? new Vector3(inner.xMax, y0, at) : new Vector3(at, y0, inner.yMax);
-                var hole = new List<Vector4> { new Vector4(door - 0.65f, door + 0.65f, 0f, 2.2f) };
-                Vector3 n = alongX ? Vector3.forward : Vector3.right;
-                m.WallWithHoles(_plasterIn, A - n * 0.06f, B - n * 0.06f, y1 - y0, -n, hole);
-                m.WallWithHoles(_plasterIn, A + n * 0.06f, B + n * 0.06f, y1 - y0, n, hole);
-            }
-            // Furniture against the walls, clear of the door.
-            string[] pool = { "WoodenTable_01", "painted_wooden_chair_01", "painted_wooden_cabinet", "painted_wooden_shelves", "sofa_02", "old_bed_frame",
-                              "Television_01", "wooden_bookshelf_worn", "vintage_cabinet_01", "painted_wooden_chair_01", "Shelf_01", "vintage_suitcase" };
-            int n2 = rng.Next(3, 6);
-            for (int i = 0; i < n2; i++)
-            {
-                string id = pool[rng.Next(pool.Length)];
-                int side = rng.Next(4);
-                if (side == b.door) side = (side + 2) % 4;
-                var (a0, b0) = FaceRun(inner, side);
-                var at = Vector3.Lerp(a0, b0, Rand(rng, 0.2f, 0.8f)) - SideOut3(side) * 0.55f;
-                at.y = y0;
-                PlaceTown(props, Prop(id), at, Mathf.Atan2(-SideOut3(side).x, -SideOut3(side).z) * Mathf.Rad2Deg);
-            }
-            PlaceTown(props, Prop("ceiling_fan"), new Vector3(inner.center.x, y1 - 0.6f, inner.center.y), 0f, 0.5f, navBlock: false);
-            PlaceTown(props, Prop("throw_pillows_01"), new Vector3(inner.center.x + 0.8f, y0, inner.center.y - 0.6f), (float)rng.NextDouble() * 360f, navBlock: false);
-        }
-
         // ==================================================================
         // Building kinds
         // ==================================================================
@@ -1088,6 +1092,7 @@ namespace FPSKit.EditorTools
             };
             for (int s = 0; s < 4; s++) b.faces[s] = old ? FaceKind.OldWindows : FaceKind.Windows;
             if (!old) ApplyFacadeStyle(b);
+            VaryWalls(b);
             return b;
         }
 

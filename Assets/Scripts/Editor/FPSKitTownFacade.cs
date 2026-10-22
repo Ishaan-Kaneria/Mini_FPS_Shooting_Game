@@ -49,6 +49,7 @@ namespace FPSKit.EditorTools
             _iron = TownFlat("WroughtIron", new Color(0.045f, 0.045f, 0.05f), 0.35f, 0.55f);
             _shutterBoxMat = TownFlat("ShutterBox", new Color(0.78f, 0.76f, 0.72f), 0.3f);
             ResolveShopfrontMaterials();
+            ResolveWallVariety();
         }
 
         /// <summary>The detail mesh for whatever stands at <paramref name="p"/> (its 64 m chunk, like <see cref="Chunk"/>).</summary>

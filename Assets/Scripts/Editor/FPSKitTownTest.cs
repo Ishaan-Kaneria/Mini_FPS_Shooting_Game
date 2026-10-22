@@ -103,6 +103,46 @@ namespace FPSKit.EditorTools
             else notes.AppendLine($"  people and cars: {renderers} renderers on the probes; probes give {ratio:0.00} of the walls' ambient from the side");
         }
 
+        /// <summary>
+        /// The houses you can enter have rooms you can walk into: every room's marker (FPSKitTownInterior) is on the navmesh
+        /// and joined to the house's front door by a complete path, upstairs rooms included (up the stair).
+        /// </summary>
+        static void CheckInteriors(List<string> problems, StringBuilder notes)
+        {
+            var root = GameObject.Find("HouseRooms");
+            if (root == null) { problems.Add("no house interiors (HouseRooms markers) in the scene"); return; }
+            int houses = 0, rooms = 0, reached = 0, ups = 0, upsReached = 0, islands = 0;
+            var seals = UnityEngine.Object.FindObjectsByType<Unity.AI.Navigation.NavMeshModifierVolume>(FindObjectsSortMode.None)
+                .Where(v => v.name == "Seal").Select(v => new Bounds(v.transform.TransformPoint(v.center), v.size)).ToList();
+            var path = new NavMeshPath();
+            var lost = new List<string>();
+            foreach (Transform house in root.transform)
+            {
+                var door = house.Find("Door");
+                if (door == null || !NavMesh.SamplePosition(door.position, out var from, 2.5f, NavMesh.AllAreas)) continue;
+                houses++;
+                foreach (Transform room in house)
+                {
+                    if (!room.name.StartsWith("Room ") || room.name.StartsWith("Room bath")) continue;   // a bathroom's door is 0.9 m: the player's
+                    bool up = room.name.EndsWith("f1");
+                    rooms++; if (up) ups++;
+                    bool ok = NavMesh.SamplePosition(room.position, out var to, 1.6f, NavMesh.AllAreas) && Mathf.Abs(to.position.y - room.position.y) < 1.2f &&
+                              NavMesh.CalculatePath(from.position, to.position, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
+                    if (ok) { reached++; if (up) upsReached++; }
+                    else
+                    {
+                        bool isSealed = seals.Any(s => s.Contains(room.position + Vector3.up * 0.2f));
+                        if (isSealed) islands++;
+                        if (lost.Count < 4) lost.Add($"{room.name} at {room.position.x:0},{room.position.z:0}{(isSealed ? " (sealed)" : "")}");
+                    }
+                }
+            }
+            if (houses < 100) problems.Add($"only {houses} houses with an interior and a door on the navmesh (100 or more wanted)");
+            else if (reached < rooms * 0.75f) problems.Add($"rooms not reachable from their front door: {rooms - reached} of {rooms}, {ups - upsReached} of {ups} upstairs, {islands} sealed as islands (e.g. {string.Join("; ", lost)})");
+            else if (ups > 0 && upsReached < ups * 0.6f) problems.Add($"upstairs rooms not reachable up their stair: {ups - upsReached} of {ups} (e.g. {string.Join("; ", lost)})");
+            else notes.AppendLine($"  interiors: {houses} houses, {reached}/{rooms} rooms reached from the door, {upsReached}/{ups} of them upstairs");
+        }
+
         /// <summary>Every collider of the town that a round can strike carries a surface physics material (FPSImpactManager).</summary>
         static void CheckSurfaces(List<string> problems, StringBuilder notes)
         {
@@ -154,6 +194,7 @@ namespace FPSKit.EditorTools
 
             CheckDynamicLighting(problems, notes);
             CheckSurfaces(problems, notes);
+            CheckInteriors(problems, notes);
 
             // ---- famous locations ----
             var places = new List<(string name, Vector3 at)>

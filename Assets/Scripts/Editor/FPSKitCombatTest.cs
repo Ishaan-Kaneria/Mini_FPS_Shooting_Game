@@ -932,7 +932,9 @@ namespace FPSKit.EditorTools
                     away = away.sqrMagnitude > 0.01f ? away.normalized : _rxTarget.transform.forward;
                     var controller = player.GetComponent<CharacterController>();
                     if (controller != null) controller.enabled = false;
-                    player.transform.position = _rxTarget.transform.position + away * 1.3f + Vector3.up * 0.05f;
+                    // 1.6 m, just outside grab reach: at 1.3 m the butt folded him, his head came into the crosshair within
+                    // MeleeSettings.grabRange, and the next press was rightly the grab, not the jab this measures.
+                    player.transform.position = _rxTarget.transform.position + away * 1.6f + Vector3.up * 0.05f;
                     if (controller != null) controller.enabled = true;
                     Face(player, _rxTarget.transform.position);
                     Physics.SyncTransforms();

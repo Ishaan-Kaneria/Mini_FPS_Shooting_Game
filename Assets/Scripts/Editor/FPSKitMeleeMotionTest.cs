@@ -464,12 +464,17 @@ namespace FPSKit.EditorTools
 
                 // Firing at a sprint is the combat jog by design (fire held turns the sprint into a jog
                 // with the gun up), so its speed is not the no-attack sprint's; it still may not push.
-                bool speedJudged = r.speedGap >= 0f && !(r.trial.gait == Gait.Sprint && (r.trial.act == Act.Fire || r.trial.act == Act.ButtThenFire));
+                // A press that took the target by the head (MeleeGrapple: walking into him face to face) has changed what
+                // the player walks into: the held body is pulled in front and leans into the hand, and in play its mind
+                // carries it with the hold -- off here -- so its speed is not the no-attack run's either. It still may not
+                // push (surge), and VerifyGrapple proves holding never moves the player.
+                bool held = r.hit != null && r.hit.Contains("Grab");
+                bool speedJudged = r.speedGap >= 0f && !held && !(r.trial.gait == Gait.Sprint && (r.trial.act == Act.Fire || r.trial.act == Act.ButtThenFire));
                 bool ok = r.surge <= MaxSurge && (!speedJudged || r.speedGap <= MaxSpeedGap);
                 if (!ok) failed++;
 
                 string control = c != null && r.trial.act != Act.None ? $"{c.moved,14:0.000}{r.moved - c.moved,9:+0.000;-0.000;0.000}" : $"{"",14}{"",9}";
-                string gapText = r.speedGap >= 0f ? (speedJudged ? $"{r.speedGap,11:0.000}" : $"{"(jog)",11}") : $"{"",11}";
+                string gapText = r.speedGap >= 0f ? (speedJudged ? $"{r.speedGap,11:0.000}" : $"{(held ? "(held)" : "(jog)"),11}") : $"{"",11}";
                 sb.Append($"  {r.trial.act,-13}{r.trial.gait,-8}{(r.trial.target ? "yes" : "no"),-8}{r.moved,9:0.000}{control}{r.surge,9:0.000}{r.excess,10:0.000}{gapText}{r.worstFrame * 1000f,8:0.0}mm@{r.worstAt,-3}{r.climb,7:0.000}  {r.hit}{(ok ? "" : "   <-- FAIL")}\n");
             }
 

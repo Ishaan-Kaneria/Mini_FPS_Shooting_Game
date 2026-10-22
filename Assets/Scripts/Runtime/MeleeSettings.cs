@@ -130,6 +130,50 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Seconds after a takedown before the next strike.")]
     [Range(0.1f, 2f)] public float takedownRecovery = 0.35f;
 
+    [Header("Grab and punch (the fight in the film Master, 2026-10-22)")]
+    [Tooltip("Metres from the eye to the nearest point of an enemy's head inside which a punch at the head takes him by it " +
+             "instead (the rifle swings onto the back first). Face to face: arm's length.")]
+    [Range(0.6f, 1.6f)] public float grabRange = 1.15f;
+    [Tooltip("Degrees off facing the player inside which a standing enemy can be taken by the face. One doubled up over " +
+             "a body blow is taken by the back of the head whichever way he faces.")]
+    [Range(20f, 120f)] public float grabFacingDegrees = 75f;
+    [Tooltip("Metres from the player to the body of the enemy held by the head: he is pulled in to this and kept there.")]
+    [Range(0.4f, 1.2f)] public float holdDistance = 0.62f;
+    [Tooltip("Seconds the hand takes to reach the head and close on it.")]
+    [Range(0.15f, 0.8f)] public float grabSeconds = 0.3f;
+    [Tooltip("Seconds each punch to the face of a held enemy takes.")]
+    [Range(0.15f, 0.8f)] public float facePunchSeconds = 0.32f;
+    [Tooltip("Seconds the overhand (the finishing blow brought down from above the head) takes.")]
+    [Range(0.25f, 1.2f)] public float overhandSeconds = 0.5f;
+    [Tooltip("Seconds the hook to the belly takes.")]
+    [Range(0.15f, 0.8f)] public float bodyBlowSeconds = 0.3f;
+    [Tooltip("Punches to the face before the next press is the overhand.")]
+    [Range(1, 4)] public int facePunchesBeforeFinisher = 2;
+    [Tooltip("Share of the pool each punch to a held face takes.")]
+    public Shares facePunchDamage = new Shares(0.22f, 0.12f, 0f);
+    [Tooltip("Share the overhand takes: over 1 ends an ordinary enemy (Ishaan's call: the final blow kills); an elite is " +
+             "left on the floor with at least 5% of its pool, and gets up hurt.")]
+    public Shares overhandDamage = new Shares(1.2f, 0.45f, 0f);
+    [Tooltip("Share the hook to the belly takes.")]
+    public Shares bodyBlowDamage = new Shares(0.2f, 0.12f, 0.03f);
+    [Tooltip("A held enemy is never finished by the punches to the face: they leave him at least this share of his pool, " +
+             "so the overhand is always the blow that ends it.")]
+    [Range(0f, 0.5f)] public float heldFloor = 0.12f;
+    [Tooltip("Seconds without a press before the hold breaks and the enemy is shoved off, dazed.")]
+    [Range(0.4f, 4f)] public float releaseAfter = 1.6f;
+    [Tooltip("Seconds a hook to the belly folds an ordinary enemy over it (an elite 60%, a boss not at all): the window " +
+             "in which the next press takes him by the back of the head.")]
+    [Range(0.3f, 3f)] public float doubledSeconds = 1.4f;
+    [Tooltip("Metres a second the overhand drives a body that survives it (an elite) down onto the floor.")]
+    [Range(0f, 6f)] public float collapseSpeed = 2.2f;
+    [Tooltip("Degrees the view narrows for a moment when a punch to the face or the hook lands (scaled by Camera Shake).")]
+    [Range(0f, 6f)] public float punchFovPulse = 1.6f;
+    [Tooltip("Degrees it narrows when the overhand lands.")]
+    [Range(0f, 8f)] public float finisherFovPulse = 2.8f;
+    [Range(0f, 100f)] public float grabCost = 8f;
+    [Range(0f, 100f)] public float facePunchCost = 12f;
+    [Range(0f, 100f)] public float bodyBlowCost = 18f;
+
     [Header("Stamina")]
     [Tooltip("The pool every strike draws on. Full, it is five punches or two kicks and a " +
              "punch before the player is winded.")]

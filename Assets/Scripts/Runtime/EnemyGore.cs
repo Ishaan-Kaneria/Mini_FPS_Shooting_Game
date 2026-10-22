@@ -156,12 +156,17 @@ public class EnemyGore : MonoBehaviour
         }
 
         // A blow draws a little blood -- a split lip, a broken nose -- never a round's spray:
-        // a kick that sprays blood reads as fake (his note).
-        BloodFX.Hit(library, info.point, info.normal, info.direction, info.fromMelee ? Mathf.Min(0.15f, severity * 0.25f) : severity);
+        // a kick that sprays blood reads as fake (his note). A fist to the face splits it more than a
+        // blow to the body: the nose and the mouth bleed (the grab and punch; still well short of a round).
+        bool face = info.fromMelee && (info.part == BodyPart.Head || info.part == BodyPart.Neck);
+        float meleeBlood = face ? Mathf.Min(0.35f, severity * 0.5f) : Mathf.Min(0.15f, severity * 0.25f);
+        BloodFX.Hit(library, info.point, info.normal, info.direction, info.fromMelee ? meleeBlood : severity);
+
+        // A fist bruises; it does not leave a hole. A bruise is skin, not blood: it shows with the Blood setting off too.
+        if (face) AddWound(info, Mathf.Clamp01(severity * 1.5f), library.bruiseMaterial);
 
         if (!BloodFX.Enabled) return;
 
-        // A fist bruises; it does not leave a hole.
         if (!info.fromMelee) AddWound(info, severity);
 
         Stain(BodyParts.Limb(info.part));
@@ -230,9 +235,10 @@ public class EnemyGore : MonoBehaviour
     /// A wound where the round went in: a dark hole with a torn red rim, stuck to the
     /// limb so it moves with it and falls with the body.
     /// </summary>
-    void AddWound(DamageInfo info, float severity)
+    void AddWound(DamageInfo info, float severity, Material material = null)
     {
-        if (maxWounds <= 0 || library.woundMaterial == null) return;
+        material ??= library.woundMaterial;
+        if (maxWounds <= 0 || material == null) return;
 
         var collider = NearestPart(info.point);
         if (collider == null) return;
@@ -251,7 +257,7 @@ public class EnemyGore : MonoBehaviour
             go.layer = 2;
             go.AddComponent<MeshFilter>().sharedMesh = WoundMesh;
             var renderer = go.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = library.woundMaterial;
+            renderer.sharedMaterial = material;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mark = go.transform;
             _woundMarks.Add(mark);
@@ -261,6 +267,8 @@ public class EnemyGore : MonoBehaviour
             _nextWound %= _woundMarks.Count;
             mark = _woundMarks[_nextWound++];
             if (mark == null) return;
+            var reused = mark.GetComponent<MeshRenderer>();
+            if (reused != null) reused.sharedMaterial = material;
         }
 
         Vector3 normal = info.normal.sqrMagnitude > 0.0001f ? info.normal.normalized : -info.direction.normalized;

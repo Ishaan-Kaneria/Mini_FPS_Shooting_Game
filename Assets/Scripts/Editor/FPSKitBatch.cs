@@ -300,6 +300,32 @@ namespace FPSKit.EditorTools
         public static void VerifyMeleeRules() => FPSKitMeleeRulesTest.Batch();
 
         /// <summary>
+        /// The grab and punch (MeleeGrapple): face to face the press takes the enemy by the head with the rifle onto the
+        /// back, he is held in front and follows the player's turn, the punches to the face land on their frame and never
+        /// finish him, the overhand does, the hold breaks when idle, an elite only when hurt, never a boss; the hook to the
+        /// belly folds him over and the next press takes him bent. Report in Build/Grapple/report.txt.
+        /// </summary>
+        public static void VerifyGrapple() => FPSKitGrappleTest.Batch();
+
+        /// <summary>
+        /// The face damage shapes made in Blender (Tools/blender/face_damage_keys.py) copied onto the game's head mesh for
+        /// FacialDamageHandler: Assets/FPSKit_Generated/Resources/FaceDamage/SK_Military_Head1.asset.
+        /// </summary>
+        public static void BakeFaceDamage()
+        {
+            try
+            {
+                Debug.Log("[FPSKitBatch] " + FPSKitFaceDamage.Bake());
+                Exit(0);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[FPSKitBatch] FAILED: face damage bake: " + e.Message);
+                Exit(1);
+            }
+        }
+
+        /// <summary>
         /// How many frames the kick's own leg hides over half of the enemy being kicked, in first
         /// person. Needs UNITY_GRAPHICS=1. Report and contact sheet in Build/KickView.
         /// </summary>

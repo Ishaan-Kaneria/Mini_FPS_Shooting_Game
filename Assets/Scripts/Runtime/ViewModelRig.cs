@@ -42,6 +42,9 @@ public class ViewModelRig : MonoBehaviour
         public float reloadProgress;
         public bool reloadEmpty;
         public float sinceShot;
+        public float grab;              // the left hand on an enemy's head, 0 to 1 (MeleeStrike.GrabHold)
+        public Vector3 grabPoint;       // where it holds the head, in the world
+        public Vector3 strikePoint;     // where the blow in flight lands (the face, the belly), in the world
     }
 
     class Arm
@@ -521,6 +524,9 @@ public class ViewModelRig : MonoBehaviour
             s.takedownWithFists = _melee.TakedownWithFists;
             s.strike = _melee.Current;
             s.strikeProgress = _melee.StrikeProgress;
+            s.grab = _melee.GrabHold;
+            s.grabPoint = _melee.GrabPoint;
+            s.strikePoint = _melee.StrikePoint;
         }
 
         if (_motor != null)
@@ -912,7 +918,8 @@ public class ViewModelRig : MonoBehaviour
         // a punch, which is what carries a fist the last ten centimetres to a real target.
         _arms.localRotation = Quaternion.identity;
         float drive = 0f;
-        if (s.strike == MeleeStrike.Strike.Jab || s.strike == MeleeStrike.Strike.Cross || (s.strike == MeleeStrike.Strike.Takedown && s.takedownWithFists))
+        if (s.strike == MeleeStrike.Strike.Jab || s.strike == MeleeStrike.Strike.Cross || (s.strike == MeleeStrike.Strike.Takedown && s.takedownWithFists)
+            || s.strike == MeleeStrike.Strike.FacePunch || s.strike == MeleeStrike.Strike.BodyBlow || s.strike == MeleeStrike.Strike.Overhand)
             drive = Mathf.Clamp01(Extension(s.strikeProgress, MeleeStrike.ImpactAt(s.strike)));
         float pf = Smooth01(_punchFrame);
         _arms.localPosition = _spec.armsOffset - _headLocal + new Vector3(0f, -0.02f, 0.14f) * drive * Mathf.Clamp01(s.fistsUp)
@@ -942,6 +949,7 @@ public class ViewModelRig : MonoBehaviour
         float f = Mathf.Clamp01(s.fistsUp);
         float carry = UITheme.EaseOut(_carry);
         float lFistW = f, rFistW = f;
+        Vector3 rElbow = new Vector3(0.55f, -0.7f, -0.2f);
         if (f > 0f)
         {
             bool finisher = s.strike == MeleeStrike.Strike.Takedown && s.takedownWithFists;
@@ -984,6 +992,10 @@ public class ViewModelRig : MonoBehaviour
                 lFistW = f * (1f - carry);
             }
 
+            // The grab and punch: the left hand on the head, the right thrown at the face or the belly (MeleeGrapple).
+            if (s.grab > 0.001f || MeleeStrike.IsGrappleStrike(s.strike))
+                GrapplePoses(s, view, Guard(RightGuard, 1f), ref lFist, ref lFistRot, ref rFist, ref rFistRot, ref lFistW, ref rElbow);
+
             // A captured move (FPSKitMocap's first-person track) in place of the drawn one, fitted to this framing.
             if (Captured != null && Captured.Frames > 1)
                 CapturedFists(view, Guard(LeftGuard, -1f), Guard(RightGuard, 1f), Wide(JabReach, -1f), Wide(CrossReach, 1f),
@@ -995,9 +1007,102 @@ public class ViewModelRig : MonoBehaviour
             rRot = Quaternion.Slerp(rRot, rFistRot, f);
         }
 
-        Reach(_right, rPos, rRot, view.TransformDirection(new Vector3(0.55f, -0.7f, -0.2f)), rFistW);
+        Reach(_right, rPos, rRot, view.TransformDirection(rElbow), rFistW);
         Squeeze(s, rFistW);
         Reach(_left, lPos, lRot, view.TransformDirection(new Vector3(-0.35f, -0.8f, 0.05f)), lFistW);
+    }
+
+    /// <summary>
+    /// A point of the world as the arms are drawn: where on the screen the world camera sees it, at a depth along the arms
+    /// camera's own ray that the arm can reach. The arms are drawn by their own camera (another field of view, set back),
+    /// so the same world point is not the same place in their space; laid on its screen position, a hand on a head is on
+    /// that head as the player sees it.
+    /// </summary>
+    Vector3 ViewPoint(Vector3 world, Transform view, float near, float far)
+    {
+        var cam = _weapon != null ? _weapon.fpsCamera : null;
+        if (cam == null) return view.InverseTransformPoint(world);
+        Vector3 vp = cam.WorldToViewportPoint(world);
+        if (vp.z <= 0.05f) return view.InverseTransformPoint(world);
+        var arms = _armsCam != null ? _armsCam : cam;
+        Vector3 at = arms.ViewportToWorldPoint(new Vector3(vp.x, vp.y, Mathf.Clamp(vp.z, near, far)));
+        return view.InverseTransformPoint(at);
+    }
+
+    /// <summary>
+    /// The grab and punch (MeleeGrapple), on top of the fists' guard. The left hand goes out to the head, closes on it over
+    /// the crown and holds it, then is pushed off it when he is let go. The right hand: a hook to the face (out from its
+    /// guard and round, knuckles flat on the target), the overhand (wound up high beside the head, knuckles back, then
+    /// brought over the top and down onto the face, the elbow leading), the hook to the belly (low and round, palm in).
+    /// All of it aimed at where the blow really lands, through <see cref="ViewPoint"/>.
+    /// </summary>
+    void GrapplePoses(State s, Transform view, Vector3 rGuard, ref Vector3 lFist, ref Quaternion lRot, ref Vector3 rFist, ref Quaternion rRot,
+                      ref float lCurl, ref Vector3 rElbow)
+    {
+        if (s.grab > 0.001f && s.grabPoint != Vector3.zero)
+        {
+            Vector3 grip = ViewPoint(s.grabPoint, view, 0.36f, 0.56f);
+            float g = s.grab;
+            lFist = Vector3.LerpUnclamped(lFist, grip, g);
+            lRot = Quaternion.Slerp(lRot, Look(view, new Vector3(0.18f, -0.6f, 0.78f), new Vector3(0.15f, 0.75f, 0.6f)), g);
+            lCurl = Mathf.Lerp(lCurl, 0.6f, g);
+        }
+
+        float k = s.strikeProgress;
+        if (k < 0f || !MeleeStrike.IsGrappleStrike(s.strike) || s.strike == MeleeStrike.Strike.Grab) return;
+        Vector3 at = s.strikePoint != Vector3.zero ? ViewPoint(s.strikePoint, view, 0.36f, 0.6f) : CrossReach;
+        Quaternion guardRot = rRot;
+        float impact = MeleeStrike.ImpactAt(s.strike);
+
+        if (s.strike == MeleeStrike.Strike.Overhand)
+        {
+            Vector3 raised = rGuard + new Vector3(0.05f, 0.25f, -0.03f);
+            Quaternion high = Look(view, new Vector3(-0.1f, 0.95f, 0.25f), new Vector3(0.1f, 0.2f, -1f));
+            Quaternion down = Look(view, new Vector3(-0.05f, -0.45f, 1f), new Vector3(0f, 0.9f, 0.4f));
+            const float windUp = 0.32f;
+            float lift;
+            if (k < windUp)
+            {
+                float t = UITheme.EaseOut(k / windUp);
+                rFist = Vector3.Lerp(rGuard, raised, t);
+                rRot = Quaternion.Slerp(guardRot, high, t);
+                lift = t;
+            }
+            else if (k < impact)
+            {
+                float t = (k - windUp) / (impact - windUp);
+                t *= t;   // accelerating into the face
+                rFist = Vector3.Lerp(raised, at + new Vector3(0f, 0.03f, 0f), t) + new Vector3(0f, 0.06f, 0.04f) * Mathf.Sin(t * Mathf.PI);
+                rRot = Quaternion.Slerp(high, down, t);
+                lift = 1f - t;
+            }
+            else if (k < impact + 0.1f)
+            {
+                rFist = at + new Vector3(0f, 0.03f, 0f);
+                rRot = down;
+                lift = 0f;
+            }
+            else
+            {
+                float t = (k - impact - 0.1f) / Mathf.Max(0.01f, 1f - impact - 0.1f);
+                t = t * t * (3f - 2f * t);
+                rFist = Vector3.Lerp(at + new Vector3(0f, 0.03f, 0f), rGuard, t);
+                rRot = Quaternion.Slerp(down, guardRot, t);
+                lift = 0f;
+            }
+            // The elbow leads the overhand: out and up as it is wound up and brought over.
+            rElbow = Vector3.Lerp(rElbow, new Vector3(0.8f, 0.35f, -0.3f), lift);
+            return;
+        }
+
+        bool body = s.strike == MeleeStrike.Strike.BodyBlow;
+        float e = Extension(k, impact);
+        Vector3 round = body ? new Vector3(0.13f, -0.02f, -0.04f) : new Vector3(0.11f, 0.03f, -0.05f);
+        rFist = Vector3.LerpUnclamped(rGuard, at, e) + round * Mathf.Sin(Mathf.Clamp01(e) * Mathf.PI);
+        Vector3 line = at - rGuard;
+        if (line.sqrMagnitude < 1e-6f) line = Vector3.forward;
+        Quaternion blow = body ? Look(view, line.normalized, new Vector3(0.6f, 0.45f, 0f)) : Look(view, line.normalized, new Vector3(0f, 1f, 0f));
+        rRot = Quaternion.Slerp(guardRot, blow, Mathf.Clamp01(e));
     }
 
     /// <summary>

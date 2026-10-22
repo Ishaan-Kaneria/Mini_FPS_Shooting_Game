@@ -298,6 +298,9 @@ public class EnemyBody : MonoBehaviour
             _gunLocalRot = gun.localRotation;
             _gunLocalScale = gun.localScale;
         }
+
+        // The face that takes the blows: the Blender-made shapes on the soldier's head (none on another head, or unbaked).
+        FacialDamageHandler.Attach(gameObject);
     }
 
     void OnEnable()
@@ -359,10 +362,11 @@ public class EnemyBody : MonoBehaviour
     /// throw a boot's length from them, and a body overlapping the player is shoved out of
     /// it at speed -- that is what sent kicked enemies up into the sky.
     /// </summary>
-    void IgnorePlayer(bool ignore)
+    void IgnorePlayer(bool ignore, Transform who = null)
     {
-        if (_ai == null || _ai.target == null) return;
-        var player = _ai.target.GetComponentsInChildren<Collider>();
+        who ??= _ai != null ? _ai.target : null;
+        if (who == null) return;
+        var player = who.GetComponentsInChildren<Collider>();
         foreach (var bone in GetComponentsInChildren<Collider>())
             foreach (var p in player)
                 if (bone != null && p != null && bone.enabled && p.enabled) Physics.IgnoreCollision(bone, p, ignore);
@@ -402,7 +406,9 @@ public class EnemyBody : MonoBehaviour
         float share = info.amount / Mathf.Max(1f, _health.maxHealth + _health.maxShield);
         float strength = Mathf.Clamp(share * 4f, 0.3f, 1f) * (info.fromMelee ? 1.4f : 1f) * reactionScale;
 
+        _hitLine = flat;
         Hurt(info.part, strength);
+        AfterPain(info, strength);
 
         // Everything below the neck is a physical reaction: the round's push on springs in the
         // upper body (HitImpulse). The head keeps its own snap.
@@ -501,6 +507,115 @@ public class EnemyBody : MonoBehaviour
         _clipRise = false;
         if (_motor != null) _motor.SetRootMotion(false, EnemyMotor.Gait.Still);
         DropGun(Vector3.zero);
+    }
+
+    // ======================================================================
+    // Folded over and held by the head (MeleeStrike's grab and punch)
+    // ======================================================================
+
+    // How far the body is into each, eased in and out: the fold over a hook to the belly, and the hold by the head.
+    float _foldW, _heldW;
+    bool _wasHeld, _heldBentPose, _ignoringHolder;
+    float _releasedAt;
+    Transform _heldBy;
+
+    /// <summary>How much the fight owns the arms: off the rifle while folded over or held.</summary>
+    float GrappleWeight => Mathf.Max(Smooth(_foldW), Smooth(_heldW));
+
+    /// <summary>
+    /// A punch to the face of a man held by the head, on top of the snap back every blow to the head already gets
+    /// (<see cref="OnDamaged"/>): the jaw turned to one side, the way a hook turns it, and the chest rocked. Only that:
+    /// with a heavier snap of its own on top, the head went round a hundred degrees in two frames (VerifyGrapple G3).
+    /// On the frame the fist lands.
+    /// </summary>
+    public void Punched(Vector3 dir, float power)
+    {
+        if (_health == null || _health.IsDead || _head == null) return;
+        Vector3 flat = Vector3.ProjectOnPlane(dir, Vector3.up);
+        if (flat.sqrMagnitude < 1e-4f) flat = -transform.forward;
+        flat.Normalize();
+        Vector3 away = Vector3.Cross(Vector3.up, flat);
+        Add(_head, Vector3.up, (Random.value < 0.5f ? -1f : 1f) * 12f * power, 0.45f);
+        Add(_chest, away, 5f * power, 0.55f);
+    }
+
+    /// <summary>
+    /// The trunk: folded over the belly from the waist after the hook, the head hanging (the film's opponent); held by the
+    /// head, pulled in towards the man holding it -- chest and neck leaning in -- and, taken while bent, held down bent.
+    /// </summary>
+    void GrappleBody()
+    {
+        float dt = Time.deltaTime;
+        bool held = _ai != null && _ai.Grappled;
+        bool doubled = _ai != null && _ai.DoubledOver;
+        if (held && !_wasHeld) _heldBentPose = doubled || _foldW > 0.5f;
+        _heldW = Mathf.MoveTowards(_heldW, held ? 1f : 0f, dt * (held ? 9f : 3f));
+        _foldW = Mathf.MoveTowards(_foldW, doubled || (held && _heldBentPose) ? 1f : 0f, dt * (doubled || held ? 7f : 2.2f));
+        if (held) _heldBy = _ai.GrappledBy;
+
+        // No collisions with the holder while held: the body leaning into the hand and the hand on his forearm touched
+        // the player's capsule, and the motor's never-stand-on-an-enemy slide moved the player 0.38 m standing still
+        // (VerifyGrapple G9). Given back once he is clear after the release (0.85 m, or 1.5 s), never while he is down
+        // (the fall gives it back itself when he is up).
+        if (held && !_wasHeld) { IgnorePlayer(true, _heldBy); _ignoringHolder = true; }
+        if (!held && _wasHeld) _releasedAt = Time.time;
+        _wasHeld = held;
+        if (!held && _ignoringHolder && _heldBy != null)
+        {
+            bool clear = Flat(transform.position - _heldBy.position).magnitude > 0.85f || Time.time - _releasedAt > 1.5f;
+            if (IsDown) _ignoringHolder = false;
+            else if (clear) { IgnorePlayer(false, _heldBy); _ignoringHolder = false; }
+        }
+
+        float f = Smooth(_foldW), h = Smooth(_heldW);
+        Vector3 right = transform.right;
+        if (f > 0.001f)
+        {
+            Turn(_spine, right, 26f * f);
+            Turn(_chestLow, right, 10f * f);
+            Turn(_chest, right, 16f * f);
+            Turn(_neck, right, 10f * f);
+        }
+        if (h > 0.001f && _heldBy != null && _chest != null && _head != null)
+        {
+            Vector3 forward = Vector3.ProjectOnPlane(_heldBy.forward, Vector3.up).normalized;
+            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : 0.42f) + Vector3.up * (_heldBentPose ? 1.0f : 1.3f);
+            LeanTowards(_chest, _head, pull, 0.55f * h, 28f);
+            if (_neck != null) LeanTowards(_neck, _head, pull, 0.45f * h, 24f);
+        }
+    }
+
+    /// <summary>
+    /// The hands, last: held, the left hand on the forearm of the man holding him, near the wrist; folded over and free,
+    /// the left hand in to the belly. The rifle stays in the right hand.
+    /// </summary>
+    void GrappleHands()
+    {
+        if (_lUpper == null || _lLower == null || _lHand == null) return;
+        float f = Smooth(_foldW), h = Smooth(_heldW);
+        if (h > 0.001f && _heldBy != null && _ai != null)
+        {
+            Vector3 shoulder = _heldBy.position + Vector3.up * 1.42f - _heldBy.right * 0.2f;
+            Vector3 wrist = Vector3.Lerp(_ai.GrabPoint, shoulder, 0.22f);
+            SolveWeighted(_lUpper, _lLower, _lHand, wrist, _lUpper.position + transform.TransformDirection(new Vector3(-0.7f, -0.4f, 0.1f)), 0.85f * h);
+        }
+        float free = f * (1f - h);
+        if (free > 0.001f && _spine != null)
+        {
+            Vector3 belly = _spine.position + transform.forward * 0.2f - Vector3.up * 0.06f - transform.right * 0.05f;
+            SolveWeighted(_lUpper, _lLower, _lHand, belly, _lUpper.position + transform.TransformDirection(new Vector3(-0.6f, -0.6f, 0.2f)), 0.9f * free);
+        }
+    }
+
+    /// <summary>Turns <paramref name="bone"/> so <paramref name="tip"/> moves towards <paramref name="goal"/>, by a share, within a limit.</summary>
+    static void LeanTowards(Transform bone, Transform tip, Vector3 goal, float share, float limit)
+    {
+        Vector3 a = tip.position - bone.position, b = goal - bone.position;
+        if (a.sqrMagnitude < 1e-6f || b.sqrMagnitude < 1e-6f) return;
+        Quaternion.FromToRotation(a, b).ToAngleAxis(out float deg, out Vector3 axis);
+        if (deg > 180f) deg -= 360f;
+        if (float.IsNaN(axis.x) || axis.sqrMagnitude < 1e-6f) return;
+        bone.rotation = Quaternion.AngleAxis(Mathf.Clamp(deg, -limit, limit) * share, axis) * bone.rotation;
     }
 
     // ======================================================================
@@ -1132,9 +1247,10 @@ public class EnemyBody : MonoBehaviour
             // the look all came on in one frame as the get-up ended (a 32-degree arm snap, measured
             // by FPSKitGetUpProbe).
             _armsUp = _down == Down.Up ? Mathf.MoveTowards(_armsUp, 1f, Time.deltaTime / ArmsEaseSeconds) : 0f;
-            float arms = Smooth(_armsUp) * (1f - _actionWeight);
+            float arms = Smooth(_armsUp) * (1f - _actionWeight) * (1f - GrappleWeight);
             float hurt = PainWeight();
             PainPose(hurt * arms);
+            AfterPainPose(arms);
             RecoverPose();
             _rifle.Follow();
             HoldPistol();
@@ -1143,6 +1259,7 @@ public class EnemyBody : MonoBehaviour
             Clutch(hurt * arms);
             HoldWoundedArms(arms);
             React();
+            GrappleBody();
             ApplyBroken();
             if (crawling && _down == Down.Up) Breathe();
             // The weapons onto where they are carried, after everything that moved the bones,
@@ -1150,6 +1267,7 @@ public class EnemyBody : MonoBehaviour
             _rifle.Follow();
             HoldPistol();
             LeftHandOnRifle();
+            GrappleHands();
             if (_down == Down.GettingUp)
             {
                 if (_clipRise) BlendFromRagdoll(Smooth((Time.time - _getUpStart) / Mathf.Max(0.05f, _riseBlendSeconds)));
@@ -1159,9 +1277,10 @@ public class EnemyBody : MonoBehaviour
         }
 
         // A fighting move owns the body while it plays; the rifle is slung during the rage.
-        float free = up * (1f - _actionWeight);
+        float free = up * (1f - _actionWeight) * (1f - GrappleWeight);
         float pain = PainWeight();
         PainPose(pain * free);
+        AfterPainPose(free);
         RecoverPose();
         Aim(free * (1f - 0.7f * _gunDip));
         // The hands let go before the rifle goes over the shoulder, and take it again after it
@@ -1173,7 +1292,9 @@ public class EnemyBody : MonoBehaviour
         Clutch(pain * free);
         HoldWoundedArms(free);
         React();
+        GrappleBody();
         ApplyBroken();
+        GrappleHands();
 
         if (_down == Down.GettingUp)
         {
@@ -1984,6 +2105,86 @@ public class EnemyBody : MonoBehaviour
     /// <summary>Doubled up, buckled or clutching a wound: the mind waits on the body.</summary>
     public bool InPain => _pain != Pain.None && Time.time < _painStart + _painLength;
 
+    // ---- after the pain (Ishaan's brief of 2026-10-22: dazed, winded; Docs/DESIGN_NOTES.md "Pain, face damage and the head grab") ----
+
+    Vector3 _hitLine;               // the last blow's direction, flat
+    float _dazedStart, _dazedUntil, _windedStart, _windedUntil, _dazedStrength, _windedStrength;
+
+    /// <summary>Reeling after a blow to the head: the head lolls and the body sways for a few seconds after the snap.</summary>
+    public bool Dazed => Time.time < _dazedUntil && (_health == null || !_health.IsDead);
+
+    /// <summary>Winded by a hard hit to the chest or the belly: hunched over, heaving for breath.</summary>
+    public bool Winded => Time.time < _windedUntil && (_health == null || !_health.IsDead);
+
+    /// <summary>
+    /// Which way the torso turns for an arm hit: the shot shoulder is driven back along the round's line. +1 for the gun
+    /// (right) arm, -1 for the other; a round from behind drives it forward instead.
+    /// </summary>
+    float ShotTurn(float side)
+    {
+        if (_hitLine.sqrMagnitude < 1e-4f) return side;
+        bool fromBehind = Vector3.Dot(_hitLine, transform.forward) > 0.2f;
+        return side * (fromBehind ? -1f : 1f);
+    }
+
+    /// <summary>
+    /// What a hit leaves after its own reaction: a blow to the head (a fist, a heavy round, any headshot that did not kill)
+    /// leaves him dazed for 2-4 s; a hard hit to the chest or belly leaves him winded for 1.5-3 s. A boss shrugs both off.
+    /// </summary>
+    void AfterPain(DamageInfo info, float strength)
+    {
+        bool boss = _ai != null && _ai.archetype != null && _ai.archetype.role == EnemyArchetype.Role.Boss;
+        if (boss || _health == null || _health.IsDead) return;
+        if ((info.part == BodyPart.Head || info.part == BodyPart.Neck) && (info.fromMelee || info.heavy || info.isHeadshot || strength > 0.6f))
+        {
+            if (!Dazed) _dazedStart = Time.time;
+            _dazedUntil = Mathf.Max(_dazedUntil, Time.time + 2f + 2f * strength);
+            _dazedStrength = Mathf.Max(Dazed ? _dazedStrength : 0f, strength);
+        }
+        else if ((info.part == BodyPart.Torso || info.part == BodyPart.LowerTorso) && strength >= 0.45f)
+        {
+            if (!Winded) _windedStart = Time.time;
+            _windedUntil = Mathf.Max(_windedUntil, Time.time + 1.5f + 1.5f * strength);
+            _windedStrength = Mathf.Max(Winded ? _windedStrength : 0f, strength);
+        }
+    }
+
+    /// <summary>
+    /// The daze and the winding, over the animation and under the aim (so the rifle sags with them): dazed, the head lolls
+    /// round slowly, the neck and the body sway out of time with it and the knees soften; winded, he is hunched over,
+    /// his chest heaving at a breath every 0.6 s, head down. Eased in over a third of a second and out over the last.
+    /// </summary>
+    void AfterPainPose(float w)
+    {
+        if (w <= 0.001f || _hips == null || (_ai != null && (_ai.Crawling || _ai.Downed || _ai.Grappled))) return;
+        float now = Time.time;
+        if (Dazed)
+        {
+            float t = now - _dazedStart;
+            float d = w * Mathf.Min(Smooth(t / 0.35f), Smooth((_dazedUntil - now) / 0.8f)) * (0.6f + 0.4f * _dazedStrength);
+            // Under the snap of the head pain itself, which is worse, it only adds once that has passed.
+            if (InPain && _pain == Pain.Head) d *= Smooth((now - _painStart) / Mathf.Max(0.1f, _painLength));
+            Turn(_head, transform.forward, 11f * d * Mathf.Sin(t * 1.4f));
+            Turn(_head, transform.right, 7f * d * (0.6f + 0.4f * Mathf.Sin(t * 0.9f + 1f)));
+            Turn(_neck, transform.forward, -5f * d * Mathf.Sin(t * 1.1f + 0.5f));
+            Turn(_spine, transform.forward, 4f * d * Mathf.Sin(t * 0.7f));
+            Turn(_spine, transform.right, 3f * d * (1f + Mathf.Sin(t * 0.6f)));
+            _hips.position += Vector3.down * (0.035f * d * transform.lossyScale.y);
+            _gunDip = Mathf.Max(_gunDip, 0.3f * d);
+        }
+        if (Winded)
+        {
+            float t = now - _windedStart;
+            float h = w * Mathf.Min(Smooth(t / 0.3f), Smooth((_windedUntil - now) / 0.7f)) * (0.6f + 0.4f * _windedStrength);
+            float breath = 0.5f + 0.5f * Mathf.Sin(t * Mathf.PI * 2f / 0.6f);
+            Turn(_spine, transform.right, (12f + 5f * breath) * h);
+            Turn(_chest, transform.right, (6f - 4f * breath) * h);
+            Turn(_head, transform.right, 8f * h);
+            _hips.position += Vector3.down * (0.04f * h * transform.lossyScale.y);
+            _gunDip = Mathf.Max(_gunDip, 0.45f * h);
+        }
+    }
+
     /// <summary>
     /// Whether it can shoot through it: from the knee once the first shock has passed, yes;
     /// with a shot arm or a round in the gut, not until it is over.
@@ -2085,18 +2286,20 @@ public class EnemyBody : MonoBehaviour
                 break;
             }
             case Pain.Arm:
-                // The gun arm: the rifle sags away, the other hand grabs the arm.
+                // The gun arm: the rifle sags away, the other hand grabs the arm, and the shot shoulder is driven back
+                // the way the round was going (a round from in front turns the torso away from it).
                 _gunDip = w * 0.85f;
                 _leftOff = w;
-                Turn(_spine, transform.up, -14f * w);
+                Turn(_spine, transform.up, 14f * ShotTurn(+1f) * w);
                 Turn(_chest, transform.right, 10f * w);
                 Turn(_head, transform.right, 15f * w * shock);
                 break;
             case Pain.OffArm:
-                // The support arm: it drops off the rifle and hangs; the rifle held one-handed, low.
+                // The support arm: it drops off the rifle and hangs; the rifle held one-handed, low; that shoulder driven
+                // back along the shot.
                 _gunDip = w * 0.55f;
                 _leftOff = w;
-                Turn(_spine, transform.up, 12f * w);
+                Turn(_spine, transform.up, 12f * ShotTurn(-1f) * w);
                 Turn(_lUpper, transform.right, -20f * w * shock);
                 break;
             case Pain.Gut:

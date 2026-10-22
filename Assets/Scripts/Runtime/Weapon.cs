@@ -932,8 +932,24 @@ public class Weapon : MonoBehaviour
         float eased = AimProgress * AimProgress * (3f - 2f * AimProgress);   // the zoom eases in and out with the gun
         float targetFov = Mathf.Lerp(sprintFov, GameSettings.VerticalFovFor(data.adsFieldOfView, aspect), eased);
 
-        fpsCamera.fieldOfView = Mathf.Lerp(fpsCamera.fieldOfView, targetFov,
-                                           Mathf.Clamp01(data.adsSpeed * Time.deltaTime));
+        // The pulse of a landed blow rides on top, taken off again before the next frame's blend so it never builds up.
+        float fov = Mathf.Lerp(fpsCamera.fieldOfView - _fovPulseApplied, targetFov, Mathf.Clamp01(data.adsSpeed * Time.deltaTime));
+        float pulseAge = Time.time - _fovPulseAt;
+        _fovPulseApplied = pulseAge < FovPulseSeconds ? -_fovPulseSize * (1f - pulseAge / FovPulseSeconds) * (1f - pulseAge / FovPulseSeconds) : 0f;
+        fpsCamera.fieldOfView = fov + _fovPulseApplied;
+    }
+
+    const float FovPulseSeconds = 0.16f;
+    float _fovPulseAt = -99f, _fovPulseSize, _fovPulseApplied;
+
+    /// <summary>
+    /// A landed blow's pulse: the view narrows by <paramref name="degrees"/> in a frame and opens again over 0.16 s, scaled
+    /// by the Camera Shake setting like the shake. The camera does not move; only the field of view pulses.
+    /// </summary>
+    public void FovPulse(float degrees)
+    {
+        _fovPulseAt = Time.time;
+        _fovPulseSize = Mathf.Max(0f, degrees) * GameSettings.CameraShake;
     }
 
     // ======================================================================

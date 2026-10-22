@@ -120,6 +120,20 @@ namespace FPSKit.EditorTools
             return i >= 0 && i + 1 < args.Length ? args[i + 1] : fallback;
         }
 
+        /// <summary>
+        /// Batch: the grab and punch (MeleeGrapple) in Desert Outpost, against a real enemy stood in front: the grab, held,
+        /// a punch to the face and the frame after, the overhand wound up and landing, him on the floor; then the hook to the
+        /// belly, him doubled over, taken bent and the overhand. Each from the player's eyes and from a camera at the side
+        /// (&lt;tag&gt;_grapple_NN_&lt;beat&gt;.png and _side.png).
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchGrapple
+        /// </summary>
+        public static void BatchGrapple()
+        {
+            _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "desert")) });
+            _onlyPoses = "grapple";
+            EditorApplication.update += NextArena;
+        }
+
         /// <summary>Batch: the right-hand close-ups only, in the Desert (quick, for tuning the grip).</summary>
         public static void BatchHands()
         {
@@ -242,7 +256,7 @@ namespace FPSKit.EditorTools
                 _lastGameFrame = Time.frameCount;
                 if (_health != null && _health.Normalized < 0.9f) _health.ResetHealth();
                 _frame++;
-                if (_frame > Frames(_pose == "warmup" ? 60f : 12f))
+                if (_frame > Frames(_pose == "warmup" ? 60f : _pose == "grapple" ? 40f : 12f))
                 {
                     Report += $"{_pose}: timed out (time {Time.time:0.0}, briefing {Object.FindAnyObjectByType<LevelManager>()?.IsBriefing}, paused {EditorApplication.isPaused}, timeScale {Time.timeScale}, dead {(_health != null && _health.IsDead)}, " +
                               $"lowered {(_weapon != null && _weapon.IsLowered)}, strike {(_melee != null ? _melee.Current.ToString() : "-")}, " +
@@ -378,6 +392,7 @@ namespace FPSKit.EditorTools
                 case "kick":
                     if (_phase == 0) { if (_frame >= Frames(2.5f)) { _melee.TryKick(); _phase = 1; } return false; }
                     return AtImpact(MeleeStrike.Strike.Kick) && Shoot();
+                case "grapple": return Grapple();
                 default:
                     Report += $"no pose {_pose}\n";
                     return true;
@@ -456,6 +471,193 @@ namespace FPSKit.EditorTools
                     return true;
                 }
             return false;
+        }
+
+        // ---- the grab and punch ------------------------------------------------------------------------------------
+
+        static GameObject _foe;
+        static EnemyAI _foeAI;
+        static int _beat, _phaseFrame;
+        static Camera _side;
+
+        static void Phase(int phase) { _phase = phase; _phaseFrame = _frame; }
+
+        /// <summary>A beat that never came: why, in the report.</summary>
+        static bool GaveUp()
+        {
+            float d = _foe != null ? Vector3.Distance(FoeHead(), _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform.position : _motor.transform.position) : -1f;
+            float roots = _foe != null ? Vector3.ProjectOnPlane(_foe.transform.position - _motor.transform.position, Vector3.up).magnitude : -1f;
+            float drift = Vector3.ProjectOnPlane(_motor.transform.position - _placedAt, Vector3.up).magnitude;
+            Report += $"grapple: gave up in phase {_phase} (roots {roots:0.00} m apart, player drifted {drift:0.00} m since placed, thrown {_melee.Thrown}, current {_melee.Current}, holding {_melee.Holding}, " +
+                      $"target {(_melee.Target != null ? _melee.Target.name : "none")}, foe head {d:0.00} m from the eye, gun away {_melee.GunAway:0.00})\n";
+            return true;
+        }
+        static int InPhase => _frame - _phaseFrame;
+        static bool At(MeleeStrike.Strike strike, float k)
+            => _melee != null && _melee.Current == strike && _melee.StrikeProgress >= k;
+
+        /// <summary>A Grunt from the level's own prefab, on the navmesh <paramref name="metres"/> ahead, facing the player, still.</summary>
+        static void Foe(float metres)
+        {
+            if (_foe != null) Object.Destroy(_foe);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+            // Measured from the eye, and only nudged onto the navmesh: snapped from a metre away near the desert's start, he
+            // stood 1.3 m off, out of grab reach.
+            Vector3 ahead = Vector3.ProjectOnPlane(_motor.transform.forward, Vector3.up).normalized;
+            Vector3 eye = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform.position : _motor.transform.position;
+            Vector3 at = new Vector3(eye.x, _motor.transform.position.y, eye.z) + ahead * metres;
+            if (NavMesh.SamplePosition(at, out var hit, 0.3f, NavMesh.AllAreas)) at = hit.position;
+            _foe = Object.Instantiate(prefab, at, Quaternion.LookRotation(-ahead));
+            _foe.name = "Shots_Foe";
+            FPSKitEnemyRoster.GetOrCreate("Grunt").ApplyTo(_foe);
+            _foeAI = _foe.GetComponent<EnemyAI>();
+            if (_foeAI != null) _foeAI.enabled = false;
+            var brain = _foe.GetComponent<EnemyBrain>();
+            if (brain != null) brain.enabled = false;
+            // The player to him (the navmesh near the start is cut back, so he cannot always be stood close enough).
+            var cc = _motor.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            Vector3 eyeOffset = Vector3.ProjectOnPlane(eye - _motor.transform.position, Vector3.up);
+            _motor.transform.position = new Vector3(at.x, _motor.transform.position.y, at.z) + ahead * -metres - eyeOffset;
+            if (cc != null) cc.enabled = true;
+            // Then stepped along the line until the eye is 0.8 m from his head, measured (the eye is not where the root says).
+            for (int i = 0; i < 3; i++)
+            {
+                Physics.SyncTransforms();
+                Vector3 e = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera.transform.position : _motor.transform.position + Vector3.up * 1.6f;
+                float gap = Vector3.ProjectOnPlane(FoeHead() - e, Vector3.up).magnitude - 0.8f;
+                if (cc != null) cc.enabled = false;
+                _motor.transform.position += ahead * gap;
+                if (cc != null) cc.enabled = true;
+            }
+            _placedAt = _motor.transform.position;
+            Physics.SyncTransforms();
+        }
+
+        static Vector3 _placedAt, _foeAt;
+
+        static Vector3 FoeHead() { var b = _foe.GetComponent<EnemyBody>(); return b != null ? b.EyePosition : _foe.transform.position + Vector3.up * 1.6f; }
+
+        static Vector3 FoeBelly()
+        {
+            foreach (var hb in _foe.GetComponentsInChildren<Hitbox>())
+                if (hb.Part == BodyPart.LowerTorso) { var c = hb.GetComponent<Collider>(); if (c != null) return c.bounds.center; }
+            return _foe.transform.position + Vector3.up;
+        }
+
+        /// <summary>Holds him: his AI on (staggered, it only keeps him in front of the player), aimed at the player.</summary>
+        static void Hold()
+        {
+            if (_foeAI == null) return;
+            _foeAI.target = _motor.transform;
+            _foeAI.enabled = true;
+        }
+
+        /// <summary>The player's view and a side view of the same moment.</summary>
+        static void Beat(string name)
+        {
+            _beat++;
+            string pose = _pose;
+            _pose = $"grapple_{_beat:00}_{name}";
+            Shoot();
+            ShootSide();
+            _pose = pose;
+        }
+
+        static void ShootSide()
+        {
+            var main = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
+            if (_side == null)
+            {
+                var go = new GameObject("Shots_SideCamera");
+                _side = go.AddComponent<Camera>();
+                _side.fieldOfView = 42f;
+                _side.nearClipPlane = 0.05f;
+                int fp = LayerMask.NameToLayer("FirstPerson");
+                _side.cullingMask = main != null ? main.cullingMask : ~0;
+                if (fp >= 0) _side.cullingMask &= ~(1 << fp);
+            }
+            Vector3 me = _motor.transform.position, him = _foe != null ? _foe.transform.position : me + _motor.transform.forward;
+            Vector3 mid = (me + him) * 0.5f + Vector3.up * 1.2f;
+            Vector3 across = Vector3.Cross(Vector3.up, him - me).normalized;
+            _side.transform.position = mid + across * 2.6f + Vector3.up * 0.15f - (him - me).normalized * 0.4f;
+            _side.transform.LookAt(mid);
+            string path = $"{_folder}/{_tag}_{_pose}_side.png";
+            var rt = RenderTexture.GetTemporary(_width, _height, 24, RenderTextureFormat.ARGB32);
+            try
+            {
+                var request = new RenderPipeline.StandardRequest { destination = rt };
+                RenderPipeline.SubmitRenderRequest(_side, request);
+                RenderPipeline.SubmitRenderRequest(_side, request);
+                var prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                var tex = new Texture2D(_width, _height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, _width, _height), 0, 0);
+                tex.Apply();
+                RenderTexture.active = prev;
+                File.WriteAllBytes(path, tex.EncodeToPNG());
+                Object.DestroyImmediate(tex);
+            }
+            finally { RenderTexture.ReleaseTemporary(rt); }
+            _written.Add(path);
+        }
+
+        /// <summary>
+        /// The whole grab and punch as one pose, its beats photographed as they happen; then the hook to the belly and the
+        /// bent hold. True when done.
+        /// </summary>
+        static bool Grapple()
+        {
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+                if (ai.gameObject != _foe) ai.gameObject.SetActive(false);
+            switch (_phase)
+            {
+                case 0: if (_frame >= Frames(1f)) { _beat = 0; Foe(0.85f); Phase(1); } return false;
+                case 1:
+                    _motor.TurnTowards(FoeHead(), 1f);
+                    if (InPhase == 1) _foeAt = _foe.transform.position;
+                    if (InPhase >= Frames(0.5f))
+                    {
+                        var agent = _foe.GetComponent<NavMeshAgent>();
+                        Report += $"grapple: before the press the foe moved {Vector3.Distance(_foeAt, _foe.transform.position):0.00} m (agent on {agent != null && agent.enabled}, on mesh {agent != null && agent.enabled && agent.isOnNavMesh}, " +
+                                  $"root motion {(_foe.GetComponent<Animator>() != null && _foe.GetComponent<Animator>().applyRootMotion)}, spawn-to-player {Vector3.ProjectOnPlane(_foeAt - _motor.transform.position, Vector3.up).magnitude:0.00} m)\n";
+                        _melee.TryPunch(); Phase(2);
+                    }
+                    return false;
+                case 2: if (At(MeleeStrike.Strike.Grab, MeleeStrike.ImpactAt(MeleeStrike.Strike.Grab) - 0.02f)) { Beat("grab"); Phase(3); } return InPhase > Frames(3f) && GaveUp();
+                case 3: if (_melee.Holding) Hold(); if (InPhase >= Frames(0.35f)) { Beat("held"); _melee.TryPunch(); Phase(4); } return false;
+                case 4: if (At(MeleeStrike.Strike.FacePunch, MeleeStrike.ImpactAt(MeleeStrike.Strike.FacePunch) - 0.02f)) { Beat("punch"); Phase(5); } return InPhase > Frames(3f) && GaveUp();
+                case 5: if (InPhase == 3) Beat("punch_after"); if (InPhase > 3 && Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(6); } return false;
+                case 6: if (At(MeleeStrike.Strike.FacePunch, MeleeStrike.ImpactAt(MeleeStrike.Strike.FacePunch) - 0.02f)) { Beat("punch2"); Phase(7); } return InPhase > Frames(3f) && GaveUp();
+                case 7: if (Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(8); } return false;
+                case 8: if (At(MeleeStrike.Strike.Overhand, 0.3f)) { Beat("overhand_up"); Phase(9); } return InPhase > Frames(3f) && GaveUp();
+                case 9: if (At(MeleeStrike.Strike.Overhand, MeleeStrike.ImpactAt(MeleeStrike.Strike.Overhand) - 0.02f)) { Beat("overhand"); Phase(10); } return InPhase > Frames(3f) && GaveUp();
+                case 10: if (InPhase >= Frames(0.8f)) { Beat("down"); Phase(11); } return false;
+                // The hook to the belly: the fists up first, swung at nobody, then the hook, him doubled, taken bent.
+                case 11:
+                    if (_melee.Current != MeleeStrike.Strike.None || _melee.FistsOut || Time.time < _melee.ReadyAt + 1.5f) return false;
+                    Foe(1.3f);
+                    Turn(100f);
+                    Phase(12);
+                    return false;
+                case 12: if (InPhase >= Frames(0.4f)) { _melee.TryPunch(); Phase(13); } return false;
+                case 13: if (Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(14); } return false;
+                case 14: if (Time.time >= _melee.ReadyAt && _melee.GunAway > 0.9f) { Phase(15); } return false;
+                case 15: _motor.TurnTowards(FoeBelly(), 1f); if (InPhase >= 3) { _melee.TryPunch(); Phase(16); } return false;
+                case 16: if (At(MeleeStrike.Strike.BodyBlow, MeleeStrike.ImpactAt(MeleeStrike.Strike.BodyBlow) - 0.02f)) { Beat("hook"); Phase(17); } return InPhase > Frames(3f) && GaveUp();
+                case 17: if (InPhase >= Frames(0.35f)) { Beat("doubled"); Phase(18); } return false;
+                case 18: _motor.TurnTowards(FoeHead(), 1f); if (Time.time >= _melee.ReadyAt && InPhase >= 2) { _melee.TryPunch(); Phase(19); } return false;
+                case 19: if (_melee.Holding) { Hold(); if (InPhase >= Frames(0.6f)) { Beat("bent_held"); Phase(20); } } return InPhase > Frames(3f) && GaveUp();
+                case 20: if (Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(_melee.Thrown == MeleeStrike.Strike.Overhand ? 21 : 20); } return false;
+                case 21: if (At(MeleeStrike.Strike.Overhand, MeleeStrike.ImpactAt(MeleeStrike.Strike.Overhand) - 0.02f)) { Beat("bent_overhand"); Phase(22); } return InPhase > Frames(3f) && GaveUp();
+                default:
+                    if (InPhase < Frames(0.8f)) return false;
+                    Beat("bent_down");
+                    if (_foe != null) Object.Destroy(_foe);
+                    if (_side != null) Object.Destroy(_side.gameObject);
+                    _foe = null; _side = null;
+                    return true;
+            }
         }
 
         static bool AtImpact(MeleeStrike.Strike strike)

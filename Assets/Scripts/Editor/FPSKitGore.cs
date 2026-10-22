@@ -35,6 +35,7 @@ namespace FPSKit.EditorTools
             var splat = Texture("BloodSplat", 512, SplatAtlas);
             var pool = Texture("BloodPool", 256, Pool);
             var wound = Texture("BloodWound", 128, Wound);
+            var bruise = Texture("BloodBruise", 128, Bruise);
             var drop = Texture("BloodDrop", 64, Drop);
             var mist = Texture("BloodMist", 128, Mist);
 
@@ -52,6 +53,8 @@ namespace FPSKit.EditorTools
             library.splatMaterial = Surface("Blood_Splat", splat, new Color(0.17f, 0.004f, 0.007f, 0.97f), 0.22f);
             library.poolMaterial = Surface("Blood_Pool", pool, new Color(0.14f, 0.003f, 0.006f, 0.98f), 0.3f);
             library.woundMaterial = Surface("Blood_Wound", wound, new Color(0.24f, 0.008f, 0.01f, 1f), 0.25f);
+            // A bruise is skin, not blood: dark purple-red, mostly matte, its edge fading out uneven.
+            library.bruiseMaterial = Surface("Blood_Bruise", bruise, new Color(0.30f, 0.07f, 0.13f, 0.78f), 0.15f);
 
             library.decalBudget = new Vector3Int(64, 128, 200);
 
@@ -456,6 +459,36 @@ namespace FPSKit.EditorTools
                     float w = radius * 0.1f * (1f - f * 0.85f);
                     Disc(alpha, shade, size, ox, oy, tile, centre + dir * (radius * 0.8f + length * f), w, w);
                 }
+            }
+        }
+
+        /// <summary>A bruise: a soft blotch, darkest off-centre, its edge broken up, with a split-skin fleck or two in it.</summary>
+        static void Bruise(float[] alpha, float[] shade, int size, System.Random rng)
+        {
+            var local = new System.Random(Seed("bruise"));
+            var phases = new float[6];
+            for (int h = 0; h < phases.Length; h++) phases[h] = (float)local.NextDouble() * Mathf.PI * 2f;
+            Vector2 core = new Vector2(0.04f, -0.03f);
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 p = new Vector2((x + 0.5f) / size - 0.5f, (y + 0.5f) / size - 0.5f);
+                    float angle = Mathf.Atan2(p.y, p.x);
+                    float edge = 0.36f;
+                    for (int h = 0; h < phases.Length; h++) edge += 0.035f / (h + 1) * Mathf.Sin(angle * (h + 2) + phases[h]);
+                    float d = p.magnitude;
+                    float a = Mathf.Clamp01((edge - d) / edge);
+                    a = a * a * (3f - 2f * a);
+                    float dark = Mathf.Clamp01(1f - (p - core).magnitude / 0.22f);
+                    int i = y * size + x;
+                    alpha[i] = a * 0.9f;
+                    shade[i] = Mathf.Lerp(1f, 0.45f, dark);
+                }
+            for (int i = 0; i < 3; i++)
+            {
+                float angle = (float)local.NextDouble() * Mathf.PI * 2f, distance = (float)local.NextDouble() * 0.12f;
+                float r = 0.012f + 0.012f * (float)local.NextDouble();
+                Disc(alpha, shade, size, 0, 0, size, new Vector2(0.5f, 0.5f) + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance, r, r * 0.5f);
             }
         }
 

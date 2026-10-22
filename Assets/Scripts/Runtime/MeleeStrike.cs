@@ -38,11 +38,16 @@ using UnityEngine;
 ///
 /// Drawn by <see cref="ViewModelRig"/> when the gun has rigged arms; without them every
 /// strike is the rifle butt (<see cref="AnimateButt"/>).
+///
+/// The grab and punch (the fight in the film <i>Master</i>; MeleeGrapple.cs): face to face, the press takes the enemy
+/// by the head, and each press after it is a punch to the face, then the overhand that ends it; a hook to the belly
+/// folds him over, and the next press takes him by the back of the head.
 /// </summary>
 [DisallowMultipleComponent]
-public class MeleeStrike : MonoBehaviour
+public partial class MeleeStrike : MonoBehaviour
 {
-    public enum Strike { None, Jab, Cross, Kick, Takedown, Butt }
+    // Appended to, never reordered.
+    public enum Strike { None, Jab, Cross, Kick, Takedown, Butt, BodyBlow, Grab, FacePunch, Overhand }
 
     [Header("Wiring")]
     [Tooltip("Found below this object when empty. Lowered while the hands are busy, and " +
@@ -174,6 +179,10 @@ public class MeleeStrike : MonoBehaviour
         Strike.Kick => 0.36f,
         Strike.Takedown => 0.34f,
         Strike.Butt => 0.32f,
+        Strike.BodyBlow => 0.38f,
+        Strike.Grab => 0.7f,          // the hand closes on the head
+        Strike.FacePunch => 0.36f,
+        Strike.Overhand => 0.55f,     // wound up high first, then brought down
         _ => 0.4f,
     };
 
@@ -196,6 +205,7 @@ public class MeleeStrike : MonoBehaviour
     float _nextScan;
 
     float _holdUntil = -1f, _heldAt;
+    Health _strikeTarget;   // who the strike in flight was thrown at (for the hands' aim; MeleeGrapple)
 
     Collider[] _overlap;
     Collider[] Overlap => _overlap ??= new Collider[64];
@@ -253,6 +263,7 @@ public class MeleeStrike : MonoBehaviour
         }
 
         if (supportHand != null) supportHand.SetActive(true);
+        LetGo(shove: false);
         _pendingTarget = null;
         _pending = false;
         _queued = Strike.None;
@@ -309,6 +320,7 @@ public class MeleeStrike : MonoBehaviour
             }
         }
 
+        UpdateHold(keys);
         UpdateFists(keys);
         RegenStamina();
         Animate();
@@ -324,7 +336,7 @@ public class MeleeStrike : MonoBehaviour
         var s = Settings;
 
         // Disarmed, the fists are the weapon: up, and staying up, whatever the trigger does.
-        if (Disarmed) _fists = true;
+        if (Disarmed || Holding) _fists = true;
         else if (_fists && Current == Strike.None)
         {
             bool wantsGun = ControlSettings.Pressed(keys.fire) || ControlSettings.Pressed(keys.aim)
@@ -359,6 +371,9 @@ public class MeleeStrike : MonoBehaviour
     {
         if (Time.time < _nextStrike) return null;
 
+        // Holding someone by the head, face to face with one, over one doubled up, or a hook at the belly.
+        if (TryGrapplePress(out Health grappled)) return grappled;
+
         // No rifle to swing with the gun on the ground: always the fists.
         if (!HasArms && !Disarmed) return Throw(Strike.Butt, 0f);
 
@@ -378,17 +393,19 @@ public class MeleeStrike : MonoBehaviour
     /// <summary>The kick key, or the takedown if the target is ready for one. Returns who it hit.</summary>
     public Health TryKick() => Time.time < _nextStrike ? null : Throw(Strike.Kick, 0f);
 
-    Health Throw(Strike strike, float delay)
+    Health Throw(Strike strike, float delay, Health forced = null)
     {
         var s = Settings;
         float range = strike == Strike.Kick ? s.kickRange : s.punchRange;
 
         // Asked again now rather than trusted from the last scan: a tenth of a second is
-        // long enough for the enemy in the prompt to have died to a teammate's bomb.
-        var target = FindTarget(range);
+        // long enough for the enemy in the prompt to have died to a teammate's bomb. The man held
+        // by the head is the target of every blow while he is held, wherever the crosshair is.
+        var target = forced != null && !forced.IsDead ? forced : FindTarget(range);
         SetTarget(target);
+        _strikeTarget = target;
 
-        if (target != null && CanTakedown(target))
+        if (target != null && !IsGrappleStrike(strike) && CanTakedown(target))
         {
             strike = Strike.Takedown;
             TakedownWithFists = _fists;
@@ -400,7 +417,10 @@ public class MeleeStrike : MonoBehaviour
             Strike.Cross => s.crossCost,
             Strike.Kick => s.kickCost,
             Strike.Butt => s.jabCost,
-            _ => s.takedownCost,
+            Strike.BodyBlow => s.bodyBlowCost,
+            Strike.Grab => s.grabCost,
+            Strike.FacePunch => s.facePunchCost,
+            _ => s.takedownCost,          // the takedown and the overhand: a finisher is never refused
         };
 
         // Winded is slower and weaker, never refused: a key that does nothing reads as a bug.
@@ -414,6 +434,10 @@ public class MeleeStrike : MonoBehaviour
             Strike.Cross => s.crossSeconds,
             Strike.Kick => s.kickSeconds,
             Strike.Butt => s.buttSeconds,
+            Strike.BodyBlow => s.bodyBlowSeconds,
+            Strike.Grab => s.grabSeconds,
+            Strike.FacePunch => s.facePunchSeconds,
+            Strike.Overhand => s.overhandSeconds,
             _ => s.takedownSeconds,
         };
 
@@ -425,6 +449,9 @@ public class MeleeStrike : MonoBehaviour
             Strike.Cross => s.crossRecovery,
             Strike.Kick => s.kickRecovery,
             Strike.Butt => s.buttRecovery,
+            Strike.BodyBlow => s.crossRecovery,
+            Strike.Grab => 0.04f,         // the next press is the first punch, as soon as the hand has hold
+            Strike.FacePunch => s.jabRecovery,
             _ => s.takedownRecovery,
         };
 
@@ -433,7 +460,7 @@ public class MeleeStrike : MonoBehaviour
         _strikeLength = length;
 
         float impact = _strikeStart + length * ImpactAt(strike);
-        _nextStrike = strike == Strike.Kick || strike == Strike.Takedown
+        _nextStrike = strike == Strike.Kick || strike == Strike.Takedown || strike == Strike.Overhand
             ? _strikeStart + length + recovery * 0.5f
             : impact + recovery;
         _chainUntil = _strikeStart + length + s.chainWindow;
@@ -507,6 +534,8 @@ public class MeleeStrike : MonoBehaviour
     /// <summary>Deals the blow. Returns whether it landed.</summary>
     bool Hit(Health target, Strike strike)
     {
+        if (IsGrappleStrike(strike)) return HitGrapple(target, strike);
+
         var s = Settings;
         Transform cam = fpsCamera.transform;
 
@@ -759,13 +788,20 @@ public class MeleeStrike : MonoBehaviour
                 StartHitStop(s.kickHitStop + extra);
                 break;
             case Strike.Takedown:
+            case Strike.Overhand:
                 PlayClip(hitClip, 1f);
                 if (_motor != null) _motor.AddShake(s.takedownShake);
+                if (strike == Strike.Overhand && weapon != null) weapon.FovPulse(s.finisherFovPulse);
                 StartHitStop(s.takedownHitStop + extra);
+                break;
+            case Strike.Grab:
+                // A grip, not a blow: no thud, no shake, no hold.
+                PlayClip(swingClip, 0.35f);
                 break;
             default:
                 PlayClip(hitClip, 0.9f);
                 if (_motor != null) _motor.AddShake(s.punchShake);
+                if ((strike == Strike.FacePunch || strike == Strike.BodyBlow) && weapon != null) weapon.FovPulse(s.punchFovPulse);
                 StartHitStop(s.punchHitStop + extra);
                 break;
         }

@@ -32,6 +32,9 @@ public class BloodLibrary : ScriptableObject
     [Tooltip("A wound on the body itself: a dark hole with a torn red rim.")]
     public Material woundMaterial;
 
+    [Tooltip("A bruise where a fist or a boot landed on the head: a soft dark blotch on the skin, no hole.")]
+    public Material bruiseMaterial;
+
     [Header("Colour")]
     [Tooltip("What a droplet is tinted. Dark: fresh blood in daylight is nearly black-red.")]
     public Color dropColor = new Color(0.34f, 0.015f, 0.02f, 1f);

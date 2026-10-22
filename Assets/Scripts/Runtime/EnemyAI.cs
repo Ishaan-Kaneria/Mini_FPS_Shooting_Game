@@ -578,7 +578,8 @@ public class EnemyAI : MonoBehaviour
         if (Time.time < _staggerUntil)
         {
             Stop();
-            ApplyShove();
+            if (Grappled) HoldInPlace();
+            else ApplyShove();
             CurrentState = State.Stagger;
             UpdateAnimator();
             return;
@@ -1342,6 +1343,84 @@ public class EnemyAI : MonoBehaviour
     /// <summary>Back on its feet: whatever stagger was running ends now.</summary>
     public void Recover() => _staggerUntil = Mathf.Min(_staggerUntil, Time.time);
 
+    // ---- held by the head, doubled over (MeleeStrike's grab and punch) ----
+
+    /// <summary>
+    /// Whoever holds it by the head, or null. While held it cannot shoot, move off or break free: it is kept
+    /// <see cref="MeleeSettings.holdDistance"/> in front of the holder, facing them (<see cref="HoldInPlace"/>),
+    /// through the agent or the motor -- nothing is parented, the navmesh still holds it.
+    /// </summary>
+    [System.NonSerialized] public Transform GrappledBy;
+
+    /// <summary>Where the holder's hand is on its head, in the world (the body leans into it: EnemyBody).</summary>
+    [System.NonSerialized] public Vector3 GrabPoint;
+
+    float _holdDistance;
+    float _doubledUntil;
+
+    /// <summary>Held by the head right now.</summary>
+    public bool Grappled => GrappledBy != null && CurrentState != State.Dead;
+
+    /// <summary>Folded over a blow to the belly right now.</summary>
+    public bool DoubledOver => CurrentState != State.Dead && Time.time < _doubledUntil;
+
+    /// <summary>Metres the held body is from where the hold keeps it: more than the grip allows, and it is let go.</summary>
+    public float HoldSlip { get; private set; }
+
+    /// <summary>Taken by the head: stops whatever it was doing and is held until <see cref="ReleaseGrapple"/>.</summary>
+    public void Grapple(Transform by, float distance)
+    {
+        if (CurrentState == State.Dead || by == null) return;
+        GrappledBy = by;
+        _holdDistance = distance;
+        HoldSlip = 0f;
+        ForceStagger(600f);
+    }
+
+    /// <summary>Let go, reeling for <paramref name="staggerSeconds"/> more.</summary>
+    public void ReleaseGrapple(float staggerSeconds)
+    {
+        if (GrappledBy == null) return;
+        GrappledBy = null;
+        HoldSlip = 0f;
+        _staggerUntil = Time.time + Mathf.Max(0.05f, staggerSeconds);
+        _nextAttackTime = Mathf.Max(_nextAttackTime, _staggerUntil + flinchAttackDelay);
+    }
+
+    /// <summary>Folded over a hook to the belly for <paramref name="seconds"/>, its attack taken away.</summary>
+    public void DoubleOver(float seconds)
+    {
+        if (CurrentState == State.Dead || seconds <= 0f) return;
+        _doubledUntil = Mathf.Max(_doubledUntil, Time.time + seconds);
+        ForceStagger(seconds);
+    }
+
+    /// <summary>
+    /// Kept in front of whoever holds it, facing them: drawn in fast each frame, so it follows the holder's turns and
+    /// steps; a wall or a ledge on the navmesh stops it, and the slip that leaves tells the holder to let go.
+    /// </summary>
+    void HoldInPlace()
+    {
+        Vector3 forward = GrappledBy.forward; forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) forward = transform.position - GrappledBy.position;
+        forward.y = 0f;
+        forward.Normalize();
+        Vector3 pin = GrappledBy.position + forward * _holdDistance;
+        Vector3 delta = pin - transform.position; delta.y = 0f;
+        HoldSlip = delta.magnitude;
+        // Fast enough to stay at arm's length at a walk (at 14 a second he trailed 0.2 m in, against the player's face).
+        Vector3 step = delta * Mathf.Clamp01(Time.deltaTime * 24f);
+
+        var motor = Motor;
+        if (motor != null && motor.RootMotion) motor.Push(step);
+        else if (_agent != null && _agent.enabled && _agent.isOnNavMesh) _agent.Move(step);
+
+        Vector3 face = GrappledBy.position - transform.position; face.y = 0f;
+        if (face.sqrMagnitude < 0.001f) return;
+        if (motor != null && motor.RootMotion) motor.Face(GrappledBy.position);
+        else transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(face), 12f * Time.deltaTime);
+    }
+
     /// <summary>Knocked off balance right now: by a heavy hit, a wound or a strike.</summary>
     public bool IsStaggered => CurrentState != State.Dead && Time.time < _staggerUntil;
 
@@ -1474,6 +1553,8 @@ public class EnemyAI : MonoBehaviour
     void OnDied(Health health)
     {
         CurrentState = State.Dead;
+        GrappledBy = null;
+        _doubledUntil = 0f;
         _attacking = false;
         StopAllCoroutines();
         ClearTelegraph();

@@ -3,10 +3,12 @@ The enemy's side of the head grab, keyed by hand in Blender (Ishaan's briefs of 
 and punch"). The first version followed the film Master by eye -- bent over by the hand on his head, limp -- and played
 badly ("I can't feel that I hold the enemy, the enemy don't try to run or punch"), so the hold is now a fight:
 
-  Enemy_HeadGrabbed_Held     (loop, 1.6 s)  the struggle: hips back and leaning away from the hand that has his head, the
-                                            neck bowed against it, the trunk wrenching side to side, the feet back-pedalling
-                                            (each planted foot dragged forward, each swing stepping back), both hands up on
-                                            the holder's wrist and forearm, pulling
+  Enemy_HeadGrabbed_Held     (loop, 1.6 s)  the clinch (his pick, 2026-10-24): bowed into the hand on the back of his neck
+                                            (about 30-38 degrees pelvis to neck, measured), knees bent, hips back, chin up so
+                                            he looks at the holder under his cap, fighting to straighten on each haul, the
+                                            trunk wrenching side to side, the feet back-pedalling (each planted foot dragged
+                                            forward, each swing stepping back), his right hand tearing at the holder's forearm
+                                            by his jaw, his left stiff-arming the holder's chest
   Enemy_HeadGrabbed_Impact   (0.5 s)        a hook to his left cheek: the face knocked round to his right, the knees going,
                                             the hands jolted off the arm and back on it
   Enemy_HeadGrabbed_ImpactB  (0.5 s)        a straight or an uppercut: the head knocked back, the chin up
@@ -16,8 +18,8 @@ badly ("I can't feel that I hold the enemy, the enemy don't try to run or punch"
   Enemy_HeadGrabbed_Wrench   (0.6 s)        breaking free: both hands thrown up at the arm, the head ripped back and away,
                                             the trunk turning, a step back
 
-The holder is placed as the game holds him: his eye 0.68 m in front of the enemy's feet at 1.65 m, the hand on the right
-side of the enemy's head behind the ear (MeleeGrapple.GripOn), the wrist and forearm coming forward and down from it.
+The holder is placed as the game holds him (HOLDER_*): his eye 0.8 m in front of the enemy's feet at 1.65 m, his left hand
+round the back of the enemy's neck (MeleeGrapple.GripOn), his forearm past the right side of the enemy's jaw.
 Feet are held on the ground (flat) and the hands put where they belong by IK (Blender's, on a copy of the skeleton
 imported with automatic bone orientation, so each bone points down its limb); the spine, the neck and the head are keyed.
 Everything is then baked to plain keys on every frame (by reading the posed bones, not through the UI's bake operator, so
@@ -164,14 +166,14 @@ def rest(arm):
     bpy.context.view_layer.update()
 
 
-# Where the holder is, in the enemy's frame (his feet at the origin, facing -Y): his eye; under the wrist of the hand that
-# has the enemy's head (on its right side, behind the ear), where the enemy's right hand takes it; and the forearm near the
-# holder's elbow, where the enemy's left hand takes it -- low, so that from the holder's eye neither arm is across the
-# face (with both hands up at the wrist they covered it; at mid-forearm the left arm still crossed the mouth).
-# MeleeGrapple.WristOf and EnemyBody.GrappleHands place the same two points in the game.
-HOLDER_EYE = Vector((0.0, -0.68, 1.65))
-MY_WRIST = Vector((-0.16, -0.07, 1.50))
-MY_FOREARM = Vector((-0.17, -0.36, 1.47))
+# Where the holder is, in the enemy's frame (his feet at the origin, facing -Y): his eye and his chest. The enemy is held in
+# a clinch (Ishaan's pick, 2026-10-24): the holder's left hand round the back of his head, dragging it down and in, so his
+# face is about level with the holder's eye and close; the holder's forearm runs from there past the right side of the
+# enemy's neck to the holder's left shoulder. MeleeGrapple.GripOn / WristOf and EnemyBody.GrappleHands place the same
+# points in the game.
+HOLDER_EYE = Vector((0.0, -0.8, 1.65))
+HOLDER_CHEST = Vector((0.03, -0.62, 1.27))
+HOLDER_SHOULDER_L = Vector((-0.2, -0.77, 1.42))   # the holder's left: the enemy's right (-X)
 
 
 def smooth(x):
@@ -215,32 +217,45 @@ def grip_hand(arm, side, amount):
         turn(arm, f"thumb_0{j}_{side}", axis, deg * amount)
 
 
+def holder_forearm(arm, along):
+    """A point on the holder's left forearm, `along` metres from his hand (on the back of the enemy's head) towards his
+    shoulder."""
+    head = bone_world_posed(arm, "head")
+    hand = head + LEFT * -0.10 + FWD * 0.05 + UP * 0.06
+    return hand + (HOLDER_SHOULDER_L - hand).normalized() * along
+
+
 def held_pose(arm, t, k, rest_pos):
-    """The struggle at phase k (0..1 round the loop)."""
+    """The clinch at phase k (0..1 round the loop): bowed forward into the hand on the back of his head, knees bent, fighting
+    to straighten up, his right hand tearing at the forearm by his neck, his left stiff-arming the holder's chest, the feet
+    trying to back away."""
     rest(arm)
     for name in ("elbow_l", "elbow_r", "knee_l", "knee_r"):
         t[name].location = rest_pos[name]
-    tug = 0.5 - 0.5 * math.cos(k * math.tau * 2.0)     # two hauls back a loop (the AI's tug is 0.8 s)
+    tug = 0.5 - 0.5 * math.cos(k * math.tau * 2.0)     # two hauls a loop (the AI's tug is 0.8 s): he tries to straighten
     twist = math.sin(k * math.tau)                      # one wrench to each side a loop
     jit = math.sin(k * math.tau * 6.0 + 0.7)            # effort
-    # Hips back and down, leaning away from the hand.
-    move(arm, "pelvis", UP * (-0.06 - 0.025 * tug) + FWD * (-0.05 - 0.035 * tug) + LEFT * (0.025 * twist))
-    turn(arm, "pelvis", UP, 7 * twist)
-    turn(arm, "pelvis", LEFT, -3 - 3 * tug)
-    turn(arm, "spine_01", LEFT, -3 - 2 * tug)
-    turn(arm, "spine_02", LEFT, -2)
-    turn(arm, "spine_03", UP, 9 * twist + 1.2 * jit)
-    turn(arm, "spine_03", LEFT, -2 - 2 * tug)
-    # The head held where the hand has it: the neck bowed forward against the lean, the face to the man holding him,
-    # turned against the trunk's wrench.
-    turn(arm, "neck_01", LEFT, 9 + 5 * tug)
-    turn(arm, "head", LEFT, 3)
-    turn(arm, "head", UP, -11 * twist)
-    turn(arm, "head", FWD, 5 * twist + 1.5 * jit)
-    # Both hands on the arm that holds him, hauling it towards his chest.
-    haul = FWD * (-0.03 * tug)
-    t["hand_r"].location = MY_WRIST + haul + UP * (0.006 * jit)
-    t["hand_l"].location = MY_FOREARM + haul
+    # Knees bent, hips back as he resists, the trunk bowed towards the hand.
+    # (Measured, pelvis to neck: the first version's 26 degrees spread down the spine came out at 12, the head 13 cm ahead
+    # of the feet; this is about 28, the head 30 cm ahead and his eyes near the holder's.)
+    move(arm, "pelvis", UP * (-0.16 - 0.02 * tug) + FWD * (-0.09 - 0.03 * tug) + LEFT * (0.02 * twist))
+    turn(arm, "pelvis", UP, 5 * twist)
+    turn(arm, "pelvis", LEFT, 17 - 3 * tug)
+    turn(arm, "spine_01", LEFT, 19 - 3 * tug)
+    turn(arm, "spine_02", LEFT, 14 - 2 * tug)
+    turn(arm, "spine_03", LEFT, 10 - 2 * tug)
+    turn(arm, "spine_03", UP, 7 * twist + 1.2 * jit)
+    # The head dragged down below the holder's eye with the trunk, but the chin up: he keeps his eyes on the man holding
+    # him (bowed right over, the holder saw only the top of his cap and none of the punches; level with the holder's eye,
+    # the holder's own forearm was between them). Lifting against it on each haul.
+    turn(arm, "neck_01", LEFT, -18 - 3 * tug)
+    turn(arm, "head", LEFT, -36 - 2 * tug)
+    turn(arm, "head", UP, -8 * twist)
+    turn(arm, "head", FWD, 4 * twist + 1.5 * jit)
+    bpy.context.view_layer.update()
+    # His right hand tearing at the forearm by his neck, his left shoving the holder's chest.
+    t["hand_r"].location = holder_forearm(arm, 0.24) + UP * (-0.05) + FWD * (-0.02 * tug) + UP * (0.006 * jit)
+    t["hand_l"].location = HOLDER_CHEST + FWD * (0.02 * tug) + LEFT * (0.01 * jit)
     # The feet back-pedalling: each planted foot dragged forward by the hold, each swing stepping back.
     for side, ph in (("l", 0.0), ("r", 0.5)):
         p = (k * 2.0 + ph) % 1.0
@@ -250,7 +265,7 @@ def held_pose(arm, t, k, rest_pos):
         else:
             q = (p - 0.6) / 0.4
             dy, lift = -stride * 0.5 + stride * smooth(q), 0.07 * math.sin(math.pi * q)
-        t[f"foot_{side}"].location = rest_pos[f"foot_{side}"] + Vector((0.0, 0.07 + dy, lift))
+        t[f"foot_{side}"].location = rest_pos[f"foot_{side}"] + Vector((0.0, 0.09 + dy, lift))
     bpy.context.view_layer.update()
     phases = {}
     for side, ph in (("l", 0.0), ("r", 0.5)):
@@ -258,8 +273,8 @@ def held_pose(arm, t, k, rest_pos):
         phases[side] = 12 * math.sin(math.pi * (p - 0.6) / 0.4) if p >= 0.6 else 0.0
     for side in ("l", "r"):
         flat_foot(arm, side, phases[side])
-    grip_hand(arm, "l", 0.8)
-    grip_hand(arm, "r", 0.8)
+    grip_hand(arm, "r", 0.85)
+    grip_hand(arm, "l", 0.25)      # an open hand on the chest
 
 
 def bone_world_posed(arm, name):
@@ -274,17 +289,17 @@ def impact_pose(arm, t, f, rest_pos, hook):
     snap = 0.75 * pulse(f, 3, 2.5, 8.0)
     sag = pulse(f, 9, 5.0, 10.0)
     if hook:
-        # Into his left cheek: the face knocked round to his right and a little back.
+        # Into his left cheek: the face knocked round to his right and up out of the hand a little.
         turn(arm, "neck_01", UP, -8 * snap)
         turn(arm, "head", UP, -13 * snap)
         turn(arm, "head", FWD, -7 * snap)
-        turn(arm, "head", LEFT, -5 * snap)
+        turn(arm, "neck_01", LEFT, -6 * snap)
         turn(arm, "spine_03", UP, -6 * snap)
     else:
-        # Straight back, the chin up.
-        turn(arm, "neck_01", LEFT, -11 * snap)
-        turn(arm, "head", LEFT, -13 * snap)
-        turn(arm, "spine_03", LEFT, -6 * snap)
+        # Knocked up out of the bow, the chin up.
+        turn(arm, "neck_01", LEFT, -14 * snap)
+        turn(arm, "head", LEFT, -12 * snap)
+        turn(arm, "spine_03", LEFT, -7 * snap)
     move(arm, "pelvis", UP * (-0.07 * sag) + FWD * (-0.03 * snap))
     turn(arm, "spine_01", LEFT, 5 * sag)
     t["hand_r"].location += UP * (-0.06 * snap) + FWD * (0.05 * snap) + LEFT * (-0.05 * snap)
@@ -310,25 +325,27 @@ def counter_pose(arm, t, f, rest_pos):
     turn(arm, "spine_01", UP, 0.25 * amount)
     turn(arm, "spine_03", UP, 0.6 * amount)
     turn(arm, "head", UP, -0.45 * amount)                       # the eyes stay on the man he is hitting
+    turn(arm, "spine_02", LEFT, -6 * max(coil, through))        # up out of the bow to throw it
     move(arm, "pelvis", FWD * (-0.03 * coil + 0.05 * through))  # back onto the rear foot, then into it
     shoulder = bone_world_posed(arm, "upperarm_l")
     cocked = shoulder + LEFT * 0.07 + UP * 0.08 + FWD * 0.02
     face = HOLDER_EYE + Vector((0.0, 0.17, -0.03))             # just short of the eye
+    rest_hand = HOLDER_CHEST
     if f < COUNTER_WIND:
-        pos = MY_FOREARM.lerp(cocked, wind)
+        pos = rest_hand.lerp(cocked, wind)
     elif f <= COUNTER_HIT:
         e = swing * swing
         mid = cocked + FWD * 0.22 + LEFT * 0.14
         pos = cocked.lerp(mid, e).lerp(mid.lerp(face, e), e)  # round, not straight
     else:
-        pos = face.lerp(MY_FOREARM, ret)
+        pos = face.lerp(rest_hand, ret)
     t["hand_l"].location = pos
     out = max(coil, through)
     t["elbow_l"].location = rest_pos["elbow_l"].lerp(shoulder + LEFT * 0.45 + UP * 0.2 - FWD * 0.15, out)
     bpy.context.view_layer.update()
     for side in ("l", "r"):
         flat_foot(arm, side)
-    grip_hand(arm, "l", 0.5 * smooth(f / 8.0) * (1 - ret))   # the grip closed into a fist
+    grip_hand(arm, "l", 1.05 * smooth(f / 8.0) * (1 - ret))   # the open hand closed into a fist
 
 
 def wrench_pose(arm, t, f, rest_pos):
@@ -336,7 +353,9 @@ def wrench_pose(arm, t, f, rest_pos):
     held_pose(arm, t, 0.0, rest_pos)
     a = smooth(f / 12.0)
     b = smooth((f - 10) / 26.0)
-    turn(arm, "neck_01", LEFT, -14 * a)
+    turn(arm, "spine_01", LEFT, -12 * a)                       # up out of the bow
+    turn(arm, "spine_02", LEFT, -8 * a)
+    turn(arm, "neck_01", LEFT, -20 * a)
     turn(arm, "head", LEFT, -8 * a)
     turn(arm, "head", UP, 18 * a)
     turn(arm, "spine_03", UP, 16 * a + 10 * b)
@@ -349,8 +368,7 @@ def wrench_pose(arm, t, f, rest_pos):
     bpy.context.view_layer.update()
     flat_foot(arm, "l")
     flat_foot(arm, "r", 10 * math.sin(math.pi * b))
-    grip_hand(arm, "l", -0.7 * a)   # open hands thrown at the arm
-    grip_hand(arm, "r", -0.7 * a)
+    grip_hand(arm, "r", -0.75 * a)   # open hands thrown at the arm
 
 
 def bake(scn, arm, name, frames, pose):
@@ -405,7 +423,7 @@ def render(scn, arm, act, frames, tag):
         c.mute = True
     written = []
     for view, pos, look, lens in (("side", (2.6, -0.4, 1.0), (0, 0, 0.95), 45), ("front", (0.6, -2.6, 1.15), (0, 0, 0.95), 45),
-                                  ("eye", tuple(HOLDER_EYE), (0, -0.05, 1.6), 18)):
+                                  ("eye", tuple(HOLDER_EYE), (0, -0.25, 1.55), 18)):
         cam.location = Vector(pos)
         cam.rotation_euler = (Vector(look) - Vector(pos)).to_track_quat("-Z", "Y").to_euler()
         cam.data.lens = lens

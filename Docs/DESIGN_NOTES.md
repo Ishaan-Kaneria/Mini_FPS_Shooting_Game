@@ -3919,3 +3919,32 @@ OpenCV) makes the mp4 and contact sheets. Everything below was found by watching
   (a punch into his wind-up stops it, nothing reaches the player) and makes G5 the wrench free and the run (1.0 -> 3.1 m in
   1.2 s); G3 caught the first punch out of the struggle turning the head 75 degrees in two frames (the impacts' snap is now
   three quarters, their blend 0.06 s; 63 degrees).
+
+### The clinch (2026-10-24, after "the punch is good, now that head holding part is not perfect")
+
+His answers, asked with the three grips rendered side by side (`BatchGrappleGrips`, `MeleeSettings.Grip`): the back of the head,
+pulled in; and what was wrong -- the hand did not grip, the head was not pulled, he was too far and small, "my arm doesn't
+look like I am holding his head (no touch felt)".
+
+* **The arms share the world's depth while holding** (`ViewModelRig.SharedDepth`). Once the arms camera has taken the world's
+  field of view, eye and clip planes (fully into the hold), it stops clearing depth, so the hand wraps behind his neck and
+  his hands are seen over the forearm. Drawn over everything, a hand on a head could only lie in front of it -- the root of
+  "no touch". URP 17 gives scripts only a getter for an overlay camera's clear-depth; the serialized `m_ClearDepth` is set by
+  cached reflection (`SetClearDepth`), the renderer reading it each frame. The grip is at its real depth then (the
+  `ViewPoint` clamp opens with `GrabHold`).
+* **He is clinched** (the keyed hold, re-authored): bowed into the hand about 30-38 degrees pelvis to neck with the knees bent
+  and the hips back, his chin up so he looks at the holder under the cap's brim, his eyes about 10 cm below the holder's and
+  some 40 cm off (`holdDistance` 0.8 to his feet; the clip is authored there, `HOLDER_EYE`); his right hand tearing at the
+  forearm by his jaw, his left stiff-arming the holder's chest; the feet still trying to back away. The grab yanks him into it
+  (0.1 s transition).
+  - Measure a bend in Blender before believing a preview: the first clinch's 26 degrees spread down the spine came out at 12
+    pelvis to neck, the head 13 cm ahead of the feet. The soldier's avatar maps Hips to the `root` bone at his feet.
+  - Where the head goes decides what is seen: bowed right over, only the cap's top showed; level with the holder's eye, the
+    holder's own forearm (an arm reaching forward passes close to the eye) was between them; below the eye, chin up, the face
+    is clear over the forearm.
+* **The hand** goes round the back of his neck under the skull from outside on the player's left, placed and turned by the
+  head's own axes (`EnemyBody.HeadUp`/`HeadFace`, `MeleeStrike.GripUp`/`GripFace`), open as it reaches and closed on contact,
+  with a slap heard. Over the crown, beside the head or at the centre of the back of it, the forearm crossed his face.
+  His right hand's target (`WristOf`) is beside his jaw and low: along the line from the grip to the player's shoulder it
+  went to his own forehead.
+* A man taken doubled over gets 0.3 of the hook's fold on top of the clinch (the full fold folded him flat).

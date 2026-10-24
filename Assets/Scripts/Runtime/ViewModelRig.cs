@@ -47,6 +47,8 @@ public class ViewModelRig : MonoBehaviour
         public Vector3 strikePoint;     // where the blow in flight lands (the face, the belly), in the world
         public int punchKind;           // the punch to a held face: 0 straight right, 1 hook, 2 uppercut (MeleeStrike.PunchKind)
         public float gripKnock;         // his punch has just knocked the holding hand, 1 to 0 (MeleeStrike.GripKnock)
+        public MeleeSettings.Grip grip; // where the left hand holds him
+        public Vector3 gripUp, gripFace; // the held head's own up and face directions, in the world
     }
 
     class Arm
@@ -93,6 +95,7 @@ public class ViewModelRig : MonoBehaviour
 
     // The arms and gun's own camera (the FirstPerson layer), and the gun's muzzle as it is seen.
     Camera _armsCam;
+    UnityEngine.Rendering.Universal.UniversalAdditionalCameraData _armsData;
     int _firstPerson = -1;
 
     // A single punch: the rifle carried in the left hand while the right is thrown.
@@ -246,6 +249,7 @@ public class ViewModelRig : MonoBehaviour
         _armsCam.nearClipPlane = Body.armsNearClip;
         _armsCam.farClipPlane = 10f;
         var data = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(_armsCam);
+        _armsData = data;
         data.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
         // Its own shadow pass: it sees only the FirstPerson layer and ten metres, so the sun's cascades are spent on
         // the gun and hands alone and they shadow each other crisply (a hand over the receiver, the sight on the top).
@@ -276,6 +280,13 @@ public class ViewModelRig : MonoBehaviour
         _armsCam.transform.localPosition = new Vector3(0f, 0f, -Body.eyeBack * (1f - aim) * (1f - hold));
         _armsCam.transform.localRotation = Quaternion.identity;
         _armsCam.fieldOfView = Mathf.Lerp(GameSettings.ArmsFieldOfView, world != null ? world.fieldOfView : GameSettings.ArmsFieldOfView, hold);
+        // Fully into the hold the arms camera is the world camera (same eye, view and clip planes), so it can keep the world's
+        // depth instead of clearing it: the fingers round the back of his neck go behind his neck and his hands on the
+        // forearm are seen over it -- drawn over everything, a hand on a head could only ever lie in front of it.
+        SharedDepth = hold >= 0.999f && world != null;
+        SetClearDepth(_armsData, !SharedDepth);
+        _armsCam.nearClipPlane = SharedDepth ? world.nearClipPlane : Body.armsNearClip;
+        _armsCam.farClipPlane = SharedDepth ? world.farClipPlane : 10f;
     }
 
     /// <summary>
@@ -536,6 +547,9 @@ public class ViewModelRig : MonoBehaviour
             s.strikePoint = _melee.StrikePoint;
             s.punchKind = _melee.PunchKind;
             s.gripKnock = _melee.GripKnock;
+            s.grip = MeleeSettings.Active.grip;
+            s.gripUp = _melee.GripUp;
+            s.gripFace = _melee.GripFace;
         }
 
         if (_motor != null)
@@ -891,6 +905,31 @@ public class ViewModelRig : MonoBehaviour
 
     static float Smooth01(float x) => x * x * (3f - 2f * x);
 
+    /// <summary>The arms are drawn in the world's depth this frame (holding a man), not over it.</summary>
+    public bool SharedDepth { get; private set; }
+
+    static System.Reflection.FieldInfo s_clearDepth;
+    static bool s_clearDepthLooked;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() { s_clearDepth = null; s_clearDepthLooked = false; }
+
+    /// <summary>
+    /// An overlay camera's "clear depth" (URP 17 shows it in the inspector but gives scripts only a getter; the renderer reads
+    /// the serialized field every frame, so it is set there). Does nothing if a URP version renames it.
+    /// </summary>
+    static void SetClearDepth(UnityEngine.Rendering.Universal.UniversalAdditionalCameraData data, bool clear)
+    {
+        if (data == null || data.clearDepth == clear) return;
+        if (!s_clearDepthLooked)
+        {
+            s_clearDepthLooked = true;
+            s_clearDepth = typeof(UnityEngine.Rendering.Universal.UniversalAdditionalCameraData)
+                .GetField("m_ClearDepth", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        }
+        s_clearDepth?.SetValue(data, clear);
+    }
+
     /// <summary>Metres from the wrist (where the IK puts the hand) to the knuckles of a closed fist.</summary>
     const float Knuckles = 0.075f;
 
@@ -1063,7 +1102,8 @@ public class ViewModelRig : MonoBehaviour
     {
         if (s.grab > 0.001f && s.grabPoint != Vector3.zero)
         {
-            Vector3 grip = ViewPoint(s.grabPoint, view, 0.36f, 0.56f);
+            // At its real depth once the arms share the world's (it wraps round him); short of it while drawn over the world.
+            Vector3 grip = ViewPoint(s.grabPoint, view, 0.36f, Mathf.Lerp(0.56f, 2f, s.grab * s.grab * s.grab));
             float g = s.grab;
             // The shake of a hand holding on hard, and the knock of his punch (back towards the eye, down and out).
             float t = Time.time;
@@ -1071,9 +1111,34 @@ public class ViewModelRig : MonoBehaviour
             float knock = s.gripKnock * s.gripKnock;
             grip += new Vector3(-0.035f, -0.03f, -0.05f) * knock;
             lFist = Vector3.LerpUnclamped(lFist, grip, g);
-            lRot = Quaternion.Slerp(lRot, Look(view, new Vector3(0.55f, 0.12f, 0.83f), new Vector3(-0.8f, 0.45f, 0.35f)), g);
-            lCurl = Mathf.Lerp(lCurl, 0.5f, g);
-            lElbow = Vector3.Lerp(lElbow, new Vector3(-0.8f, -0.6f, 0f), g);
+            Vector3 fingers, back, elbow;
+            switch (s.grip)
+            {
+                case MeleeSettings.Grip.SideOfHead:   // palm over the ear, fingers up and back over it, the elbow out
+                    fingers = new Vector3(0.3f, 0.7f, 0.65f); back = new Vector3(-0.95f, 0.15f, 0.25f); elbow = new Vector3(-0.95f, 0.05f, -0.15f);
+                    break;
+                case MeleeSettings.Grip.BackOfHead:   // the clinch: the palm over his crown, the fingers spread down the back of
+                                                      // his head (by the head's own axes, so the hand lies on it as he bows and
+                                                      // twists), the elbow out at the shoulder
+                {
+                    Vector3 up = s.gripUp.sqrMagnitude > 0.5f ? s.gripUp : Vector3.up;
+                    Vector3 face = s.gripFace.sqrMagnitude > 0.5f ? s.gripFace : -view.forward;
+                    Vector3 right = view.right;
+                    fingers = view.InverseTransformDirection(-face * 0.75f - up * 0.35f + right * 0.3f);
+                    back = view.InverseTransformDirection(up * 0.8f - face * 0.3f - right * 0.25f);
+                    elbow = new Vector3(-0.9f, 0.2f, -0.2f);
+                    break;
+                }
+                default:                              // the back of the neck, fingers round it
+                    fingers = new Vector3(0.55f, 0.12f, 0.83f); back = new Vector3(-0.8f, 0.45f, 0.35f); elbow = new Vector3(-0.8f, -0.6f, 0f);
+                    break;
+            }
+            lRot = Quaternion.Slerp(lRot, Look(view, fingers, back), g);
+            // Open as it reaches, closed on him as it arrives: the grip is felt at the moment of contact.
+            float closed = s.grip == MeleeSettings.Grip.Neck ? 0.5f : 0.72f;
+            float curl = g < 0.85f ? 0.08f : Mathf.Lerp(0.08f, closed, Smooth01((g - 0.85f) / 0.15f));
+            lCurl = Mathf.Lerp(lCurl, curl, Smooth01(Mathf.Clamp01(g * 2.5f)));
+            lElbow = Vector3.Lerp(lElbow, elbow, g);
         }
 
         float k = s.strikeProgress;

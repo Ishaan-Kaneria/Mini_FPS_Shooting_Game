@@ -132,13 +132,15 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   material on a multi-material mesh, else the collider's `Surface_*` physics material, else the tag. Pooled only (one marks mesh, three
   particle systems, three lights): never instantiate per shot. Physics materials keep default friction. Check: `FPSKitBatch.VerifyImpacts`.
 - Grab and punch (`MeleeGrapple`, `Docs/DESIGN_NOTES.md` "The grab and punch", "Held is a fight"): face to face (head within
-  `grabRange`, crosshair on it, facing) the press takes him by the back of the neck (below his face: never over the crown or
-  beside the head, the forearm hid the face); presses punch the face, straight/hook/uppercut (never finishing: `heldFloor`), then
+  `grabRange`, crosshair on it, facing) the press clinches him: bowed into the hand, chin up, eyes below the player's, the hand round
+  the back of his neck from outside on the left (`MeleeSettings.grip`, by the head's own axes; over the crown, beside the head or
+  level with the eye, the forearm hid the face); presses punch the face, straight/hook/uppercut (never finishing: `heldFloor`), then
   the overhand (kills a standard enemy, floors an elite); a hook at the belly doubles him over, the next press takes him bent.
   Never a boss. Held is a fight (`EnemyAI.UpdateStruggle`): he pulls back, winds up and punches the player unless a punch to his
   face stops it, and left alone (`releaseAfter`) or after `countersToBreak` he wrenches free and runs (`Bolting`). Pinned by
   `EnemyAI.Grapple` (back and forth only: a sideways sway orbited the view), holder collisions off, no `PlayAction` over the hold.
-  While holding, the arms camera takes the world's FOV (arms drawn at true size beside his face). Keyed clips on the Action layer
+  While holding, the arms camera takes the world's FOV, eye and clip planes and keeps the world's depth (`SharedDepth`: the hand wraps
+  behind his neck instead of lying in front of it). Measure a keyed bend in Blender before trusting a preview. Keyed clips on the Action layer
   (Blender: `Tools/blender/enemy_grabbed_clips.py`; set fps after Blender's FBX import, reset bone scale every frame, mute the IK
   to preview a bake). A melee kill is `Spun` (ragdoll along the blow), never the head-shot drop. Face damage: Blender shape keys
   (`Tools/blender/face_damage_keys.py`) baked onto the game's head by position (`FPSKitBatch.BakeFaceDamage`), driven by
@@ -154,7 +156,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Low Poly Shooter Pack's clips, baked as deltas into `FirstPersonClips` by `FPSKitBatch.BakeFirstPersonClips`
   from Assets/AnimationStaging, played about our own grip; no clip drives a bone of our arms) on
   the FirstPerson layer under a stacked arms camera (own FOV, post-processing ON, set back `eyeBack`
-  except when aiming; the world's FOV and no set-back while holding a man by the neck); `PlayerBody` is legs, kick and shadow only (upper body shadow-only). Mixamo
+  except when aiming; while holding a man, the world's FOV, eye and depth); `PlayerBody` is legs, kick and shadow only (upper body shadow-only). Mixamo
   clips never drive the first-person arms. Values in `PlayerBodySettings`. The camera never moves for a
   strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting). The arms camera renders its own shadows (gun
   self-shadowing); the world's shade reaches the gun only through `FirstPersonShade`. Muzzle light: `FPSMuzzleFlashLight` (player's casts

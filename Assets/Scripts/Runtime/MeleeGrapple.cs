@@ -53,6 +53,10 @@ public partial class MeleeStrike
     /// <summary>Where the blow in flight lands, in the world: the face, or the belly for the hook.</summary>
     public Vector3 StrikePoint { get; private set; }
 
+    /// <summary>The held head's own up (crown) and face directions, for laying the hand on it (ViewModelRig).</summary>
+    public Vector3 GripUp { get; private set; } = Vector3.up;
+    public Vector3 GripFace { get; private set; } = Vector3.forward;
+
     /// <summary>Which punch to the face is in flight: 0 the straight right, 1 the hook, 2 the uppercut.</summary>
     public int PunchKind { get; private set; }
 
@@ -179,7 +183,24 @@ public partial class MeleeStrike
     {
         Vector3 eye = HeadOf(target);
         Frame(eye, target, out Vector3 toPlayer, out Vector3 left);
-        return eye - toPlayer * 0.065f + left * 0.08f - Vector3.up * 0.135f;
+        if (Settings.grip == MeleeSettings.Grip.BackOfHead)
+        {
+            // On the top and back of the skull, by the head's own axes (it is bowed into the clinch and turns as he
+            // struggles): the palm over the crown towards the player's left, the fingers spread down the back of it.
+            var body = target.GetComponent<EnemyBody>();
+            Vector3 up = body != null ? body.HeadUp : Vector3.up, face = body != null ? body.HeadFace : -toPlayer;
+            float size = target.transform.lossyScale.y;
+            // Round the back of his neck under the skull from outside it on the player's left: bowed into the clinch his
+            // head is below the player's eye, so the forearm runs below his face, beside his jaw, and the face is clear
+            // over it (over the crown, or level with the eye, the forearm crossed the face). The hand wraps behind (drawn
+            // in the world's depth, it goes behind his neck).
+            return eye + (-face * 0.08f - up * 0.12f + left * 0.12f) * size;
+        }
+        return Settings.grip switch
+        {
+            MeleeSettings.Grip.SideOfHead => eye - toPlayer * 0.06f + left * 0.09f + Vector3.up * 0.01f,
+            _ => eye - toPlayer * 0.065f + left * 0.08f - Vector3.up * 0.135f,
+        };
     }
 
     /// <summary>
@@ -201,14 +222,17 @@ public partial class MeleeStrike
     }
 
     /// <summary>
-    /// Under the holding wrist, where his right hand takes it: off the grip towards the player and down (the clip's
-    /// MY_WRIST, Tools/blender/enemy_grabbed_clips.py).
+    /// Where his right hand takes the holding arm: on the forearm a hand's length and more from the grip towards the player's
+    /// shoulder, a little under it (the clip's holder_forearm(0.24), Tools/blender/enemy_grabbed_clips.py).
     /// </summary>
     Vector3 WristOf(Health target)
     {
+        // Beside his jaw on the player's side and low, where the forearm comes past his head: along the line from the grip
+        // to the player's shoulder it passed over his own face, and his hand went to his forehead.
         Vector3 eye = HeadOf(target);
         Frame(eye, target, out Vector3 toPlayer, out Vector3 left);
-        return GrabPoint + toPlayer * 0.075f + left * 0.07f - Vector3.up * 0.065f;
+        float size = target.transform.lossyScale.y;
+        return eye + (left * 0.12f + toPlayer * 0.10f - Vector3.up * 0.20f) * size;
     }
 
     /// <summary>The flat way from his head to the player, and the player's left.</summary>
@@ -325,7 +349,12 @@ public partial class MeleeStrike
             StrikePoint = Current == Strike.BodyBlow
                 ? PartPoint(aimAt, BodyPart.LowerTorso, fpsCamera.transform.position, aimAt.transform.position + Vector3.up)
                 : FaceOf(aimAt);
-            if (_held != null || Current == Strike.Grab) GrabPoint = GripOn(aimAt);
+            if (_held != null || Current == Strike.Grab)
+            {
+                GrabPoint = GripOn(aimAt);
+                var body = aimAt.GetComponent<EnemyBody>();
+                if (body != null) { GripUp = body.HeadUp; GripFace = body.HeadFace; }
+            }
         }
 
         if (Current == Strike.Grab)

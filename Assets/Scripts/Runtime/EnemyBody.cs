@@ -604,7 +604,8 @@ public class EnemyBody : MonoBehaviour
         }
         _heldW = Mathf.MoveTowards(_heldW, held ? 1f : 0f, dt * (held ? 9f : 3f));
         // The keyed struggle stands him up and pulls him back; taken doubled over, he is held bent over it.
-        float foldWant = held ? (_heldBentPose ? (GrabClips ? 0.7f : 1f) : 0f) : doubled ? 1f : 0f;
+        // (The clinch clip is bowed already: on top of it, the hook's full fold folded him flat.)
+        float foldWant = held ? (_heldBentPose ? (GrabClips ? 0.3f : 1f) : 0f) : doubled ? 1f : 0f;
         if (GrabClips)
         {
             animator.SetBool(GrabbedHash, held);
@@ -660,7 +661,9 @@ public class EnemyBody : MonoBehaviour
         {
             Vector3 forward = Vector3.ProjectOnPlane(_heldBy.forward, Vector3.up).normalized;
             float reach = MeleeSettings.Active.holdDistance - 0.06f;
-            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : reach);
+            // In the clinch the keyed hold bows him into the hand and brings his head in: drawn to about where it has it.
+            bool clinch = MeleeSettings.Active.grip == MeleeSettings.Grip.BackOfHead;
+            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : clinch ? 0.42f : reach);
             pull.y = _heldBentPose ? _heldBy.position.y + 1.0f : _head.position.y;
             bool wrenching = _ai != null && _ai.Grappled && _ai.Struggle == EnemyAI.HeldMove.Wrench;
             float hold = wrenching ? 1f - Mathf.Clamp01(_ai.StruggleTime / 0.2f) : 1f;
@@ -696,16 +699,15 @@ public class EnemyBody : MonoBehaviour
 
             Vector3 wrist = _ai.GrabWrist;
             Vector3 toHolder = Flat(_heldBy.position - transform.position).normalized;
-            // Pulling: the hands tug the arm towards his chest as he pulls back.
+            // In the clinch (the clip's HOLDER_* points): his right hand tears at the holder's forearm, low by his neck; his
+            // left stiff-arms the holder's chest. Both below his chin, so neither is across his face from the holder's eye.
             float tug = 0.025f * Mathf.Sin(Time.time * Mathf.PI * 2f / 0.8f);
-            Vector3 onWrist = wrist - toHolder * tug;
-            // The left on the forearm near the holder's elbow, low: from his eye neither arm is across the face (the clip's
-            // MY_FOREARM).
-            Vector3 onForearm = wrist + toHolder * 0.29f - transform.right * 0.01f - Vector3.up * 0.03f - toHolder * tug;
+            Vector3 onForearm = wrist - toHolder * tug;
+            Vector3 onChest = _heldBy.position - toHolder * 0.18f + Vector3.up * 1.27f + Vector3.Cross(Vector3.up, toHolder) * 0.03f + toHolder * tug;
             if (wrist != Vector3.zero)
             {
-                SolveWeighted(_rUpper, _rLower, _rHand, onWrist, _rUpper.position + transform.TransformDirection(new Vector3(0.45f, -0.85f, 0.1f)), 0.9f * right);
-                SolveWeighted(_lUpper, _lLower, _lHand, onForearm, _lUpper.position + transform.TransformDirection(new Vector3(-0.6f, -0.7f, -0.2f)), 0.85f * left);
+                SolveWeighted(_rUpper, _rLower, _rHand, onForearm, _rUpper.position + transform.TransformDirection(new Vector3(0.45f, -0.85f, 0.1f)), 0.9f * right);
+                SolveWeighted(_lUpper, _lLower, _lHand, onChest, _lUpper.position + transform.TransformDirection(new Vector3(-0.6f, -0.7f, -0.2f)), 0.85f * left);
             }
         }
         // His fist arriving: steered onto the holder's face, just short of the eye.
@@ -1587,6 +1589,11 @@ public class EnemyBody : MonoBehaviour
     public Vector3 FaceDirection => _head != null ? _head.rotation * _headFace : transform.forward;
 
     /// <summary>Between the eyes, roughly: a little up and forward of the head bone.</summary>
+    /// <summary>The head's own up (crown) and face directions in the world, as it is posed now; the world's up and the body's
+    /// forward without a head.</summary>
+    public Vector3 HeadUp => _head == null || _headUp == Vector3.zero ? Vector3.up : _head.rotation * _headUp;
+    public Vector3 HeadFace => _head == null || _headFace == Vector3.zero ? transform.forward : _head.rotation * _headFace;
+
     public Vector3 EyePosition => _head == null ? transform.position + Vector3.up * 1.6f
         : _head.position + (_head.rotation * _headUp + _head.rotation * _headFace) * 0.09f * transform.lossyScale.y;
 

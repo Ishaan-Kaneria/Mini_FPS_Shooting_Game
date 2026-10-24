@@ -130,16 +130,23 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Seconds after a takedown before the next strike.")]
     [Range(0.1f, 2f)] public float takedownRecovery = 0.35f;
 
+    /// <summary>Where the left hand takes a man by the head (MeleeGrapple.GripOn).</summary>
+    public enum Grip { Neck, SideOfHead, BackOfHead }
+
     [Header("Grab and punch (the fight in the film Master, 2026-10-22)")]
+    [Tooltip("Where the left hand takes him: the back of the neck under the ear, the side of the head over the ear, or the " +
+             "back of the head over the crown.")]
+    public Grip grip = Grip.BackOfHead;
     [Tooltip("Metres from the eye to the nearest point of an enemy's head inside which a punch at the head takes him by it " +
              "instead (the rifle swings onto the back first). Face to face: arm's length.")]
     [Range(0.6f, 1.6f)] public float grabRange = 1.15f;
     [Tooltip("Degrees off facing the player inside which a standing enemy can be taken by the face. One doubled up over " +
              "a body blow is taken by the back of the head whichever way he faces.")]
     [Range(20f, 120f)] public float grabFacingDegrees = 75f;
-    [Tooltip("Metres from the player to the body of the enemy held by the head: he is pulled in to this and kept there " +
-             "(he pulls against it). Far enough that his whole face is in the middle of the view, near enough to hit.")]
-    [Range(0.4f, 1.2f)] public float holdDistance = 0.68f;
+    [Tooltip("Metres from the player to the feet of the enemy held by the head (he pulls against it). In the clinch he is " +
+             "bowed into the hand from here, his face about level with the player's eye and close (the keyed hold is " +
+             "authored at this distance: Tools/blender/enemy_grabbed_clips.py HOLDER_EYE).")]
+    [Range(0.4f, 1.2f)] public float holdDistance = 0.8f;
     [Tooltip("Seconds the hand takes to reach the head and close on it.")]
     [Range(0.15f, 0.8f)] public float grabSeconds = 0.3f;
     [Tooltip("Seconds each punch to the face of a held enemy takes: a wind-up the player sees (drawn back, wound out or " +

@@ -797,8 +797,8 @@ public partial class MeleeStrike : MonoBehaviour
                 StartHitStop(s.takedownHitStop + extra);
                 break;
             case Strike.Grab:
-                // A grip, not a blow: no thud, no shake, no hold.
-                PlayClip(swingClip, 0.35f);
+                // A grip, not a blow: no shake and no hold, but the slap of the hand on his head is heard.
+                PlayClip(hitClip, 0.35f);
                 break;
             default:
                 PlayClip(hitClip, 0.9f);

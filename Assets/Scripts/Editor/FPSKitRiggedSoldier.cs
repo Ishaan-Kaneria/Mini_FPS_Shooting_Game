@@ -521,7 +521,7 @@ namespace FPSKit.EditorTools
                 var take = idle.AddTransition(held);
                 take.AddCondition(AnimatorConditionMode.If, 0f, "Grabbed");
                 take.hasExitTime = false;
-                take.duration = 0.15f;
+                take.duration = 0.1f;   // yanked into the clinch
 
                 AnimatorState GrabMove(string name, AnimationClip clip, float exit, float settle)
                 {

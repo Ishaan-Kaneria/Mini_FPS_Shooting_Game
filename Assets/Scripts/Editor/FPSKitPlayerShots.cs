@@ -148,6 +148,18 @@ namespace FPSKit.EditorTools
             EditorApplication.update += NextArena;
         }
 
+        /// <summary>
+        /// Batch: each way of holding a man by the head (MeleeSettings.Grip), photographed from the eyes a moment into the hold
+        /// and again as he struggles (&lt;tag&gt;_grip_&lt;style&gt;_a/_b.png), for choosing between them.
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchGrappleGrips
+        /// </summary>
+        public static void BatchGrappleGrips()
+        {
+            _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "desert")) });
+            _onlyPoses = "grapple_grips";
+            EditorApplication.update += NextArena;
+        }
+
         /// <summary>Batch: the right-hand close-ups only, in the Desert (quick, for tuning the grip).</summary>
         public static void BatchHands()
         {
@@ -408,6 +420,7 @@ namespace FPSKit.EditorTools
                     return AtImpact(MeleeStrike.Strike.Kick) && Shoot();
                 case "grapple": return Grapple();
                 case "grapple_video": return GrappleVideo();
+                case "grapple_grips": return GrappleGrips();
                 default:
                     Report += $"no pose {_pose}\n";
                     return true;
@@ -744,6 +757,22 @@ namespace FPSKit.EditorTools
                 }
                 if (!held && _wasHeldOnFilm)
                     Report += $"video {_videoFrame}: let go (bolting {_foeAI.Bolting}, dead {_foeAI.CurrentState == EnemyAI.State.Dead})\n";
+                if (held && _videoFrame % 10 == 0)
+                {
+                    var anim = _foe.GetComponentInChildren<Animator>();
+                    if (anim != null && anim.isHuman)
+                    {
+                        Transform hips = anim.GetBoneTransform(HumanBodyBones.Hips), head = anim.GetBoneTransform(HumanBodyBones.Head);
+                        int action = anim.GetLayerIndex("Action");
+                        var st = action >= 0 ? anim.GetCurrentAnimatorStateInfo(action) : default;
+                        string state = action < 0 ? "-" : st.IsName("Grabbed") ? "Grabbed" : st.IsName("GrabbedHit") ? "Hit" : st.IsName("GrabbedHitB") ? "HitB" : st.IsName("GrabbedCounter") ? "Counter" : st.IsName("GrabbedWrench") ? "Wrench" : st.IsName("Idle") ? "Idle" : "other";
+                        Transform pelvis = null, neck = null;
+                        foreach (var t in _foe.GetComponentsInChildren<Transform>()) { if (t.name == "pelvis") pelvis = t; if (t.name == "neck_01") neck = t; }
+                        Vector3 L(Transform t) => t != null ? _foe.transform.InverseTransformPoint(t.position) : Vector3.zero;
+                        Report += $"video {_videoFrame}: Hips bone '{hips.name}', pelvis {L(pelvis)}, neck {L(neck)}, head {L(head)} (his frame, z towards the player), " +
+                                  $"trunk {(pelvis != null && neck != null ? Vector3.Angle(neck.position - pelvis.position, Vector3.up) : -1f):0} deg, Action {state} {(action >= 0 ? anim.GetLayerWeight(action) : -1f):0.00}\n";
+                    }
+                }
                 _lastMove = _foeAI.Struggle;
                 _wasHeldOnFilm = held;
             }
@@ -782,6 +811,65 @@ namespace FPSKit.EditorTools
                     return true;
                 }
             return false;
+        }
+
+        static int _gripIndex;
+        static MeleeSettings.Grip _gripWas;
+
+        /// <summary>Each grip in turn: a fresh foe, grabbed, photographed at 0.5 s and 1.1 s into the hold. True when done.</summary>
+        static bool GrappleGrips()
+        {
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+                if (ai.gameObject != _foe) ai.gameObject.SetActive(false);
+            var styles = (MeleeSettings.Grip[])System.Enum.GetValues(typeof(MeleeSettings.Grip));
+            var settings = MeleeSettings.Active;
+            if (_foe != null && _melee.Holding) _motor.TurnTowards(FoeHead() + Vector3.down * 0.05f, 0.12f);
+            switch (_phase)
+            {
+                case 0:
+                    if (_frame < Frames(1f)) return false;
+                    if (!OntoOpenGround()) Report += "grips: no open navmesh near the start\n";
+                    _gripWas = settings.grip;
+                    _gripIndex = 0;
+                    Phase(1);
+                    return false;
+                case 1:
+                    if (_melee.Holding || Time.time < _melee.ReadyAt + 1.2f) return false;
+                    settings.grip = styles[_gripIndex];
+                    Foe(0.85f);
+                    Phase(2);
+                    return false;
+                case 2: _motor.TurnTowards(FoeHead(), 1f); if (InPhase >= Frames(0.4f)) { _melee.TryPunch(); Phase(3); } return false;
+                case 3: if (_melee.Holding) { Hold(); Phase(4); } else if (InPhase > Frames(3f)) return GaveUp(); return false;
+                case 4:
+                    if (InPhase == Frames(0.5f)) Snap($"grip_{styles[_gripIndex]}_a");
+                    if (InPhase >= Frames(1.1f))
+                    {
+                        Snap($"grip_{styles[_gripIndex]}_b");
+                        if (_foe != null) Object.Destroy(_foe);
+                        _foe = null;
+                        _gripIndex++;
+                        if (_gripIndex >= styles.Length)
+                        {
+                            settings.grip = _gripWas;
+                            if (_side != null) Object.Destroy(_side.gameObject);
+                            _side = null;
+                            return true;
+                        }
+                        Phase(1);
+                    }
+                    return false;
+            }
+            return false;
+        }
+
+        static void Snap(string name)
+        {
+            string pose = _pose;
+            _pose = name;
+            Shoot();
+            ShootSide();
+            _pose = pose;
         }
 
         static void RenderJpeg(Camera cam, string path)

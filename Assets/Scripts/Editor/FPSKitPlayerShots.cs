@@ -134,6 +134,20 @@ namespace FPSKit.EditorTools
             EditorApplication.update += NextArena;
         }
 
+        /// <summary>
+        /// Batch: the grab and punch on film -- every frame of one scripted fight, from the player's eyes and from the side
+        /// (Build/PlayerShots/&lt;tag&gt;_video/fp_NNNNN.jpg, side_NNNNN.jpg; Tools/shots/frames_to_video.py makes the mp4).
+        /// He is grabbed and left a moment (he pulls and punches back), punched three times (the third into his wind-up),
+        /// finished with the overhand; a second is grabbed and left alone (he wrenches free and runs).
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchGrappleVideo
+        /// </summary>
+        public static void BatchGrappleVideo()
+        {
+            _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "desert")) });
+            _onlyPoses = "grapple_video";
+            EditorApplication.update += NextArena;
+        }
+
         /// <summary>Batch: the right-hand close-ups only, in the Desert (quick, for tuning the grip).</summary>
         public static void BatchHands()
         {
@@ -256,7 +270,7 @@ namespace FPSKit.EditorTools
                 _lastGameFrame = Time.frameCount;
                 if (_health != null && _health.Normalized < 0.9f) _health.ResetHealth();
                 _frame++;
-                if (_frame > Frames(_pose == "warmup" ? 60f : _pose == "grapple" ? 40f : 12f))
+                if (_frame > Frames(_pose == "warmup" ? 60f : _pose.StartsWith("grapple") ? 40f : 12f))
                 {
                     Report += $"{_pose}: timed out (time {Time.time:0.0}, briefing {Object.FindAnyObjectByType<LevelManager>()?.IsBriefing}, paused {EditorApplication.isPaused}, timeScale {Time.timeScale}, dead {(_health != null && _health.IsDead)}, " +
                               $"lowered {(_weapon != null && _weapon.IsLowered)}, strike {(_melee != null ? _melee.Current.ToString() : "-")}, " +
@@ -393,6 +407,7 @@ namespace FPSKit.EditorTools
                     if (_phase == 0) { if (_frame >= Frames(2.5f)) { _melee.TryKick(); _phase = 1; } return false; }
                     return AtImpact(MeleeStrike.Strike.Kick) && Shoot();
                 case "grapple": return Grapple();
+                case "grapple_video": return GrappleVideo();
                 default:
                     Report += $"no pose {_pose}\n";
                     return true;
@@ -576,22 +591,7 @@ namespace FPSKit.EditorTools
 
         static void ShootSide()
         {
-            var main = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
-            if (_side == null)
-            {
-                var go = new GameObject("Shots_SideCamera");
-                _side = go.AddComponent<Camera>();
-                _side.fieldOfView = 42f;
-                _side.nearClipPlane = 0.05f;
-                int fp = LayerMask.NameToLayer("FirstPerson");
-                _side.cullingMask = main != null ? main.cullingMask : ~0;
-                if (fp >= 0) _side.cullingMask &= ~(1 << fp);
-            }
-            Vector3 me = _motor.transform.position, him = _foe != null ? _foe.transform.position : me + _motor.transform.forward;
-            Vector3 mid = (me + him) * 0.5f + Vector3.up * 1.2f;
-            Vector3 across = Vector3.Cross(Vector3.up, him - me).normalized;
-            _side.transform.position = mid + across * 2.6f + Vector3.up * 0.15f - (him - me).normalized * 0.4f;
-            _side.transform.LookAt(mid);
+            PlaceSide();
             string path = $"{_folder}/{_tag}_{_pose}_side.png";
             var rt = RenderTexture.GetTemporary(_width, _height, 24, RenderTextureFormat.ARGB32);
             try
@@ -612,6 +612,27 @@ namespace FPSKit.EditorTools
             _written.Add(path);
         }
 
+        /// <summary>The side camera beside the player and the foe, looking across at both.</summary>
+        static void PlaceSide()
+        {
+            var main = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
+            if (_side == null)
+            {
+                var go = new GameObject("Shots_SideCamera");
+                _side = go.AddComponent<Camera>();
+                _side.fieldOfView = 42f;
+                _side.nearClipPlane = 0.05f;
+                int fp = LayerMask.NameToLayer("FirstPerson");
+                _side.cullingMask = main != null ? main.cullingMask : ~0;
+                if (fp >= 0) _side.cullingMask &= ~(1 << fp);
+            }
+            Vector3 me = _motor.transform.position, him = _foe != null ? _foe.transform.position : me + _motor.transform.forward;
+            Vector3 mid = (me + him) * 0.5f + Vector3.up * 1.2f;
+            Vector3 across = Vector3.Cross(Vector3.up, him - me).normalized;
+            _side.transform.position = mid + across * 2.6f + Vector3.up * 0.15f - (him - me).normalized * 0.4f;
+            _side.transform.LookAt(mid);
+        }
+
         /// <summary>
         /// The whole grab and punch as one pose, its beats photographed as they happen; then the hook to the belly and the
         /// bent hold. True when done.
@@ -622,7 +643,13 @@ namespace FPSKit.EditorTools
                 if (ai.gameObject != _foe) ai.gameObject.SetActive(false);
             switch (_phase)
             {
-                case 0: if (_frame >= Frames(1f)) { _beat = 0; Foe(0.85f); Phase(1); } return false;
+                case 0:
+                    if (_frame >= Frames(1f))
+                    {
+                        if (!OntoOpenGround()) Report += "grapple: no open navmesh near the start; shot where the player stands\n";
+                        _beat = 0; Foe(0.85f); Phase(1);
+                    }
+                    return false;
                 case 1:
                     _motor.TurnTowards(FoeHead(), 1f);
                     if (InPhase == 1) _foeAt = _foe.transform.position;
@@ -640,7 +667,9 @@ namespace FPSKit.EditorTools
                 case 4: if (At(MeleeStrike.Strike.FacePunch, MeleeStrike.ImpactAt(MeleeStrike.Strike.FacePunch) - 0.02f)) { Beat("punch"); Phase(5); } return InPhase > Frames(3f) && GaveUp();
                 case 5: if (InPhase == 3) Beat("punch_after"); if (InPhase > 3 && Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(6); } return false;
                 case 6: if (At(MeleeStrike.Strike.FacePunch, MeleeStrike.ImpactAt(MeleeStrike.Strike.FacePunch) - 0.02f)) { Beat("punch2"); Phase(7); } return InPhase > Frames(3f) && GaveUp();
-                case 7: if (Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(8); } return false;
+                // Punches until the press is the overhand (the straight, the hook, the uppercut), each photographed.
+                case 7: if (Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(_melee.Thrown == MeleeStrike.Strike.Overhand ? 8 : 30); } return false;
+                case 30: if (At(MeleeStrike.Strike.FacePunch, MeleeStrike.ImpactAt(MeleeStrike.Strike.FacePunch) - 0.02f)) { Beat($"punch{_melee.PunchKind + 1}"); Phase(7); } return InPhase > Frames(3f) && GaveUp();
                 case 8: if (At(MeleeStrike.Strike.Overhand, 0.3f)) { Beat("overhand_up"); Phase(9); } return InPhase > Frames(3f) && GaveUp();
                 case 9: if (At(MeleeStrike.Strike.Overhand, MeleeStrike.ImpactAt(MeleeStrike.Strike.Overhand) - 0.02f)) { Beat("overhand"); Phase(10); } return InPhase > Frames(3f) && GaveUp();
                 case 10:
@@ -673,6 +702,171 @@ namespace FPSKit.EditorTools
                     _foe = null; _side = null;
                     return true;
             }
+        }
+
+        // ---- the grab and punch on film --------------------------------------------------------------------------
+
+        static int _videoFrame;
+        static string _videoDir;
+        static EnemyAI.HeldMove _lastMove;
+        static bool _wasHeldOnFilm;
+
+        /// <summary>The frame from the eyes and from the side, as JPEGs in the video folder.</summary>
+        static void Film()
+        {
+            if (_videoDir == null)
+            {
+                _videoDir = $"{_folder}/{_tag}_video";
+                if (Directory.Exists(_videoDir)) Directory.Delete(_videoDir, true);
+                Directory.CreateDirectory(_videoDir);
+                _videoFrame = 0;
+            }
+            _videoFrame++;
+            var main = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
+            RenderJpeg(main, $"{_videoDir}/fp_{_videoFrame:00000}.jpg");
+            PlaceSide();
+            RenderJpeg(_side, $"{_videoDir}/side_{_videoFrame:00000}.jpg");
+
+            // What he is doing, as it changes.
+            if (_foeAI != null)
+            {
+                bool held = _foeAI.Grappled;
+                if (held && (_foeAI.Struggle != _lastMove || !_wasHeldOnFilm))
+                    Report += $"video {_videoFrame}: held, {_foeAI.Struggle} (counters landed {_foeAI.CountersLanded})\n";
+                if (held && (_foeAI.Struggle == EnemyAI.HeldMove.Wind || _foeAI.Struggle == EnemyAI.HeldMove.Swing || _lastMove == EnemyAI.HeldMove.Swing))
+                {
+                    var body = _foe.GetComponent<EnemyBody>();
+                    var anim = _foe.GetComponentInChildren<Animator>();
+                    var hand = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.LeftHand) : null;
+                    var eye = _weapon.fpsCamera.transform.position;
+                    Report += $"video {_videoFrame}: {_foeAI.Struggle} {_foeAI.StruggleTime:0.00}s, roots {Vector3.ProjectOnPlane(_foe.transform.position - _motor.transform.position, Vector3.up).magnitude:0.00} m, " +
+                              $"his left hand {(hand != null ? Vector3.Distance(hand.position, eye) : -1f):0.00} m from the eye\n";
+                }
+                if (!held && _wasHeldOnFilm)
+                    Report += $"video {_videoFrame}: let go (bolting {_foeAI.Bolting}, dead {_foeAI.CurrentState == EnemyAI.State.Dead})\n";
+                _lastMove = _foeAI.Struggle;
+                _wasHeldOnFilm = held;
+            }
+        }
+
+        /// <summary>
+        /// The player onto the nearest navmesh near the start that is open ground two metres round, facing as at the start:
+        /// the hold keeps the held man on the navmesh, and stood off it at the desert's start (the shop front) he was held
+        /// at a metre, not at the hold's distance.
+        /// </summary>
+        static bool OntoOpenGround()
+        {
+            if (!NavMesh.SamplePosition(_startPos, out var home, 3f, NavMesh.AllAreas)) return false;
+            float lift = _startPos.y - home.position.y;
+            for (float r = 0f; r <= 25f; r += 1f)
+                for (int a = 0; a < (r == 0f ? 1 : 16); a++)
+                {
+                    float angle = a * 22.5f * Mathf.Deg2Rad;
+                    Vector3 at = home.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * r;
+                    if (!NavMesh.SamplePosition(at, out var hit, 0.1f, NavMesh.AllAreas)) continue;
+                    bool open = true;
+                    for (int k = 0; k < 12 && open; k++)
+                    {
+                        Vector3 d = Quaternion.AngleAxis(k * 30f, Vector3.up) * Vector3.forward * 2f;
+                        open = NavMesh.SamplePosition(hit.position + d, out var round, 0.1f, NavMesh.AllAreas)
+                               && Mathf.Abs(round.position.y - hit.position.y) < 0.2f
+                               && !NavMesh.Raycast(hit.position, round.position, out _, NavMesh.AllAreas);
+                    }
+                    if (!open) continue;
+                    var cc = _motor.GetComponent<CharacterController>();
+                    if (cc != null) cc.enabled = false;
+                    _motor.transform.SetPositionAndRotation(hit.position + Vector3.up * lift, _startRot);
+                    if (cc != null) cc.enabled = true;
+                    Physics.SyncTransforms();
+                    Report += $"{_pose}: on open ground {r:0} m from the start\n";
+                    return true;
+                }
+            return false;
+        }
+
+        static void RenderJpeg(Camera cam, string path)
+        {
+            var rt = RenderTexture.GetTemporary(_width, _height, 24, RenderTextureFormat.ARGB32);
+            try
+            {
+                var request = new RenderPipeline.StandardRequest { destination = rt };
+                RenderPipeline.SubmitRenderRequest(cam, request);
+                var prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                var tex = new Texture2D(_width, _height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, _width, _height), 0, 0);
+                tex.Apply();
+                RenderTexture.active = prev;
+                File.WriteAllBytes(path, tex.EncodeToJPG(88));
+                Object.DestroyImmediate(tex);
+            }
+            finally { RenderTexture.ReleaseTemporary(rt); }
+        }
+
+        /// <summary>
+        /// One fight, filmed every frame. True when done.
+        /// </summary>
+        static bool GrappleVideo()
+        {
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+                if (ai.gameObject != _foe) ai.gameObject.SetActive(false);
+            bool filming = _phase >= 1 && _phase < 99;
+            // The view kept on his head the way a player keeps it, a little behind.
+            if (_foe != null && _melee.Holding) _motor.TurnTowards(FoeHead() + Vector3.down * 0.05f, 0.12f);
+            switch (_phase)
+            {
+                case 0:
+                    if (_frame >= Frames(1f))
+                    {
+                        if (!OntoOpenGround()) Report += "video: no open navmesh near the start; filmed where the player stands\n";
+                        Foe(0.85f); _videoDir = null; Phase(1);
+                    }
+                    return false;
+                case 1:
+                    _motor.TurnTowards(FoeHead(), 1f);
+                    if (InPhase == 2)
+                    {
+                        var anim = _foe.GetComponentInChildren<Animator>();
+                        var headBone = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
+                        Report += $"video: his head bone {(headBone != null ? headBone.position.y - _foe.transform.position.y : -1f):0.00} m over his feet, eye point {FoeHead().y - _foe.transform.position.y:0.00}, " +
+                                  $"scale {_foe.transform.lossyScale.y:0.00}, the player's eye {_weapon.fpsCamera.transform.position.y - _motor.transform.position.y:0.00}\n";
+                    }
+                    if (InPhase >= Frames(0.4f)) { _melee.TryPunch(); Phase(2); }
+                    break;
+                case 2: if (_melee.Holding) { Hold(); Phase(3); } else if (InPhase > Frames(3f)) return GaveUp(); break;
+                // Left a moment: he pulls back against the hand and punches.
+                case 3: if (InPhase >= Frames(1.5f) && Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(4); } break;
+                case 4: if (Time.time >= _melee.ReadyAt + 0.25f) { _melee.TryPunch(); Phase(5); } break;
+                // The third into his wind-up, which it stops.
+                case 5:
+                    if (Time.time >= _melee.ReadyAt && ((_foeAI.Struggle == EnemyAI.HeldMove.Wind && _foeAI.StruggleTime > 0.1f) || InPhase > Frames(2.5f)))
+                    { _melee.TryPunch(); Phase(6); }
+                    break;
+                case 6: if (Time.time >= _melee.ReadyAt + 0.3f) { _melee.TryPunch(); Phase(7); } break;
+                case 7: if (InPhase >= Frames(2.0f)) { Foe(0.85f); Phase(8); } break;
+                // A second one, grabbed and left alone: he breaks free and runs.
+                case 8:
+                    _motor.TurnTowards(FoeHead(), 1f);
+                    if (InPhase >= Frames(0.4f) && Time.time >= _melee.ReadyAt) { _melee.TryPunch(); Phase(9); }
+                    break;
+                case 9: if (_melee.Holding) { Hold(); Phase(10); } else if (InPhase > Frames(3f)) return GaveUp(); break;
+                case 10: if (!_melee.Holding) Phase(11); else if (InPhase > Frames(6f)) Phase(11); break;
+                case 11:
+                    if (_foe != null) _motor.TurnTowards(FoeHead(), 0.08f);
+                    if (InPhase >= Frames(2.2f))
+                    {
+                        float away = _foe != null ? Vector3.ProjectOnPlane(_foe.transform.position - _motor.transform.position, Vector3.up).magnitude : -1f;
+                        Report += $"video: the second ran to {away:0.0} m; {_videoFrame} frames in {_videoDir}\n";
+                        Film();
+                        if (_foe != null) Object.Destroy(_foe);
+                        if (_side != null) Object.Destroy(_side.gameObject);
+                        _foe = null; _side = null;
+                        return true;
+                    }
+                    break;
+            }
+            if (filming) Film();
+            return false;
         }
 
         static bool AtImpact(MeleeStrike.Strike strike)

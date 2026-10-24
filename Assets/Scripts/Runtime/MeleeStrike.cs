@@ -181,8 +181,8 @@ public partial class MeleeStrike : MonoBehaviour
         Strike.Butt => 0.32f,
         Strike.BodyBlow => 0.38f,
         Strike.Grab => 0.7f,          // the hand closes on the head
-        Strike.FacePunch => 0.36f,
-        Strike.Overhand => 0.55f,     // wound up high first, then brought down
+        Strike.FacePunch => 0.45f,    // a wind-up the player sees, then the blow
+        Strike.Overhand => 0.56f,     // wound up high first, then brought down
         _ => 0.4f,
     };
 
@@ -451,7 +451,9 @@ public partial class MeleeStrike : MonoBehaviour
             Strike.Butt => s.buttRecovery,
             Strike.BodyBlow => s.crossRecovery,
             Strike.Grab => 0.04f,         // the next press is the first punch, as soon as the hand has hold
-            Strike.FacePunch => s.jabRecovery,
+            // The next punch only once this fist is most of the way home: thrown from mid-return it began from the guard
+            // and the arm jumped there in a frame.
+            Strike.FacePunch => Mathf.Max(s.jabRecovery, length * (1f - ImpactAt(Strike.FacePunch)) * 0.8f),
             _ => s.takedownRecovery,
         };
 

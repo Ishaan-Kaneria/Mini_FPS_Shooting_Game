@@ -3805,9 +3805,10 @@ execution clips, hit-stop, FOV pulse).
   from above the head (kills an ordinary enemy; an elite is floored with 5% left and gets up hurt -- it can only be grabbed
   badly hurt, so any real share killed it every time); with the fists up, **a blow aimed at the belly** is the hook that
   doubles him over (`doubledSeconds`), and the next press takes him **bent**, by the back of the head, as in the film.
-* Who: ordinary enemies; elites badly hurt, reeling or doubled up; never a boss. A held enemy cannot shoot or break free;
-  nobody else stops shooting. No press for `releaseAfter` (1.6 s), the player reaching for the gun, or him slipping more
-  than 0.9 m from the grip (a wall), and he is shoved off, reeling, and stumbles (the Action layer's clip).
+* Who: ordinary enemies; elites badly hurt, reeling or doubled up; never a boss. *(Superseded 2026-10-24, "Held is a fight"
+  below: he fights the hold, three punches before the overhand, and left alone he breaks free himself.)* A held enemy cannot
+  shoot; nobody else stops shooting. The player reaching for the gun, or him slipping more than 0.9 m from the grip (a wall),
+  and he is shoved off, reeling, and stumbles (the Action layer's clip).
 * The hold: `EnemyAI.Grapple` keeps him `holdDistance` (0.62 m) in front, facing the holder, drawn in at 24/s through the
   agent or the motor (at 14/s he trailed 0.2 m into the player's face at a walk); nothing is parented. **Collisions between
   the held body and the holder are off while held** (`EnemyBody`), given back once he is clear after the release: with them
@@ -3817,8 +3818,9 @@ execution clips, hit-stop, FOV pulse).
   world point's position on the world camera's screen, at a reachable depth along the **arms camera's** own ray (its field
   of view and set-back differ, so the same world point is elsewhere in its space); the right thrown as a hook to the face,
   the overhand (wound up high, elbow leading, brought over the top), or the hook to the belly.
-* A face-to-face grab drags his head part-way down and over (and the keyed hold bends him from the waist): held upright at
-  arm's length his face was above the eye line and hidden behind the player's forearms.
+* *(Superseded 2026-10-24.)* A face-to-face grab dragged his head part-way down and over (and the keyed hold bent him from
+  the waist): held upright at arm's length his face was above the eye line and hidden behind the player's forearms. The real
+  cause was the grip over the crown and the arms drawn too big; see below.
 
 ### The enemy's side
 * **Keyed clips** (`Tools/blender/enemy_grabbed_clips.py` -> `Assets/Models/Enemy/Enemy_Execute_HeadGrabbed_Impact.fbx`):
@@ -3860,3 +3862,60 @@ execution clips, hit-stop, FOV pulse).
 * `FPSKitPlayerShots.BatchGrapple` photographs every beat from the eyes and a side camera in Desert Outpost. A staged enemy
   needs its mind **removed**, not switched off: switched off, its stale look point (the world origin) kept the body aiming
   there, twisting the head 0.8 m off the root.
+
+### Held is a fight (2026-10-24)
+
+Ishaan, after playing the first version: "the animation is very poor. I can't feel that I hold the enemy and also the enemy
+also don't try to run or punch when I hold it and also the punch is not that clearly visible." That reverses his earlier
+"held is held". Stills could not show any of it, so the shots tool now **films** the fight: `BatchGrappleVideo` renders every
+frame from the eyes and the side (`Build/PlayerShots/<tag>_video/`), `Tools/shots/frames_to_video.py` (the mocap venv's
+OpenCV) makes the mp4 and contact sheets. Everything below was found by watching those frames.
+
+* **He fights** (`EnemyAI.UpdateStruggle`, run from the hold): pulls back against the hand (the pin breathes out
+  `struggleTug` 7 cm on a 0.8 s haul), winds up his free fist (`counterFirstAfter` 0.7 s after the grab, then every
+  `counterEvery` 1.0-1.5 s; `counterWindup` 0.45 s, the player's window) and swings it (`counterSwing` 0.1 s), landing
+  `counterDamage` 0.6 of his attack damage on the player. A punch to his face knocks a wind-up or swing out of him and holds
+  the next off for `counterAfterBlow` 0.35 s, so a player who keeps hitting always gets in first and one who stops is hit.
+  Left alone for `releaseAfter` 2.2 s, or after landing `countersToBreak` 2, he wrenches free (`wrenchSeconds` 0.6) and runs
+  (`EnemyAI.Bolting`, `boltSeconds` 2.4, 7 m in the film) before his mind takes over again. His landed punch shakes the view
+  (`counterShake`: a landed blow, the only thing that moves the camera) and knocks the holding hand (`MeleeStrike.GripKnock`);
+  torn free, the hand is thrown off in 0.08 s.
+  - His arm alone stopped 30 cm short of the holder's face across the hold (seen from the side): the pin steps him in 16 cm
+    for the swing and back 3 cm for the wind-up. The fist then arrives 0.20-0.25 m from the eye, filling the right of the view.
+  - The pin moves back and forth only: a sideways sway turned the view of a player keeping his head in sight, the pin follows
+    the view, and the two went round each other (the film showed a 90-degree orbit). A pain stumble came in from Any State
+    over the hold and ran him round the player: `EnemyBody.PlayAction` does nothing while he is held.
+* **His body** (Blender, `enemy_grabbed_clips.py`, five takes on the Action layer, set off by `EnemyBody` as the AI decides):
+  the struggle (1.6 s loop: hips back, leaning away from the hand, the neck bowed against it, the trunk wrenching, the feet
+  back-pedalling -- each planted foot dragged forward, each swing stepping back, feet kept flat), the hook's impact (face
+  turned away), the straight's/uppercut's (knocked back, chin up), his punch, the wrench. The rifle goes on his back while
+  held (`HandToHand` rules), and his hands are laid by IK on the player's arm as the player sees it: the right under the
+  wrist, the left on the forearm near the elbow -- both below his chin (with both at the wrist, then at mid-forearm, his
+  arms covered his own face from the player's eye). The head is drawn towards where it stands at the hold at its own height
+  (a fixed 1.6 m bent the 1.9 m soldier over -- the soldier is built at 1.1 scale, his pick).
+  - Blender traps: the IK must be muted when previewing the baked action (it re-solved every frame to the last clip's
+    targets); each turn set through a bone's matrix leaves a hair of scale, and on the fingers, turned every frame, it built
+    up over the clips until the hands blew apart (`rest()` now resets scale); the pack's first-person arms ride the same
+    finger bones from far off (left out of previews and the export); moving an IK pole target flips the elbow by the pole
+    angle chosen for the rest pose (keep the rest poles; move the target instead).
+  - Unity trap: the clip file's stored Humanoid mapping names the skeleton as the last file had it ("Armature.002" from one
+    Blender session, "Armature" from the next); a stale one fails the avatar and every clip with it. `GrabbedClip` clears it
+    and re-maps whenever Blender's takes change.
+* **The player's view.** The hand takes him by the back of the neck from the left, under the ear (`MeleeGrapple.GripOn`):
+  over the crown, then beside the head, the forearm covered his face. While holding, the arms camera takes the world's field
+  of view and drops its set-back (`ViewModelRig.PlaceArmsCamera`, eased by `GrabHold`): with its own 58 degrees against the
+  world's 75 the hands were drawn 1.4 times too big beside his face, and a fist on his jaw covered his whole head. The punches
+  are three: the straight right (drawn back to the shoulder), the hook (wound out wide, elbow up), the uppercut (dropped
+  low), each wind-up about half the way to the blow (`facePunchSeconds` 0.44, impact at 0.45: at 0.32 the fist went from the
+  guard to the face in seven frames and nobody saw it), the knuckles -- not the wrist the IK places -- on the face
+  (`ViewModelRig.Knuckles`), a beat on the face, then home before the next is allowed. The overhand (0.62 s) still finishes.
+* **A melee kill knocks the body over along the blow** (`EnemyDeath.Classify`: melee before the head check). Dropped by the
+  head-shot clip, a man finished by the overhand at arm's length folded forward onto the player and the camera ended inside
+  him. That also matches what `RagdollController` always said: fists and boots go straight to the ragdoll.
+* **Film on open navmesh.** At the desert's start the player stands just off the navmesh (the shop front); the held man's
+  agent cannot follow, and he was held at 1.02 m instead of 0.68 -- small and far in every frame, his punch out of reach.
+  `OntoOpenGround` moves the player first. In play the same happens wherever the player stands off the mesh: held further.
+* Checks: VerifyGrapple adds G10 (not punched, his punch lands after a visible wind-up, the hand is knocked and holds on), G11
+  (a punch into his wind-up stops it, nothing reaches the player) and makes G5 the wrench free and the run (1.0 -> 3.1 m in
+  1.2 s); G3 caught the first punch out of the struggle turning the head 75 degrees in two frames (the impacts' snap is now
+  three quarters, their blend 0.06 s; 63 degrees).

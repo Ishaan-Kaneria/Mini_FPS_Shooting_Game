@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -501,37 +502,68 @@ namespace FPSKit.EditorTools
                 back.duration = 0.2f;
             }
 
-            // Held by the head (MeleeGrapple): the hold, a loop, and a fist to the face over it -- keyed in Blender after the
-            // film Master (Tools/blender/enemy_grabbed_clips.py). Entered from Idle and left for it, never from Any State:
-            // with "Grabbed" held true, an Any State transition re-entered the hold every frame and cut the impact off.
+            // Held by the head (MeleeGrapple): the struggle, a loop -- pulling back against the hand with the feet going --
+            // and over it the punches to his face (the hook's impact, and the straight's and the uppercut's), his own punch
+            // at the holder (wind-up, swing, back to the arm) and the wrench free, all keyed in Blender
+            // (Tools/blender/enemy_grabbed_clips.py) and set off by EnemyBody as the AI decides. Entered from Idle and left
+            // for it, never from Any State: with "Grabbed" held true, an Any State transition re-entered the hold every
+            // frame and cut the impact off.
             controller.AddParameter("Grabbed", AnimatorControllerParameterType.Bool);
-            controller.AddParameter("GrabbedHit", AnimatorControllerParameterType.Trigger);
             var heldClip = GrabbedClip("Enemy_HeadGrabbed_Held");
             var hitClip = GrabbedClip("Enemy_HeadGrabbed_Impact");
+            var hitBClip = GrabbedClip("Enemy_HeadGrabbed_ImpactB");
+            var counterClip = GrabbedClip("Enemy_HeadGrabbed_Counter");
+            var wrenchClip = GrabbedClip("Enemy_HeadGrabbed_Wrench");
             if (heldClip != null && hitClip != null)
             {
                 var held = actionMachine.AddState("Grabbed");
                 held.motion = heldClip;
-                var hit = actionMachine.AddState("GrabbedHit");
-                hit.motion = hitClip;
                 var take = idle.AddTransition(held);
                 take.AddCondition(AnimatorConditionMode.If, 0f, "Grabbed");
                 take.hasExitTime = false;
                 take.duration = 0.15f;
-                var punched = held.AddTransition(hit);
-                punched.AddCondition(AnimatorConditionMode.If, 0f, "GrabbedHit");
-                punched.hasExitTime = false;
-                punched.duration = 0.04f;
-                var again = hit.AddTransition(hit);
-                again.AddCondition(AnimatorConditionMode.If, 0f, "GrabbedHit");
-                again.hasExitTime = false;
-                again.duration = 0.04f;
-                var settle = hit.AddTransition(held);
-                settle.hasExitTime = true;
-                settle.exitTime = 0.9f;
-                settle.duration = 0.1f;
-                foreach (var from in new[] { held, hit })
+
+                AnimatorState GrabMove(string name, AnimationClip clip, float exit, float settle)
                 {
+                    if (clip == null) return null;
+                    controller.AddParameter(name, AnimatorControllerParameterType.Trigger);
+                    var st = actionMachine.AddState(name);
+                    st.motion = clip;
+                    if (exit > 0f)
+                    {
+                        var back = st.AddTransition(held);
+                        back.hasExitTime = true;
+                        back.exitTime = exit;
+                        back.duration = settle;
+                    }
+                    return st;
+                }
+                void Into(AnimatorState from, AnimatorState to, float blend)
+                {
+                    if (from == null || to == null) return;
+                    var tr = from.AddTransition(to);
+                    tr.AddCondition(AnimatorConditionMode.If, 0f, to.name);
+                    tr.hasExitTime = false;
+                    tr.duration = blend;
+                }
+
+                var hit = GrabMove("GrabbedHit", hitClip, 0.9f, 0.1f);
+                var hitB = GrabMove("GrabbedHitB", hitBClip, 0.9f, 0.1f);
+                var counter = GrabMove("GrabbedCounter", counterClip, 0.95f, 0.1f);
+                var wrench = GrabMove("GrabbedWrench", wrenchClip, 0f, 0f);   // held to its last frame until he is let go
+                var grabbed = new[] { held, hit, hitB, counter, wrench };
+                // Punches land from anywhere in the fight (one in his wind-up knocks it out of him); his own punch and the
+                // wrench start from the struggle or from a punch's impact still settling.
+                foreach (var from in new[] { held, hit, hitB, counter })
+                {
+                    Into(from, hit, 0.06f);
+                    Into(from, hitB, 0.06f);
+                    Into(from, wrench, 0.1f);
+                }
+                foreach (var from in new[] { held, hit, hitB }) Into(from, counter, 0.1f);
+                foreach (var from in grabbed)
+                {
+                    if (from == null) continue;
                     var letGo = from.AddTransition(idle);
                     letGo.AddCondition(AnimatorConditionMode.IfNot, 0f, "Grabbed");
                     letGo.hasExitTime = false;
@@ -743,13 +775,21 @@ namespace FPSKit.EditorTools
         {
             if (AssetImporter.GetAtPath(GrabbedClips) is ModelImporter mi)
             {
+                // Re-set whenever Blender's file has takes the import does not (a new clip added to the script).
+                var takes = new HashSet<string>(mi.clipAnimations.Select(c => c.takeName));
                 bool dirty = mi.animationType != ModelImporterAnimationType.Human || mi.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel
-                             || mi.materialImportMode != ModelImporterMaterialImportMode.None || mi.clipAnimations.Length == 0;
+                             || mi.materialImportMode != ModelImporterMaterialImportMode.None || mi.clipAnimations.Length == 0
+                             || mi.defaultClipAnimations.Any(c => !takes.Contains(c.takeName)) || mi.clipAnimations.Length != mi.defaultClipAnimations.Length;
                 if (dirty)
                 {
                     mi.animationType = ModelImporterAnimationType.Human;
                     mi.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
                     mi.materialImportMode = ModelImporterMaterialImportMode.None;
+                    // Mapped again from the file: the stored mapping names the skeleton as the last file had it (Blender
+                    // called the armature "Armature.002" in one session, "Armature" in the next), and a stale one fails the
+                    // avatar and with it every clip.
+                    mi.humanDescription = new HumanDescription { human = new HumanBone[0], skeleton = new SkeletonBone[0] };
+                    mi.autoGenerateAvatarMappingIfUnspecified = true;
                     mi.SaveAndReimport();
                     var clips = new List<ModelImporterClipAnimation>();
                     foreach (var take in mi.defaultClipAnimations)
@@ -763,8 +803,9 @@ namespace FPSKit.EditorTools
                     mi.SaveAndReimport();
                 }
             }
+            string suffix = "_" + name.Substring(name.LastIndexOf('_') + 1);
             foreach (var a in AssetDatabase.LoadAllAssetsAtPath(GrabbedClips))
-                if (a is AnimationClip c && !c.name.StartsWith("__") && c.name.EndsWith(name.Substring(name.LastIndexOf('_') + 1)) && c.name.Contains("HeadGrabbed")) return c;
+                if (a is AnimationClip c && !c.name.StartsWith("__") && c.name.EndsWith(suffix) && c.name.Contains("HeadGrabbed")) return c;
             Debug.LogWarning("[FPSKit] Rigged soldier: no head-grab clip " + name + " in " + GrabbedClips);
             return null;
         }

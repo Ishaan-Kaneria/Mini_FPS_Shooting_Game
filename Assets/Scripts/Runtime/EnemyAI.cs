@@ -585,6 +585,14 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
+        // Free of a hold by its own effort: it runs before it fights again (brain or not).
+        if (Bolting)
+        {
+            UpdateBolt();
+            UpdateAnimator();
+            return;
+        }
+
         // A thinking enemy (EnemyBrain) decides for itself what to do with the frame; this
         // body carries it out. The hunt's quarry still runs on the old rules below.
         if (_brain != null && _brain.isActiveAndEnabled && !forcedFlight)
@@ -1346,23 +1354,49 @@ public class EnemyAI : MonoBehaviour
     // ---- held by the head, doubled over (MeleeStrike's grab and punch) ----
 
     /// <summary>
-    /// Whoever holds it by the head, or null. While held it cannot shoot, move off or break free: it is kept
-    /// <see cref="MeleeSettings.holdDistance"/> in front of the holder, facing them (<see cref="HoldInPlace"/>),
-    /// through the agent or the motor -- nothing is parented, the navmesh still holds it.
+    /// Whoever holds it by the head, or null. While held it cannot shoot or walk off: it is kept
+    /// <see cref="MeleeSettings.holdDistance"/> in front of the holder, facing them (<see cref="HoldInPlace"/>), through the
+    /// agent or the motor -- nothing is parented, the navmesh still holds it. It fights the hold (<see cref="UpdateStruggle"/>):
+    /// pulls back against it, winds up its free fist and punches the holder unless a punch to its face stops it first, and
+    /// left alone, or after landing <see cref="MeleeSettings.countersToBreak"/> punches, wrenches itself free and runs.
     /// </summary>
     [System.NonSerialized] public Transform GrappledBy;
 
     /// <summary>Where the holder's hand is on its head, in the world (the body leans into it: EnemyBody).</summary>
     [System.NonSerialized] public Vector3 GrabPoint;
 
+    /// <summary>Where the holder's wrist is seen, in the world: the held body's hands pull at it (EnemyBody).</summary>
+    [System.NonSerialized] public Vector3 GrabWrist;
+
+    /// <summary>What a held enemy is doing about it.</summary>
+    public enum HeldMove { Pull, Wind, Swing, Wrench }
+
+    /// <summary>What it is doing about the hold now (EnemyBody plays the matching clip).</summary>
+    public HeldMove Struggle { get; private set; }
+
+    /// <summary>Seconds into <see cref="Struggle"/>'s current move.</summary>
+    public float StruggleTime => Time.time - _struggleSince;
+
+    /// <summary>When its last punch landed on the holder (Time.time), or below zero for never.</summary>
+    public float CounterLandedAt { get; private set; } = -1f;
+
+    /// <summary>Its punches that have landed on the holder in this hold.</summary>
+    public int CountersLanded { get; private set; }
+
     float _holdDistance;
     float _doubledUntil;
+    float _struggleSince, _nextCounter, _lastHeldBlow, _heldSince;
+    float _boltUntil;
+    Vector3 _boltGoal;
 
     /// <summary>Held by the head right now.</summary>
     public bool Grappled => GrappledBy != null && CurrentState != State.Dead;
 
     /// <summary>Folded over a blow to the belly right now.</summary>
     public bool DoubledOver => CurrentState != State.Dead && Time.time < _doubledUntil;
+
+    /// <summary>Broken free of a hold and running from the holder right now.</summary>
+    public bool Bolting => CurrentState != State.Dead && Time.time < _boltUntil;
 
     /// <summary>Metres the held body is from where the hold keeps it: more than the grip allows, and it is let go.</summary>
     public float HoldSlip { get; private set; }
@@ -1371,9 +1405,16 @@ public class EnemyAI : MonoBehaviour
     public void Grapple(Transform by, float distance)
     {
         if (CurrentState == State.Dead || by == null) return;
+        var s = MeleeSettings.Active;
         GrappledBy = by;
         _holdDistance = distance;
         HoldSlip = 0f;
+        _heldSince = _lastHeldBlow = Time.time;
+        _nextCounter = Time.time + s.counterFirstAfter;
+        CountersLanded = 0;
+        CounterLandedAt = -1f;
+        _boltUntil = 0f;
+        BeginStruggle(HeldMove.Pull);
         ForceStagger(600f);
     }
 
@@ -1383,8 +1424,95 @@ public class EnemyAI : MonoBehaviour
         if (GrappledBy == null) return;
         GrappledBy = null;
         HoldSlip = 0f;
+        BeginStruggle(HeldMove.Pull);
         _staggerUntil = Time.time + Mathf.Max(0.05f, staggerSeconds);
         _nextAttackTime = Mathf.Max(_nextAttackTime, _staggerUntil + flinchAttackDelay);
+    }
+
+    /// <summary>
+    /// A punch to its face landed while it is held (MeleeGrapple): a wind-up or a swing in flight is knocked out of it,
+    /// it cannot start another for <see cref="MeleeSettings.counterAfterBlow"/>, and the clock to its breaking free
+    /// starts again.
+    /// </summary>
+    public void TakeHeldBlow()
+    {
+        if (!Grappled) return;
+        var s = MeleeSettings.Active;
+        _lastHeldBlow = Time.time;
+        if (Struggle == HeldMove.Wind || Struggle == HeldMove.Swing) BeginStruggle(HeldMove.Pull);
+        _nextCounter = Mathf.Max(_nextCounter, Time.time + s.counterAfterBlow);
+    }
+
+    void BeginStruggle(HeldMove move)
+    {
+        Struggle = move;
+        _struggleSince = Time.time;
+    }
+
+    /// <summary>
+    /// The held body's fight, one step a frame: pulling back against the hold, then the wind-up, the swing and its punch
+    /// landing on the holder, and the wrench free once it has been left alone for <see cref="MeleeSettings.releaseAfter"/>
+    /// or has landed enough punches.
+    /// </summary>
+    void UpdateStruggle()
+    {
+        var s = MeleeSettings.Active;
+        float now = Time.time;
+        switch (Struggle)
+        {
+            case HeldMove.Pull:
+                if (now - _lastHeldBlow >= s.releaseAfter || CountersLanded >= s.countersToBreak) BeginStruggle(HeldMove.Wrench);
+                else if (now >= _nextCounter && !Flinching) BeginStruggle(HeldMove.Wind);
+                break;
+            case HeldMove.Wind:
+                if (StruggleTime >= s.counterWindup) BeginStruggle(HeldMove.Swing);
+                break;
+            case HeldMove.Swing:
+                if (StruggleTime >= s.counterSwing)
+                {
+                    LandCounter(s);
+                    BeginStruggle(HeldMove.Pull);
+                    _nextCounter = now + Random.Range(Mathf.Min(s.counterEvery.x, s.counterEvery.y), Mathf.Max(s.counterEvery.x, s.counterEvery.y));
+                }
+                break;
+            case HeldMove.Wrench:
+                if (StruggleTime >= s.wrenchSeconds) BreakFree(s);
+                break;
+        }
+    }
+
+    // A punch to the face a moment ago: it reels from it rather than throw one.
+    bool Flinching => Time.time - _lastHeldBlow < 0.12f;
+
+    /// <summary>Its fist arrives on the holder's face.</summary>
+    void LandCounter(MeleeSettings s)
+    {
+        if (GrappledBy == null) return;
+        var victim = GrappledBy.GetComponentInParent<Health>();
+        if (victim == null || victim.IsDead) return;
+        Vector3 face = GrappledBy.position + Vector3.up * 1.6f;
+        Vector3 dir = face - (transform.position + Vector3.up * 1.5f);
+        dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : transform.forward;
+        float dealt = victim.ApplyDamage(new DamageInfo(Mathf.Max(1f, attackDamage * s.counterDamage), face, -dir, dir, gameObject) { fromMelee = true });
+        if (dealt <= 0f) return;
+        CountersLanded++;
+        CounterLandedAt = Time.time;
+        if (_voice != null) _voice.OnAttack(false);
+    }
+
+    /// <summary>Free of the hold by its own effort: it runs from the holder for a while before it fights again.</summary>
+    void BreakFree(MeleeSettings s)
+    {
+        var by = GrappledBy;
+        if (by == null) return;
+        ReleaseGrapple(0.05f);
+        _nextAttackTime = Mathf.Max(_nextAttackTime, Time.time + s.boltSeconds);
+        Vector3 away = transform.position - by.position; away.y = 0f;
+        away = away.sqrMagnitude > 0.0001f ? away.normalized : -transform.forward;
+        Vector3 goal = transform.position + away * 8f;
+        if (NavMesh.SamplePosition(goal, out var hit, 4f, NavMesh.AllAreas)) goal = hit.position;
+        _boltGoal = goal;
+        _boltUntil = Time.time + s.boltSeconds;
     }
 
     /// <summary>Folded over a hook to the belly for <paramref name="seconds"/>, its attack taken away.</summary>
@@ -1397,15 +1525,30 @@ public class EnemyAI : MonoBehaviour
 
     /// <summary>
     /// Kept in front of whoever holds it, facing them: drawn in fast each frame, so it follows the holder's turns and
-    /// steps; a wall or a ledge on the navmesh stops it, and the slip that leaves tells the holder to let go.
+    /// steps; a wall or a ledge on the navmesh stops it, and the slip that leaves tells the holder to let go. It pulls
+    /// against the hold as it struggles (back and to the sides, harder as it wrenches free), and the holder's hand on its
+    /// head goes with it.
     /// </summary>
     void HoldInPlace()
     {
+        UpdateStruggle();
+        if (!Grappled) return;
+
+        var s = MeleeSettings.Active;
         Vector3 forward = GrappledBy.forward; forward.y = 0f;
         if (forward.sqrMagnitude < 0.0001f) forward = transform.position - GrappledBy.position;
         forward.y = 0f;
         forward.Normalize();
-        Vector3 pin = GrappledBy.position + forward * _holdDistance;
+        float t = Time.time - _heldSince;
+        // Back and forth only: a sideways sway turned the view of a player keeping his head in sight, the hold followed
+        // the view, and the two went round each other.
+        float tug = s.struggleTug * (0.5f - 0.5f * Mathf.Cos(t * Mathf.PI * 2f / 0.8f));
+        if (Struggle == HeldMove.Wrench) tug += 0.3f * Mathf.Clamp01(StruggleTime / Mathf.Max(0.05f, s.wrenchSeconds));
+        // Set back for his punch, then into it: his arm alone stopped 30 cm short of the holder's face across the hold
+        // (filmed from the side), so the fist never came at the player's eye.
+        else if (Struggle == HeldMove.Wind) tug = 0.03f * Mathf.Clamp01(StruggleTime / 0.2f);
+        else if (Struggle == HeldMove.Swing) tug = -0.16f;
+        Vector3 pin = GrappledBy.position + forward * (_holdDistance + tug);
         Vector3 delta = pin - transform.position; delta.y = 0f;
         HoldSlip = delta.magnitude;
         // Fast enough to stay at arm's length at a walk (at 14 a second he trailed 0.2 m in, against the player's face).
@@ -1419,6 +1562,15 @@ public class EnemyAI : MonoBehaviour
         if (face.sqrMagnitude < 0.001f) return;
         if (motor != null && motor.RootMotion) motor.Face(GrappledBy.position);
         else transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(face), 12f * Time.deltaTime);
+    }
+
+    /// <summary>Broken free: running for <see cref="_boltGoal"/> until the bolt runs out.</summary>
+    void UpdateBolt()
+    {
+        CurrentState = State.Retreat;
+        if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh) return;
+        MoveTo(_boltGoal, 1.3f);
+        if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance + 0.3f) _boltUntil = 0f;
     }
 
     /// <summary>Knocked off balance right now: by a heavy hit, a wound or a strike.</summary>
@@ -1555,6 +1707,7 @@ public class EnemyAI : MonoBehaviour
         CurrentState = State.Dead;
         GrappledBy = null;
         _doubledUntil = 0f;
+        _boltUntil = 0f;
         _attacking = false;
         StopAllCoroutines();
         ClearTelegraph();

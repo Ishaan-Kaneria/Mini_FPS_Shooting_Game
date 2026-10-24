@@ -20,7 +20,10 @@ namespace FPSKit.EditorTools
     /// - G3 each press is a punch to the face: it lands, takes some of him, never finishes him, and his head answers it
     ///   within two frames. Nothing slows the world (Time.timeScale stays 1).
     /// - G4 the overhand ends an ordinary enemy and lets go of him.
-    /// - G5 held and left alone, the hold breaks after releaseAfter: let go, reeling.
+    /// - G5 held and left alone, he wrenches himself free after releaseAfter and runs (Ishaan, 2026-10-22: "the enemy also
+    ///   don't try to run or punch when I hold it").
+    /// - G10 held and not punched, he winds up and his punch lands on the player (the view shakes, the hand is knocked).
+    /// - G11 a punch to his face thrown into his wind-up stops it: nothing reaches the player.
     /// - G6 an elite at full health is not grabbed (the rifle butt instead); badly hurt, it is; the overhand leaves it on
     ///   the floor, not dead.
     /// - G7 a boss is never grabbed.
@@ -60,6 +63,8 @@ namespace FPSKit.EditorTools
         static float _minTimeScale = 1f;
 
         static int _landed, _missed;
+        static GameObject _hurtBy;
+        static int _hurt;
         static MeleeStrike.Strike _lastLanded;
         static int _landedFrame;
 
@@ -141,6 +146,8 @@ namespace FPSKit.EditorTools
             _melee = _player.GetComponent<MeleeStrike>();
             _melee.Landed += (m, s, t) => { _landed++; _lastLanded = s; _landedFrame = Time.frameCount; };
             _melee.Missed += (m, s) => _missed++;
+            var self = _player.GetComponent<Health>();
+            if (self != null) self.Damaged += (h, info) => { if (_hurtBy != null && info.source == _hurtBy && info.fromMelee) _hurt++; };
 
             _floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             _floor.name = "Grapple_Floor";
@@ -241,7 +248,7 @@ namespace FPSKit.EditorTools
             Require(!_melee.Holding, "G4 and lets go of him");
             Require(_minTimeScale >= 0.999f, $"G3/G4 nothing slowed the world (lowest timeScale {_minTimeScale:0.000})");
 
-            // ---- G5: left alone, the hold breaks ----
+            // ---- G10, G5: held and left alone, he punches back, then wrenches free and runs ----
             yield return Fresh();
             t = Enemy(Ahead(0.85f), "Grunt");
             ai = t.GetComponent<EnemyAI>();
@@ -252,10 +259,49 @@ namespace FPSKit.EditorTools
             yield return Until(() => _melee.Holding, 1.5f);
             ai.target = _player.transform;
             ai.enabled = true;
-            yield return Seconds(s.releaseAfter + 0.4f);
-            Require(!_melee.Holding && !ai.Grappled, $"G5 held and left alone, he is let go after {s.releaseAfter:0.0} s (holding {_melee.Holding}, grappled {ai.Grappled})");
-            Require(ai.IsStaggered, "G5 and he reels from the shove");
+            _hurtBy = t; _hurt = 0;
+            float grabbedAt = Time.time;
+            yield return Until(() => _hurt > 0 || !ai.Grappled, s.counterFirstAfter + s.counterWindup + s.counterSwing + 0.5f);
+            float landedAfter = Time.time - grabbedAt;
+            Require(_hurt > 0 && ai.CountersLanded == 1, $"G10 held and not punched, his punch lands on the player ({_hurt} blows taken, {landedAfter:0.00} s after the grab; counters {ai.CountersLanded})");
+            Require(landedAfter >= s.counterFirstAfter + s.counterWindup - 0.05f, $"G10 after a wind-up the player could see ({landedAfter:0.00} s; first try at {s.counterFirstAfter:0.00} + wind-up {s.counterWindup:0.00})");
+            yield return null;
+            Require(_melee.GripKnock > 0.5f && _melee.Holding, $"G10 the holding hand is knocked and holds on (knock {_melee.GripKnock:0.00}, holding {_melee.Holding})");
+            yield return Until(() => !ai.Grappled, s.releaseAfter + s.wrenchSeconds + 0.5f);
+            float freedAt = Time.time - grabbedAt;
+            yield return null;   // the hand lets go on the player's next frame
+            Require(!_melee.Holding && !ai.Grappled && ai.Bolting, $"G5 left alone, he wrenches himself free ({freedAt:0.00} s after the grab; releaseAfter {s.releaseAfter:0.0} + wrench {s.wrenchSeconds:0.0}) and runs (bolting {ai.Bolting})");
+            float near = Flat(t.transform.position - _player.transform.position).magnitude;
+            yield return Seconds(1.2f);
+            float far = Flat(t.transform.position - _player.transform.position).magnitude;
+            Require(far > near + 2f, $"G5 running from the player ({near:0.0} m -> {far:0.0} m in 1.2 s)");
             ai.enabled = false;
+            _hurtBy = null;
+
+            // ---- G11: a punch into his wind-up stops it ----
+            yield return Fresh();
+            t = Enemy(Ahead(0.85f), "Grunt");
+            ai = t.GetComponent<EnemyAI>();
+            yield return Frames(3);
+            Look(Head(t));
+            yield return Frames(3);
+            _melee.TryPunch();
+            yield return Until(() => _melee.Holding, 1.5f);
+            ai.target = _player.transform;
+            ai.enabled = true;
+            _hurtBy = t; _hurt = 0;
+            yield return Until(() => ai.Struggle == EnemyAI.HeldMove.Wind, s.counterFirstAfter + 0.5f);
+            bool winding = ai.Struggle == EnemyAI.HeldMove.Wind;
+            yield return Until(() => Time.time >= _melee.ReadyAt, 0.5f);
+            Count();
+            _melee.TryPunch();
+            yield return Until(() => _landed > 0 || _missed > 0, 1f);
+            var after = ai.Struggle;
+            yield return Seconds(s.counterWindup + s.counterSwing);
+            Require(winding && _landed == 1 && after == EnemyAI.HeldMove.Pull, $"G11 a punch thrown into his wind-up lands and stops it (winding {winding}, landed {_landed}, then {after})");
+            Require(_hurt == 0 && ai.CountersLanded == 0, $"G11 and nothing reaches the player ({_hurt} blows taken, counters {ai.CountersLanded})");
+            ai.enabled = false;
+            _hurtBy = null;
 
             // ---- G6: an elite ----
             yield return Fresh();
@@ -355,7 +401,7 @@ namespace FPSKit.EditorTools
             ai.enabled = true;
             yield return Frames(5);
             Vector3 stood = _player.transform.position;
-            yield return Seconds(0.35f);   // all of G9 inside releaseAfter: an idle hold breaks at 1.6 s
+            yield return Seconds(0.35f);   // all of G9 inside releaseAfter: left alone he breaks free at 2.2 s
             float drift = Flat(_player.transform.position - stood).magnitude;
             Require(_melee.Holding && drift < 0.005f, $"G9 standing and holding him, the player stays put ({drift * 1000f:0.0} mm)");
             float surge = 0f, walked = 0f;

@@ -6,11 +6,16 @@ using UnityEngine;
 ///
 /// - **Face to face** (his head within <see cref="MeleeSettings.grabRange"/> of the eye, the crosshair on it, and him
 ///   facing the player): the press takes him by the head. The rifle swings onto the back first, as for the fists.
-/// - **Held**: each press is a punch to the face (<see cref="MeleeSettings.facePunchesBeforeFinisher"/> of them, which
-///   never finish him: <see cref="MeleeSettings.heldFloor"/>), then the overhand brought down from above the head, which
-///   ends an ordinary enemy and leaves an elite on the floor. A held enemy cannot shoot or break free; nobody else
-///   stops shooting. With no press for <see cref="MeleeSettings.releaseAfter"/> seconds, or the player reaching for
-///   the gun, or the body slipping from the grip (a wall), he is shoved off, dazed.
+/// - **Held**: the left hand has him by the side of the head, behind the ear, so his face is clear in the middle of the
+///   view. Each press is a punch to the face -- the straight right, the hook, the uppercut, in turn
+///   (<see cref="MeleeSettings.facePunchesBeforeFinisher"/> of them, which never finish him:
+///   <see cref="MeleeSettings.heldFloor"/>) -- then the overhand brought down from above the head, which ends an
+///   ordinary enemy and leaves an elite on the floor. He fights it (Ishaan, 2026-10-22: "the enemy also don't try to run
+///   or punch when I hold it"; <see cref="EnemyAI.UpdateStruggle"/>): he pulls back against the hand, winds his free fist
+///   up and punches the player unless a punch to his face gets there first, and left alone for
+///   <see cref="MeleeSettings.releaseAfter"/>, or after landing <see cref="MeleeSettings.countersToBreak"/> punches,
+///   wrenches himself free and runs. He cannot shoot; nobody else stops shooting. The player reaching for the gun, or
+///   the body slipping from the grip (a wall), shoves him off, dazed.
 /// - **A hook at the belly** (fists up, the blow aimed low): he folds over it for
 ///   <see cref="MeleeSettings.doubledSeconds"/>, and the next press takes him by the back of the head, bent, as the
 ///   film's opponent is taken.
@@ -28,6 +33,7 @@ public partial class MeleeStrike
     int _heldBlows;
     float _holdBreakAt;
     bool _heldBent;
+    float _counterSeen, _tornUntil;
 
     /// <summary>Someone is held by the head.</summary>
     public bool Holding => _held != null;
@@ -47,6 +53,12 @@ public partial class MeleeStrike
     /// <summary>Where the blow in flight lands, in the world: the face, or the belly for the hook.</summary>
     public Vector3 StrikePoint { get; private set; }
 
+    /// <summary>Which punch to the face is in flight: 0 the straight right, 1 the hook, 2 the uppercut.</summary>
+    public int PunchKind { get; private set; }
+
+    /// <summary>His punch has just knocked the holding hand: 1 on the frame it lands, back to 0 over a third of a second.</summary>
+    public float GripKnock { get; private set; }
+
     /// <summary>The blows of the grab and punch, which have their own targets and damage.</summary>
     public static bool IsGrappleStrike(Strike s) => s == Strike.Grab || s == Strike.FacePunch || s == Strike.Overhand || s == Strike.BodyBlow;
 
@@ -61,6 +73,7 @@ public partial class MeleeStrike
         if (_held != null)
         {
             var next = _heldBlows < s.facePunchesBeforeFinisher ? Strike.FacePunch : Strike.Overhand;
+            if (next == Strike.FacePunch) PunchKind = _heldBlows % 3;
             hit = Throw(next, 0f, _heldHealth);
             return true;
         }
@@ -156,22 +169,54 @@ public partial class MeleeStrike
         return point;
     }
 
-    /// <summary>Where the hand holds his head: over the crown and round the back of it, from the player's side.</summary>
+    /// <summary>
+    /// Where the hand holds his head: by the back of the neck from the player's left side, under the ear, so the hand is
+    /// below his face and the forearm stays in the corner of the view. Held over the crown, and then beside the head, the
+    /// first-person forearm (an arm reaching up to eye height passes close to the eye) covered the face and every punch
+    /// landed out of sight (filmed, Build/PlayerShots/desert_video).
+    /// </summary>
     Vector3 GripOn(Health target)
     {
-        Vector3 head = HeadOf(target);
-        Vector3 toPlayer = fpsCamera.transform.position - head; toPlayer.y = 0f;
-        toPlayer = toPlayer.sqrMagnitude > 0.0001f ? toPlayer.normalized : -target.transform.forward;
-        return head + Vector3.up * 0.07f - toPlayer * 0.03f;
+        Vector3 eye = HeadOf(target);
+        Frame(eye, target, out Vector3 toPlayer, out Vector3 left);
+        return eye - toPlayer * 0.065f + left * 0.08f - Vector3.up * 0.135f;
     }
 
-    /// <summary>The face, from the player's side.</summary>
+    /// <summary>
+    /// Where the punch in flight lands on the face: the nose for the straight right, his left cheek (the player's right)
+    /// for the hook, under the chin for the uppercut.
+    /// </summary>
     Vector3 FaceOf(Health target)
     {
-        Vector3 head = HeadOf(target);
-        Vector3 toPlayer = fpsCamera.transform.position - head; toPlayer.y = 0f;
+        Vector3 eye = HeadOf(target);
+        Frame(eye, target, out Vector3 toPlayer, out Vector3 left);
+        Vector3 nose = eye + toPlayer * 0.03f - Vector3.up * 0.035f;
+        if (Current != Strike.FacePunch) return nose;
+        return PunchKind switch
+        {
+            1 => nose - left * 0.055f - toPlayer * 0.02f,
+            2 => nose - Vector3.up * 0.075f - toPlayer * 0.01f,
+            _ => nose,
+        };
+    }
+
+    /// <summary>
+    /// Under the holding wrist, where his right hand takes it: off the grip towards the player and down (the clip's
+    /// MY_WRIST, Tools/blender/enemy_grabbed_clips.py).
+    /// </summary>
+    Vector3 WristOf(Health target)
+    {
+        Vector3 eye = HeadOf(target);
+        Frame(eye, target, out Vector3 toPlayer, out Vector3 left);
+        return GrabPoint + toPlayer * 0.075f + left * 0.07f - Vector3.up * 0.065f;
+    }
+
+    /// <summary>The flat way from his head to the player, and the player's left.</summary>
+    void Frame(Vector3 head, Health target, out Vector3 toPlayer, out Vector3 left)
+    {
+        toPlayer = fpsCamera.transform.position - head; toPlayer.y = 0f;
         toPlayer = toPlayer.sqrMagnitude > 0.0001f ? toPlayer.normalized : -target.transform.forward;
-        return head + toPlayer * 0.09f - Vector3.up * 0.04f;
+        left = Vector3.Cross(toPlayer, Vector3.up).normalized;
     }
 
     // ======================================================================
@@ -191,6 +236,7 @@ public partial class MeleeStrike
             _held = ai;
             _heldHealth = target;
             _heldBlows = 0;
+            _counterSeen = Time.time;
             _holdBreakAt = Time.time + s.releaseAfter;
             GrabPoint = GripOn(target);
             ai.Grapple(transform, s.holdDistance);
@@ -241,11 +287,12 @@ public partial class MeleeStrike
             case Strike.FacePunch:
                 _heldBlows++;
                 _holdBreakAt = Time.time + s.releaseAfter;
-                if (body != null) body.Punched(dir, 1f);
+                if (ai != null) ai.TakeHeldBlow();
+                if (body != null) body.Punched(dir, 1f, PunchKind);
                 break;
 
             case Strike.Overhand:
-                if (body != null) body.Punched(dir, 1.3f);
+                if (body != null) body.Punched(dir, 1.3f, 2);
                 LetGo(shove: false);
                 // Dead, the body drops where it stands (a blow to the head: EnemyDeath's Drop). Alive (an elite), it is
                 // driven down onto the floor and gets up hurt.
@@ -287,19 +334,34 @@ public partial class MeleeStrike
             GrabHold = k < at ? UITheme.EaseOut(Mathf.Clamp01(k / at)) : 1f;
         }
         else if (_held != null) GrabHold = 1f;
-        else GrabHold = Mathf.MoveTowards(GrabHold, 0f, Time.deltaTime / 0.22f);
+        else GrabHold = Mathf.MoveTowards(GrabHold, 0f, Time.deltaTime / (Time.time < _tornUntil ? 0.08f : 0.22f));
+        GripKnock = Mathf.MoveTowards(GripKnock, 0f, Time.deltaTime / 0.33f);
 
         if (_held == null) return;
         _held.GrabPoint = GrabPoint;
+        _held.GrabWrist = WristOf(_heldHealth);
         _fistsUntil = Mathf.Max(_fistsUntil, Time.time + s.fistIdleSeconds);
 
+        // His punch landed on the player: a landed blow, so the view shakes (the only thing that moves it), and the
+        // holding hand is knocked.
+        if (_held.CounterLandedAt > _counterSeen)
+        {
+            _counterSeen = _held.CounterLandedAt;
+            GripKnock = 1f;
+            if (_motor != null) _motor.AddShake(s.counterShake);
+            PlayClip(hitClip, 0.7f);
+        }
+
+        // He wrenched himself free (EnemyAI.BreakFree), died, or was finished: let go, the hand torn off him.
         bool gone = _heldHealth == null || _heldHealth.IsDead || _held.CurrentState == EnemyAI.State.Dead || !_held.Grappled;
         bool wantsGun = ControlSettings.Pressed(keys.fire) || ControlSettings.Pressed(keys.aim) || ControlSettings.Pressed(keys.reload)
                         || MobileInput.Fire || MobileInput.Aim
                         || GameInput.PadPressed(GameAction.Fire) || GameInput.PadPressed(GameAction.Aim) || GameInput.PadPressed(GameAction.Reload);
         bool slipped = _held.HoldSlip > 0.9f;
-        bool idle = Time.time > _holdBreakAt && Current == Strike.None;
+        // A body that does not fight the hold (its AI off) is shoved off after a while; one that does breaks free itself.
+        bool idle = Time.time > _holdBreakAt + 1.5f && Current == Strike.None;
         bool dead = _self != null && _self.IsDead;
+        if (gone && _held.Bolting) { GripKnock = 1f; _tornUntil = Time.time + 0.3f; }   // torn off him: the hand thrown off
         if (gone || wantsGun || slipped || idle || dead) LetGo(shove: !gone && !dead);
     }
 

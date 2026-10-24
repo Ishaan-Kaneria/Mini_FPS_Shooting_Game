@@ -137,18 +137,21 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Degrees off facing the player inside which a standing enemy can be taken by the face. One doubled up over " +
              "a body blow is taken by the back of the head whichever way he faces.")]
     [Range(20f, 120f)] public float grabFacingDegrees = 75f;
-    [Tooltip("Metres from the player to the body of the enemy held by the head: he is pulled in to this and kept there.")]
-    [Range(0.4f, 1.2f)] public float holdDistance = 0.62f;
+    [Tooltip("Metres from the player to the body of the enemy held by the head: he is pulled in to this and kept there " +
+             "(he pulls against it). Far enough that his whole face is in the middle of the view, near enough to hit.")]
+    [Range(0.4f, 1.2f)] public float holdDistance = 0.68f;
     [Tooltip("Seconds the hand takes to reach the head and close on it.")]
     [Range(0.15f, 0.8f)] public float grabSeconds = 0.3f;
-    [Tooltip("Seconds each punch to the face of a held enemy takes.")]
-    [Range(0.15f, 0.8f)] public float facePunchSeconds = 0.32f;
+    [Tooltip("Seconds each punch to the face of a held enemy takes: a wind-up the player sees (drawn back, wound out or " +
+             "dropped low), the blow, a beat on the face and back. At 0.32 the fist went from the guard to the face in seven " +
+             "frames and nobody saw it (Ishaan, 2026-10-22).")]
+    [Range(0.15f, 0.8f)] public float facePunchSeconds = 0.44f;
     [Tooltip("Seconds the overhand (the finishing blow brought down from above the head) takes.")]
-    [Range(0.25f, 1.2f)] public float overhandSeconds = 0.5f;
+    [Range(0.25f, 1.2f)] public float overhandSeconds = 0.62f;
     [Tooltip("Seconds the hook to the belly takes.")]
     [Range(0.15f, 0.8f)] public float bodyBlowSeconds = 0.3f;
-    [Tooltip("Punches to the face before the next press is the overhand.")]
-    [Range(1, 4)] public int facePunchesBeforeFinisher = 2;
+    [Tooltip("Punches to the face before the next press is the overhand: the straight right, the hook, the uppercut, in turn.")]
+    [Range(1, 4)] public int facePunchesBeforeFinisher = 3;
     [Tooltip("Share of the pool each punch to a held face takes.")]
     public Shares facePunchDamage = new Shares(0.22f, 0.12f, 0f);
     [Tooltip("Share the overhand takes: over 1 ends an ordinary enemy (Ishaan's call: the final blow kills); an elite is " +
@@ -159,8 +162,8 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("A held enemy is never finished by the punches to the face: they leave him at least this share of his pool, " +
              "so the overhand is always the blow that ends it.")]
     [Range(0f, 0.5f)] public float heldFloor = 0.12f;
-    [Tooltip("Seconds without a press before the hold breaks and the enemy is shoved off, dazed.")]
-    [Range(0.4f, 4f)] public float releaseAfter = 1.6f;
+    [Tooltip("Seconds without a punch landing before the held enemy wrenches himself free and runs.")]
+    [Range(0.4f, 4f)] public float releaseAfter = 2.2f;
     [Tooltip("Seconds a hook to the belly folds an ordinary enemy over it (an elite 60%, a boss not at all): the window " +
              "in which the next press takes him by the back of the head.")]
     [Range(0.3f, 3f)] public float doubledSeconds = 1.4f;
@@ -171,6 +174,32 @@ public class MeleeSettings : ScriptableObject
     [Tooltip("Degrees it narrows when the overhand lands.")]
     [Range(0f, 8f)] public float finisherFovPulse = 2.8f;
     [Range(0f, 100f)] public float grabCost = 8f;
+
+    [Header("Held, he fights back (Ishaan, 2026-10-22: \"the enemy also don't try to run or punch when I hold it\")")]
+    [Tooltip("Seconds after the grab before a held enemy first winds up a punch at the player.")]
+    [Range(0.2f, 3f)] public float counterFirstAfter = 0.7f;
+    [Tooltip("Seconds between his tries after that (picked between the two each time).")]
+    public Vector2 counterEvery = new Vector2(1.0f, 1.5f);
+    [Tooltip("Seconds after a punch to his face before he can wind up again: a player who keeps hitting always gets in " +
+             "first, one who stops is hit.")]
+    [Range(0f, 2f)] public float counterAfterBlow = 0.35f;
+    [Tooltip("Seconds his wind-up takes (his free fist drawn back by his shoulder): the window in which a punch to his face " +
+             "stops it. Matches the keyed clip (Tools/blender/enemy_grabbed_clips.py, the hook lands at 0.55 s).")]
+    [Range(0.1f, 1f)] public float counterWindup = 0.45f;
+    [Tooltip("Seconds from the end of the wind-up to his fist arriving.")]
+    [Range(0.03f, 0.4f)] public float counterSwing = 0.1f;
+    [Tooltip("Share of his own attack damage his punch does to the player.")]
+    [Range(0f, 2f)] public float counterDamage = 0.6f;
+    [Tooltip("Camera shake when his punch lands on the player (a landed blow; scaled by Camera Shake).")]
+    [Range(0f, 1f)] public float counterShake = 0.45f;
+    [Tooltip("His punches landed before he breaks the hold.")]
+    [Range(1, 4)] public int countersToBreak = 2;
+    [Tooltip("Seconds he takes to wrench himself free (both hands thrown at the player's arm, the head ripped back).")]
+    [Range(0.1f, 1.2f)] public float wrenchSeconds = 0.6f;
+    [Tooltip("Seconds he runs from the player once free, before he turns to fight again.")]
+    [Range(0f, 6f)] public float boltSeconds = 2.4f;
+    [Tooltip("Metres he tugs back against the hold while he struggles (and the player's arm with him).")]
+    [Range(0f, 0.3f)] public float struggleTug = 0.07f;
     [Range(0f, 100f)] public float facePunchCost = 12f;
     [Range(0f, 100f)] public float bodyBlowCost = 18f;
 

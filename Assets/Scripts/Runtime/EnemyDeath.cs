@@ -150,9 +150,11 @@ public class EnemyDeath : MonoBehaviour
     public static Style Classify(DamageInfo info, float burstShare, bool crawling, float heavyShare = 0.55f)
     {
         info.part = BodyParts.Limb(info.part);
-        if (info.isHeadshot || info.part == BodyPart.Head) return Style.Drop;
         if (info.fromBlast) return Style.Thrown;
+        // A fist or a boot that kills knocks the body over along the blow, the head too: dropped by the head-shot clip, a
+        // man finished by the overhand held at arm's length folded forward onto the player (filmed, 2026-10-24).
         if (info.fromMelee) return Style.Spun;
+        if (info.isHeadshot || info.part == BodyPart.Head) return Style.Drop;
         if (burstShare >= heavyShare) return Style.BlownBack;
 
         // On the floor already: there is nowhere further to fall from.

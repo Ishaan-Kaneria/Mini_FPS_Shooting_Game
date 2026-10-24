@@ -518,32 +518,41 @@ public class EnemyBody : MonoBehaviour
     bool _wasHeld, _heldBentPose, _ignoringHolder;
     float _releasedAt;
     Transform _heldBy;
+    // The hands on the holder's arm (once the rifle is off them), and the free fist steered onto his face as it swings.
+    float _pryW, _swingW;
+    EnemyAI.HeldMove _struggleSeen;
 
     /// <summary>How much the fight owns the arms: off the rifle while folded over or held.</summary>
     float GrappleWeight => Mathf.Max(Smooth(_foldW), Smooth(_heldW));
 
     /// <summary>
     /// A punch to the face of a man held by the head, on top of the snap back every blow to the head already gets
-    /// (<see cref="OnDamaged"/>): the jaw turned to one side, the way a hook turns it, and the chest rocked. Only that:
-    /// with a heavier snap of its own on top, the head went round a hundred degrees in two frames (VerifyGrapple G3).
-    /// On the frame the fist lands.
+    /// (<see cref="OnDamaged"/>): with the keyed clips, the impact for the punch (<paramref name="kind"/> 1, the hook,
+    /// turns the face away from it; the straight and the uppercut knock it back); without them, the jaw turned to one side.
+    /// The chest rocks either way. On the frame the fist lands.
     /// </summary>
-    public void Punched(Vector3 dir, float power)
+    public void Punched(Vector3 dir, float power, int kind = 0)
     {
         if (_health == null || _health.IsDead || _head == null) return;
         Vector3 flat = Vector3.ProjectOnPlane(dir, Vector3.up);
         if (flat.sqrMagnitude < 1e-4f) flat = -transform.forward;
         flat.Normalize();
         Vector3 away = Vector3.Cross(Vector3.up, flat);
-        // The keyed impact over the hold (Blender, after the film) turns the head itself, with the knees buckling: then the
-        // code adds only the chest's rock (both together wrenched the head 75 degrees in two frames).
+        // The keyed impact over the hold (Blender) turns the head itself, with the knees buckling: then the code adds only
+        // the chest's rock (both together wrenched the head 75 degrees in two frames).
         bool keyed = GrabClips && _ai != null && _ai.Grappled;
         if (!keyed) Add(_head, Vector3.up, (Random.value < 0.5f ? -1f : 1f) * 12f * power, 0.45f);
         Add(_chest, away, 5f * power, 0.55f);
-        if (keyed) animator.SetTrigger(GrabbedHitHash);
+        if (keyed)
+        {
+            ResetGrabTriggers();
+            animator.SetTrigger(kind == 1 || !Has(GrabbedHitBHash) ? GrabbedHitHash : GrabbedHitBHash);
+        }
     }
 
-    static readonly int GrabbedHash = Animator.StringToHash("Grabbed"), GrabbedHitHash = Animator.StringToHash("GrabbedHit");
+    static readonly int GrabbedHash = Animator.StringToHash("Grabbed"), GrabbedHitHash = Animator.StringToHash("GrabbedHit"),
+                        GrabbedHitBHash = Animator.StringToHash("GrabbedHitB"), GrabbedCounterHash = Animator.StringToHash("GrabbedCounter"),
+                        GrabbedWrenchHash = Animator.StringToHash("GrabbedWrench");
     int _grabClips;   // 0 not looked, 1 the controller has the head-grab states, -1 it has not
 
     /// <summary>The Animator has the hold and the impact keyed in Blender (FPSKitRiggedSoldier's Action layer).</summary>
@@ -551,33 +560,51 @@ public class EnemyBody : MonoBehaviour
     {
         get
         {
-            if (_grabClips == 0)
-            {
-                _grabClips = -1;
-                if (animator != null)
-                    foreach (var p in animator.parameters)
-                        if (p.nameHash == GrabbedHash) { _grabClips = 1; break; }
-            }
+            if (_grabClips == 0) _grabClips = animator != null && Has(GrabbedHash) ? 1 : -1;
             return _grabClips > 0;
         }
     }
 
+    bool Has(int parameter)
+    {
+        if (animator == null) return false;
+        foreach (var p in animator.parameters)
+            if (p.nameHash == parameter) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Clears the head-grab triggers before another is set: one left set in a state with no way out on it fired later, a
+    /// punch thrown long after the fight had moved on.
+    /// </summary>
+    void ResetGrabTriggers()
+    {
+        if (!GrabClips) return;
+        animator.ResetTrigger(GrabbedHitHash);
+        if (Has(GrabbedHitBHash)) animator.ResetTrigger(GrabbedHitBHash);
+        if (Has(GrabbedCounterHash)) animator.ResetTrigger(GrabbedCounterHash);
+        if (Has(GrabbedWrenchHash)) animator.ResetTrigger(GrabbedWrenchHash);
+    }
+
     /// <summary>
     /// The trunk: folded over the belly from the waist after the hook, the head hanging (the film's opponent); held by the
-    /// head, pulled in towards the man holding it -- chest and neck leaning in -- and, taken while bent, held down bent.
+    /// head, the keyed struggle (FPSKitRiggedSoldier's Action layer: pulling back against the hand with the feet going,
+    /// the wind-up and the punch, the wrench free) with his head kept where the hand holds it -- the body pulling away
+    /// from a head that does not go with it. Taken while bent, he is held bent.
     /// </summary>
     void GrappleBody()
     {
         float dt = Time.deltaTime;
         bool held = _ai != null && _ai.Grappled;
         bool doubled = _ai != null && _ai.DoubledOver;
-        if (held && !_wasHeld) _heldBentPose = doubled || _foldW > 0.5f;
+        if (held && !_wasHeld)
+        {
+            _heldBentPose = doubled || _foldW > 0.5f;
+            _struggleSeen = EnemyAI.HeldMove.Pull;
+        }
         _heldW = Mathf.MoveTowards(_heldW, held ? 1f : 0f, dt * (held ? 9f : 3f));
-        // Taken face to face he is dragged part-way down and over by the head, as the film's hero drags his man down (and
-        // so his face is under the player's arms, in view, not hidden behind them); taken doubled over, he is held right down.
-        // With the keyed hold playing, the clip is bent already: only the fold of a man doubled over a hook is added.
-        // (Held, the clip owns the bend even while the hook's fold would still be running: both together folded him flat.)
-        float foldWant = held && GrabClips ? 0f : doubled ? 1f : held ? (_heldBentPose ? 1f : 0.45f) : 0f;
+        // The keyed struggle stands him up and pulls him back; taken doubled over, he is held bent over it.
+        float foldWant = held ? (_heldBentPose ? (GrabClips ? 0.7f : 1f) : 0f) : doubled ? 1f : 0f;
         if (GrabClips)
         {
             animator.SetBool(GrabbedHash, held);
@@ -585,10 +612,20 @@ public class EnemyBody : MonoBehaviour
             {
                 if (_actionLayer < 0) _actionLayer = animator.GetLayerIndex("Action");
                 _actionUntil = Mathf.Max(_actionUntil, Time.time + 0.2f);
+                // The struggle's moves as the AI makes them: the wind-up (which plays on into the punch) and the wrench.
+                var move = _ai.Struggle;
+                if (move != _struggleSeen)
+                {
+                    if (move == EnemyAI.HeldMove.Wind && Has(GrabbedCounterHash)) { ResetGrabTriggers(); animator.SetTrigger(GrabbedCounterHash); }
+                    else if (move == EnemyAI.HeldMove.Wrench && Has(GrabbedWrenchHash)) { ResetGrabTriggers(); animator.SetTrigger(GrabbedWrenchHash); }
+                    _struggleSeen = move;
+                }
             }
+            else if (_wasHeld) ResetGrabTriggers();
         }
-        // Let go alive and on his feet: a stumble away (the Action layer's), not a snap back to standing.
-        if (!held && _wasHeld && !IsDown && _health != null && !_health.IsDead) PlayAction("Stumble", 0.9f);
+        // Let go alive and on his feet: a stumble away (the Action layer's), not a snap back to standing -- unless he
+        // broke free himself, and runs.
+        if (!held && _wasHeld && !IsDown && _health != null && !_health.IsDead && !(_ai != null && _ai.Bolting)) PlayAction("Stumble", 0.9f);
         _foldW = Mathf.MoveTowards(_foldW, foldWant, dt * (doubled ? 7f : held ? 3f : 2.2f));
         if (held) _heldBy = _ai.GrappledBy;
 
@@ -615,29 +652,72 @@ public class EnemyBody : MonoBehaviour
             Turn(_chest, right, 16f * f);
             Turn(_neck, right, 10f * f);
         }
+        // The head where the hand holds it: drawn forward to where it would be standing at the hold, at its own height,
+        // the chest and the neck turned towards that while the clip pulls the body back (never towards the hand itself:
+        // the hand is placed from the head, and the two chased each other round; nor to a set height: at 1.6 m it bent
+        // a soldier whose eyes are at 1.9 over).
         if (h > 0.001f && _heldBy != null && _chest != null && _head != null)
         {
             Vector3 forward = Vector3.ProjectOnPlane(_heldBy.forward, Vector3.up).normalized;
-            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : 0.45f) + Vector3.up * (_heldBentPose ? 1.0f : 1.35f);
-            LeanTowards(_chest, _head, pull, 0.55f * h, 28f);
-            if (_neck != null) LeanTowards(_neck, _head, pull, 0.45f * h, 24f);
+            float reach = MeleeSettings.Active.holdDistance - 0.06f;
+            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : reach);
+            pull.y = _heldBentPose ? _heldBy.position.y + 1.0f : _head.position.y;
+            bool wrenching = _ai != null && _ai.Grappled && _ai.Struggle == EnemyAI.HeldMove.Wrench;
+            float hold = wrenching ? 1f - Mathf.Clamp01(_ai.StruggleTime / 0.2f) : 1f;
+            LeanTowards(_chest, _head, pull, 0.3f * h * hold, 20f);
+            if (_neck != null) LeanTowards(_neck, _head, pull, 0.45f * h * hold, 22f);
         }
     }
 
     /// <summary>
-    /// The hands, last: held, the left hand on the forearm of the man holding him, near the wrist; folded over and free,
-    /// the left hand in to the belly. The rifle stays in the right hand.
+    /// The hands, last. Held: once the rifle is on his back, his right hand on the holder's wrist and his left on the
+    /// forearm, pulling at them; the left lets go for the wind-up (the clip's) and is steered onto the holder's face as it
+    /// swings; both are thrown off the arm in the wrench. Folded over and free, the left hand in to the belly.
     /// </summary>
     void GrappleHands()
     {
         if (_lUpper == null || _lLower == null || _lHand == null) return;
+        float dt = Time.deltaTime;
         float f = Smooth(_foldW), h = Smooth(_heldW);
-        if (h > 0.001f && _heldBy != null && _ai != null)
+        bool held = h > 0.001f && _heldBy != null && _ai != null && _ai.Grappled;
+        bool handsFree = Rigged ? !_rifle.InHands : (_slung || gun == null || _gunDropped);
+        _pryW = Mathf.MoveTowards(_pryW, held && handsFree ? 1f : 0f, dt * (held ? 5f : 6f));
+        bool swinging = held && _ai.Struggle == EnemyAI.HeldMove.Swing;
+        _swingW = Mathf.MoveTowards(_swingW, swinging ? 1f : 0f, dt * (swinging ? 14f : 4f));
+
+        if (_pryW > 0.001f && _heldBy != null && _ai != null && _rUpper != null)
         {
-            Vector3 shoulder = _heldBy.position + Vector3.up * 1.42f - _heldBy.right * 0.2f;
-            Vector3 wrist = Vector3.Lerp(_ai.GrabPoint, shoulder, 0.22f);
-            SolveWeighted(_lUpper, _lLower, _lHand, wrist, _lUpper.position + transform.TransformDirection(new Vector3(-0.7f, -0.4f, 0.1f)), 0.85f * h);
+            var move = _ai.Struggle;
+            float time = _ai.StruggleTime;
+            float right = Smooth(_pryW) * h, left = right;
+            if (held && move == EnemyAI.HeldMove.Wrench) { float a = Mathf.Clamp01(time / 0.15f); right *= 1f - a; left *= 1f - a; }
+            if (held && (move == EnemyAI.HeldMove.Wind || move == EnemyAI.HeldMove.Swing)) left *= 1f - Smooth(Mathf.Clamp01(time / 0.12f));
+            left *= 1f - Smooth(_swingW);
+
+            Vector3 wrist = _ai.GrabWrist;
+            Vector3 toHolder = Flat(_heldBy.position - transform.position).normalized;
+            // Pulling: the hands tug the arm towards his chest as he pulls back.
+            float tug = 0.025f * Mathf.Sin(Time.time * Mathf.PI * 2f / 0.8f);
+            Vector3 onWrist = wrist - toHolder * tug;
+            // The left on the forearm near the holder's elbow, low: from his eye neither arm is across the face (the clip's
+            // MY_FOREARM).
+            Vector3 onForearm = wrist + toHolder * 0.29f - transform.right * 0.01f - Vector3.up * 0.03f - toHolder * tug;
+            if (wrist != Vector3.zero)
+            {
+                SolveWeighted(_rUpper, _rLower, _rHand, onWrist, _rUpper.position + transform.TransformDirection(new Vector3(0.45f, -0.85f, 0.1f)), 0.9f * right);
+                SolveWeighted(_lUpper, _lLower, _lHand, onForearm, _lUpper.position + transform.TransformDirection(new Vector3(-0.6f, -0.7f, -0.2f)), 0.85f * left);
+            }
         }
+        // His fist arriving: steered onto the holder's face, just short of the eye.
+        if (_swingW > 0.001f && _heldBy != null)
+        {
+            Vector3 eyes = EyesOf(_heldBy);
+            Vector3 back = Flat(transform.position - eyes);
+            back = back.sqrMagnitude > 1e-4f ? back.normalized : transform.forward;
+            Vector3 fist = eyes + back * 0.17f - Vector3.up * 0.03f;
+            SolveWeighted(_lUpper, _lLower, _lHand, fist, _lUpper.position + transform.TransformDirection(new Vector3(-0.8f, 0.3f, -0.3f)), 0.7f * Smooth(_swingW) * h);
+        }
+
         float free = f * (1f - h);
         if (free > 0.001f && _spine != null)
         {
@@ -1186,7 +1266,9 @@ public class EnemyBody : MonoBehaviour
     /// <summary>Plays one of the fighting moves over the body for a time.</summary>
     void PlayAction(string trigger, float seconds)
     {
-        if (animator == null) return;
+        // Held by the head the Action layer is the struggle's: a pain stumble (its legs on the move, the held body being
+        // pulled along) came in from Any State over it and ran him round the player.
+        if (animator == null || (_ai != null && _ai.Grappled)) return;
         if (_actionLayer < 0) _actionLayer = animator.GetLayerIndex("Action");
         if (_actionLayer < 0) return;
         animator.SetTrigger(trigger);
@@ -1203,7 +1285,8 @@ public class EnemyBody : MonoBehaviour
 
         // In a rage, every blow the brain lands is thrown as a fighter's strike, timed so the
         // blow lands as the wind-up ends.
-        bool fists = Raging || HandToHand;
+        // Held by the head, he fights the hand with both of his: the rifle goes on the back.
+        bool fists = Raging || HandToHand || (_ai != null && _ai.Grappled);
         if (_ai != null) _ai.HandsOnly = fists;
         if (fists) _wantSlung = true;
         if (fists && _ai != null && _ai.Attacking && _ai.WindupStart > _lastStrikeWindup)

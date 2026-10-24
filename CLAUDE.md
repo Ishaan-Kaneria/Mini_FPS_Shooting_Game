@@ -131,13 +131,20 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Bullet impacts: `FPSImpactManager.HandleImpact(RaycastHit)` from every gun (Weapon, EnemyAI, TechnicalTruck); surface = struck face's
   material on a multi-material mesh, else the collider's `Surface_*` physics material, else the tag. Pooled only (one marks mesh, three
   particle systems, three lights): never instantiate per shot. Physics materials keep default friction. Check: `FPSKitBatch.VerifyImpacts`.
-- Grab and punch (`MeleeGrapple`, `Docs/DESIGN_NOTES.md` "The grab and punch"): face to face (head within `grabRange`, crosshair on it,
-  facing) the press grabs the head; presses punch the face (never finishing: `heldFloor`), then the overhand (kills a standard enemy,
-  floors an elite); a hook at the belly doubles him over, the next press takes him bent. Never a boss. Held: pinned by `EnemyAI.Grapple`,
-  holder collisions off (on, the motor's enemy slide moved the player), keyed hold/impact clips on the Action layer (Blender:
-  `Tools/blender/enemy_grabbed_clips.py`; set fps after Blender's FBX import). Face damage: Blender shape keys
+- Grab and punch (`MeleeGrapple`, `Docs/DESIGN_NOTES.md` "The grab and punch", "Held is a fight"): face to face (head within
+  `grabRange`, crosshair on it, facing) the press takes him by the back of the neck (below his face: never over the crown or
+  beside the head, the forearm hid the face); presses punch the face, straight/hook/uppercut (never finishing: `heldFloor`), then
+  the overhand (kills a standard enemy, floors an elite); a hook at the belly doubles him over, the next press takes him bent.
+  Never a boss. Held is a fight (`EnemyAI.UpdateStruggle`): he pulls back, winds up and punches the player unless a punch to his
+  face stops it, and left alone (`releaseAfter`) or after `countersToBreak` he wrenches free and runs (`Bolting`). Pinned by
+  `EnemyAI.Grapple` (back and forth only: a sideways sway orbited the view), holder collisions off, no `PlayAction` over the hold.
+  While holding, the arms camera takes the world's FOV (arms drawn at true size beside his face). Keyed clips on the Action layer
+  (Blender: `Tools/blender/enemy_grabbed_clips.py`; set fps after Blender's FBX import, reset bone scale every frame, mute the IK
+  to preview a bake). A melee kill is `Spun` (ragdoll along the blow), never the head-shot drop. Face damage: Blender shape keys
   (`Tools/blender/face_damage_keys.py`) baked onto the game's head by position (`FPSKitBatch.BakeFaceDamage`), driven by
-  `FacialDamageHandler`. A staged test enemy has its `EnemyBrain` removed, not disabled. Check: `FPSKitBatch.VerifyGrapple`.
+  `FacialDamageHandler`. A staged test enemy has its `EnemyBrain` removed, not disabled. Judge it in motion:
+  `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchGrappleVideo` + `Tools/shots/frames_to_video.py`
+  (stood on open navmesh, or he is held short). Check: `FPSKitBatch.VerifyGrapple`.
 - Punch (`MeleeStrike`): damage is a share of the target's pool by role (boss only chips);
   the touch button is always shown; the gun is lowered via `Weapon.Lower`, hits reported via
   `Weapon.ReportHit`. Drawn as a rifle-butt strike (`MeleeStrike.AnimateButt` via
@@ -147,7 +154,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Low Poly Shooter Pack's clips, baked as deltas into `FirstPersonClips` by `FPSKitBatch.BakeFirstPersonClips`
   from Assets/AnimationStaging, played about our own grip; no clip drives a bone of our arms) on
   the FirstPerson layer under a stacked arms camera (own FOV, post-processing ON, set back `eyeBack`
-  except when aiming); `PlayerBody` is legs, kick and shadow only (upper body shadow-only). Mixamo
+  except when aiming; the world's FOV and no set-back while holding a man by the neck); `PlayerBody` is legs, kick and shadow only (upper body shadow-only). Mixamo
   clips never drive the first-person arms. Values in `PlayerBodySettings`. The camera never moves for a
   strike: only a landed blow shakes it, through `AddShake` (Camera Shake setting). The arms camera renders its own shadows (gun
   self-shadowing); the world's shade reaches the gun only through `FirstPersonShade`. Muzzle light: `FPSMuzzleFlashLight` (player's casts

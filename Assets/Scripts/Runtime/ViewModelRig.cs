@@ -908,6 +908,12 @@ public class ViewModelRig : MonoBehaviour
     /// <summary>The arms are drawn in the world's depth this frame (holding a man), not over it.</summary>
     public bool SharedDepth { get; private set; }
 
+    /// <summary>The left arm is drawn where it really is in the world this frame (holding a man), so he can take hold of it.</summary>
+    public bool LeftArmInWorld => SharedDepth && _left != null && _left.lower != null && _left.hand != null;
+
+    /// <summary>A point on the left forearm as drawn last, <paramref name="along"/> from the elbow (0) to the wrist (1).</summary>
+    public Vector3 LeftForearm(float along) => Vector3.Lerp(_left.lower.position, _left.hand.position, along);
+
     static System.Reflection.FieldInfo s_clearDepth;
     static bool s_clearDepthLooked;
 
@@ -1128,8 +1134,10 @@ public class ViewModelRig : MonoBehaviour
                     Vector3 right = view.right;
                     fingers = view.InverseTransformDirection(-face * 0.85f + right * 0.35f + up * 0.1f);
                     back = view.InverseTransformDirection(-right * 0.9f + up * 0.25f);
-                    // Wide and high, so the forearm comes in from the left beside his face, not up across it.
-                    elbow = new Vector3(-0.95f, 0.4f, -0.25f);
+                    // Out to the left and down, bent: the forearm rises from a low elbow to his neck. (Wide and high it was a
+                    // level bar from the edge of the screen, stiff; the hand is on the left of his neck now, so a low elbow
+                    // keeps clear of his face.)
+                    elbow = new Vector3(-0.75f, -0.6f, 0.05f);
                     break;
                 }
                 default:                              // the back of the neck, fingers round it

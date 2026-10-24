@@ -663,12 +663,14 @@ public class EnemyBody : MonoBehaviour
             float reach = MeleeSettings.Active.holdDistance - 0.06f;
             // In the clinch the keyed hold bows him into the hand and brings his head in: drawn to about where it has it.
             bool clinch = MeleeSettings.Active.grip == MeleeSettings.Grip.BackOfHead;
-            Vector3 pull = _heldBy.position + forward * (_heldBentPose ? 0.5f : clinch ? 0.42f : reach);
-            pull.y = _heldBentPose ? _heldBy.position.y + 1.0f : _head.position.y;
+            // Yanked into each punch by the hand on his neck (MeleeGrapple: EnemyAI.GrabPull).
+            float yank = _ai != null ? _ai.GrabPull : 0f;
+            Vector3 pull = _heldBy.position + forward * ((_heldBentPose ? 0.5f : clinch ? 0.42f : reach) - 0.1f * yank);
+            pull.y = (_heldBentPose ? _heldBy.position.y + 1.0f : _head.position.y) - 0.03f * yank;
             bool wrenching = _ai != null && _ai.Grappled && _ai.Struggle == EnemyAI.HeldMove.Wrench;
             float hold = wrenching ? 1f - Mathf.Clamp01(_ai.StruggleTime / 0.2f) : 1f;
-            LeanTowards(_chest, _head, pull, 0.3f * h * hold, 20f);
-            if (_neck != null) LeanTowards(_neck, _head, pull, 0.45f * h * hold, 22f);
+            LeanTowards(_chest, _head, pull, (0.3f + 0.25f * yank) * h * hold, 20f);
+            if (_neck != null) LeanTowards(_neck, _head, pull, (0.45f + 0.3f * yank) * h * hold, 22f);
         }
     }
 
@@ -1388,6 +1390,7 @@ public class EnemyBody : MonoBehaviour
             if (crawling && _down == Down.Up) Breathe();
             // The weapons onto where they are carried, after everything that moved the bones,
             // then the left hand onto the handguard.
+            LowReady();
             _rifle.Follow();
             HoldPistol();
             LeftHandOnRifle();
@@ -1741,7 +1744,11 @@ public class EnemyBody : MonoBehaviour
         bool sidearm = _pistolHand != 0;
         bool free = _down == Down.Up && !crawling && !Recovering && _actionWeight < 0.5f;
         float want = free && !sidearm && held && (limping || calm) ? 1f : 0f;
-        string state = limping && !calm ? "Aim" : "Low";
+        // Calm, a soldier carries at the low ready -- both hands on it, the stock in the shoulder, the muzzle down in
+        // front (the shouldered clip, lowered by LowReady) -- never "Low", the rifle hanging from the right hand like a
+        // case and swinging with every step, the left hand flapping at the thigh (Ishaan, 2026-10-24: "wandering
+        // artificially... make them serious soldiers").
+        string state = "Aim";
         if (state != _carryState) { animator.CrossFadeInFixedTime(state, 0.3f, _carryLayer); _carryState = state; }
         _carryWeight = Mathf.MoveTowards(_carryWeight, want, Time.deltaTime * 3f);
         animator.SetLayerWeight(_carryLayer, Smooth(_carryWeight));
@@ -1754,6 +1761,42 @@ public class EnemyBody : MonoBehaviour
             _sidearmWeight = Mathf.MoveTowards(_sidearmWeight, sidearm && free ? 1f : 0f, Time.deltaTime / Mathf.Max(0.1f, drawSeconds));
             animator.SetLayerWeight(_sidearmLayer, Smooth(_sidearmWeight));
         }
+    }
+
+    [Header("Low ready (calm, on patrol)")]
+    [Tooltip("Where the right hand holds the grip at the low ready, in the body's own space (x right, y up from the feet, " +
+             "z forward; the prefab's units): low in front of the belly, the stock tucked under the arm against the chest.")]
+    public Vector3 lowReadyGrip = new Vector3(0.13f, 1.08f, 0.24f);
+    [Tooltip("The way the muzzle points at the low ready, in the body's space: down at the ground a few metres ahead and " +
+             "in across the body (off his own feet).")]
+    public Vector3 lowReadyBore = new Vector3(-0.36f, -0.5f, 0.79f);
+
+    float _lowReady;
+
+    /// <summary>
+    /// The low ready over the shouldered carry while calm (Ishaan, 2026-10-24: "make them serious soldiers"): the right hand
+    /// put by IK on the grip of a rifle held low in front -- muzzle down ahead and across, both hands on it (the left goes
+    /// onto the handguard after, the rifle being laid on the hand) -- instead of the old low carry that hung it from one
+    /// hand like a case, swinging with every step. Eased with the carry layer, off the moment the weapon comes up.
+    /// (Pivoting the shouldered rifle about its butt pushed the grip back into the chest and folded the arm behind him.)
+    /// </summary>
+    void LowReady()
+    {
+        bool calm = _brain != null && !_brain.WeaponUp && _rifle.InHands && _pistolHand == 0 && _down == Down.Up;
+        _lowReady = Mathf.MoveTowards(_lowReady, calm ? Smooth(_carryWeight) : 0f, Time.deltaTime * 3f);
+        float w = Smooth(_lowReady) * (1f - _actionWeight) * (1f - GrappleWeight);
+        if (w <= 0.001f || _rUpper == null || _rLower == null || _rHand == null || rifleSocket == null) return;
+
+        // The rifle's pose there; the hand that carries it there (the socket is a fixed child of the hand).
+        Vector3 bore = transform.TransformDirection(lowReadyBore.sqrMagnitude > 1e-4f ? lowReadyBore.normalized : Vector3.forward);
+        Quaternion wantRot = Quaternion.LookRotation(bore, transform.up);
+        Quaternion handRot = wantRot * Quaternion.Inverse(rifleSocket.localRotation);
+        Vector3 handPos = transform.TransformPoint(lowReadyGrip);
+
+        Quaternion before = _rHand.rotation;
+        SolveWeighted(_rUpper, _rLower, _rHand, Vector3.Lerp(_rHand.position, handPos, w),
+                      _rUpper.position + transform.TransformDirection(new Vector3(0.6f, -0.75f, -0.25f)), 1f);
+        _rHand.rotation = Quaternion.Slerp(before, handRot, w);
     }
 
     /// <summary>The spine, neck and head turned onto the player, shared down the chain.</summary>

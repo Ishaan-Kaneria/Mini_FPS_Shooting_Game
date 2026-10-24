@@ -110,6 +110,16 @@ namespace FPSKit.EditorTools
             foreach (var rp in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) { Object.DestroyImmediate(rp.gameObject); probes++; }
             sb.AppendLine($"  reflection probes removed: {probes}");
 
+            // ---- light probes: the copy is not in the original's adaptive probe volume set (FPSKitTownGI), so the town's
+            // walls, which take their light from those probes, go back to the sky ambient they had before ----
+            int ambient = 0;
+            foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+                if (r.receiveGI == ReceiveGI.LightProbes && (GameObjectUtility.GetStaticEditorFlags(r.gameObject) & StaticEditorFlags.ContributeGI) != 0
+                    && r.lightProbeUsage != LightProbeUsage.Off) { r.lightProbeUsage = LightProbeUsage.Off; ambient++; }
+            var pv = Object.FindAnyObjectByType<ProbeVolume>();
+            if (pv != null) Object.DestroyImmediate(pv.gameObject);
+            sb.AppendLine($"  static renderers back on the sky ambient: {ambient}");
+
             // ---- particles off ----
             int ps = 0;
             foreach (var p in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) { p.gameObject.SetActive(false); ps++; }

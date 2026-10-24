@@ -1368,6 +1368,9 @@ public class EnemyAI : MonoBehaviour
     /// <summary>Where the holder's wrist is seen, in the world: the held body's hands pull at it (EnemyBody).</summary>
     [System.NonSerialized] public Vector3 GrabWrist;
 
+    /// <summary>How hard the holding hand is yanking his head into the punch now, 0 to 1 (EnemyBody leans him into it).</summary>
+    [System.NonSerialized] public float GrabPull;
+
     /// <summary>What a held enemy is doing about it.</summary>
     public enum HeldMove { Pull, Wind, Swing, Wrench }
 

@@ -182,6 +182,11 @@ namespace FPSKit.EditorTools
             var reflection = Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None).Where(p => p.enabled).ToList();
             foreach (var p in reflection) p.enabled = false;
             bool ok;
+            // The classic probes are baked by a pipeline that uses them: Low (High and Medium use adaptive probe volumes,
+            // and with those on, a bake leaves light probe groups out). FPSKitTownGI bakes the volumes after.
+            int quality = QualitySettings.GetQualityLevel();
+            int low = System.Array.IndexOf(QualitySettings.names, "Low");
+            if (low >= 0) QualitySettings.SetQualityLevel(low, true);
             try
             {
                 ok = Lightmapping.Bake();
@@ -196,7 +201,7 @@ namespace FPSKit.EditorTools
                     ok = Lightmapping.Bake();
                 }
             }
-            finally { foreach (var p in reflection) p.enabled = true; }
+            finally { foreach (var p in reflection) p.enabled = true; QualitySettings.SetQualityLevel(quality, true); }
             if ((LightmapSettings.lightProbes?.count ?? 0) == 0) Debug.LogError("[FPSKit] town light probes: none baked (VerifyTown fails on it)");
             string dataFolder = path.Substring(0, path.Length - ".unity".Length);
             if (AssetDatabase.IsValidFolder(dataFolder))
@@ -205,6 +210,9 @@ namespace FPSKit.EditorTools
             var probes = LightmapSettings.lightProbes;
             Debug.Log($"[FPSKit] town light probes baked: {(ok ? "done" : "FAILED")}, {probes?.count ?? 0} probes, {contributors} contributing meshes, " +
                       $"{LightmapSettings.lightmaps.Length} lightmaps (0 wanted), {clock.Elapsed.TotalSeconds:0}s");
+            EditorSceneManager.SaveScene(scene, path);
+            // Then the real bounced light, for High and Medium (Docs/DESIGN_NOTES.md "Real light: adaptive probe volumes").
+            if (!FPSKitTownGI.BakeNow(scene, path)) Debug.LogError("[FPSKit] town GI: the adaptive probe volume bake failed");
             EditorSceneManager.SaveScene(scene, path);
         }
     }

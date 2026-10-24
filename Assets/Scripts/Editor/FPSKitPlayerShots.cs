@@ -160,6 +160,31 @@ namespace FPSKit.EditorTools
             EditorApplication.update += NextArena;
         }
 
+        /// <summary>
+        /// Batch: a calm soldier on his beat, filmed every frame from beside him and from 15 m (&lt;tag&gt;_patrol/fp_ and
+        /// side_NNNNN.jpg; Tools/shots/frames_to_video.py). He keeps his own mind and is never shown the player.
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchPatrolVideo
+        /// </summary>
+        public static void BatchPatrolVideo()
+        {
+            _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "desert")) });
+            _onlyPoses = "patrol_video";
+            EditorApplication.update += NextArena;
+        }
+
+        /// <summary>
+        /// Batch: the light round the desert town, for judging it: the street from the start, a shopfront, a man's face in
+        /// the sun and in a building's shade, the ground and upper floors of the nearest houses, and a shop's interior seen
+        /// through its front (&lt;tag&gt;_light_NN_&lt;place&gt;.png).
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchLightingTour [-fpskitTag before]
+        /// </summary>
+        public static void BatchLightingTour()
+        {
+            _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "desert")) });
+            _onlyPoses = "lighting_tour";
+            EditorApplication.update += NextArena;
+        }
+
         /// <summary>Batch: the right-hand close-ups only, in the Desert (quick, for tuning the grip).</summary>
         public static void BatchHands()
         {
@@ -282,7 +307,7 @@ namespace FPSKit.EditorTools
                 _lastGameFrame = Time.frameCount;
                 if (_health != null && _health.Normalized < 0.9f) _health.ResetHealth();
                 _frame++;
-                if (_frame > Frames(_pose == "warmup" ? 60f : _pose.StartsWith("grapple") ? 40f : 12f))
+                if (_frame > Frames(_pose == "warmup" ? 60f : _pose.StartsWith("grapple") || _pose.EndsWith("_video") || _pose == "lighting_tour" ? 40f : 12f))
                 {
                     Report += $"{_pose}: timed out (time {Time.time:0.0}, briefing {Object.FindAnyObjectByType<LevelManager>()?.IsBriefing}, paused {EditorApplication.isPaused}, timeScale {Time.timeScale}, dead {(_health != null && _health.IsDead)}, " +
                               $"lowered {(_weapon != null && _weapon.IsLowered)}, strike {(_melee != null ? _melee.Current.ToString() : "-")}, " +
@@ -421,6 +446,8 @@ namespace FPSKit.EditorTools
                 case "grapple": return Grapple();
                 case "grapple_video": return GrappleVideo();
                 case "grapple_grips": return GrappleGrips();
+                case "patrol_video": return PatrolVideo();
+                case "lighting_tour": return LightingTour();
                 default:
                     Report += $"no pose {_pose}\n";
                     return true;
@@ -811,6 +838,207 @@ namespace FPSKit.EditorTools
                     return true;
                 }
             return false;
+        }
+
+        static Transform _decoy;
+
+        static readonly string[] PatrolTypes = (System.Environment.GetEnvironmentVariable("FPSKIT_PATROL_TYPES") ?? "Grunt,Runner,Screamer,Marksman,Outrider").Split(',');
+        static int _patrolIndex;
+
+        /// <summary>Each of the desert's standard soldiers walking his beat, calm, filmed in turn. True when done.</summary>
+        static bool PatrolVideo()
+        {
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+                if (ai.gameObject != _foe) ai.gameObject.SetActive(false);
+            switch (_phase)
+            {
+                case 0:
+                    if (_frame < Frames(1f)) return false;
+                    if (!OntoOpenGround()) Report += "patrol: no open navmesh near the start\n";
+                    _patrolIndex = 0;
+                    Phase(1);
+                    return false;
+                case 1:
+                {
+                    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+                    Vector3 ahead = Vector3.ProjectOnPlane(_startRot * Vector3.forward, Vector3.up).normalized;
+                    Vector3 at = _motor.transform.position + ahead * 14f;
+                    if (NavMesh.SamplePosition(at, out var hit, 4f, NavMesh.AllAreas)) at = hit.position;
+                    if (_foe != null) Object.Destroy(_foe);
+                    _foe = Object.Instantiate(prefab, at, Quaternion.LookRotation(Vector3.Cross(Vector3.up, ahead)));
+                    _foe.name = "Shots_Patrol";
+                    FPSKitEnemyRoster.GetOrCreate(PatrolTypes[_patrolIndex]).ApplyTo(_foe);
+                    _foeAI = _foe.GetComponent<EnemyAI>();
+                    // Somebody to hunt who is never there: far below the map, so his mind stays calm.
+                    if (_decoy == null) _decoy = new GameObject("Shots_Decoy").transform;
+                    _decoy.position = at + Vector3.down * 500f;
+                    if (_foeAI != null) _foeAI.target = _decoy;
+                    var brain = _foe.GetComponent<EnemyBrain>();
+                    if (brain != null) brain.patrolRadius = 9f;
+                    _videoDir = null;
+                    Phase(2);
+                    return false;
+                }
+                case 2:
+                    // The squad's radio stays quiet (every 6-10 s it sends the calm to look near the player).
+                    typeof(EnemySquad).GetField("_nextRadio", BindingFlags.Static | BindingFlags.NonPublic)?.SetValue(null, Time.time + 999f);
+                    if (InPhase < Frames(1.5f)) return false;   // settled into his beat
+                    FilmPatrol();
+                    if (InPhase >= Frames(7f))
+                    {
+                        var brain = _foe.GetComponent<EnemyBrain>();
+                        Report += $"patrol {PatrolTypes[_patrolIndex]}: {_videoFrame} frames, his mind {(brain != null ? brain.Mind.ToString() + " (" + brain.Doing + ")" : "none")}\n";
+                        Object.Destroy(_foe); _foe = null;
+                        if (++_patrolIndex < PatrolTypes.Length) { Phase(1); return false; }
+                        if (_side != null) Object.Destroy(_side.gameObject);
+                        _side = null;
+                        return true;
+                    }
+                    return false;
+            }
+            return false;
+        }
+
+        static void FilmPatrol()
+        {
+            if (_videoDir == null)
+            {
+                _videoDir = $"{_folder}/{_tag}_patrol_{PatrolTypes[_patrolIndex]}";
+                if (Directory.Exists(_videoDir)) Directory.Delete(_videoDir, true);
+                Directory.CreateDirectory(_videoDir);
+                _videoFrame = 0;
+            }
+            _videoFrame++;
+            var main = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
+            _motor.TurnTowards(_foe.transform.position + Vector3.up * 1.3f, 1f);
+            RenderJpeg(main, $"{_videoDir}/fp_{_videoFrame:00000}.jpg");
+            PlaceSide();
+            // Close beside him, three quarters from the front, following.
+            Vector3 him = _foe.transform.position;
+            Vector3 face = _foe.transform.forward;
+            Vector3 across = _foe.transform.right;
+            _side.transform.position = him + face * 1.4f + across * 3.0f + Vector3.up * 1.5f;
+            _side.transform.LookAt(him + Vector3.up * 1.1f);
+            RenderJpeg(_side, $"{_videoDir}/side_{_videoFrame:00000}.jpg");
+        }
+
+        static int _tourShot;
+        static List<(Vector3 at, Vector3 look, string name)> _tourRooms;
+
+        /// <summary>The lighting tour, one place after another. True when done.</summary>
+        static bool LightingTour()
+        {
+            foreach (var ai in Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None))
+                if (ai.gameObject != _foe) ai.gameObject.SetActive(false);
+            void Place(Vector3 feet, Vector3 look)
+            {
+                var cc = _motor.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                _motor.transform.position = feet + Vector3.up * 0.05f;
+                if (cc != null) cc.enabled = true;
+                Physics.SyncTransforms();
+                _motor.TurnTowards(look, 1f);
+            }
+            string Name(string place) => $"light_{++_tourShot:00}_{place}";
+            switch (_phase)
+            {
+                case 0:
+                    if (_frame < Frames(1f)) return false;
+                    _tourShot = 0;
+                    _tourRooms = TourRooms();
+                    Report += $"tour: {_tourRooms.Count} rooms picked\n";
+                    Phase(1);
+                    return false;
+                case 1: if (InPhase >= Frames(0.5f)) { Snap1(Name("street")); Phase(2); } return false;
+                case 2: Turn(90f); if (InPhase >= Frames(0.6f)) { Snap1(Name("shopfront")); Phase(3); } return false;
+                case 3:
+                {
+                    // A man's face in the sun, 2.4 m off, facing the player.
+                    Turn(0f);
+                    if (InPhase == 1) FaceFoe(2.4f);
+                    if (InPhase >= Frames(1.2f)) { _motor.TurnTowards(FoeHead() + Vector3.down * 0.15f, 1f); Snap1(Name("face_sun")); Phase(4); }
+                    return false;
+                }
+                case 4:
+                    if (InPhase == 1) { if (_foe != null) Object.Destroy(_foe); _foe = null; if (!IntoShade()) Report += "tour: no shade\n"; }
+                    if (InPhase == 3) FaceFoe(2.4f);
+                    if (InPhase >= Frames(1.4f)) { _motor.TurnTowards(FoeHead() + Vector3.down * 0.15f, 1f); Snap1(Name("face_shade")); if (_foe != null) Object.Destroy(_foe); _foe = null; Phase(5); }
+                    return false;
+                default:
+                {
+                    int i = _phase - 5;
+                    if (i >= _tourRooms.Count) return true;
+                    var (at, look, place) = _tourRooms[i];
+                    if (InPhase == 1) Place(at, look);
+                    if (InPhase >= Frames(0.8f)) { Snap1(Name(place)); Phase(_phase + 1); }
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>Only the player's view (the tour does not need a side camera).</summary>
+        static void Snap1(string name)
+        {
+            string pose = _pose;
+            _pose = name;
+            Shoot();
+            _pose = pose;
+        }
+
+        /// <summary>A still Grunt <paramref name="metres"/> in front of the eye, facing the player, mind removed.</summary>
+        static void FaceFoe(float metres)
+        {
+            if (_foe != null) Object.Destroy(_foe);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+            Vector3 ahead = Vector3.ProjectOnPlane(_motor.transform.forward, Vector3.up).normalized;
+            Vector3 at = _motor.transform.position + ahead * metres;
+            if (NavMesh.SamplePosition(at, out var hit, 1.5f, NavMesh.AllAreas)) at = hit.position;
+            _foe = Object.Instantiate(prefab, at, Quaternion.LookRotation(-ahead));
+            _foe.name = "Shots_Face";
+            FPSKitEnemyRoster.GetOrCreate("Grunt").ApplyTo(_foe);
+            _foeAI = _foe.GetComponent<EnemyAI>();
+            if (_foeAI != null) { _foeAI.target = _motor.transform; _foeAI.enabled = false; }
+            var brain = _foe.GetComponent<EnemyBrain>();
+            if (brain != null) Object.DestroyImmediate(brain);
+        }
+
+        /// <summary>
+        /// Rooms of the three houses nearest the start (FPSKitTownInterior's marks), ground floor and upstairs: stood at
+        /// the room's way in, looking across it, plus one shop seen from its doorway.
+        /// </summary>
+        static List<(Vector3, Vector3, string)> TourRooms()
+        {
+            var list = new List<(Vector3, Vector3, string)>();
+            var rooms = GameObject.Find("HouseRooms");
+            if (rooms == null) return list;
+            var houses = new List<Transform>();
+            foreach (Transform h in rooms.transform) houses.Add(h);
+            houses.Sort((a, b) => Dist(a).CompareTo(Dist(b)));
+            float Dist(Transform h) { var d = h.Find("Door"); return d == null ? 1e9f : (d.position - _startPos).sqrMagnitude; }
+            int taken = 0;
+            foreach (var h in houses)
+            {
+                if (taken >= 3) break;
+                bool any = false;
+                foreach (Transform m in h)
+                {
+                    if (!m.name.StartsWith("Room ")) continue;
+                    if (!NavMesh.SamplePosition(m.position, out var hit, 0.6f, NavMesh.AllAreas)) continue;
+                    // Looking across the room: away from the nearest wall.
+                    Vector3 best = Vector3.forward; float far = 0f;
+                    for (int a = 0; a < 8; a++)
+                    {
+                        Vector3 d = Quaternion.AngleAxis(a * 45f, Vector3.up) * Vector3.forward;
+                        float reach = Physics.Raycast(hit.position + Vector3.up * 1.5f, d, out var rh, 12f, ~0, QueryTriggerInteraction.Ignore) ? rh.distance : 12f;
+                        if (reach > far) { far = reach; best = d; }
+                    }
+                    list.Add((hit.position, hit.position + Vector3.up * 1.45f + best * 4f, $"{h.name.ToLower()}{taken + 1}_{m.name.Substring(5).Replace(' ', '_').ToLower()}"));
+                    any = true;
+                    if (list.Count >= 8) return list;
+                }
+                if (any) taken++;
+            }
+            return list;
         }
 
         static int _gripIndex;

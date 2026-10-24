@@ -221,6 +221,10 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   leaves folded flat against a wall, nothing (plinth, kerb) across a threshold, stair foot 1.5 m in, stairwell cut from the
   first tread with < 2.45 m over its top, no floor or rug over the stairwell, furniture off the 1.4 m lanes to every doorway.
   Room marks sit at each room's way in; VerifyTown `CheckInteriors` wants 95% of rooms / 90% upstairs reached.
+- Desert light (`Docs/DESIGN_NOTES.md` "Real light"): adaptive probe volumes on High/Medium (`FPSKitTownGI`, 3 m probes over the
+  town, run after the classic probe bake in every desert build); bake the saved scene with `UNITY_GRAPHICS=1 Tools/unity-batch.sh
+  FPSKitBatch.BakeDesertLight -force-vulkan` (APV cannot bake on OpenGL; no OpenCL here, so the CPU lightmapper; close Firefox --
+  it is near the 14 GB). Low/phones/web keep classic probes (`FPSKitReducedCopy` reverts the walls to ambient). Shadows to 150 m.
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

@@ -307,6 +307,9 @@ namespace FPSKit.EditorTools
         /// </summary>
         public static void VerifyGrapple() => FPSKitGrappleTest.Batch();
 
+        /// <summary>Bakes the saved desert scene's adaptive probe volumes (FPSKitTownGI); needs UNITY_GRAPHICS=1 for the GPU.</summary>
+        public static void BakeDesertLight() => FPSKitTownGI.BatchBakeSaved();
+
         /// <summary>
         /// The face damage shapes made in Blender (Tools/blender/face_damage_keys.py) copied onto the game's head mesh for
         /// FacialDamageHandler: Assets/FPSKit_Generated/Resources/FaceDamage/SK_Military_Head1.asset.

@@ -19,7 +19,7 @@ namespace FPSKit.EditorTools
     ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 60m on two
     ///             cascades, 2x MSAA, full resolution, and the cheaper renderer, with no
     ///             ambient occlusion.
-    ///   High   -- PC_RPAsset: shadows to 50m on three cascades at 4096, 2x MSAA, rendered at 85% and upscaled with
+    ///   High   -- PC_RPAsset: shadows to 150m on four cascades at 4096, adaptive probe volumes, 2x MSAA, rendered at 85% and upscaled with
     ///             FSR 1, and ambient occlusion at half resolution with eight samples and a bilateral blur. Measured on
     ///             the Intel Arc laptop: MSAA 4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass
     ///             was ~4.7 ms.
@@ -64,14 +64,21 @@ namespace FPSKit.EditorTools
                 changed = true;
             }
 
-            // Shadow maps: 4096 on High over its 50 m (a texel about 1.5 cm in the nearest cascade), 2048 on Medium.
-            changed |= Configure(high, shadows: true, distance: 50f, cascades: 3, msaa: 2, hdr: true, scale: 0.85f, soft: true,
+            // Shadow maps: 4096 on High over 150 m in four cascades (2026-10-24, "make the shadows, lighting very realistic,
+            // forget about the size": at 50 m the far half of a street, its balconies and awnings, had no shadows at all);
+            // the nearest cascade still holds a texel under a centimetre. 2048 on Medium over 80 m.
+            // Adaptive probe volumes on High and Medium (FPSKitTownGI): every pixel lit by the bounced light where it is.
+            // Low -- the phones and the web build -- keeps the classic probes.
+            changed |= Configure(high, shadows: true, distance: 150f, cascades: 4, msaa: 2, hdr: true, scale: 0.85f, soft: true,
                                  renderer: null, upscaling: 3, shadowResolution: 4096,        // 3 = FSR 1
-                                 additionalShadows: true);                                    // the player's muzzle flash
+                                 additionalShadows: true,                                     // the player's muzzle flash
+                                 probeVolumes: true);
+            changed |= SetVector3(high, "m_Cascade4Split", new Vector3(0.05f, 0.15f, 0.4f));   // 7.5 / 22.5 / 60 / 150 m
             changed |= Ssao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
-            changed |= Configure(medium, shadows: true, distance: 60f, cascades: 2, msaa: 2, hdr: true, scale: 1f, soft: false,
-                                 renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer), shadowResolution: 2048);
+            changed |= Configure(medium, shadows: true, distance: 80f, cascades: 2, msaa: 2, hdr: true, scale: 1f, soft: false,
+                                 renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer), shadowResolution: 2048,
+                                 probeVolumes: true);
             changed |= Levels(low, medium, high);
             if (changed) AssetDatabase.SaveAssets();
             return changed;
@@ -79,10 +86,13 @@ namespace FPSKit.EditorTools
 
         static bool Configure(UniversalRenderPipelineAsset asset, bool shadows, float distance, int cascades,
                               int msaa, bool hdr, float scale, bool soft, ScriptableRendererData renderer, int upscaling = 0,
-                              int shadowResolution = 0, bool additionalShadows = false)
+                              int shadowResolution = 0, bool additionalShadows = false, bool probeVolumes = false)
         {
             var so = new SerializedObject(asset);
             bool changed = false;
+            // 0 the classic light probes, 1 adaptive probe volumes; L1 harmonics, the medium memory budget.
+            changed |= SetInt(so, "m_LightProbeSystem", probeVolumes ? 1 : 0);
+            if (probeVolumes) changed |= SetInt(so, "m_ProbeVolumeSHBands", 1);
             changed |= SetBool(so, "m_MainLightShadowsSupported", shadows);
             // Point and spot shadows: High only, for the one light that asks for them (the player's muzzle flash,
             // FPSMuzzleFlashLight, at the lowest per-light tier in the 2048 atlas). Off elsewhere: the flash still lights.
@@ -147,14 +157,16 @@ namespace FPSKit.EditorTools
                     // desert's rounded mud brick ("black grime") and was switched off. On again (2026-10-21, asked for, to
                     // ground the town's walls where they meet the road): eight samples and the bilateral blur, which
                     // keeps the occlusion off the far side of an edge, a radius that reaches the foot of a wall, and a
-                    // moderate strength. Half resolution keeps the pass about 2 ms on the laptop.
-                    c |= SetBool(m.FindPropertyRelative("Downsample"), true);
-                    c |= SetInt(m.FindPropertyRelative("Samples"), 1);        // Medium = 8 samples
+                    // moderate strength. 2026-10-24 ("very realistic, forget about the size"): full resolution and twelve
+                    // samples, so the contact shading -- a wall's foot, under a shelf, round a window frame -- is crisp and
+                    // carries the small objects the probe volumes are too coarse for; a little stronger, a little wider.
+                    c |= SetBool(m.FindPropertyRelative("Downsample"), false);
+                    c |= SetInt(m.FindPropertyRelative("Samples"), 0);        // High = 12 samples
                     c |= SetInt(m.FindPropertyRelative("BlurQuality"), 0);    // High = bilateral
                     c |= SetInt(m.FindPropertyRelative("Source"), 1);         // depth and normals
-                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.65f);
-                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.25f);
-                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.35f);
+                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.8f);
+                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.2f);
+                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.45f);
                     c |= SetBool(so.FindProperty("m_Active"), true);
                     if (c) { so.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(f); EditorUtility.SetDirty(data); changed = true; }
                 }
@@ -226,6 +238,17 @@ namespace FPSKit.EditorTools
             so.FindProperty("m_CurrentQuality").intValue = 2;
             so.ApplyModifiedPropertiesWithoutUndo();
             Debug.Log("[FPSKit] quality tiers: Low, Medium, High.");
+            return true;
+        }
+
+        static bool SetVector3(UniversalRenderPipelineAsset asset, string name, Vector3 v)
+        {
+            var so = new SerializedObject(asset);
+            var p = so.FindProperty(name);
+            if (p == null || p.vector3Value == v) return false;
+            p.vector3Value = v;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
             return true;
         }
 

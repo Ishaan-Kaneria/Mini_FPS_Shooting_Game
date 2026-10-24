@@ -3953,3 +3953,69 @@ look like I am holding his head (no touch felt)".
   His right hand's target (`WristOf`) is beside his jaw and low: along the line from the grip to the player's shoulder it
   went to his own forehead.
 * A man taken doubled over gets 0.3 of the hook's fold on top of the clinch (the full fold folded him flat).
+
+
+## Real light: adaptive probe volumes, longer shadows, finer contact shading (2026-10-24)
+
+Asked for: "the shadows and the realistic lighting effect of each and every small object, i.e. buildings, houses, interiors,
+shops", the faces easier to see, then "make the shadows, lighting very realistic. Forget about the size, I want real".
+
+* **What was wrong** (`FPSKitPlayerShots.BatchLightingTour`: the street, a shopfront, a face in sun and shade, rooms of the
+  nearest houses; `-fpskitTag` names the set). The town's walls took the flat sky ambient whole -- the classic probes
+  (`FPSKitTownProbes`) lit only what moves, by design, because they were too sparse for walls -- so a room was lit like the
+  street with the sun taken away: no light falling in from the windows, no darker far wall, nothing under a table, the
+  inside of a shop as bright as its front. Shadows ended at 50 m.
+* **Adaptive Probe Volumes** (`FPSKitTownGI`) on High and Medium: probes 3 m apart wherever there is geometry (up to 81 m
+  in open air), baked by path tracing from the sky and the sun's bounce; every renderer -- wall, shelf, face, car -- reads
+  the light where it is, per pixel. No lightmap UVs, so it works on the generated town. Every static mesh renderer in the
+  arena receives from probes (no lightmaps are made); the town's own generated geometry (839 renderers: building chunks,
+  interiors, landmarks, roads) and the terrain bounce it. The bake runs after the classic one in every desert build
+  (`BakeTownProbes` -> `FPSKitTownGI.BakeNow`, the async bake's step called in a loop), or on the saved scene alone:
+  `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.BakeDesertLight -force-vulkan` (about 11 minutes of lighting).
+  Seen in the tour: rooms now lit from their doors and windows, ceilings dark where no sky reaches them, corners and wall
+  feet darker; it renders on OpenGL as well as Vulkan.
+* **What it took to bake on this laptop** (each one a failed run):
+  - APV cannot bake on OpenGL, and the batch editor runs OpenGL Core on the Intel Arc: `-force-vulkan`.
+  - URP sets the volumes up only when it makes its pipeline, from the asset active then: one made before APV was on has
+    none and the bake "would not start". `FPSKitTownGI` renders a camera under Low and then High to make a fresh one.
+  - At 1 m the town wanted more than Unity's 67,180,350 probes per baking set: 3 m (a room still gets two or three across;
+    the small things are SSAO's).
+  - The GPU lightmapper needs OpenCL and there is none for the Arc unless Intel's runtime (`intel-opencl-icd`) is installed;
+    without it the bake read output that was never written, every frame, 458,000 exceptions, until the editor fell over.
+    The CPU lightmapper unless `FPSKIT_GI_GPU=1`, and a log watch stops a bake whose light transport did not start.
+  - Memory (14 GB): over the whole 1.4 km terrain the bake took 10.4 GB and earlyoom killed it. Now the volume covers the
+    town (1,060 m, 90 m high; 1.09 M probes, capped at 4 M by `FPSKIT_GI_MAX_PROBES`), the backdrop layer lays no probes,
+    props and window joinery do not bounce (28,000 objects), and textures are an eighth size during the bake (the GPU
+    shares the system's memory: killed with the editor showing 4.4 GB). With Firefox open it is still close: a second bake
+    was stopped by the session's memory reaper.
+  - With APV on, a bake leaves classic light probe groups out, so the classic probes are baked under Low first.
+  - **Frozen helpers**: the heat guard freezes Unity's whole process tree; a job killed while frozen left Unity.DataStore and
+    the shader compilers stopped, and every later editor segfaulted on quit (exit 139 on every check). `unity-batch.sh`
+    now thaws and ends any stopped Unity helper before a job.
+  - Low -- the phones and the web build, which ship the reduced copy -- keeps the classic probes: `FPSKitReducedCopy` puts
+    the static renderers back on the sky ambient and removes the volume (the copy is not in the original's baking set).
+  - The probe data (`DesertOutpost_APV*.bytes`, 40 MB of light, 40 MB of L2, 80 MB of editor-only debug data) is in LFS.
+* **Brightness**: the first bake (bounce 1.15, the plain sky) made the shade realistic but darker than the old flat ambient,
+  a soldier in a building's shade included -- against the ask. The code now bakes bounce 1.8 with the sky at 1.3 times
+  (`ApvIndirect`, `ApvSky`) and reads the probes with longer offsets for 3 m spacing (`ProbeVolumesOptions` normal 0.4, view
+  0.3, on the scene's global profile: dark ceilings from probes buried in them). **The committed scene still holds the
+  first bake** until the re-bake runs (the brighter one was stopped for memory).
+* **Shadows** on High to 150 m in four cascades (7.5 / 22.5 / 60 / 150 m) at 4096: at 50 m the far half of a street, its
+  balconies and awnings, had none. Medium 80 m.
+* **SSAO** on High at full resolution, twelve samples, intensity 0.8, radius 0.45: the contact shading the probes are too
+  coarse for -- a wall's foot, under a shelf, round a window frame.
+
+## Serious soldiers: the low ready on patrol; the clinch's arm and hands (2026-10-24)
+
+* "The enemy when far away was wandering artificially with their right hand moving back and forth. Make them serious
+  soldiers." Filmed (`FPSKitPlayerShots.BatchPatrolVideo`, each desert type calm on his beat; the squad's radio muted so he
+  stays calm): the calm carry ("Low", Mixamo Rifle_Idle_Low on the Carry layer) hung the rifle from the right hand like a
+  case, muzzle back, swinging with every step, the left hand open at the thigh. Now calm soldiers carry at the **low ready**
+  (`EnemyBody.LowReady`): the shouldered clip on the Carry layer, the right hand put by IK on the grip of a rifle held low
+  in front (`lowReadyGrip`, body space) with the muzzle down ahead and across (`lowReadyBore`), the left hand onto its
+  handguard after; steady through the stride; off the moment the weapon comes up. Pivoting the shouldered rifle about its
+  butt instead pushed the grip back into the chest and folded the arm behind him.
+* The clinch: the player's left arm rises bent from a low elbow to the left side of his neck (wide and high it was a level
+  bar from the screen's edge); his right hand takes the player's **real forearm** (`ViewModelRig.LeftForearm`: drawn in the
+  world's depth while holding, so it is where it is) instead of air; the holding hand yanks his head into each punch
+  (`EnemyAI.GrabPull`, `EnemyBody` leans him into it).

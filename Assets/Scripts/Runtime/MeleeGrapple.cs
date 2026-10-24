@@ -34,6 +34,7 @@ public partial class MeleeStrike
     float _holdBreakAt;
     bool _heldBent;
     float _counterSeen, _tornUntil;
+    ViewModelRig _rig;
 
     /// <summary>Someone is held by the head.</summary>
     public bool Holding => _held != null;
@@ -228,6 +229,9 @@ public partial class MeleeStrike
     /// </summary>
     Vector3 WristOf(Health target)
     {
+        // The real forearm when it is drawn where it is (holding: ViewModelRig.SharedDepth), towards the wrist.
+        if (_rig == null && weapon != null) _rig = weapon.GetComponent<ViewModelRig>();
+        if (_rig != null && _rig.LeftArmInWorld) return _rig.LeftForearm(0.62f) - Vector3.up * 0.02f;
         // Beside his jaw on the player's side and low, where the forearm comes past his head: along the line from the grip
         // to the player's shoulder it passed over his own face, and his hand went to his forehead.
         Vector3 eye = HeadOf(target);
@@ -372,6 +376,14 @@ public partial class MeleeStrike
         if (_held == null) return;
         _held.GrabPoint = GrabPoint;
         _held.GrabWrist = WristOf(_heldHealth);
+        // The holding hand yanks his head into each punch: in through the wind-up to the blow, let off after it.
+        float pull = 0f;
+        if (Current == Strike.FacePunch || Current == Strike.Overhand)
+        {
+            float k = StrikeProgress, at = ImpactAt(Current);
+            pull = k < 0f ? 0f : k < at ? UITheme.EaseOut(k / at) : 1f - Mathf.Clamp01((k - at) / 0.2f);
+        }
+        _held.GrabPull = pull;
         _fistsUntil = Mathf.Max(_fistsUntil, Time.time + s.fistIdleSeconds);
 
         // His punch landed on the player: a landed blow, so the view shakes (the only thing that moves it), and the

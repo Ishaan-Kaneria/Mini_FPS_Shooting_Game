@@ -56,6 +56,43 @@ namespace FPSKit.EditorTools
         /// </summary>
         static long MaxProbes => long.TryParse(Environment.GetEnvironmentVariable("FPSKIT_GI_MAX_PROBES"), out var n) ? n : 4_000_000;
 
+        /// <summary>
+        /// The scene's own lights made honest now the light that reaches the shade is baked: the sun's shadows at full
+        /// strength (0.8 let a fifth of the sun through every wall and awning), and the shadowless "Bounce Light"
+        /// (FPSKitSceneBuilder, 2026-10-03: a weak directional light from the far side, standing in for the sand's bounce)
+        /// switched off -- it lit every shaded face and every room by the same amount, through the walls, and flattened the
+        /// interiors. And the eye that adapts to the dark indoors (EyeAdaptation). The reduced copy (phones, the web) puts the
+    /// lights back and removes the eye: it has no probe volumes.
+        /// </summary>
+        public static void ApplyRealLightLook()
+        {
+            foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (l.type != LightType.Directional) continue;
+                if (l.name == "Bounce Light") { l.enabled = false; continue; }
+                if (l.shadows != LightShadows.None) l.shadowStrength = 1f;
+            }
+            // Rooms as dark against the street as they are want the eye that adapts to them (EyeAdaptation). Made afresh each
+            // time, so it carries the code's values (a component saved with the scene keeps the values it was saved with).
+            foreach (var old in Object.FindObjectsByType<EyeAdaptation>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Object.DestroyImmediate(old.gameObject);
+            var go = new GameObject("EyeAdaptation");
+            var arena = GameObject.Find("Arena");
+            if (arena != null) go.transform.SetParent(arena.transform, false);
+            go.AddComponent<EyeAdaptation>();
+        }
+
+        /// <summary>Opens the saved desert scene, applies <see cref="ApplyRealLightLook"/>, saves it, and exits (batch).</summary>
+        public static void BatchLookSaved()
+        {
+            var scene = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
+            FPSKitQualityTiers.Ensure();   // the tiers' shadows and SSAO as the code has them
+            ApplyRealLightLook();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, DesertScene);
+            FPSKitBatch.Exit(0);
+        }
+
         /// <summary>Opens the saved desert scene, bakes its APV, saves it, and exits (batch).</summary>
         public static void BatchBakeSaved()
         {
@@ -87,6 +124,7 @@ namespace FPSKit.EditorTools
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
             FPSKitQualityTiers.Ensure();
+            ApplyRealLightLook();
 
             // Textures at an eighth of their size for the bake: the GPU here shares the system's memory, so every texture
             // the editor uploads counts against the 14 GB, and with the whole town's at full size the baker was killed by
@@ -141,9 +179,32 @@ namespace FPSKit.EditorTools
             // things is SSAO's), up to 81 m in open air. At 1 m the town wanted more than Unity's 67,180,350 probes a set.
             set.minDistanceBetweenProbes = 3f;
             set.simplificationLevels = 3;
+            // The grid lifted half a spacing: from the ground at 0 its layers fell at 0, 3 and 6 m, in the floor slabs of
+            // the town's 3.2 m storeys, and floors read probes buried in them (dark, sky-blue floors under bright walls, the
+            // lighting tour). At 1.5 and 4.5 m they are in the middle of each storey's rooms.
+            set.probeOffset = new Vector3(0f, 1.5f, 0f);
             set.minRendererVolumeSize = 1f;         // props smaller than a cubic metre do not subdivide the grid (they still shade)
             int backdropLayer = LayerMask.NameToLayer("Backdrop");
             set.renderersLayerMask = backdropLayer >= 0 ? ~(1 << backdropLayer) : ~0;   // the apron and the far scenery lay no probes
+            // Probes that land in a wall see its inside and bake black; with dilation off (the default) they kept it and the
+            // walls and corners beside them blended it in -- black spots in every room's corners (his first look, 2026-10-24).
+            // Dilation fills them from good neighbours within a probe spacing; virtual offset pushes probes near a surface
+            // further out of it first.
+            var so = new SerializedObject(set);
+            void Set(string name, object value)
+            {
+                var prop = so.FindProperty("settings." + name);
+                if (prop == null) { Debug.LogWarning("[FPSKit] town GI: no baking setting " + name); return; }
+                switch (value) { case bool b: prop.boolValue = b; break; case int i: prop.intValue = i; break; case float f: prop.floatValue = f; break; }
+            }
+            Set("dilationSettings.enableDilation", true);
+            Set("dilationSettings.dilationDistance", 3.5f);
+            Set("dilationSettings.dilationIterations", 2);
+            Set("dilationSettings.dilationValidityThreshold", 0.25f);
+            Set("virtualOffsetSettings.useVirtualOffset", true);
+            Set("virtualOffsetSettings.searchMultiplier", 0.45f);
+            Set("virtualOffsetSettings.outOfGeoOffset", 0.05f);
+            so.ApplyModifiedPropertiesWithoutUndo();
             set.skyOcclusion = false;
             EditorUtility.SetDirty(set);
             set.TryAddScene(AssetDatabase.AssetPathToGUID(path));   // false when it is in the set already
@@ -242,12 +303,24 @@ namespace FPSKit.EditorTools
                 if (message.Contains("Light baking could not be started") || message.Contains("PostProcessingOutput/APVBake")) transportFailed = true;
             }
             Application.logMessageReceived += Watch;
+            // Everything that does not bounce light is switched off while the bake runs and back on before the scene is
+            // saved: the baker snapshots every enabled renderer (28,000 of them, props, cars, people, the window joinery),
+            // though only the town's own geometry and the terrain bounce light, and with the snapshot the bake came within a
+            // few hundred MB of the 14 GB (earlyoom killed one with the editor at 4.9 GB). The light it bakes is the same.
+            var idle = new System.Collections.Generic.List<Renderer>();
+            foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+                if (r.enabled && (GameObjectUtility.GetStaticEditorFlags(r.gameObject) & StaticEditorFlags.ContributeGI) == 0) { r.enabled = false; idle.Add(r); }
+            var foliage = Object.FindObjectsByType<Terrain>(FindObjectsSortMode.None).Where(t => t.drawTreesAndFoliage).ToList();
+            foreach (var t in foliage) t.drawTreesAndFoliage = false;
+
             // Realtime reflection probes stay out of any bake (headless captures drew white: FPSKitTownProbes).
             var reflection = Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None).Where(p => p.enabled).ToList();
             foreach (var p in reflection) p.enabled = false;
 
             void Finish(bool ok)
             {
+                foreach (var r in idle) if (r != null) r.enabled = true;
+                foreach (var t in foliage) if (t != null) t.drawTreesAndFoliage = true;
                 Application.logMessageReceived -= Watch;
                 QualitySettings.globalTextureMipmapLimit = mipLimit;
                 RenderSettings.ambientIntensity = ambientWas;
@@ -260,7 +333,7 @@ namespace FPSKit.EditorTools
                 // The set's data lies beside it: <set>.Cell*.bytes and <set>-<scenario>.Cell*.bytes.
                 string dir = System.IO.Path.GetDirectoryName(setPath), stem = System.IO.Path.GetFileNameWithoutExtension(setPath);
                 foreach (var f in System.IO.Directory.GetFiles(dir, stem + "*.bytes")) bytes += new System.IO.FileInfo(f).Length;
-                Debug.Log($"[FPSKit] town GI (APV) {(ok ? "baked" : "FAILED")}: {cells} cells, {bytes / 1048576f:0} MB of probe data, {statics} static renderers ({bouncing} bouncing), " +
+                Debug.Log($"[FPSKit] town GI (APV) {(ok ? "baked" : "FAILED")}: {cells} cells, {bytes / 1048576f:0} MB of probe data, {statics} static renderers ({bouncing} bouncing, {idle.Count} switched off for it), " +
                           $"{clock.Elapsed.TotalMinutes:0.0} min, {(settings != null ? settings.lightmapper.ToString() : "?")}");
                 done(ok);
             }

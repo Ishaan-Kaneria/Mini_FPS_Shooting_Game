@@ -946,6 +946,21 @@ namespace FPSKit.EditorTools
                     if (_frame < Frames(1f)) return false;
                     _tourShot = 0;
                     _tourRooms = TourRooms();
+                    // Diagnosis switches: FPSKIT_TOUR_BOUNCE=1 puts the old shadowless bounce light back on, FPSKIT_TOUR_SSAO=0
+                    // switches screen-space occlusion off, FPSKIT_TOUR_PROBES=0 takes every static renderer off the probes.
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_BOUNCE") == "1")
+                        foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                            if (l.name == "Bounce Light") l.enabled = true;
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_SSAO") == "0" && GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp)
+                    {
+                        var list = new SerializedObject(urp).FindProperty("m_RendererDataList");
+                        for (int i = 0; list != null && i < list.arraySize; i++)
+                            if (list.GetArrayElementAtIndex(i).objectReferenceValue is UnityEngine.Rendering.Universal.ScriptableRendererData data)
+                                foreach (var f in data.rendererFeatures) if (f != null && f.name.Contains("Occlusion")) f.SetActive(false);
+                    }
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_PROBES") == "0")
+                        foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+                            if (r.gameObject.isStatic) r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
                     Report += $"tour: {_tourRooms.Count} rooms picked\n";
                     Phase(1);
                     return false;
@@ -970,7 +985,8 @@ namespace FPSKit.EditorTools
                     if (i >= _tourRooms.Count) return true;
                     var (at, look, place) = _tourRooms[i];
                     if (InPhase == 1) Place(at, look);
-                    if (InPhase >= Frames(0.8f)) { Snap1(Name(place)); Phase(_phase + 1); }
+                    // Long enough for the eye to adapt to the room (EyeAdaptation, 1.4 s to most of the way).
+                    if (InPhase >= Frames(3f)) { Snap1(Name(place)); Phase(_phase + 1); }
                     return false;
                 }
             }

@@ -61,7 +61,7 @@ cd "$PROJECT"
 # Helpers left frozen. The heat guard below freezes Unity's whole tree; if this script is killed while it is frozen
 # (earlyoom, the session's memory reaper), the editor dies but its helpers stay stopped -- and every later editor
 # connected to the stopped Unity.DataStore and segfaulted on quit (exit 139 on every job, 2026-10-24). Thawed and ended.
-for p in $(ps -eo pid=,stat=,comm= | awk '$2 ~ /^T/ && $3 ~ /^(Unity\.DataStore|UnityAutoQuitte|UnityShaderComp|LightBaker)/ {print $1}'); do
+for p in $(ps -eo pid=,stat=,comm= | awk '$2 ~ /^T/ && $3 ~ /^(Unity\.DataStore|UnityAutoQuitte|UnityShaderComp|LightBaker|AssetImportWork)/ {print $1}'); do
   kill -CONT "$p" 2>/dev/null || true
   kill -9 "$p" 2>/dev/null || true
   echo "unity-batch: ended a frozen Unity helper left by an earlier job ($p)"

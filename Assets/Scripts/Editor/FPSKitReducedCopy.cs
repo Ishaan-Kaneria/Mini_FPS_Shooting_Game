@@ -117,7 +117,17 @@ namespace FPSKit.EditorTools
                 if (r.receiveGI == ReceiveGI.LightProbes && (GameObjectUtility.GetStaticEditorFlags(r.gameObject) & StaticEditorFlags.ContributeGI) != 0
                     && r.lightProbeUsage != LightProbeUsage.Off) { r.lightProbeUsage = LightProbeUsage.Off; ambient++; }
             var pv = Object.FindAnyObjectByType<ProbeVolume>();
-            if (pv != null) Object.DestroyImmediate(pv.gameObject);
+            if (pv != null)
+            {
+                Object.DestroyImmediate(pv.gameObject);
+                // Without the volumes the shade is lit as before: the sand's stand-in bounce light back on, the sun's
+                // shadows at the theme's strength (FPSKitTownGI.ApplyRealLightLook took both away for the full scene).
+                foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    if (l.type == LightType.Directional && l.name == "Bounce Light") l.enabled = true;
+                    else if (l.type == LightType.Directional && l.shadows != LightShadows.None) l.shadowStrength = 0.8f;
+                foreach (var eye in Object.FindObjectsByType<EyeAdaptation>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    Object.DestroyImmediate(eye.gameObject);
+            }
             sb.AppendLine($"  static renderers back on the sky ambient: {ambient}");
 
             // ---- particles off ----

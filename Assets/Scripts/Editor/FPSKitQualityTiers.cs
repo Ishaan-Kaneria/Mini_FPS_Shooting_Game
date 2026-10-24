@@ -159,14 +159,18 @@ namespace FPSKit.EditorTools
                     // keeps the occlusion off the far side of an edge, a radius that reaches the foot of a wall, and a
                     // moderate strength. 2026-10-24 ("very realistic, forget about the size"): full resolution and twelve
                     // samples, so the contact shading -- a wall's foot, under a shelf, round a window frame -- is crisp and
-                    // carries the small objects the probe volumes are too coarse for; a little stronger, a little wider.
+                    // carries the small objects the probe volumes are too coarse for.
                     c |= SetBool(m.FindPropertyRelative("Downsample"), false);
                     c |= SetInt(m.FindPropertyRelative("Samples"), 0);        // High = 12 samples
                     c |= SetInt(m.FindPropertyRelative("BlurQuality"), 0);    // High = bilateral
                     c |= SetInt(m.FindPropertyRelative("Source"), 1);         // depth and normals
-                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.8f);
-                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.2f);
-                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.45f);
+                    // Contact only: the probe volumes shade the corners and the far walls themselves now, and SSAO's own
+                    // reach made dark speckled smudges along every wall and ceiling edge -- the "black spots on the corner"
+                    // he saw (2026-10-24; gone with SSAO off in the lighting tour). 12 cm keeps the foot of a wall, the
+                    // underside of a shelf and a window frame's edge, and nothing room-sized.
+                    c |= SetFloat(m.FindPropertyRelative("Intensity"), 0.4f);
+                    c |= SetFloat(m.FindPropertyRelative("DirectLightingStrength"), 0.1f);
+                    c |= SetFloat(m.FindPropertyRelative("Radius"), 0.12f);
                     c |= SetBool(so.FindProperty("m_Active"), true);
                     if (c) { so.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(f); EditorUtility.SetDirty(data); changed = true; }
                 }

@@ -1126,7 +1126,8 @@ public class ViewModelRig : MonoBehaviour
                     Vector3 right = view.right;
                     fingers = view.InverseTransformDirection(-face * 0.75f - up * 0.35f + right * 0.3f);
                     back = view.InverseTransformDirection(up * 0.8f - face * 0.3f - right * 0.25f);
-                    elbow = new Vector3(-0.9f, 0.2f, -0.2f);
+                    // Wide and high, so the forearm comes in from the left beside his face, not up across it.
+                    elbow = new Vector3(-0.95f, 0.4f, -0.25f);
                     break;
                 }
                 default:                              // the back of the neck, fingers round it

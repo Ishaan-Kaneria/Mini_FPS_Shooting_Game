@@ -3942,8 +3942,9 @@ look like I am holding his head (no touch felt)".
   - Where the head goes decides what is seen: bowed right over, only the cap's top showed; level with the holder's eye, the
     holder's own forearm (an arm reaching forward passes close to the eye) was between them; below the eye, chin up, the face
     is clear over the forearm.
-* **The hand** goes round the back of his neck under the skull from outside on the player's left, placed and turned by the
-  head's own axes (`EnemyBody.HeadUp`/`HeadFace`, `MeleeStrike.GripUp`/`GripFace`), open as it reaches and closed on contact,
+* **The hand** goes round the back of his head at the base of the skull from outside on the player's left (first round the
+  back of his neck; he had it moved up and further behind, which also lifts the forearm to his mouth -- moved further out
+  as well, the forearm crossed his face more), placed and turned by the head's own axes (`EnemyBody.HeadUp`/`HeadFace`, `MeleeStrike.GripUp`/`GripFace`), open as it reaches and closed on contact,
   with a slap heard. Over the crown, beside the head or at the centre of the back of it, the forearm crossed his face.
   His right hand's target (`WristOf`) is beside his jaw and low: along the line from the grip to the player's shoulder it
   went to his own forehead.

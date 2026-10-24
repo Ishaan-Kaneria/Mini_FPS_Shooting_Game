@@ -133,7 +133,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   particle systems, three lights): never instantiate per shot. Physics materials keep default friction. Check: `FPSKitBatch.VerifyImpacts`.
 - Grab and punch (`MeleeGrapple`, `Docs/DESIGN_NOTES.md` "The grab and punch", "Held is a fight"): face to face (head within
   `grabRange`, crosshair on it, facing) the press clinches him: bowed into the hand, chin up, eyes below the player's, the hand round
-  the back of his neck from outside on the left (`MeleeSettings.grip`, by the head's own axes; over the crown, beside the head or
+  the back of his head at the base of the skull, from outside on the left (`MeleeSettings.grip`, by the head's own axes; over the crown, beside the head or
   level with the eye, the forearm hid the face); presses punch the face, straight/hook/uppercut (never finishing: `heldFloor`), then
   the overhand (kills a standard enemy, floors an elite); a hook at the belly doubles him over, the next press takes him bent.
   Never a boss. Held is a fight (`EnemyAI.UpdateStruggle`): he pulls back, winds up and punches the player unless a punch to his

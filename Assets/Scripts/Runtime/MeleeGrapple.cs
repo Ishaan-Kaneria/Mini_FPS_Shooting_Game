@@ -190,11 +190,11 @@ public partial class MeleeStrike
             var body = target.GetComponent<EnemyBody>();
             Vector3 up = body != null ? body.HeadUp : Vector3.up, face = body != null ? body.HeadFace : -toPlayer;
             float size = target.transform.lossyScale.y;
-            // Round the back of his neck under the skull from outside it on the player's left: bowed into the clinch his
-            // head is below the player's eye, so the forearm runs below his face, beside his jaw, and the face is clear
-            // over it (over the crown, or level with the eye, the forearm crossed the face). The hand wraps behind (drawn
-            // in the world's depth, it goes behind his neck).
-            return eye + (-face * 0.08f - up * 0.12f + left * 0.12f) * size;
+            // Round the back of his head at the base of the skull, from outside it on the player's left (Ishaan moved it up
+            // off the neck and further behind, 2026-10-24): bowed into the clinch his head is below the player's eye, so the
+            // forearm runs below his face, beside his jaw, and the face is clear over it (over the crown, or level with the
+            // eye, the forearm crossed the face). The hand wraps behind (drawn in the world's depth, it goes behind him).
+            return eye + (-face * 0.13f - up * 0.09f + left * 0.13f) * size;
         }
         return Settings.grip switch
         {

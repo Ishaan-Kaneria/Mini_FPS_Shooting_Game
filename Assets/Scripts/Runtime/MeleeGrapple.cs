@@ -190,11 +190,12 @@ public partial class MeleeStrike
             var body = target.GetComponent<EnemyBody>();
             Vector3 up = body != null ? body.HeadUp : Vector3.up, face = body != null ? body.HeadFace : -toPlayer;
             float size = target.transform.lossyScale.y;
-            // Round the back of his head at the base of the skull, from outside it on the player's left (Ishaan moved it up
-            // off the neck and further behind, 2026-10-24): bowed into the clinch his head is below the player's eye, so the
-            // forearm runs below his face, beside his jaw, and the face is clear over it (over the crown, or level with the
-            // eye, the forearm crossed the face). The hand wraps behind (drawn in the world's depth, it goes behind him).
-            return eye + (-face * 0.13f - up * 0.09f + left * 0.13f) * size;
+            // On the left side of his neck at the base of the skull, on its surface where the player sees it: the palm on the
+            // side of his neck, the fingers round the back of it (drawn in the world's depth, they go behind him). Placed
+            // behind his head the whole hand was hidden by it and only the forearm showed, crossing to the middle of his face
+            // ("my hand is not fully going to more left side and hold his neck/head", Ishaan 2026-10-24). From here the
+            // forearm comes in from the bottom left beside his face.
+            return eye + (face * 0.025f - up * 0.075f + left * 0.11f) * size;
         }
         return Settings.grip switch
         {
@@ -232,7 +233,7 @@ public partial class MeleeStrike
         Vector3 eye = HeadOf(target);
         Frame(eye, target, out Vector3 toPlayer, out Vector3 left);
         float size = target.transform.lossyScale.y;
-        return eye + (left * 0.12f + toPlayer * 0.10f - Vector3.up * 0.20f) * size;
+        return eye + (left * 0.14f + toPlayer * 0.15f - Vector3.up * 0.22f) * size;
     }
 
     /// <summary>The flat way from his head to the player, and the player's left.</summary>
@@ -240,7 +241,9 @@ public partial class MeleeStrike
     {
         toPlayer = fpsCamera.transform.position - head; toPlayer.y = 0f;
         toPlayer = toPlayer.sqrMagnitude > 0.0001f ? toPlayer.normalized : -target.transform.forward;
-        left = Vector3.Cross(toPlayer, Vector3.up).normalized;
+        // Unity's cross product is left-handed: up x toPlayer is the player's left. (The other way round it was the
+        // player's right, and for a day every left-hand grip sat on the right of his head, the forearm across his face.)
+        left = Vector3.Cross(Vector3.up, toPlayer).normalized;
     }
 
     // ======================================================================

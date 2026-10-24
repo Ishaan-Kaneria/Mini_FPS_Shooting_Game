@@ -1121,11 +1121,13 @@ public class ViewModelRig : MonoBehaviour
                                                       // his head (by the head's own axes, so the hand lies on it as he bows and
                                                       // twists), the elbow out at the shoulder
                 {
+                    // The palm against the left side of his neck, the fingers round the back of it towards his spine, the back
+                    // of the hand out to the player's left, the thumb up under his ear.
                     Vector3 up = s.gripUp.sqrMagnitude > 0.5f ? s.gripUp : Vector3.up;
                     Vector3 face = s.gripFace.sqrMagnitude > 0.5f ? s.gripFace : -view.forward;
                     Vector3 right = view.right;
-                    fingers = view.InverseTransformDirection(-face * 0.75f - up * 0.35f + right * 0.3f);
-                    back = view.InverseTransformDirection(up * 0.8f - face * 0.3f - right * 0.25f);
+                    fingers = view.InverseTransformDirection(-face * 0.85f + right * 0.35f + up * 0.1f);
+                    back = view.InverseTransformDirection(-right * 0.9f + up * 0.25f);
                     // Wide and high, so the forearm comes in from the left beside his face, not up across it.
                     elbow = new Vector3(-0.95f, 0.4f, -0.25f);
                     break;

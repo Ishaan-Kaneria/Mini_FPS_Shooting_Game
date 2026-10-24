@@ -3942,9 +3942,13 @@ look like I am holding his head (no touch felt)".
   - Where the head goes decides what is seen: bowed right over, only the cap's top showed; level with the holder's eye, the
     holder's own forearm (an arm reaching forward passes close to the eye) was between them; below the eye, chin up, the face
     is clear over the forearm.
-* **The hand** goes round the back of his head at the base of the skull from outside on the player's left (first round the
-  back of his neck; he had it moved up and further behind, which also lifts the forearm to his mouth -- moved further out
-  as well, the forearm crossed his face more), placed and turned by the head's own axes (`EnemyBody.HeadUp`/`HeadFace`, `MeleeStrike.GripUp`/`GripFace`), open as it reaches and closed on contact,
+* **The hand** holds the left side of his neck at the base of the skull, on its surface where the player sees it (the palm
+  on the side of the neck, the fingers round the back), the arm coming straight in from the left, his face clear. Every
+  earlier try (round the back of the neck, the back of the head, "up and behind") sat on his *right*: `MeleeGrapple.Frame`
+  took `Cross(toPlayer, up)` for the player's left, and Unity's cross product is left-handed, so it was the player's right
+  and the forearm crossed his face whatever was tuned ("my hand is not fully going to more left side", Ishaan). It is
+  `Cross(up, toPlayer)`. Placed behind his head, the hand was hidden by it and only the forearm showed. Placed and turned by
+  the head's own axes (`EnemyBody.HeadUp`/`HeadFace`, `MeleeStrike.GripUp`/`GripFace`), open as it reaches and closed on contact,
   with a slap heard. Over the crown, beside the head or at the centre of the back of it, the forearm crossed his face.
   His right hand's target (`WristOf`) is beside his jaw and low: along the line from the grip to the player's shoulder it
   went to his own forehead.

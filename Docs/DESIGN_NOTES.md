@@ -3996,10 +3996,34 @@ shops", the faces easier to see, then "make the shadows, lighting very realistic
     the static renderers back on the sky ambient and removes the volume (the copy is not in the original's baking set).
   - The probe data (`DesertOutpost_APV*.bytes`, 40 MB of light, 40 MB of L2, 80 MB of editor-only debug data) is in LFS.
 * **Brightness**: the first bake (bounce 1.15, the plain sky) made the shade realistic but darker than the old flat ambient,
-  a soldier in a building's shade included -- against the ask. The code now bakes bounce 1.8 with the sky at 1.3 times
-  (`ApvIndirect`, `ApvSky`) and reads the probes with longer offsets for 3 m spacing (`ProbeVolumesOptions` normal 0.4, view
-  0.3, on the scene's global profile: dark ceilings from probes buried in them). **The committed scene still holds the
-  first bake** until the re-bake runs (the brighter one was stopped for memory).
+  a soldier in a building's shade included -- against the ask. Re-baked at bounce 1.8 with the sky at 1.3 times
+  (`ApvIndirect`, `ApvSky`), the probes read with longer offsets for 3 m spacing (`ProbeVolumesOptions` normal 0.4, view 0.3,
+  on the scene's global profile: dark ceilings from probes buried in them).
+* **"Lots of black spots on the corner"** (his look at the first bake). Two causes, found with the tour's switches
+  (`FPSKIT_TOUR_SSAO=0`, `FPSKIT_TOUR_BOUNCE=1`, `FPSKIT_TOUR_REFL=0`, `FPSKIT_TOUR_PROBES=0`): SSAO's reach (0.45 m, 0.8)
+  made speckled dark smudges along every wall and ceiling edge -- now contact only (0.12 m, 0.4), the probe volumes shade the
+  corners themselves; and probes that landed in walls baked black and stayed so (dilation is off by default) -- now dilation
+  (3.5 m, two passes) and a stronger virtual offset. The probe grid is lifted 1.5 m (`probeOffset`): from the ground its
+  layers fell in the floor slabs of the 3.2 m storeys.
+* **Honest lights in the full scene** (`FPSKitTownGI.ApplyRealLightLook`, also `FPSKitBatch.DesertRealLightLook` on the saved
+  scene): the shadowless "Bounce Light" (2026-10-03's stand-in for the sand's bounce) off -- it lit every room and floor
+  through the roofs by the same amount; sun shadow strength 1 (0.8 let a fifth of the sun through every wall). The reduced
+  copy puts both back.
+* **The eye adapts indoors** (`EyeAdaptation`, runtime): a room is as dark against the street as it is, and at the street's
+  exposure its floor read black. Ten times a second it counts how much of the upper sky a roof hides over the eye and opens
+  the exposure up to 0.6 stop (1.6 and 0.85 burned whitewashed rooms out), over 1.4 s going in, 0.5 s coming out; its own
+  global volume adds to the scene's exposure (no shared profile written). Only with the probe volumes on.
+* **Indoor floors reflected the sky** (a cold blue sheen on carpets and tiles, the gun mirroring a blue sky indoors: gone with
+  reflections off). URP's Lit shader has none of HDRP's probe-volume reflection normalization, so every surface without a
+  reflection probe mirrors the scene's sky. `FPSKitTownGI.PlaceIndoorReflections` puts a box reflection probe round each
+  house with an inside (160, the union of its rooms found by casts from the room marks), all sharing one 32 px warm room
+  cubemap (`Town/IndoorRoom.cubemap`: lit ceiling, pale walls, dark floor) -- nothing captured or rendered.
+  `IndoorReflections` switches on only those within 45 m, and only under Forward+ (High): URP draws at most 64 probes a frame,
+  and on Medium's Forward path an object takes its probe from its bounds, and a house's walls are merged into its block's
+  chunk with the street fronts.
+* **The GPU lightmapper** crashed on the Intel Arc even with `intel-opencl-icd` installed (`RadeonRaysMeshManager::StoreToGPU`).
+  The CPU bake takes 8-10 minutes since everything that does not bounce light is switched off during it (the baker's snapshot
+  went from 28,114 objects to 840 and the bake from earlyoom kills to under 6 GB).
 * **Shadows** on High to 150 m in four cascades (7.5 / 22.5 / 60 / 150 m) at 4096: at 50 m the far half of a street, its
   balconies and awnings, had none. Medium 80 m.
 * **SSAO** on High at full resolution, twelve samples, intensity 0.8, radius 0.45: the contact shading the probes are too

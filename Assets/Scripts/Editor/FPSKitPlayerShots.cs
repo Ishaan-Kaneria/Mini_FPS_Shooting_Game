@@ -958,6 +958,11 @@ namespace FPSKit.EditorTools
                             if (list.GetArrayElementAtIndex(i).objectReferenceValue is UnityEngine.Rendering.Universal.ScriptableRendererData data)
                                 foreach (var f in data.rendererFeatures) if (f != null && f.name.Contains("Occlusion")) f.SetActive(false);
                     }
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_REFL") == "0")
+                    {
+                        RenderSettings.reflectionIntensity = 0f;
+                        foreach (var rp in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) rp.enabled = false;
+                    }
                     if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_PROBES") == "0")
                         foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
                             if (r.gameObject.isStatic) r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;

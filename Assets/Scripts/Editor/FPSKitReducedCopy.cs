@@ -127,6 +127,8 @@ namespace FPSKit.EditorTools
                     else if (l.type == LightType.Directional && l.shadows != LightShadows.None) l.shadowStrength = 0.8f;
                 foreach (var eye in Object.FindObjectsByType<EyeAdaptation>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                     Object.DestroyImmediate(eye.gameObject);
+                foreach (var indoor in Object.FindObjectsByType<IndoorReflections>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    Object.DestroyImmediate(indoor.gameObject);
             }
             sb.AppendLine($"  static renderers back on the sky ambient: {ambient}");
 

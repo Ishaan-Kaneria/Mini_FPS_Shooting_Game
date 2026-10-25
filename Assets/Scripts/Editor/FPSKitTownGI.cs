@@ -80,6 +80,107 @@ namespace FPSKit.EditorTools
             var arena = GameObject.Find("Arena");
             if (arena != null) go.transform.SetParent(arena.transform, false);
             go.AddComponent<EyeAdaptation>();
+            PlaceIndoorReflections(arena != null ? arena.transform : null);
+        }
+
+        const string RoomCubePath = "Assets/FPSKit_Generated/Town/IndoorRoom.cubemap";
+
+        /// <summary>
+        /// A box reflection probe round every house with an inside (FPSKitTownInterior's room marks), each showing the same
+        /// small warm room cubemap; switched on near the eye under Forward+ by <see cref="IndoorReflections"/>. The box is
+        /// the union of the house's rooms, each found by casting from its middle to the walls and the ceiling above head
+        /// height (clear of furniture). Replaced whole each time.
+        /// </summary>
+        static void PlaceIndoorReflections(Transform arena)
+        {
+            foreach (var old in Object.FindObjectsByType<IndoorReflections>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Object.DestroyImmediate(old.gameObject);
+            var rooms = GameObject.Find("HouseRooms");
+            if (rooms == null) { Debug.LogWarning("[FPSKit] indoor reflections: no HouseRooms in the scene"); return; }
+            var cube = RoomCube();
+            var root = new GameObject("IndoorReflections");
+            if (arena != null) root.transform.SetParent(arena, false);
+            int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian", "PlayerBounds");
+            Physics.SyncTransforms();
+            int houses = 0;
+            foreach (Transform house in rooms.transform)
+            {
+                bool any = false;
+                var box = new Bounds();
+                foreach (Transform room in house)
+                {
+                    if (!room.name.StartsWith("Room ")) continue;
+                    var look = room.Find("Look");
+                    Vector3 floor = (look != null ? look.position : room.position) - Vector3.up * 0.3f;
+                    Vector3 from = floor + Vector3.up * 2.1f;   // over the wardrobes, under the ceiling
+                    float Cast(Vector3 d, float far) => Physics.Raycast(from, d, out var hit, far, mask, QueryTriggerInteraction.Ignore) ? hit.distance : -1f;
+                    float xp = Cast(Vector3.right, 14f), xn = Cast(Vector3.left, 14f), zp = Cast(Vector3.forward, 14f), zn = Cast(Vector3.back, 14f);
+                    float up = Physics.Raycast(floor + Vector3.up * 0.5f, Vector3.up, out var ceil, 6f, mask, QueryTriggerInteraction.Ignore) ? ceil.distance + 0.5f : -1f;
+                    if (xp < 0f || xn < 0f || zp < 0f || zn < 0f || up < 0f) continue;   // open to the sky one way: not a room
+                    var rb = new Bounds();
+                    rb.SetMinMax(new Vector3(from.x - xn, floor.y - 0.05f, from.z - zn), new Vector3(from.x + xp, floor.y + up, from.z + zp));
+                    if (!any) { box = rb; any = true; } else box.Encapsulate(rb);
+                }
+                if (!any) continue;
+                var go = new GameObject("RoomProbe_" + house.GetSiblingIndex());
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = box.center;
+                var probe = go.AddComponent<ReflectionProbe>();
+                probe.mode = ReflectionProbeMode.Custom;
+                probe.customBakedTexture = cube;
+                probe.size = box.size;
+                probe.center = Vector3.zero;
+                probe.boxProjection = false;
+                probe.blendDistance = 0.25f;
+                probe.importance = 2;                // over the street probes where they overlap
+                probe.intensity = 1f;
+                probe.enabled = false;               // IndoorReflections switches them on near the eye
+                houses++;
+            }
+            root.AddComponent<IndoorReflections>();
+            Debug.Log($"[FPSKit] indoor reflections: {houses} house probes");
+        }
+
+        /// <summary>
+        /// The room every indoor surface reflects: a lit ceiling overhead, pale walls round, a darker floor below, warm, at about
+        /// the light a room in this town has (linear values; the sky's reflection is several times brighter). 32 px a face.
+        /// </summary>
+        static Cubemap RoomCube()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Cubemap>(RoomCubePath);
+            const int n = 32;
+            var cube = existing != null ? existing : new Cubemap(n, TextureFormat.RGBAHalf, true);
+            Color ceiling = new Color(0.36f, 0.33f, 0.29f), wall = new Color(0.26f, 0.23f, 0.19f), floor = new Color(0.09f, 0.075f, 0.06f);
+            var faces = new[] { CubemapFace.PositiveX, CubemapFace.NegativeX, CubemapFace.PositiveY, CubemapFace.NegativeY, CubemapFace.PositiveZ, CubemapFace.NegativeZ };
+            var px = new Color[n * n];
+            foreach (var face in faces)
+            {
+                for (int y = 0; y < n; y++)
+                    for (int x = 0; x < n; x++)
+                    {
+                        float u = (x + 0.5f) / n * 2f - 1f, v = (y + 0.5f) / n * 2f - 1f;
+                        Vector3 d = face switch
+                        {
+                            CubemapFace.PositiveX => new Vector3(1f, -v, -u),
+                            CubemapFace.NegativeX => new Vector3(-1f, -v, u),
+                            CubemapFace.PositiveY => new Vector3(u, 1f, v),
+                            CubemapFace.NegativeY => new Vector3(u, -1f, -v),
+                            CubemapFace.PositiveZ => new Vector3(u, -v, 1f),
+                            _ => new Vector3(-u, -v, -1f),
+                        };
+                        float h = d.normalized.y;
+                        px[y * n + x] = h >= 0f ? Color.Lerp(wall, ceiling, Mathf.SmoothStep(0f, 1f, h)) : Color.Lerp(wall, floor, Mathf.SmoothStep(0f, 1f, -h));
+                    }
+                cube.SetPixels(px, face);
+            }
+            cube.Apply(true);
+            if (existing == null)
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(RoomCubePath));
+                AssetDatabase.CreateAsset(cube, RoomCubePath);
+            }
+            else EditorUtility.SetDirty(cube);
+            return cube;
         }
 
         /// <summary>Opens the saved desert scene, applies <see cref="ApplyRealLightLook"/>, saves it, and exits (batch).</summary>

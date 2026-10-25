@@ -223,8 +223,11 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Room marks sit at each room's way in; VerifyTown `CheckInteriors` wants 95% of rooms / 90% upstairs reached.
 - Desert light (`Docs/DESIGN_NOTES.md` "Real light"): adaptive probe volumes on High/Medium (`FPSKitTownGI`, 3 m probes over the
   town, run after the classic probe bake in every desert build); bake the saved scene with `UNITY_GRAPHICS=1 Tools/unity-batch.sh
-  FPSKitBatch.BakeDesertLight -force-vulkan` (APV cannot bake on OpenGL; no OpenCL here, so the CPU lightmapper; close Firefox --
-  it is near the 14 GB). Low/phones/web keep classic probes (`FPSKitReducedCopy` reverts the walls to ambient). Shadows to 150 m.
+  FPSKitBatch.BakeDesertLight -force-vulkan` (APV cannot bake on OpenGL; the GPU lightmapper crashes on the Arc, so CPU, ~9 min).
+  Low/phones/web keep classic probes (`FPSKitReducedCopy` reverts walls, bounce light, eye, indoor probes). Shadows to 150 m. SSAO is
+  contact only (its reach made black corner smudges). The full scene has no "Bounce Light", sun shadows at 1, `EyeAdaptation`, and
+  `IndoorReflections` (house box probes with one warm cubemap: URP mirrors the sky indoors otherwise). Judge with
+  `FPSKitPlayerShots.BatchLightingTour -fpskitTag <name>` (switches: FPSKIT_TOUR_SSAO/BOUNCE/REFL/PROBES).
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

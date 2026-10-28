@@ -226,8 +226,9 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   FPSKitBatch.BakeDesertLight -force-vulkan` (APV cannot bake on OpenGL; the GPU lightmapper crashes on the Arc, so CPU, ~9 min).
   Low/phones/web keep classic probes (`FPSKitReducedCopy` reverts walls, bounce light, eye, indoor probes). Shadows to 150 m. SSAO is
   contact only (its reach made black corner smudges). The full scene has no "Bounce Light", sun shadows at 1, `EyeAdaptation`, and
-  `IndoorReflections` (house box probes with one warm cubemap: URP mirrors the sky indoors otherwise). Judge with
-  `FPSKitPlayerShots.BatchLightingTour -fpskitTag <name>` (switches: FPSKIT_TOUR_SSAO/BOUNCE/REFL/PROBES).
+  `IndoorReflections` (house and shop box probes with one warm cubemap: URP mirrors the sky indoors otherwise;
+  URP fades a probe in from inside its box, so each box reaches 0.1 m past the room's surfaces; at most 40 on, nearest first). Judge with
+  `FPSKitPlayerShots.BatchLightingTour -fpskitTag <name>` (switches: FPSKIT_TOUR_SSAO/BOUNCE/REFL/PROBES/INDOOR).
 - `FPSKitGraphics.Apply` must never write the three tier assets; only `FPSKitQualityTiers.Ensure` does. The dynamic UI fonts are never saved
   (`FPSKitFontHygiene`), except by `Rebuild Font Assets`.
 - Art-pack lookups (`Pack`) may return null; always fall back.

@@ -4021,6 +4021,23 @@ shops", the faces easier to see, then "make the shadows, lighting very realistic
   `IndoorReflections` switches on only those within 45 m, and only under Forward+ (High): URP draws at most 64 probes a frame,
   and on Medium's Forward path an object takes its probe from its bounds, and a house's walls are merged into its block's
   chunk with the street fronts.
+* **Shops reflected the sky too, and the house probes did less than they seemed** (2026-10-27). Every shop with an inside to
+  see (behind glass, open to the street, or half shut) leaves a mark in `ShopRooms` (`FPSKitTownShopfront`: the inside as a
+  unit box, facing the street, scaled to its width, height and depth), and gets a probe from 6 cm behind its glass to its
+  back wall; a dark one reflects the room at 0.45. URP takes a probe's box as `ReflectionProbe.bounds`, the box alone (a
+  2 m box with a 0.5 m blend reported 2 m), and fades it in from the faces inward (`CalculateProbeWeight`), so the first
+  house boxes, drawn on the walls with the floor 5 cm in and a 0.25 m blend, gave a floor a fifth of the room and four
+  fifths sky, and the walls next to nothing. Every room box now reaches 0.1 m past the floor, walls and ceiling (into a
+  0.25 m wall) and fades over 5 cm. A street of shops has dozens of probes within 45 m: `IndoorReflections.maxOn` keeps
+  the nearest 40 on (URP's 64 include the street's). The lighting tour adds the nearest lit, dark and open shops, and from
+  just inside the open one (`FPSKIT_TOUR_INDOOR=0` turns these probes off for the same shots; the tour's limit is 75 s). Seen:
+  behind a half-shut shutter the inside had a blue-white sky sheen, now dark; the open shop's walls lost their grey sheen and
+  its terrazzo reads warm; an upstairs bedroom's carpet, blue-purple at the far end with a blue shine on the wardrobe, is red
+  to the wall. Shopfronts, signs and the street are unchanged.
+  **Open (checkpoint, scene not committed):** the full desert rebuild that carries the shop marks failed VerifyTown on the
+  classic probes alone: people's probes 1.42 against the walls' 0.77 (ratio 1.85; the committed scene gives 0.80). Not yet
+  understood. The full BuildTheme was also earlyoom-killed in its APV bake; BakeDesertLight on the saved scene finished it.
+  The rebuilt scene is kept in Build/ShopProbeScene/ (copy back over Assets/ to resume).
 * **The GPU lightmapper** crashed on the Intel Arc even with `intel-opencl-icd` installed (`RadeonRaysMeshManager::StoreToGPU`).
   The CPU bake takes 8-10 minutes since everything that does not bounce light is switched off during it (the baker's snapshot
   went from 28,114 objects to 840 and the bake from earlyoom kills to under 6 GB).

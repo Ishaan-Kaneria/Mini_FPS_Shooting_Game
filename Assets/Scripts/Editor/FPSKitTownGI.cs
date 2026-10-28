@@ -86,23 +86,48 @@ namespace FPSKit.EditorTools
         const string RoomCubePath = "Assets/FPSKit_Generated/Town/IndoorRoom.cubemap";
 
         /// <summary>
-        /// A box reflection probe round every house with an inside (FPSKitTownInterior's room marks), each showing the same
-        /// small warm room cubemap; switched on near the eye under Forward+ by <see cref="IndoorReflections"/>. The box is
-        /// the union of the house's rooms, each found by casting from its middle to the walls and the ceiling above head
-        /// height (clear of furniture). Replaced whole each time.
+        /// A box reflection probe round every house with an inside (FPSKitTownInterior's room marks) and every shop with one
+        /// (FPSKitTownShopfront's marks), each showing the same small warm room cubemap; switched on near the eye under
+        /// Forward+ by <see cref="IndoorReflections"/>. A house's box is the union of its rooms, each found by casting from
+        /// its middle to the walls and the ceiling above head height (clear of furniture); a shop's is its inside as built,
+        /// from 6 cm behind the glass (the glass reflects the street) to the back wall.
+        ///
+        /// URP fades a probe in from its box's faces inward over the blend distance (ReflectionProbe.bounds is the box
+        /// alone), so a box drawn on the room's surfaces gave them almost nothing: the first house probes had the floor
+        /// 5 cm inside a 0.25 m fade (a fifth of the room, four fifths sky) and the walls on the faces themselves. Each box
+        /// now reaches <see cref="RoomPad"/> past the floor, the walls and the ceiling, into their thickness (a house wall
+        /// is 0.25 m), and fades over <see cref="RoomBlend"/>. Replaced whole each time.
         /// </summary>
         static void PlaceIndoorReflections(Transform arena)
         {
             foreach (var old in Object.FindObjectsByType<IndoorReflections>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 Object.DestroyImmediate(old.gameObject);
             var rooms = GameObject.Find("HouseRooms");
-            if (rooms == null) { Debug.LogWarning("[FPSKit] indoor reflections: no HouseRooms in the scene"); return; }
+            var shops = GameObject.Find("ShopRooms");
+            if (rooms == null && shops == null) { Debug.LogWarning("[FPSKit] indoor reflections: no HouseRooms or ShopRooms in the scene"); return; }
             var cube = RoomCube();
             var root = new GameObject("IndoorReflections");
             if (arena != null) root.transform.SetParent(arena, false);
             int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian", "PlayerBounds");
             Physics.SyncTransforms();
+            void Probe(string name, Bounds box, float intensity)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = box.center;
+                var probe = go.AddComponent<ReflectionProbe>();
+                probe.mode = ReflectionProbeMode.Custom;
+                probe.customBakedTexture = cube;
+                probe.size = box.size;
+                probe.center = Vector3.zero;
+                probe.boxProjection = false;
+                probe.blendDistance = RoomBlend;
+                probe.importance = 2;                // over the street probes where they overlap
+                probe.intensity = intensity;
+                probe.enabled = false;               // IndoorReflections switches them on near the eye
+            }
             int houses = 0;
+            if (rooms != null)
             foreach (Transform house in rooms.transform)
             {
                 bool any = false;
@@ -122,24 +147,41 @@ namespace FPSKit.EditorTools
                     if (!any) { box = rb; any = true; } else box.Encapsulate(rb);
                 }
                 if (!any) continue;
-                var go = new GameObject("RoomProbe_" + house.GetSiblingIndex());
-                go.transform.SetParent(root.transform, false);
-                go.transform.position = box.center;
-                var probe = go.AddComponent<ReflectionProbe>();
-                probe.mode = ReflectionProbeMode.Custom;
-                probe.customBakedTexture = cube;
-                probe.size = box.size;
-                probe.center = Vector3.zero;
-                probe.boxProjection = false;
-                probe.blendDistance = 0.25f;
-                probe.importance = 2;                // over the street probes where they overlap
-                probe.intensity = 1f;
-                probe.enabled = false;               // IndoorReflections switches them on near the eye
+                box.Expand(2f * RoomPad);
+                Probe("RoomProbe_" + house.GetSiblingIndex(), box, 1f);
                 houses++;
             }
+            // A shop: its mark is its inside as a unit box (FPSKitTownShopfront); the probe's box is world-aligned, as the
+            // town's faces are. A dark shop (shut half way, or trading unlit) reflects a dimmer room.
+            int lit = 0, dark = 0;
+            if (shops != null)
+            foreach (Transform shop in shops.transform)
+            {
+                // In the mark's units: out past the side walls, the floor, the ceiling and the back wall; the front 6 cm
+                // behind the glass.
+                var size = shop.localScale;
+                float sx = 0.5f + RoomPad / size.x, sy = 0.5f + RoomPad / size.y, back = -0.5f - RoomPad / size.z, front = 0.5f - 0.06f / size.z;
+                var box = new Bounds(shop.position, Vector3.zero);
+                for (int c = 0; c < 8; c++)
+                    box.Encapsulate(shop.TransformPoint(new Vector3((c & 1) != 0 ? sx : -sx, (c & 2) != 0 ? sy : -sy, (c & 4) != 0 ? front : back)));
+                bool isDark = shop.name.EndsWith(" dark");
+                Probe("ShopProbe_" + shop.GetSiblingIndex(), box, isDark ? ShopDarkReflection : 1f);
+                if (isDark) dark++; else lit++;
+            }
             root.AddComponent<IndoorReflections>();
-            Debug.Log($"[FPSKit] indoor reflections: {houses} house probes");
+            Debug.Log($"[FPSKit] indoor reflections: {houses} house probes, {lit + dark} shop probes ({dark} dark)");
         }
+
+        /// <summary>How far a room's probe box reaches past its surfaces, into the walls, floor and ceiling.</summary>
+        const float RoomPad = 0.1f;
+
+        /// <summary>How far in from its box's faces a room's probe fades in; less than <see cref="RoomPad"/>, so every surface
+        /// of the room takes the whole of it.</summary>
+        const float RoomBlend = 0.05f;
+
+        /// <summary>How bright the room a dark shop reflects is against a lit one's: its walls are the dark interior paint
+        /// (0.16 against 0.34).</summary>
+        const float ShopDarkReflection = 0.45f;
 
         /// <summary>
         /// The room every indoor surface reflects: a lit ceiling overhead, pale walls round, a darker floor below, warm, at about

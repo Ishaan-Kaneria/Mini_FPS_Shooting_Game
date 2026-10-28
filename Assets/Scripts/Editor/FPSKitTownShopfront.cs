@@ -42,6 +42,13 @@ namespace FPSKit.EditorTools
         }
         private static readonly List<ShopFace> _shopFaces = new List<ShopFace>();
 
+        /// <summary>
+        /// "ShopRooms": a mark for each shop with an inside to see (FPSKitTownGI gives each a reflection probe, the lighting
+        /// tour looks into them). The mark is the inside as a unit box: at its middle, facing out to the street, its scale
+        /// the inside's width, height and depth -- an empty object, so nothing is drawn or collides.
+        /// </summary>
+        private static Transform _shopMarks;
+
         private static Material _foundation, _stallriser, _shopGlass, _shopInside, _stallMarble;
         /// <summary>The shutters' paints and the storefronts' four frame finishes (FPSKitTownShopfront.ShopLook).</summary>
         private static Material[] _shutterPaints, _frameAccents, _risers;
@@ -172,6 +179,10 @@ namespace FPSKit.EditorTools
                 m.Quad(inside, a, a + back, a + back + top, a + top, u);
                 m.Quad(inside, c, c + back, c + back + top, c + top, -u);
                 m.Quad(_shopDark, a + top, c + top, c + back + top, a + back + top, Vector3.down);
+                if (_shopMarks == null) { _shopMarks = new GameObject("ShopRooms").transform; _shopMarks.SetParent(_volumes.parent, false); }
+                var mark = Mark(_shopMarks, lit ? $"Shop {state}" : $"Shop {state} dark", S(W * 0.5f, hs * 0.5f) + back * 0.5f);
+                mark.rotation = Quaternion.LookRotation(nrm);
+                mark.localScale = new Vector3(W, hs, back.magnitude);
                 if (state == ShopState.Glazed || state == ShopState.Stall)
                 {
                     var centre = (p0 + p1) * 0.5f;

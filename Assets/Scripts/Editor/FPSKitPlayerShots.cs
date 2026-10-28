@@ -307,7 +307,7 @@ namespace FPSKit.EditorTools
                 _lastGameFrame = Time.frameCount;
                 if (_health != null && _health.Normalized < 0.9f) _health.ResetHealth();
                 _frame++;
-                if (_frame > Frames(_pose == "warmup" ? 60f : _pose.StartsWith("grapple") || _pose.EndsWith("_video") || _pose == "lighting_tour" ? 40f : 12f))
+                if (_frame > Frames(_pose == "warmup" ? 60f : _pose == "lighting_tour" ? 75f : _pose.StartsWith("grapple") || _pose.EndsWith("_video") ? 40f : 12f))
                 {
                     Report += $"{_pose}: timed out (time {Time.time:0.0}, briefing {Object.FindAnyObjectByType<LevelManager>()?.IsBriefing}, paused {EditorApplication.isPaused}, timeScale {Time.timeScale}, dead {(_health != null && _health.IsDead)}, " +
                               $"lowered {(_weapon != null && _weapon.IsLowered)}, strike {(_melee != null ? _melee.Current.ToString() : "-")}, " +
@@ -963,6 +963,13 @@ namespace FPSKit.EditorTools
                         RenderSettings.reflectionIntensity = 0f;
                         foreach (var rp in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) rp.enabled = false;
                     }
+                    // FPSKIT_TOUR_INDOOR=0: the rooms' and shops' own reflection probes off (IndoorReflections), the sky's kept.
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_INDOOR") == "0")
+                        foreach (var indoor in Object.FindObjectsByType<IndoorReflections>(FindObjectsSortMode.None))
+                        {
+                            indoor.enabled = false;
+                            foreach (var rp in indoor.GetComponentsInChildren<ReflectionProbe>(true)) rp.enabled = false;
+                        }
                     if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_PROBES") == "0")
                         foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
                             if (r.gameObject.isStatic) r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
@@ -1025,7 +1032,8 @@ namespace FPSKit.EditorTools
 
         /// <summary>
         /// Rooms of the three houses nearest the start (FPSKitTownInterior's marks), ground floor and upstairs: stood at
-        /// the room's way in, looking across it, plus one shop seen from its doorway.
+        /// the room's way in, looking across it; then the shops nearest the start (FPSKitTownShopfront's marks): one behind
+        /// glass and lit, one dark, one open to the street seen from the pavement and from just inside it.
         /// </summary>
         static List<(Vector3, Vector3, string)> TourRooms()
         {
@@ -1039,7 +1047,7 @@ namespace FPSKit.EditorTools
             int taken = 0;
             foreach (var h in houses)
             {
-                if (taken >= 3) break;
+                if (taken >= 3 || list.Count >= 8) break;
                 bool any = false;
                 foreach (Transform m in h)
                 {
@@ -1055,10 +1063,37 @@ namespace FPSKit.EditorTools
                     }
                     list.Add((hit.position, hit.position + Vector3.up * 1.45f + best * 4f, $"{h.name.ToLower()}{taken + 1}_{m.name.Substring(5).Replace(' ', '_').ToLower()}"));
                     any = true;
-                    if (list.Count >= 8) return list;
+                    if (list.Count >= 8) break;
                 }
                 if (any) taken++;
             }
+
+            var shopMarks = GameObject.Find("ShopRooms");
+            if (shopMarks == null) return list;
+            var shops = new List<Transform>();
+            foreach (Transform sm in shopMarks.transform) shops.Add(sm);
+            shops.Sort((a, b) => (a.position - _startPos).sqrMagnitude.CompareTo((b.position - _startPos).sqrMagnitude));
+            // A mark is the shop's inside as a unit box facing the street: the pavement is 1.6 m out from its front.
+            void Shop(System.Func<string, bool> kind, string place, bool inside = false)
+            {
+                foreach (var sm in shops)
+                {
+                    if (!kind(sm.name)) continue;
+                    Vector3 floorMid = sm.position - Vector3.up * (sm.localScale.y * 0.5f), outward = sm.forward;
+                    Vector3 at = inside ? floorMid + outward * (sm.localScale.z * 0.5f - 0.7f) : floorMid + outward * (sm.localScale.z * 0.5f + 1.6f);
+                    if (!inside)
+                    {
+                        if (!NavMesh.SamplePosition(at, out var hit, 0.8f, NavMesh.AllAreas)) continue;
+                        at = hit.position;
+                    }
+                    list.Add((at, floorMid - outward * (sm.localScale.z * 0.5f) + Vector3.up * 0.6f, place));
+                    return;
+                }
+            }
+            Shop(n => n == "Shop Glazed", "shop_glazed_lit");
+            Shop(n => n.EndsWith(" dark"), "shop_dark");
+            Shop(n => n == "Shop Stall", "shop_stall");
+            Shop(n => n == "Shop Stall", "shop_stall_inside", inside: true);
             return list;
         }
 

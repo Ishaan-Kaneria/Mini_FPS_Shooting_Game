@@ -51,7 +51,7 @@ namespace FPSKit.EditorTools
         private static void ResetTownBuildings()
         {
             _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
-            _palletPrefab = null; _roomMarks = null;
+            _palletPrefab = null; _roomMarks = null; _shopMarks = null;
             _volumes = null; _signNames = null; _roadSignNames = null;
             _oldSquares.Clear(); _vacantLots.Clear();
         }

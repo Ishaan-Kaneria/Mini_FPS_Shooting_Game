@@ -313,6 +313,10 @@ namespace FPSKit.EditorTools
         /// <summary>The saved desert scene's lights made honest for the baked light (FPSKitTownGI.ApplyRealLightLook).</summary>
         public static void DesertRealLightLook() => FPSKitTownGI.BatchLookSaved();
 
+        /// <summary>The realism audit of an arena (FPSKitRealismAudit): -fpskitTheme "Desert Outpost", -fpskitRealismTop 20.
+        /// Needs a graphics device: UNITY_GRAPHICS=1.</summary>
+        public static void AuditRealism() => FPSKitRealismAudit.Batch();
+
         /// <summary>
         /// The face damage shapes made in Blender (Tools/blender/face_damage_keys.py) copied onto the game's head mesh for
         /// FacialDamageHandler: Assets/FPSKit_Generated/Resources/FaceDamage/SK_Military_Head1.asset.

@@ -285,6 +285,13 @@ to prove a rule must fail with the rule deleted (hence public `ControlSettings.C
 `DeviceProfile.FormFor`). If `VerifyReach` fails by more than a few percent, read the reported
 extents before changing anything.
 
+## Realism
+
+- Judge realism by `FPSKitBatch.AuditRealism` (FPSKit > Realism > Audit Arena, `UNITY_GRAPHICS=1`, about 3 min): its
+  measurements and its close-up, wireframe, texel and five-light evidence (`Docs/REALISM_AUDIT_<Arena>.md`,
+  `Build/Realism/`), never a screenshot alone; unsure is UNCERTAIN, never fine (`Docs/DESIGN_NOTES.md` "The realism audit").
+  Its desert walk (`DesertWalk`) is also the frame-time path. Every downloaded asset goes in `LICENSES.md`.
+
 ## Conventions
 
 - Tags/layers are provisioned in `EnsureProjectTagsAndLayers()` only.

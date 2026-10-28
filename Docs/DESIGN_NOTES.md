@@ -4060,3 +4060,60 @@ shops", the faces easier to see, then "make the shadows, lighting very realistic
   bar from the screen's edge); his right hand takes the player's **real forearm** (`ViewModelRig.LeftForearm`: drawn in the
   world's depth while holding, so it is where it is) instead of air; the holding hand yanks his head into each punch
   (`EnemyAI.GrabPull`, `EnemyBody` leans him into it).
+
+## The realism audit (2026-10-28)
+
+Asked for: the game to look real and run without a hitch, the desert first. "Don't judge realism from normal screenshots
+alone": screenshots had been misread before (blocky, flat-coloured objects described as detailed). So Part 1 is a tool,
+`FPSKitRealismAudit` (FPSKit > Realism > Audit Arena; `UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.AuditRealism
+-fpskitTheme "Desert Outpost"`), that measures every visible object and writes `Docs/REALISM_AUDIT_<Arena>.md` and a CSV,
+with evidence images in `Build/Realism/<Arena>/` (not in git).
+
+* **Objects**: an imported model by its prefab, a generated surface by the builder's group and material (the town is merged
+  into chunk meshes; a fix is made per material in the generator), Unity primitives, each terrain layer, the sky, each gun's
+  first-person model and the arms (`FP_Arms`, posed on the gun at run time: its screen share is the guns' average).
+* **Real only if shape, surface and light all pass.** Shape: triangles, triangles per m2, the bevelled share of hard-edge
+  length (10-60 degrees beside a strip under 6 cm; a 16-sided pipe's facets do not count), plain boxes (8 corners, 12
+  triangles). Surface: maps, texels per metre (UV area against world area), repeats across a face (95th percentile of a
+  triangle's UV span), albedo variation, and variation inside 4 x 4 patches of samples, which catches a palette texture
+  (every gun: 0.90 across it, 0.016 in any patch). Light: lit, shadows, probes, albedo against URP's validation range and
+  the real material's, smoothness, metallic, occlusion where smooth, emission only on lamps. Thresholds are constants at the
+  top of the file; the report prints them.
+* **Material kinds** come from the material's name, then its texture's, then the object's, a word at a time: by what it is
+  made of before what it is (`~` words), so "FrameAluminium" is aluminium. Word starts match ("wooden"), `=` words only
+  whole ("rust", not "rustic"); "Skin" is weak (packs use it for variants: "Shirt3_Skin2"). An unrecognised kind is
+  UNCERTAIN, never assumed fine.
+* **Screen importance**: a fixed 602 m walk (`DesertWalk`: down the avenue, West Road, East 130, the boulevard, the clock
+  square, the souk; 419 views every 5 m ahead and 70 degrees each side, plus the rooms of the four houses nearest it), each
+  view drawn with every object in its own id colour and the pixels counted. Part 3 times the same walk.
+  - The id must be a **Vector** property: as a Color, Unity converted it to linear on its way in and the first audit handed
+    the town's walls to its cushions (interior props "seen" in 300 of 419 street views). Decoding is calibrated each run
+    (32 levels a channel drawn and read back).
+  - Transparent surfaces (glass, the weathering strips over every wall's foot) are counted in a second pass over the solid
+    surfaces' depth; drawn opaque in the first they hid the walls behind them.
+  - Instanced terrain needs a terrain shader to place its patches: `drawInstanced` off in the id and texel passes.
+* **Evidence** for the 20 most-seen failing objects of the world and every gun: a 1920 x 1080 close-up from 1.5 m in place
+  (a surface's point nearest a view that saw most of it; a terrain layer only where a downward cast hits the terrain, not the
+  roads over it), a wireframe drawn over it with GL against a depth pass of the same triangles (`GL.wireframe` draws nothing
+  through URP's render requests), a texel density view (`Hidden/FPSKit/RealismTexelDensity`), URP's albedo validation
+  (Rendering Debugger, set from code; transparent overlays taken out, which the debug view draws solid), and the five-light
+  test: a 1.8 m patch of the real surface (every triangle passing within it: a plaza is a few huge triangles) or the whole
+  model on a stage in an empty scene, beside 18 %, 80 % and 4 % cards, under midday sun, low evening sun, shade, a room lit
+  only through its doorway, and one 2700 K lamp at night, plus a sixth render with every light off (anything still seen
+  emits). Shade, indoor and night levels are reported against the grey card, not rated: a frame under its hood is already
+  shaded at midday.
+* Edit-mode renders do get sun shadows (an empty scene's cube cast one; the town's close-ups show them).
+* Autodesk Interactive (the Survivalist arms) keeps roughness, not smoothness, in `_Glossiness` / `_SpecGlossMap` behind
+  `_Use*Map` toggles; read as URP Lit, the gloves looked mirror-smooth and the skin metallic.
+* Geometry is measured once per mesh and kept in `Library/FPSKitRealismGeometry.bin` (keyed by name, counts and bounds):
+  10 minutes the first time, 3 after.
+* The audit switches to Medium and turns multisampling off to count ids; URP writes the sample count through to the tier's
+  QualitySettings, which the editor saved (ProjectSettings left at Medium, its anti-aliasing 0). Every tier's
+  anti-aliasing and the current tier are put back at the end.
+* **Desert, first audit**: of 349 objects of the world, 22 REAL (18 % of what the walk sees: the asphalt, the glass), 16
+  UNCERTAIN (11 %: the sky, a 4096 panorama at 11 pixels per degree against the screen's 18), 210 NEEDS WORK (57 %), 101
+  FAKE (14 %); all six guns FAKE (Low Poly Weapons: one 512 palette texture, 2-12k triangles), the arms NEEDS WORK
+  (gloves at albedo 0.01, smoothness 0.70). Recurring: 222 objects with no bevelled edge, 95 flat colours, 94 albedos out of
+  range, 66 visible tilings. Nothing glows (every light-off test black) except the parked cars' lamp material by day.
+  Reference photos (Wikimedia Commons, CC BY / BY-SA) in `Build/Realism/reference/`, listed in `LICENSES.md`.
+

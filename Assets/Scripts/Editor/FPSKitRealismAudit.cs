@@ -36,6 +36,7 @@ namespace FPSKit.EditorTools
     ///
     /// Writes Docs/REALISM_AUDIT_&lt;Arena&gt;.md, a CSV beside it, and the images under Build/Realism/&lt;Arena&gt;/.
     ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.AuditRealism -fpskitTheme "Desert Outpost" [-fpskitRealismTop 20]
+    ///       [-fpskitRealismAlso "Town_DoorWood,Parked_Car_Sedan_A"]
     /// </summary>
     public static partial class FPSKitRealismAudit
     {
@@ -72,6 +73,14 @@ namespace FPSKit.EditorTools
         const int HeldTrisMin = 15000;
         /// <summary>A material on less than this share of an object's surface can make it NEEDS WORK at worst, not FAKE.</summary>
         const float MinorShare = 0.05f;
+        /// <summary>
+        /// Natural materials (wood, stone, brick, sand, concrete, asphalt, skin...) are never one pure hue: in their mean
+        /// colour (linear) the weakest channel is at least this share of the strongest (terracotta 0.09, dark mahogany 0.07).
+        /// The doors' pine tinted into range read 0.15 in brightness and passed while drawn bright orange (0.47, 0.07, 0.009:
+        /// 0.02), 2026-10-29. Paint, fabric, plastic and tiles may be any colour.
+        /// </summary>
+        const float NaturalChromaFloor = 0.05f;
+        static readonly string[] NaturalKinds = { "wood", "asphalt", "sand", "mud brick", "brick", "concrete", "stone", "skin", "hair", "rubber" };
 
         enum Verdict { Real, Uncertain, NeedsWork, Fake }
 
@@ -198,6 +207,7 @@ namespace FPSKit.EditorTools
             public float AlbedoMean => albedo != null ? albedo.mean : Lum(baseColour);
             public float AlbedoP98 => albedo != null ? albedo.p98 : Lum(baseColour);
             public float AlbedoP2 => albedo != null ? albedo.p2 : Lum(baseColour);
+            public Color AlbedoColour => albedo != null ? albedo.meanColour : baseColour;
             public float Variation => albedo != null && albedo.mean > 1e-4f ? albedo.std / albedo.mean : 0f;
             public float Fine => albedo != null ? albedo.fine : 0f;
             public float Tilt => normal != null ? Mathf.Atan(Mathf.Tan(normal.tiltMean * Mathf.Deg2Rad) * bumpScale) * Mathf.Rad2Deg : 0f;
@@ -219,7 +229,8 @@ namespace FPSKit.EditorTools
             finally { EditorSceneManager.OpenScene(scene.path); }   // the audit swaps materials; the saved scene is put back
         }
 
-        /// <summary>Batch: -fpskitTheme "Desert Outpost" (default), -fpskitRealismTop N (20).</summary>
+        /// <summary>Batch: -fpskitTheme "Desert Outpost" (default), -fpskitRealismTop N (20), -fpskitRealismAlso "name,name"
+        /// (objects whose name holds one of these get evidence too).</summary>
         public static void Batch()
         {
             int code = 0;
@@ -326,6 +337,9 @@ namespace FPSKit.EditorTools
                                .Concat(ranked.Where(i => i.overall != Verdict.Real && i.source == "player weapon")).ToList();
             // Window glass and the weathering overlays get evidence too, however they rate (glass drawn black, 2026-10-28).
             chosen.AddRange(ranked.Where(i => (i.cls == "glass" || i.cls == "decal") && i.importance >= 0.05 && !chosen.Contains(i)));
+            // -fpskitRealismAlso "DoorWood,Parked_Car_Sedan_A": these too, however they rate (a fix's before and after).
+            foreach (var want in (Arg("-fpskitRealismAlso") ?? "").Split(',').Select(w => w.Trim()).Where(w => w.Length > 0))
+                chosen.AddRange(ranked.Where(i => i.name.Contains(want) && !chosen.Contains(i)));
             // The scene's materials were swapped for the id pass: put the saved scene back before anything is drawn as itself.
             EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             SetTier();

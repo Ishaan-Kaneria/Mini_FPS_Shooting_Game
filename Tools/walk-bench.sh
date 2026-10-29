@@ -10,6 +10,10 @@ BIN="Build/Perf/smooth/FPSKitSmooth.x86_64"
 [ -x "$BIN" ] || { echo "no build at $BIN: run Tools/unity-batch.sh FPSKitBatch.BuildSmoothPlayer"; exit 1; }
 mkdir -p Build/Perf/walk
 cpu_temp() { sensors 2>/dev/null | grep 'Package id' | grep -o '+[0-9]*' | head -1 | tr -d + || true; }
+# On battery the chip runs at lower power limits: the step-1 walk ran a third slower on battery with an identical scene
+# (2026-10-29). Said loudly, and written into every report.
+power() { [ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" = "1" ] && echo "mains" || echo "BATTERY"; }
+[ "$(power)" = "BATTERY" ] && echo "walk-bench: WARNING: on battery; the numbers will not compare with a run on mains" >&2
 for TIER in "${TIERS[@]}"; do
   OUT="Build/Perf/walk/${TAG}_${TIER}.txt"; rm -f "$OUT"
   # The same start for every run: below 70 C, so throttling does not decide the numbers.
@@ -24,5 +28,5 @@ for TIER in "${TIERS[@]}"; do
     sleep 2
   done
   kill $PID 2>/dev/null || true
-  if [ -f "$OUT" ]; then echo "cpu package max ${MAX} C during the run" >> "$OUT"; cat "$OUT"; else echo "no report; see Build/Perf/walk/${TAG}_${TIER}.log"; fi
+  if [ -f "$OUT" ]; then echo "cpu package max ${MAX} C during the run, on $(power)" >> "$OUT"; cat "$OUT"; else echo "no report; see Build/Perf/walk/${TAG}_${TIER}.log"; fi
 done

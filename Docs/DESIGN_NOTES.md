@@ -4117,3 +4117,54 @@ with evidence images in `Build/Realism/<Arena>/` (not in git).
   range, 66 visible tilings. Nothing glows (every light-off test black) except the parked cars' lamp material by day.
   Reference photos (Wikimedia Commons, CC BY / BY-SA) in `Build/Realism/reference/`, listed in `LICENSES.md`.
 
+
+### Measurements fixed, the baseline, and step 1: surfaces that answer light as real ones do (2026-10-29)
+
+* **Measurement fixes before any change** (asked for: "these numbers are our before baseline"). The light test's grey card is
+  placed halfway to the camera and checked visible from several corners (Town_FoundationConcrete read 0.00 in every light:
+  the card stood behind the foundation course); it is compared with the object only under sun and sky and only when a cast
+  shows the card lit (Town_TrimStone's night ratio of 119 was a card in a sill's shadow); indoor and night levels are absolute,
+  in midday grey cards. Glass and the weathering overlays are measured in place, with the street's realtime reflection probes
+  rendered as the game renders them at load (edit mode never renders them: every window reflected black). The baseline report
+  and evidence are kept in `Build/Realism/baseline/`.
+* **The walk benchmark** (`WalkProbe`, `Tools/walk-bench.sh`, the audit's own route): release build, 1920 x 1080, Vulkan, two
+  minutes at a jog. Before step 1 the Medium tier ran 21.4 fps average, 1 % low 15.0, worst frame 107 ms, 2538 of 2572
+  frames over 33 ms, GPU-bound (CPU and GPU both about 47 ms a frame), 1.6 GB resident; High 12.4 fps. Part 3 starts far from
+  60.
+* **Step 1, the light response** (route d of the brief). Generators, not output: pavers 0.10 -> 0.25 (tint x1.5 on sRGB),
+  sand 0.18 -> 0.30 (terrain layer remap and the apron's tint), doors 0.02 -> 0.21 at smoothness 0.35, trim stone 0.66 -> 0.50,
+  shop walls from black paint to plaster (0.36 dark, 0.47 lit: dark shops are dark from the light that reaches in), interior
+  paints with their brightest texels at 0.77 (under 0.80) and twice the normal strength (relief 2.9 -> 5.7 degrees), every
+  town scan's brightest 2 % held under 0.85 (`CapAlbedo`: plastered brick's tint had taken it to 1.82), the arms' gloves and
+  shirt lifted to a darkest 0.035 at smoothness 0.30 / 0.15 (their own material copies, `ViewModels/Cloth`), the parked cars'
+  lamp emission off by day. The audit rates the light of every one of them REAL; their shape and surface are steps 2-4. The
+  per-paver tint waits for step 2's shared variation layer (one shader feature for every material, not a paver special).
+* **The doors' first fix was wrong in a way the audit could not see.** The pine door scan is almost pure red (mean sRGB 76,
+  37, 14); tinted into range it measured 0.15 and passed, and was drawn bright orange (linear 0.47, 0.07, 0.009). Doors now
+  use the weathered pine boards (`wood_shutter`, 0.19, its blue a fifth of its red), and the audit checks colour: in a natural
+  material's mean colour the weakest channel is at least 5 % of the strongest (`NaturalChromaFloor`; terracotta 9 %,
+  mahogany 7 %). It also caught the window frames (the same scan, 1 %), left for step 4.
+* **Brighter surfaces bounce more, and the people's probes were 1.9 times the walls' ambient.** A step-1 rebuild failed
+  VerifyTown's probe ratio (0.6-1.4 wanted). It was not where the bake ran, which meshes bounce, the terrain or the GI cache
+  (each tried: 1.88-1.91 every time); the earlier re-bake that measured 0.80 had been run on the committed scene. Read probe
+  by probe, the light from below had gone from 0.14-0.29 to 0.6-0.8 with the sun off and 1.7 with it: the street at its real
+  albedo throws back what the 2.75 boost (set when the ground was 0.10) multiplied again. The bake is linear in its indirect
+  strength (0.62 at 2.75, 0.22 at 1.0 on the old ground), so `TownProbeIndirect` is 1.15: 0.80 again. The bake now logs the
+  ratio itself.
+* **The adaptive probe volumes keep their 1.8 bounce.** Tried at 1.0 on the argument that the brighter ground would make up
+  for it: every shaded wall lost about a quarter of its brightness on screen, the soldier in face_shade went nearly black and
+  rooms lost 5-34 %. A shaded wall is lit by the sky and the other walls, not much by the street. At 1.8 with the new surfaces
+  the lighting tour came out brighter than before everywhere (street +8 %, shop fronts +11 %, rooms +1 to +18 %), nothing
+  clipped in any view, and fewer crushed blacks in ten of twelve (the old house's majlis 28 % -> 2 %; the second old house's
+  majlis and bedroom rose, 22 -> 25 % and 20 -> 24 %). Exposure, eye adaptation
+  and bloom were left as they are: no view clips, and the mid-tones sit about mid-grey (street 116 of 255).
+* **Two generators write the same material** (found refreshing materials in place): `StoneWarm` is sandstone_blocks_04 for
+  the walls and white_sandstone_bricks for the landmarks, `Rubble` two tints, one asset each; whichever runs last dresses both.
+  On the lighting list.
+* **The walk after step 1 ran on battery** (the charger was off for the whole session): Medium 14.4 and 14.8 fps, High 8.3,
+  the package at 100-101 C, against 21.4 / 12.4 at 87-88 C. The two scenes draw exactly the same (29,314 renderers, 184.5 M
+  triangles, one light; only 752 switched-off room probes more), and the bake ran at half speed too (15.5 min for 8.3).
+  Check `/sys/class/power_supply/ADP1/online` before any benchmark; re-run on mains.
+* Each diagnostic `Lightmapping.Bake()` writes the scene's lighting data to disk whether the scene is saved or not: re-bake
+  after experimenting. The probe read after an adaptive probe bake returns the ambient itself (1.00): the classic probes are
+  not read while the volumes are on; VerifyTown reads them on the saved scene.

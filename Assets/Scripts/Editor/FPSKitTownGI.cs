@@ -34,8 +34,11 @@ namespace FPSKit.EditorTools
         public const string DesertScene = "Assets/FPSKit_Generated/Scenes/DesertOutpost.unity";
 
         /// <summary>
-        /// Bounce strength for the APV bake: the classic probes' 2.75 (FPSKitTownProbes) made up for walls lit by the whole
-        /// sky ambient beside people lit by probes; with everything on probes the light can be what it is.
+        /// Bounce strength for the APV bake: the classic probes' boost (FPSKitTownProbes) made up for walls lit by the whole
+        /// sky ambient beside people lit by probes; with everything on probes the light can be what it is. Tried at 1.0 once
+        /// the ground had its real albedo (the realism pass, step 1, 2026-10-29): every shaded wall lost about a quarter of
+        /// its brightness on screen (lighting tour, 150 to 110), the soldier in face_shade went nearly black and rooms
+        /// 5-34 %; the brighter street does not make it up, a shaded wall being lit by the sky and the other walls. 1.8 kept.
         /// </summary>
         const float ApvIndirect = 1.8f;
 

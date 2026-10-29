@@ -492,8 +492,12 @@ namespace FPSKit.EditorTools
         /// A URP Lit material from an albedo, a normal and a packed mask. Kept in step with the textures on every
         /// call (so a retint or retile in code reaches the asset), and created once.
         /// </summary>
+        /// <param name="normalStrength">The normal map's strength (_BumpScale).</param>
+        /// <param name="flatSmoothness">0 or more: the surface's smoothness everywhere, the mask kept for its occlusion only.
+        /// URP only scales a mask's smoothness, and a scan of rough wood (0.05) cannot be made a painted door's 0.35.</param>
         public static Material LitFromMaps(string path, Texture2D diff, Texture2D nor, Texture2D mask, Color tint,
-                                           Vector2 tiling, bool alphaClip, float smoothness = 1f, bool twoSided = false)
+                                           Vector2 tiling, bool alphaClip, float smoothness = 1f, bool twoSided = false,
+                                           float normalStrength = 1f, float flatSmoothness = -1f)
         {
             var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
             bool create = mat == null;
@@ -504,7 +508,18 @@ namespace FPSKit.EditorTools
             mat.SetColor("_BaseColor", tint);
             if (nor != null) { mat.SetTexture("_BumpMap", nor); mat.EnableKeyword("_NORMALMAP"); }
             else mat.DisableKeyword("_NORMALMAP");
-            if (mask != null)
+            mat.SetFloat("_BumpScale", normalStrength);
+            if (mask != null && flatSmoothness >= 0f)
+            {
+                mat.SetTexture("_MetallicGlossMap", null);
+                mat.DisableKeyword("_METALLICSPECGLOSSMAP");
+                mat.SetTexture("_OcclusionMap", mask);       // the mask's green is its occlusion
+                mat.EnableKeyword("_OCCLUSIONMAP");
+                mat.SetFloat("_OcclusionStrength", 1f);
+                mat.SetFloat("_Metallic", 0f);
+                mat.SetFloat("_Smoothness", flatSmoothness);
+            }
+            else if (mask != null)
             {
                 mat.SetTexture("_MetallicGlossMap", mask);
                 mat.EnableKeyword("_METALLICSPECGLOSSMAP");
@@ -603,7 +618,30 @@ namespace FPSKit.EditorTools
                 Object.DestroyImmediate(go);
                 made++;
             }
+            UnlightLamps("Car");
             return made;
+        }
+
+        /// <summary>The town is in daylight: a vehicle's lamps (the car pack's emission) are not lit, parked or driving.</summary>
+        static bool DaylightLamps(string group) => group == "Car";
+
+        /// <summary>
+        /// The lamps of the vehicles already converted (their prefabs are kept between builds, so their materials are not
+        /// made again): emission off, every build. The realism audit found parked cars' bodies glowing in shade and indoors.
+        /// </summary>
+        static void UnlightLamps(string group)
+        {
+            string folder = $"{MatFolder}/{group}";
+            if (!AssetDatabase.IsValidFolder(folder)) return;
+            foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { folder }))
+            {
+                var m = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+                if (m == null || !m.IsKeywordEnabled("_EMISSION")) continue;
+                m.DisableKeyword("_EMISSION");
+                if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", Color.black);
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+                EditorUtility.SetDirty(m);
+            }
         }
 
         /// <summary>
@@ -652,7 +690,7 @@ namespace FPSKit.EditorTools
             m.SetTexture("_OcclusionMap", occ);
             if (occ != null) { m.EnableKeyword("_OCCLUSIONMAP"); m.SetFloat("_OcclusionStrength", F("_OcclusionStrength", 1f)); }
 
-            if (src.IsKeywordEnabled("_EMISSION"))
+            if (src.IsKeywordEnabled("_EMISSION") && !DaylightLamps(group))
             {
                 m.EnableKeyword("_EMISSION");
                 m.SetTexture("_EmissionMap", Tex("_EmissionMap"));

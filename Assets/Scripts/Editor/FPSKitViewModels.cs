@@ -108,8 +108,7 @@ namespace FPSKit.EditorTools
 
             // The gloved arms and the sleeve only: the pack's bare-armed mesh lies under the gloved one,
             // and with both drawn the skin showed through the gloves in white patches.
-            bool ArmPart(string n) => n.Contains("FPS") && (n.Contains("Gloves") || n.Contains("Shirt"));
-            var arms = BuildBody(ArmsSource, "FP_Arms", keep: ArmPart, enable: ArmPart);
+            var arms = BuildArmsPrefab();
             // The player's own body: what is seen looking down, and the leg that kicks. No
             // head and no arms (the first-person arms are separate); one vest.
             bool BodyPart(string n) => n.Contains("Pants") || n.Contains("Boots") || n == "SK_Military_Shirt3" || n == "SK_Military_Vest1";
@@ -172,7 +171,23 @@ namespace FPSKit.EditorTools
         /// A Survivalist body cut down to the meshes asked for, on its full skeleton, with
         /// the pack's URP materials in place of the Built-in ones it ships with.
         /// </summary>
-        static GameObject BuildBody(string source, string name, System.Func<string, bool> keep, System.Func<string, bool> enable)
+        /// <summary>The first-person arms alone (FPSKitBatch.BuildFirstPersonArms): the guns reference this prefab, so
+        /// remaking it changes no gun.</summary>
+        public static void BuildArms()
+        {
+            EnsureFolder(Folder);
+            BuildArmsPrefab();
+        }
+
+        static GameObject BuildArmsPrefab()
+        {
+            // The gloved arms and the sleeve only: the pack's bare-armed mesh lies under the gloved one,
+            // and with both drawn the skin showed through the gloves in white patches.
+            bool ArmPart(string n) => n.Contains("FPS") && (n.Contains("Gloves") || n.Contains("Shirt"));
+            return BuildBody(ArmsSource, "FP_Arms", keep: ArmPart, enable: ArmPart, cloth: true);
+        }
+
+        static GameObject BuildBody(string source, string name, System.Func<string, bool> keep, System.Func<string, bool> enable, bool cloth = false)
         {
             var src = AssetDatabase.LoadAssetAtPath<GameObject>(source);
             if (src == null) { Debug.LogWarning($"[FPSKit] View Models: {source} is missing"); return null; }
@@ -192,7 +207,7 @@ namespace FPSKit.EditorTools
                     if (!smr.gameObject.activeSelf) { Object.DestroyImmediate(smr.gameObject); continue; }
 
                     var mats = smr.sharedMaterials;
-                    for (int i = 0; i < mats.Length; i++) mats[i] = UrpMaterial(mats[i]);
+                    for (int i = 0; i < mats.Length; i++) mats[i] = cloth ? Cloth(UrpMaterial(mats[i])) : UrpMaterial(mats[i]);
                     smr.sharedMaterials = mats;
                 }
 
@@ -221,6 +236,67 @@ namespace FPSKit.EditorTools
         static IEnumerable<Transform> Children(Transform t)
         {
             foreach (Transform c in t) yield return c;
+        }
+
+        /// <summary>
+        /// The arms' gloves and sleeve as the realism audit asked (2026-10-28): the pack's gloves went down to albedo 0.000
+        /// and 0.01 on average (blacker than black leather or cloth, about 0.04; URP's validation flagged them) with a
+        /// smoothness of 0.70 (Autodesk Interactive, roughness 0.3), and the shirt to 0.000 in patches. A URP Lit copy under
+        /// FPSKit_Generated: the albedo lifted so its darkest texels are 0.035, the pack's normal and occlusion kept,
+        /// smoothness 0.30 (gloves) and 0.15 (shirt). The pack's own files are left as they are.
+        /// </summary>
+        static Material Cloth(Material src)
+        {
+            if (src == null) return null;
+            bool gloves = src.name.Contains("Gloves");
+            if (!gloves && !src.name.Contains("Shirt")) return src;
+            string dir = Folder + "/Cloth";
+            EnsureFolder(dir);
+            var tex = src.HasProperty("_MainTex") ? src.GetTexture("_MainTex") as Texture2D : null;
+            Texture2D lifted = tex != null ? LiftedTexture(tex, dir, 0.035f) : null;
+            string path = $"{dir}/{src.name}_Cloth.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            bool create = m == null;
+            if (create) m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            m.SetTexture("_BaseMap", lifted != null ? lifted : tex);
+            m.SetColor("_BaseColor", src.HasProperty("_Color") ? src.GetColor("_Color") : Color.white);
+            var nor = src.HasProperty("_BumpMap") && (!src.HasProperty("_UseNormalMap") || src.GetFloat("_UseNormalMap") > 0.5f) ? src.GetTexture("_BumpMap") : null;
+            m.SetTexture("_BumpMap", nor);
+            if (nor != null) m.EnableKeyword("_NORMALMAP"); else m.DisableKeyword("_NORMALMAP");
+            var ao = src.HasProperty("_OcclusionMap") && (!src.HasProperty("_UseAoMap") || src.GetFloat("_UseAoMap") > 0.5f) ? src.GetTexture("_OcclusionMap") : null;
+            m.SetTexture("_OcclusionMap", ao);
+            if (ao != null) m.EnableKeyword("_OCCLUSIONMAP"); else m.DisableKeyword("_OCCLUSIONMAP");
+            m.SetTexture("_MetallicGlossMap", null);
+            m.DisableKeyword("_METALLICSPECGLOSSMAP");
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Smoothness", gloves ? 0.30f : 0.15f);
+            if (create) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>A copy of <paramref name="src"/> with its darkest texels lifted to <paramref name="floor"/> (linear), the
+        /// rest scaled to keep its whites: read from the file, written beside the cloth materials, imported as sRGB.</summary>
+        static Texture2D LiftedTexture(Texture2D src, string dir, float floor)
+        {
+            string file = AssetDatabase.GetAssetPath(src);
+            if (string.IsNullOrEmpty(file) || !System.IO.File.Exists(file)) return null;
+            var t = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
+            if (!t.LoadImage(System.IO.File.ReadAllBytes(file))) { Object.DestroyImmediate(t); return null; }
+            var px = t.GetPixels32();
+            byte Lift(byte b) => (byte)Mathf.RoundToInt(Mathf.LinearToGammaSpace(floor + Mathf.GammaToLinearSpace(b / 255f) * (1f - floor)) * 255f);
+            for (int i = 0; i < px.Length; i++) px[i] = new Color32(Lift(px[i].r), Lift(px[i].g), Lift(px[i].b), px[i].a);
+            t.SetPixels32(px);
+            string path = $"{dir}/{System.IO.Path.GetFileNameWithoutExtension(file)}_lifted.png";
+            System.IO.File.WriteAllBytes(path, t.EncodeToPNG());
+            int size = Mathf.Max(t.width, t.height);
+            Object.DestroyImmediate(t);
+            AssetDatabase.ImportAsset(path);
+            if (AssetImporter.GetAtPath(path) is TextureImporter ti)
+            {
+                ti.sRGBTexture = true; ti.maxTextureSize = Mathf.Min(4096, Mathf.NextPowerOfTwo(size)); ti.mipmapEnabled = true;
+                ti.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         /// <summary>

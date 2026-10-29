@@ -81,7 +81,8 @@ namespace FPSKit.EditorTools
             _shopGlass.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
             UnityEditor.EditorUtility.SetDirty(_shopGlass);
             // Inside an open shop: painted walls in its own light, darker than the street, not the black of a shut room.
-            _shopInside = TownFlat("ShopInsideLit", new Color(0.34f, 0.32f, 0.29f), 0.25f);
+            // Painted plaster, about 0.50 linear (it was 0.085: darker than any real plaster).
+            _shopInside = TownFlat("ShopInsideLit", new Color(0.74f, 0.71f, 0.65f), 0.25f);
             // Variety (2026-10-21, "too many shopfronts look identical"): shutters in the paints they come in here, beside the
             // white and the rusted; four frame finishes -- anodised aluminium, bronze, charcoal, a painted green; three
             // stallriser stones.

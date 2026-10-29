@@ -401,7 +401,7 @@ namespace FPSKit.EditorTools
         static (string cls, string[] words, float aMin, float aMax, float sMin, float sMax, bool metal) ClassData(string cls) =>
             Classes.FirstOrDefault(c => c.cls == cls);
 
-        static readonly string[] LampWords = { "lamp", "light", "bulb", "glow", "neon", "screen", "led", "lantern", "emissive", "fire", "flame", "lava" };
+        static readonly string[] LampWords = { "lamp", "light", "bulb", "glow", "neon", "screen", "led", "lantern", "emissive", "fire", "flame", "lava", "signal", "traffic" };
 
         static MatInfo Measure(Material m, string itemName)
         {
@@ -510,12 +510,13 @@ namespace FPSKit.EditorTools
                 shader = it.terrain != null && it.terrain.materialTemplate != null ? it.terrain.materialTemplate.shader.name : "terrain (built-in)",
                 lit = true, baseMap = l.diffuseTexture, normalMap = l.normalMapTexture, maskMap = l.maskMapTexture,
                 bumpScale = l.normalScale, smoothness = l.smoothness, metallic = l.metallic,
-                baseColour = Color.white, st = new Vector4(1f / Mathf.Max(0.01f, l.tileSize.x), 1f / Mathf.Max(0.01f, l.tileSize.y), 0, 0),
+                // URP's terrain multiplies the layer's texture by its remap (linear, not a colour): part of its albedo.
+                baseColour = new Color(l.diffuseRemapMax.x, l.diffuseRemapMax.y, l.diffuseRemapMax.z), st = new Vector4(1f / Mathf.Max(0.01f, l.tileSize.x), 1f / Mathf.Max(0.01f, l.tileSize.y), 0, 0),
             };
-            mi.albedo = Stats(mi.baseMap, 0, Color.white);
+            mi.albedo = Stats(mi.baseMap, 0, mi.baseColour);
             mi.normal = Stats(mi.normalMap, 1, Color.white);
             mi.mask = Stats(mi.maskMap, 2, Color.white);
-            if (mi.mask != null) mi.smoothness = mi.mask.a;   // URP terrain: the mask map's alpha is the smoothness
+            if (mi.mask != null) mi.smoothness = mi.mask.a * l.maskMapRemapMax.w;   // URP terrain: the mask's alpha, remapped, is the smoothness
             mi.cls = ClassOf(l.name, l.diffuseTexture != null ? l.diffuseTexture.name : null);
             if (mi.cls == "unknown") mi.cls = "sand";
             if (mi.baseMap != null)
@@ -647,6 +648,11 @@ namespace FPSKit.EditorTools
                 if (cd.cls == null || mi.cls == "unknown") { Mark(ref it.light, Verdict.Uncertain, "light", $"{who}material kind not recognised from its name: albedo and smoothness not checked against a real range"); continue; }
                 if (mi.AlbedoMean < cd.aMin || mi.AlbedoMean > cd.aMax)
                     Mark(ref it.light, Cap(Verdict.NeedsWork), "light", $"{who}albedo {mi.AlbedoMean:0.00} outside real {mi.cls} ({cd.aMin:0.00}-{cd.aMax:0.00})");
+                var ac = mi.AlbedoColour;
+                float strongest = Mathf.Max(ac.r, Mathf.Max(ac.g, ac.b)), weakest = Mathf.Min(ac.r, Mathf.Min(ac.g, ac.b));
+                if (NaturalKinds.Contains(mi.cls) && strongest > 1e-4f && weakest / strongest < NaturalChromaFloor)
+                    Mark(ref it.light, Cap(Verdict.NeedsWork), "light", $"{who}colour deeper than any real {mi.cls}: mean ({ac.r:0.000}, {ac.g:0.000}, {ac.b:0.000}) linear, " +
+                                                                    $"the weakest channel {weakest / strongest:P0} of the strongest (at least {NaturalChromaFloor:P0})");
                 if (mi.smoothness < cd.sMin - 0.02f || mi.smoothness > cd.sMax + 0.02f)
                     Mark(ref it.light, Cap(Verdict.NeedsWork), "light", $"{who}smoothness {mi.smoothness:0.00} outside real {mi.cls} ({cd.sMin:0.00}-{cd.sMax:0.00})");
                 if (!cd.metal && mi.cls != "gun finish" && mi.metallic > 0.1f) Mark(ref it.light, Cap(Verdict.NeedsWork), "light", $"{who}metallic {mi.metallic:0.00} on {mi.cls}");

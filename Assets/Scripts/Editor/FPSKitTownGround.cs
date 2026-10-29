@@ -398,7 +398,9 @@ namespace FPSKit.EditorTools
             var spec = new (string tex, float tile, Color tint)[]
             {
                 // The scans are orange-brown; blue lifted over red takes them to the pale beige of real desert ground.
-                ("gravelly_sand", 7f, new Color(0.92f, 0.95f, 1.08f)),
+                // gravelly_sand x1.74 (the remap is linear): it measured 0.18, darker than any real desert sand (Siwa's reads
+                // 0.3-0.4); about 0.32 now (realism audit, 2026-10-28).
+                ("gravelly_sand", 7f, new Color(1.60f, 1.65f, 1.88f)),
                 ("dry_ground_rocks", 6f, new Color(0.90f, 0.94f, 1.06f)),
                 ("rock_ground", 5f, new Color(0.95f, 0.96f, 1.0f)),
                 ("farm_soil", 5f, new Color(0.85f, 0.80f, 0.74f)),
@@ -579,7 +581,8 @@ namespace FPSKit.EditorTools
         /// <summary>Flat sand from the terrain's edge to the horizon, and the highway running on across it.</summary>
         private static void BuildTownApron(Transform root, int backdrop)
         {
-            var sand = TownMat("ApronSandPale", "gravelly_sand", new Color(0.92f, 0.95f, 1.08f), 18f);
+            // As the terrain's sand (1.74 in linear is 1.29 on this sRGB tint): 0.16 measured, about 0.28 now.
+            var sand = TownMat("ApronSandPale", "gravelly_sand", new Color(1.18f, 1.22f, 1.39f), 18f);
             var asphalt = TownMat("ApronAsphalt", "asphalt_02", new Color(0.92f, 0.9f, 0.88f), 6f);
             var m = new TownMesh();
             float inner = TownTerrainHalf - 0.5f, outer = 3600f;
@@ -848,7 +851,8 @@ namespace FPSKit.EditorTools
         /// </summary>
         // Smoothness scales the scan's own (from its roughness map). Low by default: plaster, stone, earth and asphalt in a dry
         // climate are matte, and with the sky reflecting (the HDRI cubemap) anything higher looks wet.
-        private static Material TownMat(string name, string tex, Color tint, float tileMetres, float smoothness = 0.35f)
+        private static Material TownMat(string name, string tex, Color tint, float tileMetres, float smoothness = 0.35f,
+                                        float albedoCap = AlbedoCap, float normalStrength = 1f, float flatSmoothness = -1f)
         {
             string key = $"{name}|{tex}|{tileMetres}";
             if (_townMats.TryGetValue(key, out var cached) && cached != null) return cached;
@@ -860,9 +864,57 @@ namespace FPSKit.EditorTools
                 m = MakeMaterialAt(path, tint * 0.75f, 0.1f, 0f);
             }
             else
-                m = FPSKitTownAssets.LitFromMaps(path, diff, nor, mask, tint, Vector2.one / Mathf.Max(0.1f, tileMetres), false, smoothness);
+                m = FPSKitTownAssets.LitFromMaps(path, diff, nor, mask, CapAlbedo(name, diff, tint, albedoCap), Vector2.one / Mathf.Max(0.1f, tileMetres), false, smoothness,
+                                                 normalStrength: normalStrength, flatSmoothness: flatSmoothness);
             _townMats[key] = m;
             return m;
+        }
+
+        /// <summary>
+        /// No real surface is whiter than about 0.85 (fresh whitewash 0.8; URP's own validation stops at 0.90), and the realism
+        /// audit found tints that took a scan's brightest texels to 1.0-1.6 (plastered brick 1.64, rough white plaster 1.13).
+        /// </summary>
+        private const float AlbedoCap = 0.85f;
+
+        private static readonly Dictionary<Texture2D, float[]> _texLum = new Dictionary<Texture2D, float[]>();
+
+        /// <summary>
+        /// The tint brought down, if need be, so that the brightest 2 % of the tinted texture's texels are no whiter than
+        /// <paramref name="cap"/> (linear). The texture is read from its file (works without a graphics device, as the batch
+        /// builds run); colours are sRGB in, as the material takes them.
+        /// </summary>
+        private static Color CapAlbedo(string name, Texture2D diff, Color tint, float cap)
+        {
+            if (!_texLum.TryGetValue(diff, out var rgb))
+            {
+                rgb = null;
+                string file = AssetDatabase.GetAssetPath(diff);
+                if (!string.IsNullOrEmpty(file) && System.IO.File.Exists(file))
+                {
+                    var t = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
+                    if (t.LoadImage(System.IO.File.ReadAllBytes(file)))
+                    {
+                        var px = t.GetPixels32();
+                        int step = Mathf.Max(1, px.Length / 65536);
+                        var list = new List<float>();
+                        for (int i = 0; i < px.Length; i += step)
+                        { list.Add(Mathf.GammaToLinearSpace(px[i].r / 255f)); list.Add(Mathf.GammaToLinearSpace(px[i].g / 255f)); list.Add(Mathf.GammaToLinearSpace(px[i].b / 255f)); }
+                        rgb = list.ToArray();
+                    }
+                    Object.DestroyImmediate(t);
+                }
+                _texLum[diff] = rgb;
+            }
+            if (rgb == null) return tint;
+            Color lt = tint.linear;
+            var lum = new float[rgb.Length / 3];
+            for (int i = 0; i < lum.Length; i++) lum[i] = 0.2126f * rgb[i * 3] * lt.r + 0.7152f * rgb[i * 3 + 1] * lt.g + 0.0722f * rgb[i * 3 + 2] * lt.b;
+            System.Array.Sort(lum);
+            float p98 = lum[(int)(lum.Length * 0.98f)];
+            if (p98 <= cap) return tint;
+            float k = Mathf.Pow(cap / p98, 1f / 2.2f);
+            Debug.Log($"[FPSKit] town material {name}: brightest texels {p98:0.00}, tint brought down to keep them at {cap:0.00}");
+            return new Color(tint.r * k, tint.g * k, tint.b * k, tint.a);
         }
 
         /// <summary>A flat URP Lit colour for the town (glass, paint, metal), cached by name.</summary>

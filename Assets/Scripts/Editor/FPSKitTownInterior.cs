@@ -86,16 +86,17 @@ namespace FPSKit.EditorTools
         private static void ResolveInteriorMaterials()
         {
             if (_paints != null && _paints[0] != null) return;
-            // Paints: the wanted colour over painted_plaster_wall's mean (171, 163, 160).
+            // Paints: the wanted colour over painted_plaster_wall's mean (171, 163, 160). Kept under 0.80 (white paint, not
+            // a light source) and its normal doubled: at 1 its relief tilted 2.9 degrees, a flat print in low light.
             _paints = new[]
             {
-                TownMat("PaintWhite", "painted_plaster_wall", new Color(1.36f, 1.40f, 1.36f), 2.5f),
-                TownMat("PaintCream", "painted_plaster_wall", new Color(1.38f, 1.39f, 1.25f), 2.5f),
-                TownMat("PaintYellow", "painted_plaster_wall", new Color(1.40f, 1.40f, 1.12f), 2.5f),
-                TownMat("PaintGreen", "painted_plaster_wall", new Color(1.20f, 1.36f, 1.25f), 2.5f),
-                TownMat("PaintBlue", "painted_plaster_wall", new Color(1.17f, 1.32f, 1.42f), 2.5f),
-                TownMat("PaintPeach", "painted_plaster_wall", new Color(1.39f, 1.29f, 1.16f), 2.5f),
-                TownMat("PaintGrey", "painted_plaster_wall", new Color(1.20f, 1.26f, 1.25f), 2.5f),
+                TownMat("PaintWhite", "painted_plaster_wall", new Color(1.36f, 1.40f, 1.36f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
+                TownMat("PaintCream", "painted_plaster_wall", new Color(1.38f, 1.39f, 1.25f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
+                TownMat("PaintYellow", "painted_plaster_wall", new Color(1.40f, 1.40f, 1.12f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
+                TownMat("PaintGreen", "painted_plaster_wall", new Color(1.20f, 1.36f, 1.25f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
+                TownMat("PaintBlue", "painted_plaster_wall", new Color(1.17f, 1.32f, 1.42f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
+                TownMat("PaintPeach", "painted_plaster_wall", new Color(1.39f, 1.29f, 1.16f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
+                TownMat("PaintGrey", "painted_plaster_wall", new Color(1.20f, 1.26f, 1.25f), 2.5f, albedoCap: 0.80f, normalStrength: 2f),
             };
             _paintWash = TownMat("PaintWhitewash", "white_stucco", new Color(1.05f, 1.03f, 0.98f), 2f);
             _paintMud = TownMat("PaintMudInside", "clay_plaster", new Color(1.75f, 1.70f, 1.62f), 3f);

@@ -41,7 +41,8 @@ namespace FPSKit.EditorTools
             _ashlarPale = TownMat("AshlarHoney", "seaworn_sandstone_brick", new Color(1.47f, 1.43f, 1.30f), 2.4f, 0.25f);
             _rustic = TownMat("RusticStone", "sandstone_blocks_05", new Color(1.10f, 1.11f, 1.08f), 3f, 0.25f);
             _rusticDressed = TownMat("RusticDressed", "concrete_brick_wall_001", new Color(1.30f, 1.30f, 1.25f), 3f, 0.25f);
-            _trimStone = TownMat("TrimStone", "plastered_wall_02", new Color(1.19f, 1.20f, 1.18f), 2.23f, 0.25f);
+            // 0.66 measured, above real limestone's 0.65: about 0.50 (x0.88 on the sRGB tint).
+            _trimStone = TownMat("TrimStone", "plastered_wall_02", new Color(1.05f, 1.06f, 1.04f), 2.23f, 0.25f);
             _frameBronze = TownFlat("FrameBronze", new Color(0.11f, 0.09f, 0.075f), 0.45f, 0.35f);
             _frameCharcoal = TownFlat("FrameCharcoal", new Color(0.075f, 0.08f, 0.085f), 0.4f, 0.3f);
             _frameGreen = TownFlat("FrameGreen", new Color(0.06f, 0.15f, 0.11f), 0.4f);

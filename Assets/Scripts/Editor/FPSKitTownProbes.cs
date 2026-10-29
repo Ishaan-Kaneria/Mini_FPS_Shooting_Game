@@ -27,8 +27,14 @@ namespace FPSKit.EditorTools
     public static partial class FPSKitSceneBuilder
     {
         private static int _townProbeCount;
-        /// <summary>The probe bake's indirect strength (see BakeTownProbes); VerifyTown checks the probes against the ambient.</summary>
-        private const float TownProbeIndirect = 2.75f;
+        /// <summary>
+        /// The probe bake's indirect strength (see BakeTownProbes); VerifyTown checks the probes against the ambient. 2.75 when
+        /// the pavers' albedo was 0.10 and the sand's 0.18; with the ground at its real 0.25-0.32 (the realism pass, step 1)
+        /// the same 2.75 gave people 1.9 of the walls' ambient, most of it bounced up off the street (from below 1.70, sun
+        /// off 0.69; the old ground 0.14-0.29). The bake is linear in it (0.62 at 2.75, 0.22 at 1.0): 1.15 brings the sides
+        /// back to about 0.8 of the walls' ambient, 2026-10-29.
+        /// </summary>
+        private const float TownProbeIndirect = 1.15f;
 
         private static void PlaceTownLightProbes(Transform root)
         {
@@ -114,6 +120,10 @@ namespace FPSKit.EditorTools
             return true;
         }
 
+        /// <summary>Batch: the saved desert scene's light baked again, the people's probes and the adaptive probe volumes
+        /// (FPSKitBatch.BakeDesertProbes; UNITY_GRAPHICS=1, -force-vulkan).</summary>
+        public static void BakeSavedTownProbes() => BakeTownProbes(default, FPSKitTownGI.DesertScene);
+
         /// <summary>
         /// Bakes the town's probes (and nothing else) after the scene is saved, then saves it again. The geometry that
         /// shades and bounces light -- building chunks, landmarks, roads, the edge's structures -- is marked Contribute GI
@@ -122,6 +132,13 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void BakeTownProbes(UnityEngine.SceneManagement.Scene scene, string path)
         {
+            // BakeSavedTownProbes: the saved scene, opened here.
+            if (!scene.IsValid()) scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            if (_townProbeCount == 0)
+            {
+                var placed = GameObject.Find("TownLightProbes")?.GetComponent<LightProbeGroup>();
+                _townProbeCount = placed != null ? placed.probePositions.Length : 0;
+            }
             if (_townProbeCount == 0) return;
             var clock = System.Diagnostics.Stopwatch.StartNew();
             int contributors = 0;
@@ -208,11 +225,16 @@ namespace FPSKit.EditorTools
                 foreach (var guid in AssetDatabase.FindAssets("ReflectionProbe-", new[] { dataFolder }))
                     AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(guid));
             var probes = LightmapSettings.lightProbes;
+            float ratio = FPSKitTownTest.PeopleProbeRatio(out float sides, out float ambient);
             Debug.Log($"[FPSKit] town light probes baked: {(ok ? "done" : "FAILED")}, {probes?.count ?? 0} probes, {contributors} contributing meshes, " +
-                      $"{LightmapSettings.lightmaps.Length} lightmaps (0 wanted), {clock.Elapsed.TotalSeconds:0}s");
+                      $"{LightmapSettings.lightmaps.Length} lightmaps (0 wanted), people's sides {ratio:0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00}), {clock.Elapsed.TotalSeconds:0}s");
             EditorSceneManager.SaveScene(scene, path);
             // Then the real bounced light, for High and Medium (Docs/DESIGN_NOTES.md "Real light: adaptive probe volumes").
-            if (!FPSKitTownGI.BakeNow(scene, path)) Debug.LogError("[FPSKit] town GI: the adaptive probe volume bake failed");
+            // FPSKIT_SKIP_APV=1: leave the adaptive probe bake to FPSKitBatch.BakeDesertLight on the saved scene. Baked in the
+            // same editor as the build, the build's 5.6 GB and the baker's together were killed by earlyoom (2026-10-27).
+            if (System.Environment.GetEnvironmentVariable("FPSKIT_SKIP_APV") == "1") Debug.Log("[FPSKit] town GI: skipped (FPSKIT_SKIP_APV); bake it with FPSKitBatch.BakeDesertLight");
+            else if (!FPSKitTownGI.BakeNow(scene, path)) Debug.LogError("[FPSKit] town GI: the adaptive probe volume bake failed");
+            else Debug.Log($"[FPSKit] town light probes after the adaptive probe bake: people's sides {FPSKitTownTest.PeopleProbeRatio(out sides, out ambient):0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00})");
             EditorSceneManager.SaveScene(scene, path);
         }
     }

@@ -32,7 +32,9 @@ namespace FPSKit.EditorTools
             _asphalt = TownMat("Asphalt", "asphalt_02", new Color(0.86f, 0.84f, 0.82f), 7f, 0.22f);
             // The worn asphalt scan is strewn with leaves; a desert street is the same asphalt, paler and dustier.
             _asphaltWorn = TownMat("AsphaltDusty", "asphalt_02", new Color(1.02f, 0.98f, 0.92f), 6.5f, 0.2f);
-            _pavers = TownMat("PaversGrey", "square_concrete_pavers", new Color(0.86f, 0.85f, 0.83f), 2.2f, 0.28f);
+            // Measured 0.10, darker than any real concrete paver (0.15-0.55; they read brown in the sun): x1.5 on the sRGB tint
+            // takes them to about 0.25 (realism audit, 2026-10-28).
+            _pavers = TownMat("PaversGrey", "square_concrete_pavers", new Color(1.29f, 1.28f, 1.25f), 2.2f, 0.28f);
             _paversPlaza = TownMat("PlazaStone", "sandstone_blocks_08", new Color(1.02f, 0.96f, 0.88f), 3.5f, 0.3f);
             _kerb = TownMat("Kerb", "plastered_wall_02", new Color(0.88f, 0.86f, 0.82f), 1.6f, 0.2f);
             _paint = TownFlat("RoadPaint", new Color(0.88f, 0.87f, 0.82f), 0.25f);

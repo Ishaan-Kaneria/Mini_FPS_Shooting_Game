@@ -310,6 +310,10 @@ namespace FPSKit.EditorTools
         /// <summary>Bakes the saved desert scene's adaptive probe volumes (FPSKitTownGI); needs UNITY_GRAPHICS=1 for the GPU.</summary>
         public static void BakeDesertLight() => FPSKitTownGI.BatchBakeSaved();
 
+        /// <summary>The saved desert scene's whole light baked again: the people's light probes, then the adaptive probe
+        /// volumes (FPSKitSceneBuilder.BakeSavedTownProbes). UNITY_GRAPHICS=1 and -force-vulkan, about ten minutes.</summary>
+        public static void BakeDesertProbes() => Run(FPSKitSceneBuilder.BakeSavedTownProbes);
+
         /// <summary>The saved desert scene's lights made honest for the baked light (FPSKitTownGI.ApplyRealLightLook).</summary>
         public static void DesertRealLightLook() => FPSKitTownGI.BatchLookSaved();
 
@@ -436,6 +440,9 @@ namespace FPSKit.EditorTools
 
         /// <summary>The first-person arms, legs and guns (FPSKit > View Models > Build).</summary>
         public static void BuildViewModels() => Run(FPSKitViewModels.Build);
+
+        /// <summary>The first-person arms alone (FP_Arms); no gun is remade.</summary>
+        public static void BuildFirstPersonArms() => Run(FPSKitViewModels.BuildArms);
 
         /// <summary>
         /// Plays the loop the player sees: dashboard, into an arena, quit, back to the

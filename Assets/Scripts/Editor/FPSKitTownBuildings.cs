@@ -126,7 +126,11 @@ namespace FPSKit.EditorTools
             _frameDark = TownFlat("FrameDark", new Color(0.18f, 0.15f, 0.13f), 0.35f, 0.3f);
             _steel = TownFlat("SteelDark", new Color(0.12f, 0.12f, 0.12f), 0.4f, 0.7f);
             _rust = TownFlat("Rebar", new Color(0.30f, 0.17f, 0.10f), 0.25f, 0.6f);
-            _doorWood = TownMat("DoorWood", "rough_pine_door", new Color(0.86f, 0.74f, 0.60f), 2.2f);
+            // Weathered pine boards, about 0.19 (linear) with the tint, the blue lifted most to keep a real wood's colour. The
+            // pine door scan it replaces was near black (0.027) and almost pure red: tinted into range it measured 0.15 and was
+            // drawn bright orange, its blue 2 % of its red (the realism pass, step 1, 2026-10-29). Smoothness 0.35 everywhere
+            // (oiled or painted wood), the scan's mask kept for its occlusion.
+            _doorWood = TownMat("DoorWood", "wood_shutter", new Color(1.30f, 1.55f, 2.00f), 2.2f, flatSmoothness: 0.35f);
             _doorMetal = TownMat("DoorMetal", "painted_metal_shutter", new Color(0.55f, 0.36f, 0.26f), 2f);
             _gateGreen = TownMat("GateGreen", "painted_metal_shutter", new Color(0.30f, 0.52f, 0.40f), 2f);
             _gateBlue = TownMat("GateBlue", "painted_metal_shutter", new Color(0.32f, 0.44f, 0.62f), 2f);
@@ -139,7 +143,9 @@ namespace FPSKit.EditorTools
             _tankBlue = TownFlat("TankBlue", new Color(0.12f, 0.30f, 0.55f), 0.35f);
             _dish = TownFlat("DishWhite", new Color(0.86f, 0.86f, 0.84f), 0.4f, 0.2f);
             _solar = TownFlat("SolarPanel", new Color(0.05f, 0.08f, 0.14f), 0.9f, 0.3f);
-            _shopDark = TownFlat("ShopInterior", new Color(0.16f, 0.14f, 0.12f), 0.2f);
+            // A shop that is shut or unlit is dark from the light that reaches it, not from black paint: its walls are painted
+            // plaster (about 0.40 linear) like a lit one's. It was 0.018.
+            _shopDark = TownFlat("ShopInterior", new Color(0.66f, 0.63f, 0.58f), 0.2f);
             _clothMat = TownFlat("Laundry", new Color(0.85f, 0.85f, 0.82f), 0.1f);
             _townSignMat = UnlitAtlas("TownSigns", "TownSigns.png", 0.92f);
             _roadSignMat = UnlitAtlas("TownRoadSigns", "TownRoadSigns.png", 0.92f);

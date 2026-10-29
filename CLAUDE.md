@@ -213,7 +213,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   Shops (`FPSKitTownShopfront`): storefront 0.35 m behind the piers, frames 5 cm out of glass/shutter, sign plates 10 cm off the
   wall under a hood, retail cornice, foundation course; `ShopFront` keeps the old draws from the building's random sequence (new
   choices from its own) so the town does not reshuffle. Cover outside shops (`SpinShopCover`) carries `CoverSpot` for EnemyBrain.
-  Probe bake indirect is scaled (`TownProbeIndirect` 2.75) so people/cars get ~0.8 of the walls' sky ambient (VerifyTown checks the
+  Probe bake indirect is scaled (`TownProbeIndirect` 1.15 since the ground got its real albedo; it was 2.75) so people/cars get ~0.8 of the walls' sky ambient (VerifyTown checks the
   ratio); never judge a dark civilian by its material first. A building's shops share a `ShopLook` (layout-seeded).
   Walls vary per building (`FPSKitTownWalls`, layout-seeded); house interiors are `FPSKitTownInterior` + `FPSKitTownFurniture`
   (`Docs/DESIGN_NOTES.md` "Walls varied and weathered"): new randomness never draws from `b.rng` (replay the old draws when
@@ -291,6 +291,9 @@ extents before changing anything.
   measurements and its close-up, wireframe, texel and five-light evidence (`Docs/REALISM_AUDIT_<Arena>.md`,
   `Build/Realism/`), never a screenshot alone; unsure is UNCERTAIN, never fine (`Docs/DESIGN_NOTES.md` "The realism audit").
   Its walk (`WalkRoute`) is also the frame-time benchmark's (`WalkProbe`, `Tools/walk-bench.sh`). Every downloaded asset goes in `LICENSES.md`.
+  A fix's before/after: `-fpskitRealismAlso "Name,Name"` forces those objects into the evidence. Brightness alone is not colour:
+  natural materials must pass `NaturalChromaFloor` (a scan tinted into range was bright orange). Brighter surfaces change the
+  bounce: after an albedo change re-bake and re-measure VerifyTown's probe ratio and the lighting tour.
 
 ## Conventions
 

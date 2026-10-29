@@ -4083,7 +4083,7 @@ with evidence images in `Build/Realism/<Arena>/` (not in git).
   made of before what it is (`~` words), so "FrameAluminium" is aluminium. Word starts match ("wooden"), `=` words only
   whole ("rust", not "rustic"); "Skin" is weak (packs use it for variants: "Shirt3_Skin2"). An unrecognised kind is
   UNCERTAIN, never assumed fine.
-* **Screen importance**: a fixed 602 m walk (`DesertWalk`: down the avenue, West Road, East 130, the boulevard, the clock
+* **Screen importance**: a fixed 602 m walk (`WalkRoute.Desert`: down the avenue, West Road, East 130, the boulevard, the clock
   square, the souk; 419 views every 5 m ahead and 70 degrees each side, plus the rooms of the four houses nearest it), each
   view drawn with every object in its own id colour and the pixels counted. Part 3 times the same walk.
   - The id must be a **Vector** property: as a Color, Unity converted it to linear on its way in and the first audit handed

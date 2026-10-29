@@ -262,50 +262,50 @@ namespace FPSKit.EditorTools
                     cam.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(look - eye));
                     var ground = Box("Ground", new Vector3(0f, floorY - 0.05f, 0f), new Vector3(60f, 0.1f, 60f), groundMat, set);
                     own[ground.GetComponent<Renderer>()] = -1;
-                    var cardRenderers = new Renderer[3];
-                    for (int c = 0; c < 3; c++)
-                    {
-                        // Lower left of the frame, a little in front of the subject.
-                        var vp = cam.ViewportToWorldPoint(new Vector3(0.07f + c * 0.075f, 0.12f, Vector3.Distance(eye, look) * 0.9f));
-                        var card = Box($"Card{c}", vp, Vector3.one * 0.0001f, cards[c], set);
-                        float size = Vector3.Distance(eye, look) * 0.07f;
-                        card.transform.localScale = new Vector3(size, size, 0.005f);
-                        card.transform.rotation = Quaternion.LookRotation(-cardNormal, patch.floor || patch.ceiling ? Vector3.forward : Vector3.up);
-                        if (patch.floor) card.transform.position = new Vector3(vp.x, 0.004f, vp.z);
-                        if (patch.ceiling) card.transform.position = new Vector3(vp.x, -0.004f, vp.z);
-                        cardRenderers[c] = card.GetComponent<Renderer>();
-                    }
                     var room = BuildRoom(set, floorY, roomMat);
                     var blocker = Box("Blocker", Vector3.zero, new Vector3(14f, 14f, 0.05f), groundMat, set);
                     blocker.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
 
-                    // ---- the id mask: the object 1, the cards 2-4 ----
-                    room.SetActive(false); blocker.SetActive(false);
-                    var saved = new Dictionary<Renderer, Material[]>();
-                    foreach (var r in set.GetComponentsInChildren<Renderer>())
+                    // ---- the cards, where the camera sees all three: lower left first, then the other corners ----
+                    // Halfway between the subject and the camera, clear of the subject's own sills and hoods (the first
+                    // audit's cards sat 0.1 x the distance off the subject: hidden behind the foundation course, shaded by a sill).
+                    var cardRenderers = new Renderer[3];
+                    Color32[] idPx = null;
+                    float reach = Vector3.Distance(eye, look);
+                    foreach (var anchor in new[] { new Vector2(0.07f, 0.12f), new Vector2(0.70f, 0.12f), new Vector2(0.07f, 0.80f), new Vector2(0.70f, 0.80f), new Vector2(0.40f, 0.10f) })
                     {
-                        saved[r] = r.sharedMaterials;
-                        int id = Array.IndexOf(cardRenderers, r) is int ci && ci >= 0 ? 2 + ci : 0;
-                        r.sharedMaterials = r.sharedMaterials.Select((m, s) => IdMaterial(id != 0 ? id : own.TryGetValue(r, out var o) && (o == int.MaxValue || o == s) ? 1 : 0, m)).ToArray();
+                        foreach (var r in cardRenderers) if (r != null) Object.DestroyImmediate(r.gameObject);
+                        for (int c = 0; c < 3; c++)
+                        {
+                            var vp = cam.ViewportToWorldPoint(new Vector3(anchor.x + c * 0.075f, anchor.y, reach * 0.55f));
+                            var card = Box($"Card{c}", vp, Vector3.one * 0.0001f, cards[c], set);
+                            float size = reach * 0.045f;
+                            card.transform.localScale = new Vector3(size, size, 0.005f);
+                            card.transform.rotation = Quaternion.LookRotation(-cardNormal, patch.floor || patch.ceiling ? Vector3.forward : Vector3.up);
+                            cardRenderers[c] = card.GetComponent<Renderer>();
+                        }
+                        idPx = IdMask(set, subject, own, cardRenderers, room, blocker, cam, camData, ids);
+                        int[] seen = new int[5];
+                        foreach (var px in idPx) { int id = IdOf(px); if (id >= 1 && id <= 4) seen[id]++; }
+                        if (seen[2] >= 150 && seen[3] >= 150 && seen[4] >= 150) break;
                     }
-                    var t = subject.GetComponentInChildren<Terrain>();
-                    Material tWas = null;
-                    if (t != null) { tWas = t.materialTemplate; t.materialTemplate = IdMaterial(1, null); }
-                    camData.renderPostProcessing = false; camData.antialiasing = AntialiasingMode.None;
-                    cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = Color.black; cam.allowHDR = false;
-                    RenderSettings.skybox = null;
-                    Render(cam, ids);
-                    var idPx = Read32(ids);
-                    foreach (var kvr in saved) kvr.Key.sharedMaterials = kvr.Value;
-                    if (t != null) t.materialTemplate = tWas;
+
+                    // Is the grey card lit by each light, or in the subject's own shadow? (Casts against the subject, given
+                    // colliders for the purpose.)
+                    foreach (var mf in subject.GetComponentsInChildren<MeshFilter>()) if (mf.sharedMesh != null && mf.GetComponent<Collider>() == null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    Physics.SyncTransforms();
+                    var cardAt = cardRenderers[0].bounds.center - cardNormal * -0.01f;
+                    bool Blocked(Vector3 to) => Physics.Linecast(cardAt, to, ~0, QueryTriggerInteraction.Ignore);
 
                     // ---- five lights ----
                     var strip = new Texture2D(DW * 5, DH, TextureFormat.RGB24, false);
                     var stats = new (float obj, float grey, float cv)[6];
+                    var cardLit = new bool[6];
                     for (int k = 0; k < 5; k++)
                     {
                         SetLights(k, sun, lamp, door, sky, room, blocker, look, floorY, ambient, reflections, sunLook);
                         DynamicGI.UpdateEnvironment();
+                        cardLit[k] = k == 4 ? !Blocked(lamp.transform.position) : k == 3 ? !Blocked(door.transform.position) : !Blocked(cardAt - sun.transform.forward * 60f);
                         grade.postExposure.value = DisplayExposure[k];
                         camData.renderPostProcessing = true; camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
                         cam.clearFlags = k == 4 ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox; cam.backgroundColor = new Color(0.005f, 0.006f, 0.01f); cam.allowHDR = true;
@@ -330,7 +330,7 @@ namespace FPSKit.EditorTools
                     strip.Apply(false);
                     File.WriteAllBytes($"{it.evidence}/light_test.jpg", strip.EncodeToJPG(88));
                     Object.DestroyImmediate(strip);
-                    ReportStage(it, stats);
+                    ReportStage(it, stats, cardLit);
                     Object.DestroyImmediate(set.gameObject);
                 }
             }
@@ -340,6 +340,37 @@ namespace FPSKit.EditorTools
                 Object.DestroyImmediate(display); Object.DestroyImmediate(measure); Object.DestroyImmediate(ids);
                 Object.DestroyImmediate(camGo);
             }
+        }
+
+        /// <summary>The stage drawn in ids (the object 1, the grey, white and black cards 2-4, nothing else) at the
+        /// measuring size; the materials are put back after.</summary>
+        static Color32[] IdMask(Transform set, Transform subject, Dictionary<Renderer, int> own, Renderer[] cardRenderers, GameObject room, GameObject blocker,
+                                Camera cam, UniversalAdditionalCameraData camData, RenderTexture ids)
+        {
+            bool roomWas = room.activeSelf, blockerWas = blocker.activeSelf;
+            room.SetActive(false); blocker.SetActive(false);
+            var saved = new Dictionary<Renderer, Material[]>();
+            foreach (var r in set.GetComponentsInChildren<Renderer>())
+            {
+                saved[r] = r.sharedMaterials;
+                int ci = Array.IndexOf(cardRenderers, r);
+                int id = ci >= 0 ? 2 + ci : 0;
+                r.sharedMaterials = r.sharedMaterials.Select((m, s) => IdMaterial(id != 0 ? id : own.TryGetValue(r, out var o) && (o == int.MaxValue || o == s) ? 1 : 0, m)).ToArray();
+            }
+            var t = subject.GetComponentInChildren<Terrain>();
+            Material tWas = null;
+            if (t != null) { tWas = t.materialTemplate; t.materialTemplate = IdMaterial(1, null); }
+            var skyWas = RenderSettings.skybox;
+            camData.renderPostProcessing = false; camData.antialiasing = AntialiasingMode.None;
+            cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = Color.black; cam.allowHDR = false;
+            RenderSettings.skybox = null;
+            Render(cam, ids);
+            var px = Read32(ids);
+            foreach (var kv in saved) kv.Key.sharedMaterials = kv.Value;
+            if (t != null) t.materialTemplate = tWas;
+            RenderSettings.skybox = skyWas;
+            room.SetActive(roomWas); blocker.SetActive(blockerWas);
+            return px;
         }
 
         /// <summary>The subject on the stage; <paramref name="own"/> marks the object's own renderers (int.MaxValue all
@@ -462,25 +493,32 @@ namespace FPSKit.EditorTools
             return ((float)mean, gn > 0 ? (float)(g / gn) : 0, mean > 1e-6 ? (float)(sd / mean) : 0);
         }
 
-        static void ReportStage(Item it, (float obj, float grey, float cv)[] s)
+        /// <summary>
+        /// What the five lights show. Under the sun and sky (midday, evening, shade) the object is compared with the grey
+        /// card beside it, when that card is lit by the same light (a cast to the sun says so; a card in the object's own
+        /// shadow gives no comparison). Indoors and at night the light is local, card and object at different distances
+        /// from it, so their brightness is given as it is, in units of the grey card at midday (the first audit's night ratio
+        /// of 119 was a card in a sill's shadow; its 0.00s a card hidden behind the foundation course).
+        /// </summary>
+        static void ReportStage(Item it, (float obj, float grey, float cv)[] s, bool[] lit)
         {
             if (s[0].obj <= 0) { it.measured.Add("light test: the object was not in its own stage view"); return; }
-            float Ratio(int k) => s[k].grey > 1e-5f ? s[k].obj / s[k].grey : 0f;
             var mi = it.mats.FirstOrDefault();
-            float expect = mi != null ? mi.AlbedoMean / 0.18f : 0f;
-            it.measured.Add("light test (object / 18% grey card): " + string.Join(", ", Enumerable.Range(0, 5).Select(k => $"{LightNames[k]} {Ratio(k):0.00}")) +
+            // An overlay's pixels are the overlay blended over the wall, so its own albedo predicts nothing.
+            float expect = mi != null && it.cls != "decal" ? mi.AlbedoMean / 0.18f : 0f;
+            string Ratio(int k) => !lit[k] ? "n/a (card in the object's shadow)" : s[k].grey <= 1e-5f ? "n/a (card not seen)" : (s[k].obj / s[k].grey).ToString("0.00");
+            it.measured.Add($"light test against the 18% grey card (sun and sky): midday {Ratio(0)}, evening {Ratio(1)}, shade {Ratio(2)}" +
                             (expect > 0 ? $"; its albedo alone would give {expect:0.00}" : ""));
-            it.measured.Add($"light test levels against midday: evening {s[1].obj / s[0].obj:0.00}, shade {s[2].obj / s[0].obj:0.00}, indoor {s[3].obj / s[0].obj:0.000}, night {s[4].obj / s[0].obj:0.0000}");
+            float unit = s[0].grey > 1e-5f && lit[0] ? s[0].grey : 0f;
+            if (unit > 0)
+                it.measured.Add($"light test brightness, in midday grey cards: midday {s[0].obj / unit:0.00}, evening {s[1].obj / unit:0.00}, shade {s[2].obj / unit:0.00}, indoor {s[3].obj / unit:0.000}, night {s[4].obj / unit:0.000} (the card itself: indoor {s[3].grey / unit:0.000}{(lit[3] ? "" : ", shadowed")}, night {s[4].grey / unit:0.000}{(lit[4] ? "" : ", shadowed")})");
+            it.measured.Add($"light test levels against its own midday: evening {s[1].obj / s[0].obj:0.00}, shade {s[2].obj / s[0].obj:0.00}, indoor {s[3].obj / s[0].obj:0.000}, night {s[4].obj / s[0].obj:0.000}");
             it.measured.Add($"light test relief: brightness varies {s[0].cv:P0} across it at midday, {s[1].cv:P0} in the low evening sun");
             bool clear = it.cls is "glass" or "water" or "decal";
             // With no light at all, a real surface is black; what is left is its own emission.
-            float dark = s[0].obj > 1e-6f ? s[5].obj / s[0].obj : 0f;
+            float dark = s[5].obj / s[0].obj;
             it.measured.Add($"light test with every light off: {dark:P2} of its midday brightness");
             if (dark > 0.02f) it.measured.Add($"!!glows: with every light off it keeps {dark:P0} of its midday brightness (it emits light)");
-            // In shade it should lose what the grey card in the same plane loses (a wall facing away from a high sun loses little).
-            float objShade = s[2].obj / s[0].obj, cardShade = s[0].grey > 1e-6f ? s[2].grey / s[0].grey : objShade;
-            // Reported, not rated: a surface already shaded at midday (a frame under its hood) keeps all of its brightness in shade.
-            it.measured.Add($"light test shade: keeps {objShade:P0} of its midday brightness; the grey card beside it {cardShade:P0}");
             if (!clear && it.skyMaterial == null && s[1].cv < 0.06f) it.measured.Add($"!flat under raking light: its brightness varies only {s[1].cv:P0} across it in the low evening sun");
         }
     }

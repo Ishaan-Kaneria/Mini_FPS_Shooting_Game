@@ -290,7 +290,7 @@ extents before changing anything.
 - Judge realism by `FPSKitBatch.AuditRealism` (FPSKit > Realism > Audit Arena, `UNITY_GRAPHICS=1`, about 3 min): its
   measurements and its close-up, wireframe, texel and five-light evidence (`Docs/REALISM_AUDIT_<Arena>.md`,
   `Build/Realism/`), never a screenshot alone; unsure is UNCERTAIN, never fine (`Docs/DESIGN_NOTES.md` "The realism audit").
-  Its desert walk (`DesertWalk`) is also the frame-time path. Every downloaded asset goes in `LICENSES.md`.
+  Its walk (`WalkRoute`) is also the frame-time benchmark's (`WalkProbe`, `Tools/walk-bench.sh`). Every downloaded asset goes in `LICENSES.md`.
 
 ## Conventions
 

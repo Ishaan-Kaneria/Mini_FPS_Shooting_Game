@@ -324,6 +324,8 @@ namespace FPSKit.EditorTools
             // world's objects they would push it out of the list).
             var chosen = ranked.Where(i => i.overall != Verdict.Real && i.source != "player weapon").Take(top)
                                .Concat(ranked.Where(i => i.overall != Verdict.Real && i.source == "player weapon")).ToList();
+            // Window glass and the weathering overlays get evidence too, however they rate (glass drawn black, 2026-10-28).
+            chosen.AddRange(ranked.Where(i => (i.cls == "glass" || i.cls == "decal") && i.importance >= 0.05 && !chosen.Contains(i)));
             // The scene's materials were swapped for the id pass: put the saved scene back before anything is drawn as itself.
             EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             SetTier();

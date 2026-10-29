@@ -23,50 +23,29 @@ namespace FPSKit.EditorTools
         static float RouteLength;
         static float _fov = 70f, _far = 1500f;
 
-        /// <summary>
-        /// Desert Outpost's walk (about 600 m, two minutes at a walk; Part 3 measures frame times along the same one): from the
-        /// player's start down the avenue's east pavement, east along West Road, north up East 130, west along the boulevard to
-        /// the clock square, on into the souk street. Each leg is a navmesh path (short legs: a long route's search gives up).
-        /// </summary>
-        static readonly Vector2[] DesertWalk =
-        {
-            new Vector2(11f, -124f), new Vector2(60f, -136.5f), new Vector2(124f, -136.5f), new Vector2(124.5f, -60f),
-            new Vector2(124.5f, 12f), new Vector2(60f, 11.75f), new Vector2(14f, 4f), new Vector2(0f, -7f),
-            new Vector2(-60f, 18f), new Vector2(-130f, 20f),
-        };
-
-        /// <summary>The walk's polyline on the navmesh, from the player's start.</summary>
+        /// <summary>The walk's polyline on the navmesh, from the player's start (WalkRoute: the benchmark walks the same).</summary>
         static List<Vector3> WalkLine(string theme)
         {
             var motor = Object.FindAnyObjectByType<PlayerMotor>();
             var cam = motor != null ? motor.GetComponentInChildren<Camera>(true) : null;
             if (cam != null) { _fov = cam.fieldOfView; _far = Mathf.Max(cam.farClipPlane, 600f); }
             Vector3 start = motor != null ? motor.transform.position : Vector3.zero;
-            var points = new List<Vector3>();
-            var waypoints = new List<Vector3> { start };
-            if (theme == "Desert Outpost") waypoints.AddRange(DesertWalk.Select(w => new Vector3(w.x, start.y, w.y)));
-            else
+            var waypoints = WalkRoute.For(theme.Replace(" ", ""));
+            if (waypoints == null)
             {
-                // Other arenas until they have their own walk: a seeded ring of navmesh points round the start.
+                // Other arenas until they have their own walk: a ring of navmesh points round the start.
+                var ring = new List<Vector2>();
                 for (int i = 1; i <= 10; i++)
                 {
                     float a = i * 36f * Mathf.Deg2Rad, r = 40f + 12f * (i % 3);
-                    waypoints.Add(start + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r));
+                    ring.Add(new Vector2(start.x + Mathf.Cos(a) * r, start.z + Mathf.Sin(a) * r));
                 }
+                waypoints = ring.ToArray();
             }
-            Vector3? last = null;
-            var path = new NavMeshPath();
-            foreach (var w in waypoints)
-            {
-                if (!NavMesh.SamplePosition(w, out var hit, 20f, NavMesh.AllAreas)) { Log($"walk: no navmesh near {w}"); continue; }
-                var p = hit.position;
-                if (last == null) { points.Add(p); last = p; continue; }
-                if (NavMesh.CalculatePath(last.Value, p, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete)
-                    points.AddRange(path.corners.Skip(1));
-                else { Log($"walk: no complete path {last.Value} -> {p} ({path.status}); straight"); points.Add(p); }
-                last = p;
-            }
-            return points;
+            var notes = new List<string>();
+            var line = WalkRoute.Line(start, waypoints, notes);
+            foreach (var n in notes) Log("walk: " + n);
+            return line;
         }
 
         /// <summary>

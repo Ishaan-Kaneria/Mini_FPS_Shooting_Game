@@ -55,6 +55,10 @@ namespace FPSKit.EditorTools
                 poses[it] = pose;
             }
             Log($"close-up spots for {poses.Count} of {chosen.Count}");
+            RenderRealtimeProbes();
+            bool Clearish(Item i) => i.cls is "glass" or "decal";
+            var closePx = new Dictionary<Item, Color32[]>();
+            var withoutPx = new Dictionary<Item, Color32[]>();
 
             // ---- 1. the object as the game draws it, and its wireframe ----
             var validation = new Dictionary<Item, Color32[]>();
@@ -75,6 +79,7 @@ namespace FPSKit.EditorTools
                     cam.allowHDR = true;
                     Render(cam, rt, twice: true);
                     SavePng(rt, $"{it.evidence}/close.png");
+                    if (Clearish(it)) closePx[it] = Read32(rt);
                     DrawWire(rt, cam, it, pose, gun.renderers);
                     SavePng(rt, $"{it.evidence}/wire.png");
                 }
@@ -86,6 +91,15 @@ namespace FPSKit.EditorTools
                 foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
                     if ((r is MeshRenderer || r is SkinnedMeshRenderer) && r.sharedMaterials.Any(IsTransparent))
                         r.sharedMaterials = r.sharedMaterials.Select(m => IsTransparent(m) ? Nothing(false) : m).ToArray();
+                // An overlay is judged on the walls under it: the same close-up again without the overlays.
+                foreach (var kv in poses.Where(p => p.Key.cls == "decal"))
+                {
+                    var cam = Aim(AuditCamera(true), kv.Value);
+                    cam.clearFlags = CameraClearFlags.Skybox; cam.allowHDR = true;
+                    Render(cam, rt, twice: true);
+                    SavePng(rt, $"{kv.Key.evidence}/close_without.png");
+                    withoutPx[kv.Key] = Read32(rt);
+                }
                 debug.materialValidationMode = DebugMaterialValidationMode.Albedo;
                 try
                 {
@@ -126,6 +140,7 @@ namespace FPSKit.EditorTools
                     for (int i = 0; i < px.Length; i++) if (IdOf(px[i]) == it.id) { own[i] = true; n++; }
                     mask[it] = own;
                     it.measured.Add($"fills {(double)n / px.Length:P0} of its close-up");
+                    if (n > 0 && closePx.TryGetValue(it, out var shown)) InPlace(it, pose, own, shown, withoutPx.TryGetValue(it, out var bare) ? bare : null);
                     if (validation.TryGetValue(it, out var vpx) && n > 0)
                     {
                         int red = 0, blue = 0;
@@ -174,6 +189,76 @@ namespace FPSKit.EditorTools
             // ---- 6. the five-light test on a stage ----
             Stage(patches, sunLook, profile);
             foreach (var p in patches.Values) p.Dispose();
+        }
+
+        /// <summary>
+        /// The street's realtime reflection probes, which the game renders when the level loads, rendered here the same way
+        /// (a cube from each probe's centre) and given to the probe as its texture: in edit mode they are never rendered,
+        /// and every window and car in their boxes reflected black.
+        /// </summary>
+        static void RenderRealtimeProbes()
+        {
+            int done = 0, failed = 0;
+            foreach (var p in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None))
+            {
+                if (!p.enabled || p.mode != ReflectionProbeMode.Realtime) continue;
+                var rt = new RenderTexture(p.resolution, p.resolution, 16, p.hdr ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGB32)
+                         { dimension = TextureDimension.Cube, useMipMap = true, autoGenerateMips = true, hideFlags = HideFlags.DontSave };
+                var go = new GameObject("ProbeCamera") { hideFlags = HideFlags.DontSave };
+                var cam = go.AddComponent<Camera>();
+                cam.enabled = false;
+                go.transform.position = p.transform.position + p.center;
+                cam.nearClipPlane = Mathf.Max(0.05f, p.nearClipPlane); cam.farClipPlane = p.farClipPlane; cam.cullingMask = p.cullingMask;
+                cam.clearFlags = p.clearFlags == ReflectionProbeClearFlags.Skybox ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
+                cam.backgroundColor = p.backgroundColor;
+                var data = cam.GetUniversalAdditionalCameraData();
+                data.renderPostProcessing = false; data.renderShadows = p.shadowDistance > 0f;
+                bool ok;
+                try { ok = cam.RenderToCubemap(rt, 63); } catch (Exception) { ok = false; }
+                Object.DestroyImmediate(go);
+                if (!ok) { failed++; rt.Release(); Object.DestroyImmediate(rt); continue; }
+                p.mode = ReflectionProbeMode.Custom;
+                p.customBakedTexture = rt;
+                done++;
+            }
+            Log($"realtime reflection probes rendered for the close-ups: {done}{(failed > 0 ? $", {failed} could not be" : "")}");
+        }
+
+        static float Luma(Color32 c) => (0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b) / 255f;
+
+        /// <summary>
+        /// Glass and overlays measured where they are, in their close-up as the game draws it: glass by how bright it is
+        /// against the rest of the view and how much it varies (reflections vary; a black hole does not), and which probe it
+        /// reflects; an overlay by how much it darkens the wall under it (the close-up with it against the one without).
+        /// </summary>
+        static void InPlace(Item it, Pose pose, bool[] own, Color32[] shown, Color32[] bare)
+        {
+            double s = 0, sq = 0, rest = 0; int n = 0, m = 0;
+            for (int i = 0; i < shown.Length && i < own.Length; i++)
+            {
+                float l = Luma(shown[i]);
+                if (own[i]) { s += l; sq += l * l; n++; } else { rest += l; m++; }
+            }
+            if (n == 0) return;
+            double mean = s / n, cv = mean > 1e-4 ? Math.Sqrt(Math.Max(0, sq / n - mean * mean)) / mean : 0, other = m > 0 ? rest / m : 0;
+            if (it.cls == "glass")
+            {
+                var probes = new List<ReflectionProbeBlendInfo>();
+                var r = pose.member?.renderer;
+                if (r != null) r.GetClosestReflectionProbes(probes);
+                string reflects = probes.Count > 0 ? string.Join(" + ", probes.Select(p => $"{p.probe.name} ({p.weight:P0})")) : "the sky only (no probe reaches it)";
+                it.measured.Add($"in place: brightness {mean:0.000} against {other:0.000} for the rest of its close-up ({mean / Math.Max(other, 1e-4):P0}), varying {cv:P0} across it; on Medium it reflects {reflects}");
+                // Near black against what is round it, however much its few reflections vary (at 2 % of the view's
+                // brightness a 90 % variation is still black).
+                if (mean / Math.Max(other, 1e-4) < 0.08 || mean < 0.03)
+                    it.measured.Add($"!!renders as a black hole: {mean / Math.Max(other, 1e-4):P0} of the brightness round it: almost no reflection and nothing seen behind it");
+            }
+            else if (it.cls == "decal" && bare != null)
+            {
+                double with = 0, without = 0;
+                for (int i = 0; i < shown.Length && i < own.Length; i++) if (own[i]) { with += Luma(shown[i]); without += Luma(bare[i]); }
+                it.measured.Add($"in place: where it lies the wall is {1 - with / Math.Max(without, 1e-4):P0} darker with it than without (close.png against close_without.png); it covers {(double)n / own.Length:P0} of its close-up");
+            }
         }
 
         static IEnumerable<Item> _all;

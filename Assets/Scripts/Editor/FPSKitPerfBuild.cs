@@ -7,7 +7,9 @@ using UnityEngine;
 namespace FPSKit.EditorTools
 {
     /// <summary>
-    /// A development build of the main menu and the Abandoned Fairground (Linux x64, Vulkan only) for measuring outside the editor. It runs the PerfProbe
+    /// Builds for measuring and play-testing outside the editor. The desert ones (main menu + Desert Outpost, Linux, Vulkan):
+    /// BuildSmooth (release, the walk benchmark's and the play-test's), BuildDesertDev (development); Tools/build-desert.sh.
+    /// Also a development build of the main menu and the Abandoned Fairground (Linux x64, Vulkan only) for measuring outside the editor. It runs the PerfProbe
     /// component when started with <c>-fpskitperf &lt;file&gt;</c>; <c>Tools/run-perf-build.sh</c> starts it under Vulkan and OpenGL.
     /// Output goes to Build/Perf/&lt;tag&gt;/ (Build/ is not committed). Frame timing stats are turned on for the build and put back after.
     /// </summary>
@@ -25,7 +27,16 @@ namespace FPSKit.EditorTools
         /// A release build of the menu and Desert Outpost (Linux x64, Vulkan) for SmoothProbe: start it with
         /// <c>-fpskitsmooth &lt;report&gt;</c>. Build/Perf/smooth/FPSKitSmooth.x86_64.
         /// </summary>
+        [MenuItem("Tools/MiniFPS/Performance/Build Desert Play-Test Player (release)")]
         public static void BuildSmooth() => Build("smooth", "Assets/FPSKit_Generated/Scenes/DesertOutpost.unity", BuildOptions.None, "FPSKitSmooth");
+
+        /// <summary>
+        /// The same menu and Desert Outpost as a development build (Build/Perf/desertdev/FPSKitDesertDev.x86_64): the Profiler
+        /// can attach, errors show, and FrameCostProbe (<c>-fpskitcost &lt;report&gt;</c>) reads every render pass's GPU time.
+        /// A development player runs slower than the release one: judge frame rates in the release build.
+        /// </summary>
+        [MenuItem("Tools/MiniFPS/Performance/Build Desert Development Player")]
+        public static void BuildDesertDev() => Build("desertdev", "Assets/FPSKit_Generated/Scenes/DesertOutpost.unity", BuildOptions.Development, "FPSKitDesertDev");
 
         public static void Build(string tag) => Build(tag, ScenePath, BuildOptions.Development, "FPSKitPerf");
 

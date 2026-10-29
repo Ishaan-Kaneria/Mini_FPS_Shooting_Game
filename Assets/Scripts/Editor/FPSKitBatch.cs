@@ -383,6 +383,13 @@ namespace FPSKit.EditorTools
         /// <summary>A release Linux build of the menu and Desert Outpost for SmoothProbe (-fpskitsmooth &lt;report&gt;). Build/Perf/smooth.</summary>
         public static void BuildSmoothPlayer() => Run(FPSKitPerfBuild.BuildSmooth);
 
+        /// <summary>What makes Unity log "Invalid worldAABB": every object in a scene with bounds that are not finite or are
+        /// absurdly large (FPSKitBoundsCheck). -fpskitTheme picks the arena (Desert Outpost).</summary>
+        public static void FindInvalidBounds() => FPSKitBoundsCheck.Batch();
+
+        /// <summary>The menu and Desert Outpost as a development build, Build/Perf/desertdev (FrameCostProbe reads the passes there).</summary>
+        public static void BuildDesertDevPlayer() => Run(FPSKitPerfBuild.BuildDesertDev);
+
         /// <summary>Writes any missing tuning asset under FPSKit_Generated/Resources (FPSKit > Settings > Ensure Runtime Settings).</summary>
         public static void EnsureRuntimeSettings() => Run(FPSKitRuntimeSettings.Ensure);
 

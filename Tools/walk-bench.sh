@@ -13,14 +13,18 @@ cpu_temp() { sensors 2>/dev/null | grep 'Package id' | grep -o '+[0-9]*' | head 
 # On battery the chip runs at lower power limits: the step-1 walk ran a third slower on battery with an identical scene
 # (2026-10-29). Said loudly, and written into every report.
 power() { [ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" = "1" ] && echo "mains" || echo "BATTERY"; }
-[ "$(power)" = "BATTERY" ] && echo "walk-bench: WARNING: on battery; the numbers will not compare with a run on mains" >&2
+if [ "$(power)" = "BATTERY" ] && [ "${WALK_ALLOW_BATTERY:-0}" != "1" ]; then
+  echo "walk-bench: refused: on battery (the numbers would not compare with a run on mains); plug in, or WALK_ALLOW_BATTERY=1" >&2
+  exit 3
+fi
+EXTRA=(); [ "${WALK_ALLOW_BATTERY:-0}" = "1" ] && EXTRA=(-fpskitallowbattery)
 for TIER in "${TIERS[@]}"; do
   OUT="Build/Perf/walk/${TAG}_${TIER}.txt"; rm -f "$OUT"
   # The same start for every run: below 70 C, so throttling does not decide the numbers.
   while [ "$(cpu_temp)" != "" ] && [ "$(cpu_temp)" -ge 70 ]; do sleep 10; done
   echo "walk-bench: $TAG $TIER (cpu $(cpu_temp) C)"
   "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "Build/Perf/walk/${TAG}_${TIER}.log" \
-         -fpskitwalk "$OUT" -fpskitquality "$TIER" &
+         -fpskitwalk "$OUT" -fpskitquality "$TIER" "${EXTRA[@]}" &
   PID=$!; MAX=0
   for i in $(seq 1 300); do
     [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break

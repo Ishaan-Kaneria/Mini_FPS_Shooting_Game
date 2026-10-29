@@ -17,6 +17,10 @@ using UnityEngine.SceneManagement;
 /// worst frame and how many frames took over 33 ms (and 25), CPU and GPU time a frame, garbage collections, memory, and
 /// where on the walk each of the worst frames came, then quits. The tier asked for is set as the player's own and put back
 /// after. Built with FPSKitPerfBuild.BuildSmooth; run by Tools/walk-bench.sh. Holds no static state.
+/// On battery it refuses (the chip runs at lower power limits: the step-1 walk ran a third slower on battery with an
+/// identical scene, 2026-10-29) unless started with <c>-fpskitallowbattery</c>, and the power source is in every report.
+/// It also records what is drawn each frame (batches, SetPass calls, triangles, shadow casters, where the release player
+/// reports them) and the main and render threads' time, so a slow frame can be put down to the CPU or the GPU.
 /// </summary>
 public class WalkProbe : MonoBehaviour
 {
@@ -41,9 +45,75 @@ public class WalkProbe : MonoBehaviour
 
     struct Slow { public float ms, at, metres; public bool gc; }
 
+    /// <summary>The power source: "battery" when running on it. Unity's battery status first; on Linux, where it may be
+    /// Unknown, the kernel's power supplies (a mains or USB input online, else a discharging battery).</summary>
+    public static string PowerSource()
+    {
+        switch (SystemInfo.batteryStatus)
+        {
+            case BatteryStatus.Discharging: return "battery";
+            case BatteryStatus.Charging: case BatteryStatus.Full: case BatteryStatus.NotCharging: return "mains";
+        }
+        try
+        {
+            const string root = "/sys/class/power_supply";
+            if (!Directory.Exists(root)) return "mains (no battery reported)";
+            bool input = false, discharging = false;
+            foreach (var d in Directory.GetDirectories(root))
+            {
+                string Read(string f) { var p = Path.Combine(d, f); return File.Exists(p) ? File.ReadAllText(p).Trim() : ""; }
+                string type = Read("type");
+                if ((type == "Mains" || type == "USB") && Read("online") == "1") input = true;
+                if (type == "Battery" && Read("status") == "Discharging") discharging = true;
+            }
+            return input ? "mains" : discharging ? "battery" : "mains (no battery reported)";
+        }
+        catch (Exception) { return "unknown"; }
+    }
+
+    /// <summary>The render counters a frame draws (ProfilerRecorder; some players do not report all of them).</summary>
+    public sealed class DrawCounters : IDisposable
+    {
+        public static readonly string[] Names = { "Batches Count", "SetPass Calls Count", "Draw Calls Count", "Triangles Count", "Vertices Count", "Shadow Casters Count" };
+        readonly Unity.Profiling.ProfilerRecorder[] _rec = new Unity.Profiling.ProfilerRecorder[Names.Length];
+        public readonly List<long>[] Values = Names.Select(_ => new List<long>()).ToArray();
+        public DrawCounters()
+        {
+            for (int i = 0; i < Names.Length; i++) _rec[i] = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, Names[i]);
+        }
+        public void Sample()
+        {
+            for (int i = 0; i < Names.Length; i++) if (_rec[i].Valid && _rec[i].LastValue > 0) Values[i].Add(_rec[i].LastValue);
+        }
+        public void Clear() { foreach (var v in Values) v.Clear(); }
+        public string Report()
+        {
+            var parts = new List<string>();
+            for (int i = 0; i < Names.Length; i++)
+            {
+                string n = Names[i].Replace(" Count", "").ToLowerInvariant();
+                if (Values[i].Count == 0) { parts.Add($"{n} not reported"); continue; }
+                var o = Values[i].OrderBy(x => x).ToArray();
+                parts.Add($"{n} {Big(o[o.Length / 2])} (p95 {Big(o[(int)(o.Length * 0.95f)])})");
+            }
+            return string.Join(" | ", parts);
+        }
+        public long Median(int i) { var v = Values[i]; if (v.Count == 0) return -1; var o = v.OrderBy(x => x).ToArray(); return o[o.Length / 2]; }
+        public void Dispose() { foreach (var r in _rec) r.Dispose(); }
+    }
+
+    public static string Big(long v) => v >= 1_000_000 ? $"{v / 1e6:0.0}M" : v >= 10_000 ? $"{v / 1e3:0}k" : v.ToString();
+
     IEnumerator Start()
     {
         var sb = new StringBuilder();
+        if (PowerSource() == "battery" && Array.IndexOf(Environment.GetCommandLineArgs(), "-fpskitallowbattery") < 0)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_out)));
+            File.WriteAllText(_out, "refused: on battery (frame times on battery do not compare with mains); plug in, or pass -fpskitallowbattery\n");
+            Application.Quit(3);
+            yield break;
+        }
         int savedTier = GameSettings.QualityTier;
         if (_tier != null && Enum.TryParse(_tier, true, out GameSettings.Quality wanted)) GameSettings.QualityTier = (int)wanted;
         if (SceneManager.GetActiveScene().name != "DesertOutpost")
@@ -68,12 +138,14 @@ public class WalkProbe : MonoBehaviour
         sb.AppendLine($"walk: {WalkRoute.Length(line):0} m of route, {_seconds:0} s at a jog | api {SystemInfo.graphicsDeviceType} | gpu {SystemInfo.graphicsDeviceName} | " +
                       $"{Screen.width}x{Screen.height} | quality {QualitySettings.names[QualitySettings.GetQualityLevel()]} | render scale {QualityTiers.TierRenderScale:0.00} | " +
                       $"cap {(Application.targetFrameRate > 0 ? Application.targetFrameRate.ToString() : "none")} vsync {QualitySettings.vSyncCount} | dev build {Debug.isDebugBuild}");
-        sb.AppendLine($"cpu {SystemInfo.processorModel} x{SystemInfo.processorCount} | ram {SystemInfo.systemMemorySize} MB");
+        sb.AppendLine($"cpu {SystemInfo.processorModel} x{SystemInfo.processorCount} | ram {SystemInfo.systemMemorySize} MB | power {PowerSource()} (battery {SystemInfo.batteryLevel:P0})");
         foreach (var n in notes) sb.AppendLine("route: " + n);
 
         MobileInput.Reset();
         MobileInput.Active = true;
         var dt = new List<float>(); var cpu = new List<float>(); var gpu = new List<float>();
+        var main = new List<float>(); var render = new List<float>(); var presentWait = new List<float>();
+        using var draws = new DrawCounters();
         var slow = new List<Slow>();
         var timings = new FrameTiming[1];
         int gcStart = GC.CollectionCount(0), stalls = 0, seg = 1;
@@ -117,7 +189,11 @@ public class WalkProbe : MonoBehaviour
             {
                 if (timings[0].cpuFrameTime > 0) cpu.Add((float)timings[0].cpuFrameTime);
                 if (timings[0].gpuFrameTime > 0) gpu.Add((float)timings[0].gpuFrameTime);
+                if (timings[0].cpuMainThreadFrameTime > 0) main.Add((float)timings[0].cpuMainThreadFrameTime);
+                if (timings[0].cpuRenderThreadFrameTime > 0) render.Add((float)timings[0].cpuRenderThreadFrameTime);
+                if (timings[0].cpuMainThreadPresentWaitTime > 0) presentWait.Add((float)timings[0].cpuMainThreadPresentWaitTime);
             }
+            draws.Sample();
         }
         MobileInput.Reset();
 
@@ -131,6 +207,10 @@ public class WalkProbe : MonoBehaviour
             sb.AppendLine($"avg {1000f / dt.Average():0.0} fps | 1% low {Low(0.01f):0.0} fps | 0.1% low {Low(0.001f):0.0} fps | worst frame {s[s.Length - 1]:0.0} ms | " +
                           $"frames over 33 ms: {dt.Count(x => x > 33.3f)} | over 25 ms: {dt.Count(x => x > 25f)}");
             sb.AppendLine($"frame time p50 {P(0.5f):0.0} / p95 {P(0.95f):0.0} / p99 {P(0.99f):0.0} ms | cpu p50 {Pc(cpu, 0.5f):0.0} / p99 {Pc(cpu, 0.99f):0.0} ms | gpu p50 {Pc(gpu, 0.5f):0.0} / p99 {Pc(gpu, 0.99f):0.0} ms");
+            // The main thread waiting on present is the GPU (or vsync) holding it up; its own work is main minus the wait.
+            sb.AppendLine($"threads p50: main {Pc(main, 0.5f):0.0} ms (of which waiting to present {Pc(presentWait, 0.5f):0.0}), render thread {Pc(render, 0.5f):0.0} ms" +
+                          (FrameTimingManager.IsFeatureEnabled() ? "" : " (frame timing stats off in this build)"));
+            sb.AppendLine("drawn a frame: " + draws.Report());
             sb.AppendLine($"garbage collections: {GC.CollectionCount(0) - gcStart} | memory: allocated {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, reserved {UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / 1048576} MB, mono {UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() / 1048576} MB | {ProcessMemory()}");
             if (slow.Count > 0)
             {

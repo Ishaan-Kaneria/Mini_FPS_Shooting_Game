@@ -23,8 +23,8 @@ for TIER in "${TIERS[@]}"; do
   # The same start for every run: below 70 C, so throttling does not decide the numbers.
   while [ "$(cpu_temp)" != "" ] && [ "$(cpu_temp)" -ge 70 ]; do sleep 10; done
   echo "walk-bench: $TAG $TIER (cpu $(cpu_temp) C)"
-  "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "Build/Perf/walk/${TAG}_${TIER}.log" \
-         -fpskitwalk "$OUT" -fpskitquality "$TIER" "${EXTRA[@]}" &
+  "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "$PWD/Build/Perf/walk/${TAG}_${TIER}.log" \
+         -fpskitwalk "$PWD/$OUT" -fpskitquality "$TIER" "${EXTRA[@]}" &
   PID=$!; MAX=0
   for i in $(seq 1 300); do
     [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break
@@ -32,5 +32,5 @@ for TIER in "${TIERS[@]}"; do
     sleep 2
   done
   kill $PID 2>/dev/null || true
-  if [ -f "$OUT" ]; then echo "cpu package max ${MAX} C during the run, on $(power)" >> "$OUT"; cat "$OUT"; else echo "no report; see Build/Perf/walk/${TAG}_${TIER}.log"; fi
+  if [ -f "$OUT" ]; then echo "cpu package max ${MAX} C during the run, on $(power)" >> "$OUT"; cat "$OUT"; else echo "no report; see $PWD/Build/Perf/walk/${TAG}_${TIER}.log"; fi
 done

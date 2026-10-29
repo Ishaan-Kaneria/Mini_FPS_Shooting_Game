@@ -13,7 +13,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Where the frame time goes in Desert Outpost (Part A of the 2026-10-29 brief: measure before fixing). Does nothing unless
 /// the player is started with <c>-fpskitcost &lt;report file&gt;</c> (optionally <c>-fpskitquality Low|Medium|High</c>).
-/// It stands the player at fixed views along WalkRoute (every 50 m, looking along the route) and at each draws the frame
+/// It stands the player at fixed views along WalkRoute (every 100 m, looking along the route) and at each draws the frame
 /// as it is, then with one thing taken away at a time: the sun's shadows, post-processing, transparent surfaces, the
 /// furniture inside rooms, roof and facade props, street props, people and cars, the facades' detail meshes, the terrain,
 /// the arms and gun, everything past 150 m, props' shadows. The frame time lost with each is its cost. At each view it
@@ -25,8 +25,8 @@ using UnityEngine.SceneManagement;
 public class FrameCostProbe : MonoBehaviour
 {
     string _out, _tier;
-    const float ViewSpacing = 50f, FarCut = 150f;
-    const int Settle = 6, Measure = 30;
+    const float ViewSpacing = 100f, FarCut = 150f;
+    const int Settle = 5, Measure = 20;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -42,7 +42,7 @@ public class FrameCostProbe : MonoBehaviour
         if (q >= 0 && q + 1 < args.Length) probe._tier = args[q + 1];
     }
 
-    sealed class Group { public string name; public readonly List<Renderer> rs = new List<Renderer>(); public readonly List<long> tris = new List<long>(); }
+    sealed class Group { public string name; public int casters; public readonly List<Renderer> rs = new List<Renderer>(); public readonly List<long> tris = new List<long>(); }
 
     sealed class Config
     {
@@ -127,12 +127,15 @@ public class FrameCostProbe : MonoBehaviour
             else g = top ?? "other";
             var grp = G(g);
             grp.rs.Add(r); grp.tris.Add(Tris(r));
+            if (r.shadowCastingMode != ShadowCastingMode.Off) grp.casters++;
         }
         var all = groups.Values.SelectMany(g => g.rs).ToList();
         var terrains = FindObjectsByType<Terrain>(FindObjectsInactive.Exclude);
         var sun = FindObjectsByType<Light>(FindObjectsInactive.Exclude).FirstOrDefault(l => l.type == LightType.Directional && l.enabled);
         var camData = cam.GetUniversalAdditionalCameraData();
-        var transparent = all.Where(r => r.sharedMaterials.Any(m => m != null && m.renderQueue > 2500)).ToList();
+        var transparent = all.Where(r => r != null).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.renderQueue > 2500).Distinct().ToList();
+        string[] passes = { "UniversalForward", "UniversalForwardOnly", "SRPDefaultUnlit", "ShadowCaster", "DepthOnly", "DepthNormals" };
+        void Passes(bool on) { foreach (var m in transparent) foreach (var p in passes) m.SetShaderPassEnabled(p, on); }
         var propShadows = new[] { "furniture in rooms", "roof and facade props", "street and yard props" }.Where(groups.ContainsKey)
             .SelectMany(n => groups[n].rs).Where(r => r.shadowCastingMode == ShadowCastingMode.On).ToList();
         var arms = Camera.allCameras.Where(c => c != cam && c.GetUniversalAdditionalCameraData().renderType == CameraRenderType.Overlay).ToList();
@@ -149,9 +152,9 @@ public class FrameCostProbe : MonoBehaviour
             new Config { name = "no post-processing", on = () => camData.renderPostProcessing = false, off = () => camData.renderPostProcessing = true },
             new Config { name = "no renderer features (" + string.Join(", ", features.Select(f => f.name)) + ")",
                          on = () => { foreach (var f in features) f.SetActive(false); }, off = () => { foreach (var f in features) f.SetActive(true); } },
-            new Config { name = "no transparent surfaces", on = Off(transparent), off = On(transparent) },
-            new Config { name = "props cast no shadows", on = () => { foreach (var r in propShadows) r.shadowCastingMode = ShadowCastingMode.Off; },
-                         off = () => { foreach (var r in propShadows) r.shadowCastingMode = ShadowCastingMode.On; } },
+            new Config { name = $"no transparent surfaces ({transparent.Count} materials)", on = () => Passes(false), off = () => Passes(true) },
+            new Config { name = "props cast no shadows", on = () => { foreach (var r in propShadows) if (r != null) r.shadowCastingMode = ShadowCastingMode.Off; },
+                         off = () => { foreach (var r in propShadows) if (r != null) r.shadowCastingMode = ShadowCastingMode.On; } },
             new Config { name = "no terrain", on = () => { foreach (var t in terrains) { t.drawHeightmap = false; t.drawTreesAndFoliage = false; } },
                          off = () => { foreach (var t in terrains) { t.drawHeightmap = true; t.drawTreesAndFoliage = true; } } },
             new Config { name = "no arms and gun camera", on = () => { foreach (var c in arms) c.enabled = false; }, off = () => { foreach (var c in arms) c.enabled = true; } },
@@ -165,7 +168,26 @@ public class FrameCostProbe : MonoBehaviour
                 off = () => { foreach (var r in farList) r.enabled = true; foreach (var t in terrains) t.drawTreesAndFoliage = true; } },
         };
         foreach (var g in groups.Values.OrderByDescending(g => g.tris.Sum()))
-            if (g.name != "arms and gun") configs.Add(new Config { name = "no " + g.name, on = Off(g.rs), off = On(g.rs) });
+            if (g.name != "arms and gun" && g.rs.Count > 150) configs.Add(new Config { name = "no " + g.name, on = Off(g.rs), off = On(g.rs) });
+
+        // Settings a tier could change (Part A's candidates), each alone.
+        var urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        float lodBias = QualitySettings.lodBias, shadowDist = urpAsset != null ? urpAsset.shadowDistance : 0f, scale = urpAsset != null ? urpAsset.renderScale : 1f;
+        var armsData = arms.Select(c => c.GetUniversalAdditionalCameraData()).ToList();
+        var bloom = FindObjectsByType<Volume>(FindObjectsInactive.Exclude).Where(v => v.isGlobal && v.sharedProfile != null)
+            .Select(v => v.sharedProfile.TryGet<Bloom>(out var b) ? b : null).Where(b => b != null && b.active).ToList();
+        var terrainWas = terrains.Select(t => (t.heightmapPixelError, t.basemapDistance, t.detailObjectDistance, t.detailObjectDensity)).ToList();
+        configs.Add(new Config { name = $"LOD bias 1 (now {lodBias:0.##})", on = () => QualitySettings.lodBias = 1f, off = () => QualitySettings.lodBias = lodBias });
+        configs.Add(new Config { name = "LOD bias 0.6", on = () => QualitySettings.lodBias = 0.6f, off = () => QualitySettings.lodBias = lodBias });
+        configs.Add(new Config { name = "no MSAA", on = () => cam.allowMSAA = false, off = () => cam.allowMSAA = true });
+        configs.Add(new Config { name = "arms camera without its own shadow pass", on = () => { foreach (var d in armsData) d.renderShadows = false; }, off = () => { foreach (var d in armsData) d.renderShadows = true; } });
+        configs.Add(new Config { name = "no bloom", on = () => { foreach (var b in bloom) b.active = false; }, off = () => { foreach (var b in bloom) b.active = true; } });
+        configs.Add(new Config { name = $"shadows to 50 m (now {shadowDist:0})", on = () => { if (urpAsset) urpAsset.shadowDistance = 50f; }, off = () => { if (urpAsset) urpAsset.shadowDistance = shadowDist; } });
+        configs.Add(new Config { name = "render scale 0.85", on = () => { if (urpAsset) urpAsset.renderScale = 0.85f; }, off = () => { if (urpAsset) urpAsset.renderScale = scale; } });
+        configs.Add(new Config { name = "terrain: pixel error 8, base map at 120 m", on = () => { foreach (var t in terrains) { t.heightmapPixelError = 8f; t.basemapDistance = 120f; } },
+                                 off = () => { for (int i = 0; i < terrains.Length; i++) { terrains[i].heightmapPixelError = terrainWas[i].heightmapPixelError; terrains[i].basemapDistance = terrainWas[i].basemapDistance; } } });
+        configs.Add(new Config { name = "terrain: no detail meshes", on = () => { foreach (var t in terrains) t.detailObjectDensity = 0f; },
+                                 off = () => { for (int i = 0; i < terrains.Length; i++) terrains[i].detailObjectDensity = terrainWas[i].detailObjectDensity; } });
 
         // Profiler samples (development builds only): every sample's GPU and CPU time at each view.
         var samplerNames = new List<string>();
@@ -185,9 +207,50 @@ public class FrameCostProbe : MonoBehaviour
         MobileInput.Reset();
         MobileInput.Active = true;
         int roomsOutsideDrawn = 0, roomsOutsideTotal = 0;
+        // The report, written after every view: a failure late in a twenty-minute run must not lose what was measured.
+        var huge = new List<string>();
+        string Report(int viewsDone)
+        {
+            var r = new StringBuilder();
+            float Med(List<float> l) { if (l.Count == 0) return 0f; var o = l.OrderBy(x => x).ToArray(); return o[o.Length / 2]; }
+            long MedL(List<long> l) { if (l.Count == 0) return -1; var o = l.OrderBy(x => x).ToArray(); return o[o.Length / 2]; }
+            var full = configs[0];
+            float baseMs = Med(full.ms);
+            r.AppendLine($"frame cost: {viewsDone} of {views.Count} views {ViewSpacing:0} m apart on WalkRoute, {Measure} frames each way | api {SystemInfo.graphicsDeviceType} | {Screen.width}x{Screen.height} | " +
+                          $"quality {QualitySettings.names[QualitySettings.GetQualityLevel()]} | render scale {QualityTiers.TierRenderScale:0.00} | dev build {Debug.isDebugBuild} | power {WalkProbe.PowerSource()}");
+            r.AppendLine($"everything on: frame {baseMs:0.0} ms median (gpu {(full.gpu.Count > 0 ? Med(full.gpu).ToString("0.0") : "not reported")}) | " +
+                          string.Join(" | ", WalkProbe.DrawCounters.Names.Select((n, i) => $"{n.Replace(" Count", "").ToLowerInvariant()} {(MedL(full.counters[i]) < 0 ? "not reported" : WalkProbe.Big(MedL(full.counters[i])))}")));
+            r.AppendLine("what each thing costs (frame time saved without it, median over the views; and what is drawn without it):");
+            foreach (var c in configs.Skip(1).OrderBy(c => Med(c.ms)))
+            {
+                float saved = baseMs - Med(c.ms);
+                r.AppendLine($"  {saved,6:0.0} ms ({saved / Mathf.Max(0.01f, baseMs):P0})  {c.name}  -> {Med(c.ms):0.0} ms | " +
+                              string.Join(", ", new[] { 0, 1, 3, 5 }.Select(i => $"{WalkProbe.DrawCounters.Names[i].Replace(" Count", "").ToLowerInvariant()} {(MedL(c.counters[i]) < 0 ? "-" : WalkProbe.Big(MedL(c.counters[i])))}")));
+            }
+            r.AppendLine($"rooms' furniture drawn from outside: {roomsOutsideDrawn} room-views of {roomsOutsideTotal} ({(float)roomsOutsideDrawn / Mathf.Max(1, viewsDone):0.0} rooms a view, of {rooms.Count} rooms)");
+            r.AppendLine("groups in the scene: " + string.Join("; ", groups.Values.OrderByDescending(g => g.tris.Sum()).Select(g => $"{g.name} {g.rs.Count} renderers, {WalkProbe.Big(g.tris.Sum())} tris, {g.casters} cast shadows")));
+            if (profiledFrames > 0)
+            {
+                r.AppendLine($"profiler samples, GPU ms a frame (top 30 of {gpuSum.Count}; nested samples overlap their parents):");
+                foreach (var kv in gpuSum.OrderByDescending(kv => kv.Value).Take(30)) r.AppendLine($"  {kv.Value / profiledFrames,6:0.00}  {kv.Key}");
+                r.AppendLine("profiler samples, CPU ms a frame (top 30):");
+                foreach (var kv in cpuSum.OrderByDescending(kv => kv.Value).Take(30)) r.AppendLine($"  {kv.Value / profiledFrames,6:0.00}  {kv.Key}");
+            }
+            else r.AppendLine($"profiler samples: none readable ({recorders.Count} recorders; GPU and CPU per pass need a development build)");
+            r.AppendLine($"objects with bounds over 10 km or not finite (Unity's \"Invalid worldAABB\"): {(huge.Count == 0 ? "none" : string.Join("; ", huge.Take(20)))}");
+            r.AppendLine("what is drawn at each view (for the camera or a shadow), by group:");
+            r.Append(census);
+            r.AppendLine("per view, frame ms with everything on / without the sun's shadows / past 150 m: " +
+                          string.Join("  ", Enumerable.Range(0, viewsDone).Select(v => $"{v + 1}: {Slice(full.ms, v):0} / {Slice(configs[1].ms, v):0} / {Slice(configs.First(c => c.name.StartsWith("nothing past")).ms, v):0}")));
+            return r.ToString();
+        }
+
         for (int v = 0; v < views.Count; v++)
         {
             var (pos, dir) = views[v];
+            // Ten minutes of measuring in a level whose clock may be two and a half.
+            if (level != null) level.HoldClockForBenchmark(120f);
+            if (player == null) { census.AppendLine($"view {v + 1}: the player is gone (the level ended?); stopped here"); break; }
             if (cc) cc.enabled = false;
             float ground = Physics.Raycast(pos + Vector3.up * 3f, Vector3.down, out var hit, 20f, ~0, QueryTriggerInteraction.Ignore) ? hit.point.y : pos.y;
             player.transform.position = new Vector3(pos.x, ground + 0.1f, pos.z);
@@ -211,7 +274,10 @@ public class FrameCostProbe : MonoBehaviour
 
             foreach (var c in configs)
             {
-                c.on();
+                if (level != null) level.HoldClockForBenchmark(120f);
+                // Things are destroyed in play (a prop shot apart): a config that throws must not end the run.
+                try { c.on(); }
+                catch (Exception e) { Debug.LogWarning($"[FrameCostProbe] {c.name}: {e.Message}"); }
                 for (int k = 0; k < Settle; k++) { if (health) health.Heal(1000f); yield return null; }
                 for (int k = 0; k < Measure; k++)
                 {
@@ -223,7 +289,8 @@ public class FrameCostProbe : MonoBehaviour
                     draws.Clear(); draws.Sample();
                     for (int i = 0; i < WalkProbe.DrawCounters.Names.Length; i++) if (draws.Values[i].Count > 0) c.counters[i].Add(draws.Values[i][0]);
                 }
-                c.off();
+                try { c.off(); }
+                catch (Exception e) { Debug.LogWarning($"[FrameCostProbe] {c.name} (undo): {e.Message}"); }
             }
             // The passes, in frames of their own: a recorder on every sample slows the frame it measures.
             if (recorders.Count > 0)
@@ -243,12 +310,13 @@ public class FrameCostProbe : MonoBehaviour
                 }
                 foreach (var (_, rec) in recorders) rec.enabled = false;
             }
+            try { Write(Report(v + 1), partial: true); }
+            catch (Exception e) { Debug.LogWarning("[FrameCostProbe] report: " + e); }
         }
         MobileInput.Reset();
 
         // Anything whose bounds are not finite or span more than 10 km: what makes Unity log "Invalid worldAABB" in
         // development players and the editor (it names no object).
-        var huge = new List<string>();
         foreach (var r in FindObjectsByType<Renderer>(FindObjectsInactive.Include))
         {
             var b = r.bounds;
@@ -259,40 +327,9 @@ public class FrameCostProbe : MonoBehaviour
         foreach (var l in FindObjectsByType<Light>(FindObjectsInactive.Include))
             if (!float.IsFinite(l.range) || !float.IsFinite(l.transform.position.x + l.transform.position.y + l.transform.position.z)) huge.Add($"{PathOf(l.transform)} (light range {l.range})");
 
-        // The report.
-        float Med(List<float> l) { if (l.Count == 0) return 0f; var o = l.OrderBy(x => x).ToArray(); return o[o.Length / 2]; }
-        long MedL(List<long> l) { if (l.Count == 0) return -1; var o = l.OrderBy(x => x).ToArray(); return o[o.Length / 2]; }
-        var full = configs[0];
-        float baseMs = Med(full.ms);
-        sb.AppendLine($"frame cost: {views.Count} views {ViewSpacing:0} m apart on WalkRoute, {Measure} frames each way | api {SystemInfo.graphicsDeviceType} | {Screen.width}x{Screen.height} | " +
-                      $"quality {QualitySettings.names[QualitySettings.GetQualityLevel()]} | render scale {QualityTiers.TierRenderScale:0.00} | dev build {Debug.isDebugBuild} | power {WalkProbe.PowerSource()}");
-        sb.AppendLine($"everything on: frame {baseMs:0.0} ms median (gpu {(full.gpu.Count > 0 ? Med(full.gpu).ToString("0.0") : "not reported")}) | " +
-                      string.Join(" | ", WalkProbe.DrawCounters.Names.Select((n, i) => $"{n.Replace(" Count", "").ToLowerInvariant()} {(MedL(full.counters[i]) < 0 ? "not reported" : WalkProbe.Big(MedL(full.counters[i])))}")));
-        sb.AppendLine("what each thing costs (frame time saved without it, median over the views; and what is drawn without it):");
-        foreach (var c in configs.Skip(1).OrderBy(c => Med(c.ms)))
-        {
-            float saved = baseMs - Med(c.ms);
-            sb.AppendLine($"  {saved,6:0.0} ms ({saved / Mathf.Max(0.01f, baseMs):P0})  {c.name}  -> {Med(c.ms):0.0} ms | " +
-                          string.Join(", ", new[] { 0, 1, 3, 5 }.Select(i => $"{WalkProbe.DrawCounters.Names[i].Replace(" Count", "").ToLowerInvariant()} {(MedL(c.counters[i]) < 0 ? "-" : WalkProbe.Big(MedL(c.counters[i])))}")));
-        }
-        sb.AppendLine($"rooms' furniture drawn from outside: {roomsOutsideDrawn} room-views of {roomsOutsideTotal} ({(float)roomsOutsideDrawn / Mathf.Max(1, views.Count):0.0} rooms a view, of {rooms.Count} rooms)");
-        sb.AppendLine("groups in the scene: " + string.Join("; ", groups.Values.OrderByDescending(g => g.tris.Sum()).Select(g => $"{g.name} {g.rs.Count} renderers, {WalkProbe.Big(g.tris.Sum())} tris, {g.rs.Count(r => r.shadowCastingMode != ShadowCastingMode.Off)} cast shadows")));
-        if (profiledFrames > 0)
-        {
-            sb.AppendLine($"profiler samples, GPU ms a frame (top 30 of {gpuSum.Count}; nested samples overlap their parents):");
-            foreach (var kv in gpuSum.OrderByDescending(kv => kv.Value).Take(30)) sb.AppendLine($"  {kv.Value / profiledFrames,6:0.00}  {kv.Key}");
-            sb.AppendLine("profiler samples, CPU ms a frame (top 30):");
-            foreach (var kv in cpuSum.OrderByDescending(kv => kv.Value).Take(30)) sb.AppendLine($"  {kv.Value / profiledFrames,6:0.00}  {kv.Key}");
-        }
-        else sb.AppendLine($"profiler samples: none readable ({recorders.Count} recorders; GPU and CPU per pass need a development build)");
-        sb.AppendLine($"objects with bounds over 10 km or not finite (Unity's \"Invalid worldAABB\"): {(huge.Count == 0 ? "none" : string.Join("; ", huge.Take(20)))}");
-        sb.AppendLine("what is drawn at each view (for the camera or a shadow), by group:");
-        sb.Append(census);
-        sb.AppendLine("per view, frame ms with everything on / without the sun's shadows / past 150 m: " +
-                      string.Join("  ", Enumerable.Range(0, views.Count).Select(v => $"{v + 1}: {Slice(full.ms, v):0} / {Slice(configs[1].ms, v):0} / {Slice(configs.First(c => c.name.StartsWith("nothing past")).ms, v):0}")));
-
         GameSettings.QualityTier = savedTier;
-        Write(sb.ToString());
+        try { Write(sb.ToString() + Report(views.Count)); }
+        catch (Exception e) { Debug.LogWarning("[FrameCostProbe] report: " + e); }
         Application.Quit();
     }
 
@@ -312,10 +349,11 @@ public class FrameCostProbe : MonoBehaviour
         return part.Length > 0 ? part[part.Length / 2] : 0f;
     }
 
-    void Write(string text)
+    /// <summary>The report; a partial one beside it (the bench script waits for the report itself to appear).</summary>
+    void Write(string text, bool partial = false)
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(_out)));
-        File.WriteAllText(_out, text);
+        File.WriteAllText(partial ? _out + ".partial" : _out, text);
     }
 
     static long Tris(Renderer r)

@@ -7,7 +7,7 @@
 set -u
 cd "$(dirname "$0")/.."
 KIND="${1:-release}"
-[ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" = "1" ] || { echo "build-desert: on battery; plug in first" >&2; exit 3; }
+[ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" = "1" ] || [ "${ALLOW_BATTERY:-0}" = "1" ] || { echo "build-desert: on battery; plug in first (or ALLOW_BATTERY=1)" >&2; exit 3; }
 build() {
   local method="$1"
   echo "build-desert: $method"

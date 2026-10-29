@@ -724,6 +724,18 @@ public class LevelManager : MonoBehaviour
     }
 
     /// <summary>
+    /// For the frame-cost benchmark only (FrameCostProbe, which measures for about ten minutes in a level whose clock
+    /// may be two and a half): keeps at least this many seconds on the clock. Nothing in play calls it; the clock still
+    /// ends the level when the measuring stops.
+    /// </summary>
+    public void HoldClockForBenchmark(float seconds)
+    {
+        if (!IsRunning) return;
+        _deadline = Mathf.Max(_deadline, Time.time + seconds);
+        TimeRemaining = Mathf.Max(0f, _deadline - Time.time);
+    }
+
+    /// <summary>
     /// Whether the player could walk to a point. Public so <see cref="LevelObjective"/>
     /// can ask it before marking ground -- an objective on an island is an objective the
     /// player is scored against and cannot reach, which is the same failure the spawner

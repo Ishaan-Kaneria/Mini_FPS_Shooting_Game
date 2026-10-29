@@ -8,15 +8,19 @@ TAG="${1:?tag}"; KIND="${2:-release}"; shift $(( $# >= 2 ? 2 : 1 ))
 TIERS=("${@:-Medium}"); [ $# -eq 0 ] && TIERS=(Medium)
 [ "$KIND" = dev ] && BIN="Build/Perf/desertdev/FPSKitDesertDev.x86_64" || BIN="Build/Perf/smooth/FPSKitSmooth.x86_64"
 [ -x "$BIN" ] || { echo "no build at $BIN: Tools/build-desert.sh $KIND"; exit 1; }
-[ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" = "1" ] || { echo "cost-bench: refused: on battery" >&2; exit 3; }
+EXTRA=()
+if [ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" != "1" ]; then
+  [ "${ALLOW_BATTERY:-0}" = "1" ] || { echo "cost-bench: refused: on battery (or ALLOW_BATTERY=1)" >&2; exit 3; }
+  EXTRA=(-fpskitallowbattery); echo "cost-bench: on battery, as asked; the report says so" >&2
+fi
 cpu_temp() { sensors 2>/dev/null | grep 'Package id' | grep -o '+[0-9]*' | head -1 | tr -d + || true; }
 mkdir -p Build/Perf/cost
 for TIER in "${TIERS[@]}"; do
   OUT="Build/Perf/cost/${TAG}_${KIND}_${TIER}.txt"; rm -f "$OUT"
   while [ "$(cpu_temp)" != "" ] && [ "$(cpu_temp)" -ge 70 ]; do sleep 10; done
   echo "cost-bench: $TAG $KIND $TIER (cpu $(cpu_temp) C)"
-  "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "Build/Perf/cost/${TAG}_${KIND}_${TIER}.log" \
-         -fpskitcost "$OUT" -fpskitquality "$TIER" &
+  "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "$PWD/Build/Perf/cost/${TAG}_${KIND}_${TIER}.log" \
+         -fpskitcost "$PWD/$OUT" -fpskitquality "$TIER" "${EXTRA[@]}" &
   PID=$!; MAX=0
   for i in $(seq 1 600); do
     [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break
@@ -24,5 +28,5 @@ for TIER in "${TIERS[@]}"; do
     sleep 2
   done
   sleep 2; kill $PID 2>/dev/null || true
-  if [ -f "$OUT" ]; then echo "cpu package max ${MAX} C during the run, on mains" >> "$OUT"; head -40 "$OUT"; else echo "no report; see Build/Perf/cost/${TAG}_${KIND}_${TIER}.log"; fi
+  if [ -f "$OUT" ]; then echo "cpu package max ${MAX} C during the run, on $([ "$(cat /sys/class/power_supply/ADP1/online 2>/dev/null)" = "1" ] && echo mains || echo BATTERY)" >> "$OUT"; head -40 "$OUT"; else echo "no report; see Build/Perf/cost/${TAG}_${KIND}_${TIER}.log"; fi
 done

@@ -323,8 +323,11 @@ namespace FPSKit.EditorTools
                     // The grade he signed off on in 2026-10-03, a touch less warm: the photographed sky and textures
                     // carry their own colour now and do not need pushing.
                     t.bloomIntensity = 0.45f;
-                    t.postExposure = 0.25f;                    // 0.05 until "too dark overall": +0.2 EV
-                    t.saturation = 0f;
+                    // His pick C (2026-10-30): the single grade nearest the look he had approved, which was the scene's
+                    // grade replaced by the hurt effect's zeros and then graded twice (GradeProbe: -0.20 EV, saturation
+                    // +10 against +0.25 / 0). It was +0.25 (0.05 until "too dark overall").
+                    t.postExposure = -0.2f;
+                    t.saturation = 10f;
                     t.colorFilter = new Color(1f, 0.975f, 0.94f);
                     t.vignetteIntensity = 0.2f;
                     t.contrast = 10f;

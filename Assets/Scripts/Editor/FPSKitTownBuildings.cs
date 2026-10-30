@@ -40,6 +40,9 @@ namespace FPSKit.EditorTools
         private static readonly List<TownLot> _townLots = new List<TownLot>();
         private static readonly Dictionary<Vector2Int, TownMesh> _chunks = new Dictionary<Vector2Int, TownMesh>();
         private static Transform _volumes;
+        /// <summary>The houses' insides (FPSKitTownInterior.BuildHouseInside), their layer, and how many are built.</summary>
+        private static Transform _interiorGroup;
+        private static int _interiorLayer, _interiorCount;
 
         /// <summary>Doors of enterable buildings and yard gates: where civilians go in and out (FPSKitTownLife).</summary>
         private static readonly List<Vector3> _townDoors = new List<Vector3>();
@@ -53,6 +56,7 @@ namespace FPSKit.EditorTools
             _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
             _palletPrefab = null; _roomMarks = null; _shopMarks = null;
             _volumes = null; _signNames = null; _roadSignNames = null;
+            _interiorGroup = null; _interiorLayer = 0; _interiorCount = 0;
             _oldSquares.Clear(); _vacantLots.Clear();
         }
 
@@ -221,6 +225,9 @@ namespace FPSKit.EditorTools
             _volumes.SetParent(group, false);
             var props = new GameObject("BuildingProps").transform;
             props.SetParent(group, false);
+            _interiorGroup = new GameObject("HouseInteriors").transform;
+            _interiorGroup.SetParent(group, false);
+            _interiorLayer = layer;
 
             PlanGridLots(rng);
             PlanOldTownLots(rng);
@@ -768,7 +775,7 @@ namespace FPSKit.EditorTools
             if (b.oldStyle && b.rng.NextDouble() < 0.55) PalmBeams(m, b);
 
             RoofClutter(m, b, roofY, props);
-            if (b.enterable) HouseInterior(m, det, b, props);
+            if (b.enterable) HouseInterior(b, props);
 
             // ---- navigation: keep the closed parts of the building off the bake ----
             // (With an upstairs, only the roof is kept off: the first floor is walked on.)

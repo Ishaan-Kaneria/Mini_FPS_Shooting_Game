@@ -204,23 +204,43 @@ namespace FPSKit.EditorTools
                         list.Add(i);
                     }
             }
+            int Room(Vector3 c)
+            {
+                if (cells.TryGetValue(new Vector2Int(Mathf.FloorToInt(c.x / Cell), Mathf.FloorToInt(c.z / Cell)), out var near))
+                    foreach (int i in near) if (boxes[i].Contains(c)) return i;
+                return -1;
+            }
+            (int[] first, Renderer[] all) Listed(List<List<Renderer>> per)
+            {
+                var starts = new int[boxes.Count];
+                var list = new List<Renderer>();
+                for (int i = 0; i < boxes.Count; i++) { starts[i] = list.Count; list.AddRange(per[i]); }
+                return (starts, list.ToArray());
+            }
             var inRoom = boxes.Select(_ => new List<Renderer>()).ToList();
             int outside = 0;
             foreach (var r in props.GetComponentsInChildren<Renderer>(true))
             {
-                var c = r.bounds.center;
-                int found = -1;
-                if (cells.TryGetValue(new Vector2Int(Mathf.FloorToInt(c.x / Cell), Mathf.FloorToInt(c.z / Cell)), out var near))
-                    foreach (int i in near) if (boxes[i].Contains(c)) { found = i; break; }
-                if (found >= 0) inRoom[found].Add(r); else outside++;
+                int i = Room(r.bounds.center);
+                if (i >= 0) inRoom[i].Add(r); else outside++;
             }
-            var first = new int[boxes.Count];
-            var all = new List<Renderer>();
-            for (int i = 0; i < boxes.Count; i++) { first[i] = all.Count; all.AddRange(inRoom[i]); }
+            // The houses' insides (FPSKitTownInterior.BuildHouseInside), each under its house's box.
+            var shellOf = boxes.Select(_ => new List<Renderer>()).ToList();
+            int shellsLost = 0;
+            var insides = GameObject.Find("Arena/Buildings/HouseInteriors");
+            if (insides != null)
+                foreach (var r in insides.GetComponentsInChildren<Renderer>(true))
+                {
+                    int i = Room(r.bounds.center);
+                    if (i >= 0) shellOf[i].Add(r); else shellsLost++;
+                }
+            var (first, all) = Listed(inRoom);
+            var (shellFirst, shells) = Listed(shellOf);
             var go = new GameObject("RoomContents");
             if (arena != null) go.transform.SetParent(arena, false);
-            go.AddComponent<RoomContents>().Set(boxes.ToArray(), first, all.ToArray());
-            Debug.Log($"[FPSKit] room contents: {all.Count} renderers in {boxes.Count} rooms ({inRoom.Count(l => l.Count > 0)} with something in them), {outside} props outside any room");
+            go.AddComponent<RoomContents>().Set(boxes.ToArray(), first, all, shellFirst, shells);
+            Debug.Log($"[FPSKit] room contents: {all.Length} renderers in {boxes.Count} rooms ({inRoom.Count(l => l.Count > 0)} with something in them), {outside} props outside any room; " +
+                      $"{shells.Length} house insides placed, {shellsLost} outside every box (always drawn)");
         }
 
         /// <summary>How far a room's probe box reaches past its surfaces, into the walls, floor and ceiling.</summary>

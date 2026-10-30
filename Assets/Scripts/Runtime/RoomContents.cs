@@ -14,24 +14,31 @@ public class RoomContents : MonoBehaviour
     [Tooltip("Metres from a room (its box) inside which what is in it is drawn. Past it the room is behind its walls, or a few pixels through a door.")]
     [Min(5f)] public float radius = 30f;
 
+    [Tooltip("Metres from a house inside which its own inside (floors, ceilings, partitions, stairs) is drawn. Further than the furniture's, so a doorway seen across a street never shows through an empty house.")]
+    [Min(5f)] public float shellRadius = 60f;
+
     [Tooltip("Seconds between checks. A room comes into view at a walk well inside the radius, so a quarter of a second is never seen.")]
     [Range(0.05f, 1f)] public float interval = 0.25f;
 
     [SerializeField] Bounds[] _rooms = new Bounds[0];
     [SerializeField] int[] _first = new int[0];         // each room's first renderer in _renderers; the next room's is its end
     [SerializeField] Renderer[] _renderers = new Renderer[0];
+    [SerializeField] int[] _shellFirst = new int[0];    // the same for each room's house inside (FPSKitTownInterior), drawn to shellRadius
+    [SerializeField] Renderer[] _shells = new Renderer[0];
 
-    bool[] _on;
+    bool[] _on, _shellOn;
     float _next;
 
     public int RoomCount => _rooms.Length;
     public int RendererCount => _renderers.Length;
 
-    /// <summary>The generator's: the rooms and what is in each (renderers listed room after room).</summary>
-    public void Set(Bounds[] rooms, int[] first, Renderer[] renderers)
+    /// <summary>The generator's: the rooms, what is in each and each one's house inside (renderers listed room after room).</summary>
+    public void Set(Bounds[] rooms, int[] first, Renderer[] renderers, int[] shellFirst, Renderer[] shells)
     {
-        _rooms = rooms; _first = first; _renderers = renderers; _on = null;
+        _rooms = rooms; _first = first; _renderers = renderers; _shellFirst = shellFirst; _shells = shells; _on = _shellOn = null;
     }
+
+    public int ShellCount => _shells.Length;
 
     void OnEnable() { _on = null; _next = 0f; }
 
@@ -39,7 +46,8 @@ public class RoomContents : MonoBehaviour
     {
         // Everything back on, so nothing is left hidden if this is switched off (a test, a debug view).
         foreach (var r in _renderers) if (r != null) r.enabled = true;
-        _on = null;
+        foreach (var r in _shells) if (r != null) r.enabled = true;
+        _on = _shellOn = null;
     }
 
     void Update()
@@ -49,17 +57,24 @@ public class RoomContents : MonoBehaviour
         var cam = Camera.main;
         if (cam == null) return;
         Vector3 eye = cam.transform.position;
-        float r2 = radius * radius;
+        float r2 = radius * radius, s2 = shellRadius * shellRadius;
         bool first = _on == null || _on.Length != _rooms.Length;
-        if (first) _on = new bool[_rooms.Length];
+        if (first) { _on = new bool[_rooms.Length]; _shellOn = new bool[_rooms.Length]; }
+        bool shells = _shellFirst != null && _shellFirst.Length == _rooms.Length;
         for (int i = 0; i < _rooms.Length; i++)
         {
-            bool want = (_rooms[i].ClosestPoint(eye) - eye).sqrMagnitude < r2;
-            if (!first && want == _on[i]) continue;
-            _on[i] = want;
-            int end = i + 1 < _first.Length ? _first[i + 1] : _renderers.Length;
-            for (int k = _first[i]; k < end; k++)
-                if (_renderers[k] != null) _renderers[k].enabled = want;
+            float d2 = (_rooms[i].ClosestPoint(eye) - eye).sqrMagnitude;
+            Toggle(d2 < r2, ref _on[i], first, _first, _renderers, i);
+            if (shells) Toggle(d2 < s2, ref _shellOn[i], first, _shellFirst, _shells, i);
         }
+    }
+
+    static void Toggle(bool want, ref bool on, bool first, int[] starts, Renderer[] list, int i)
+    {
+        if (!first && want == on) return;
+        on = want;
+        int end = i + 1 < starts.Length ? starts[i + 1] : list.Length;
+        for (int k = starts[i]; k < end; k++)
+            if (list[k] != null) list[k].enabled = want;
     }
 }

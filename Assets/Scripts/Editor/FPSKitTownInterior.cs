@@ -171,10 +171,16 @@ namespace FPSKit.EditorTools
 
         // ------------------------------------------------------------------
         /// <summary>The inside of a house you can enter (BuildMass calls it; the outer walls and their openings are built).</summary>
-        private static void HouseInterior(TownMesh m, TownMesh det, Mass b, Transform props)
+        private static void HouseInterior(Mass b, Transform props)
         {
             ResolveInteriorMaterials();
             ResolveFurnitureMaterials();
+            // The house's inside is its own mesh, not part of its 64 m block's: RoomContents skips a house's floors,
+            // ceilings, partitions and stairs while the eye is far from it (they were drawn, and drawn into the sun's
+            // shadow map, for every house in every visible block: the sun's shadows were 6.5 ms of a 24 ms frame on Medium,
+            // 2026-10-30). Built at the end, below.
+            var m = new TownMesh();
+            var det = new TownMesh();
             // The single room this replaced made these draws from the building's sequence; made the same, every building after
             // this one comes out as it did (3-5 pieces: which, which wall, where; and the cushions' turn).
             var seq = b.rng;
@@ -409,6 +415,26 @@ namespace FPSKit.EditorTools
                     Furnish(m, det, props, f, b, r, y1, old, own);
                 }
             }
+            BuildHouseInside(m, det);
+        }
+
+        /// <summary>A house's inside as two objects of its own: the shell (with a collider, walked on, baked into the
+        /// navmesh as the blocks are) and its fine work (as the facades' Detail_ meshes: no collider, out of the bake, no
+        /// normal maps, culled small).</summary>
+        private static void BuildHouseInside(TownMesh m, TownMesh det)
+        {
+            int n = _interiorCount++;
+            m.Build(_interiorGroup, $"Interior_{n}", _interiorLayer, "Concrete", compression: UnityEditor.ModelImporterMeshCompression.Low);
+            var plain = new Dictionary<Material, Material>();
+            foreach (var mat in new List<Material>(det.Materials))
+                if (mat != null && mat.IsKeywordEnabled("_NORMALMAP")) det.Swap(mat, PlainCopy(mat, plain));
+            var go = det.Build(_interiorGroup, $"Detail_Interior_{n}", _interiorLayer, "Concrete", collider: false,
+                               compression: UnityEditor.ModelImporterMeshCompression.Medium, tangents: false);
+            if (go == null) return;
+            go.AddComponent<Unity.AI.Navigation.NavMeshModifier>().ignoreFromBuild = true;
+            var lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(0.3f, new Renderer[] { go.GetComponent<Renderer>() }) });
+            lod.RecalculateBounds();
         }
 
         private static Transform _roomMarks;

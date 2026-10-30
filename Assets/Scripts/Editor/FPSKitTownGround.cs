@@ -433,6 +433,9 @@ namespace FPSKit.EditorTools
             return layers;
         }
 
+        /// <summary>The terrain's render queue: after the opaque town (2000), before alpha-tested foliage (2450).</summary>
+        private const int TerrainQueue = 2010;
+
         private static Material TownTerrainMaterial()
         {
             string path = $"{FPSKitTownAssets.MatFolder}/TownTerrain.mat";
@@ -447,6 +450,11 @@ namespace FPSKit.EditorTools
             mat.EnableKeyword("_MASKMAP");
             mat.SetFloat("_EnableInstancedPerPixelNormal", 1f);
             mat.EnableKeyword("_TERRAIN_INSTANCED_PERPIXEL_NORMAL");
+            // Drawn after the town, not first (URP's terrain is Geometry-100): four height-blended layers with normal and
+            // mask maps are a dozen texture reads a pixel, and drawn first the terrain shaded all the ground the roads,
+            // pavements and buildings then covered. After them, the depth test skips those pixels (FrameCostProbe,
+            // 2026-10-30: the terrain was 7.5 ms of a 26 ms frame on Medium).
+            mat.renderQueue = TerrainQueue;
             if (create) AssetDatabase.CreateAsset(mat, path);
             else EditorUtility.SetDirty(mat);
             return mat;

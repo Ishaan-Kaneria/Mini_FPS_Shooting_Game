@@ -289,8 +289,19 @@ namespace FPSKit.EditorTools
                 if (imp.materialImportMode != ModelImporterMaterialImportMode.ImportViaMaterialDescription)
                 { imp.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription; dirty = true; }
                 if (imp.meshCompression != ModelImporterMeshCompression.Low) { imp.meshCompression = ModelImporterMeshCompression.Low; dirty = true; }
+                // Simpler levels of every scan, chosen by its size on screen (Unity's Mesh LOD). The scans are 160 of the
+                // desert's 184.5 million triangles: an air conditioner of 9,500 on 2,838 walls, a cabinet of 29,700 in 2,840
+                // rooms, a tea set of 8,400 (2026-10-30); each was drawn whole until its LOD group cut it off.
+                if (!imp.generateMeshLods) { imp.generateMeshLods = true; dirty = true; }
                 if (dirty) imp.SaveAndReimport();
             }
+        }
+
+        /// <summary>Batch: the Poly Haven models' import settings as the code has them (FPSKitBatch.ConfigureTownModels).</summary>
+        public static int ConfigurePolyHavenModels()
+        {
+            ConfigureModels();
+            return PolyHavenModels().Count(f => AssetImporter.GetAtPath(f) is ModelImporter m && m.generateMeshLods);
         }
 
         public static IEnumerable<string> PolyHavenModels()

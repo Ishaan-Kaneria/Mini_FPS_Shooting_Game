@@ -235,6 +235,7 @@ namespace FPSKit.EditorTools
             if (System.Environment.GetEnvironmentVariable("FPSKIT_SKIP_APV") == "1") Debug.Log("[FPSKit] town GI: skipped (FPSKIT_SKIP_APV); bake it with FPSKitBatch.BakeDesertLight");
             else if (!FPSKitTownGI.BakeNow(scene, path)) Debug.LogError("[FPSKit] town GI: the adaptive probe volume bake failed");
             else Debug.Log($"[FPSKit] town light probes after the adaptive probe bake: people's sides {FPSKitTownTest.PeopleProbeRatio(out sides, out ambient):0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00})");
+            FPSKitTownOcclusion.Bake();     // what the streets' buildings hide is not drawn
             EditorSceneManager.SaveScene(scene, path);
         }
     }

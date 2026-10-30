@@ -16,9 +16,9 @@ namespace FPSKit.EditorTools
     ///   Low    -- Mobile_RPAsset: no real-time shadows, no MSAA, no HDR. Full render scale:
     ///             the page sets the pixel budget, and 80% here was the "very blurry" build.
     ///             The phone and browser default.
-    ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 60m on two
-    ///             cascades, 2x MSAA, full resolution, and the cheaper renderer, with no
-    ///             ambient occlusion.
+    ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 80m on two
+    ///             cascades, no MSAA (SMAA on the camera), full resolution, and the cheaper
+    ///             renderer, with no ambient occlusion.
     ///   High   -- PC_RPAsset: shadows to 150m on four cascades at 4096, adaptive probe volumes, 2x MSAA, rendered at 85% and upscaled with
     ///             FSR 1, and ambient occlusion at half resolution with eight samples and a bilateral blur. Measured on
     ///             the Intel Arc laptop: MSAA 4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass
@@ -76,10 +76,13 @@ namespace FPSKit.EditorTools
             changed |= SetVector3(high, "m_Cascade4Split", new Vector3(0.05f, 0.15f, 0.4f));   // 7.5 / 22.5 / 60 / 150 m
             changed |= Ssao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
-            changed |= Configure(medium, shadows: true, distance: 80f, cascades: 2, msaa: 2, hdr: true, scale: 1f, soft: false,
+            // No MSAA on Medium: 6.9 ms of a 38 ms frame on the Arc laptop at 1080p (FrameCostProbe, 2026-10-30); its edges are
+            // smoothed by SMAA on the camera instead (QualityTiers.ApplyScene).
+            changed |= Configure(medium, shadows: true, distance: 80f, cascades: 2, msaa: 1, hdr: true, scale: 1f, soft: false,
                                  renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer), shadowResolution: 2048,
                                  probeVolumes: true);
             changed |= Levels(low, medium, high);
+            changed |= LevelLodBias();
             if (changed) AssetDatabase.SaveAssets();
             return changed;
         }
@@ -183,6 +186,33 @@ namespace FPSKit.EditorTools
         static bool SetInt(SerializedProperty p, int v) { if (p == null || p.intValue == v) return false; p.intValue = v; return true; }
 
         /// <summary>Rewrites QualitySettings to exactly Low, Medium, High, in that order.</summary>
+        /// <summary>
+        /// How far each tier draws detail: QualitySettings.lodBias multiplies every LOD switch and cut-off distance. At 2 on
+        /// Medium and High a 2 m prop was drawn at full detail out to 870 m, and the walk drew 17 million triangles a frame
+        /// (FrameCostProbe, 2026-10-30: bias 1 on Medium saved 5.3 ms of 38 and took it to 9.2 million). The props' Mesh LOD
+        /// (FPSKitTownAssets) makes the nearer switches simpler meshes rather than pops. Low, Medium, High.
+        /// </summary>
+        static readonly float[] TierLodBias = { 1f, 1f, 1.5f };
+
+        static bool LevelLodBias()
+        {
+            var qs = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset");
+            if (qs == null || qs.Length == 0) return false;
+            var so = new SerializedObject(qs[0]);
+            var levels = so.FindProperty("m_QualitySettings");
+            if (levels == null || levels.arraySize != 3) return false;
+            bool changed = false;
+            for (int i = 0; i < 3; i++)
+            {
+                var bias = levels.GetArrayElementAtIndex(i).FindPropertyRelative("lodBias");
+                if (bias == null || Mathf.Approximately(bias.floatValue, TierLodBias[i])) continue;
+                bias.floatValue = TierLodBias[i];
+                changed = true;
+            }
+            if (changed) so.ApplyModifiedPropertiesWithoutUndo();
+            return changed;
+        }
+
         static bool Levels(RenderPipelineAsset low, RenderPipelineAsset medium, RenderPipelineAsset high)
         {
             var qs = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset");

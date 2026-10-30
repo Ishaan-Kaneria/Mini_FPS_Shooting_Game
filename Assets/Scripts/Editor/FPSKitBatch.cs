@@ -314,6 +314,14 @@ namespace FPSKit.EditorTools
         /// volumes (FPSKitSceneBuilder.BakeSavedTownProbes). UNITY_GRAPHICS=1 and -force-vulkan, about ten minutes.</summary>
         public static void BakeDesertProbes() => Run(FPSKitSceneBuilder.BakeSavedTownProbes);
 
+        /// <summary>The saved desert scene's occlusion culling baked again (FPSKitTownOcclusion), and saved.</summary>
+        public static void BakeDesertOcclusion() => Run(() =>
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+            if (!FPSKitTownOcclusion.Bake()) throw new System.Exception("occlusion bake failed");
+            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene, FPSKitTownGI.DesertScene);
+        });
+
         /// <summary>The saved desert scene's lights made honest for the baked light (FPSKitTownGI.ApplyRealLightLook).</summary>
         public static void DesertRealLightLook() => FPSKitTownGI.BatchLookSaved();
 

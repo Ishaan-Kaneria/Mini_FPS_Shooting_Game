@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -109,6 +110,7 @@ namespace FPSKit.EditorTools
             var shops = GameObject.Find("ShopRooms");
             if (rooms == null && shops == null) { Debug.LogWarning("[FPSKit] indoor reflections: no HouseRooms or ShopRooms in the scene"); return; }
             var cube = RoomCube();
+            var boxes = new List<Bounds>();
             var root = new GameObject("IndoorReflections");
             if (arena != null) root.transform.SetParent(arena, false);
             int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian", "PlayerBounds");
@@ -128,6 +130,7 @@ namespace FPSKit.EditorTools
                 probe.importance = 2;                // over the street probes where they overlap
                 probe.intensity = intensity;
                 probe.enabled = false;               // IndoorReflections switches them on near the eye
+                boxes.Add(box);
             }
             int houses = 0;
             if (rooms != null)
@@ -173,6 +176,51 @@ namespace FPSKit.EditorTools
             }
             root.AddComponent<IndoorReflections>();
             Debug.Log($"[FPSKit] indoor reflections: {houses} house probes, {lit + dark} shop probes ({dark} dark)");
+            PlaceRoomContents(arena, boxes);
+        }
+
+        /// <summary>
+        /// What is in each room (the buildings' props whose middle is in its box: furniture, shop goods), handed to a
+        /// <see cref="RoomContents"/> that draws it only near the room. The same boxes as the rooms' reflection probes,
+        /// but its own object: the phone and web copy removes the probes and keeps this. Replaced whole each time.
+        /// </summary>
+        static void PlaceRoomContents(Transform arena, List<Bounds> boxes)
+        {
+            foreach (var old in Object.FindObjectsByType<RoomContents>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Object.DestroyImmediate(old.gameObject);
+            var props = GameObject.Find("Arena/Buildings/BuildingProps");
+            if (props == null || boxes.Count == 0) { Debug.LogWarning("[FPSKit] room contents: no BuildingProps or no rooms"); return; }
+            // The rooms by 16 m cells of the ground, so each prop is tested against the few rooms round it.
+            const float Cell = 16f;
+            var cells = new Dictionary<Vector2Int, List<int>>();
+            for (int i = 0; i < boxes.Count; i++)
+            {
+                var b = boxes[i];
+                for (int x = Mathf.FloorToInt(b.min.x / Cell); x <= Mathf.FloorToInt(b.max.x / Cell); x++)
+                    for (int z = Mathf.FloorToInt(b.min.z / Cell); z <= Mathf.FloorToInt(b.max.z / Cell); z++)
+                    {
+                        var key = new Vector2Int(x, z);
+                        if (!cells.TryGetValue(key, out var list)) cells[key] = list = new List<int>();
+                        list.Add(i);
+                    }
+            }
+            var inRoom = boxes.Select(_ => new List<Renderer>()).ToList();
+            int outside = 0;
+            foreach (var r in props.GetComponentsInChildren<Renderer>(true))
+            {
+                var c = r.bounds.center;
+                int found = -1;
+                if (cells.TryGetValue(new Vector2Int(Mathf.FloorToInt(c.x / Cell), Mathf.FloorToInt(c.z / Cell)), out var near))
+                    foreach (int i in near) if (boxes[i].Contains(c)) { found = i; break; }
+                if (found >= 0) inRoom[found].Add(r); else outside++;
+            }
+            var first = new int[boxes.Count];
+            var all = new List<Renderer>();
+            for (int i = 0; i < boxes.Count; i++) { first[i] = all.Count; all.AddRange(inRoom[i]); }
+            var go = new GameObject("RoomContents");
+            if (arena != null) go.transform.SetParent(arena, false);
+            go.AddComponent<RoomContents>().Set(boxes.ToArray(), first, all.ToArray());
+            Debug.Log($"[FPSKit] room contents: {all.Count} renderers in {boxes.Count} rooms ({inRoom.Count(l => l.Count > 0)} with something in them), {outside} props outside any room");
         }
 
         /// <summary>How far a room's probe box reaches past its surfaces, into the walls, floor and ceiling.</summary>

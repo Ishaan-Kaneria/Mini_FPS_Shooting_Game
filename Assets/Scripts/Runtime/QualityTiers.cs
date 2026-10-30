@@ -179,7 +179,17 @@ public static class QualityTiers
         foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
         {
             var data = cam.GetUniversalAdditionalCameraData();
-            if (data != null && data.renderType == CameraRenderType.Base) data.renderPostProcessing = post;
+            if (data != null && data.renderType == CameraRenderType.Base)
+            {
+                data.renderPostProcessing = post;
+                // Medium has no MSAA (6.9 ms at 1080p on an integrated GPU): its edges are smoothed in post instead.
+                if (post && Current == GameSettings.Quality.Medium)
+                {
+                    data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+                    data.antialiasingQuality = AntialiasingQuality.Medium;
+                }
+                else if (data.antialiasing == AntialiasingMode.SubpixelMorphologicalAntiAliasing) data.antialiasing = AntialiasingMode.None;
+            }
         }
 
         foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsInactive.Include))

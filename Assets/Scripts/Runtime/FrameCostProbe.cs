@@ -186,6 +186,19 @@ public class FrameCostProbe : MonoBehaviour
         configs.Add(new Config { name = "render scale 0.85", on = () => { if (urpAsset) urpAsset.renderScale = 0.85f; }, off = () => { if (urpAsset) urpAsset.renderScale = scale; } });
         configs.Add(new Config { name = "terrain: pixel error 8, base map at 120 m", on = () => { foreach (var t in terrains) { t.heightmapPixelError = 8f; t.basemapDistance = 120f; } },
                                  off = () => { for (int i = 0; i < terrains.Length; i++) { terrains[i].heightmapPixelError = terrainWas[i].heightmapPixelError; terrains[i].basemapDistance = terrainWas[i].basemapDistance; } } });
+        var terrainMats = terrains.Select(t => t.materialTemplate).Where(m => m != null).Distinct().ToList();
+        var queues = terrainMats.Select(m => m.renderQueue).ToList();
+        configs.Add(new Config { name = "terrain drawn after the town (queue 2010)", on = () => { foreach (var m in terrainMats) m.renderQueue = 2010; },
+                                 off = () => { for (int i = 0; i < terrainMats.Count; i++) terrainMats[i].renderQueue = queues[i]; } });
+        configs.Add(new Config { name = "terrain drawn first (queue 1900)", on = () => { foreach (var m in terrainMats) m.renderQueue = 1900; },
+                                 off = () => { for (int i = 0; i < terrainMats.Count; i++) terrainMats[i].renderQueue = queues[i]; } });
+        var aa = camData.antialiasing;
+        configs.Add(new Config { name = $"no post anti-aliasing (now {aa})", on = () => camData.antialiasing = AntialiasingMode.None, off = () => camData.antialiasing = aa });
+        var grain = FindObjectsByType<Volume>(FindObjectsInactive.Exclude).Where(v => v.isGlobal && v.sharedProfile != null)
+            .Select(v => v.sharedProfile.TryGet<FilmGrain>(out var f) ? f : null).Where(f => f != null && f.active).ToList();
+        configs.Add(new Config { name = "no film grain", on = () => { foreach (var f in grain) f.active = false; }, off = () => { foreach (var f in grain) f.active = true; } });
+        bool hdr = urpAsset != null && urpAsset.supportsHDR;
+        configs.Add(new Config { name = $"HDR off (now {hdr})", on = () => { if (urpAsset) urpAsset.supportsHDR = false; }, off = () => { if (urpAsset) urpAsset.supportsHDR = hdr; } });
         configs.Add(new Config { name = "terrain: no detail meshes", on = () => { foreach (var t in terrains) t.detailObjectDensity = 0f; },
                                  off = () => { for (int i = 0; i < terrains.Length; i++) terrains[i].detailObjectDensity = terrainWas[i].detailObjectDensity; } });
 

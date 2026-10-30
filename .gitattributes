@@ -203,3 +203,5 @@ Assets/FPSKit_Generated/Scenes/MarsColony.unity filter=lfs diff=lfs merge=lfs -t
 Assets/FPSKit_Generated/Town/TownTerrain.asset filter=lfs diff=lfs merge=lfs -text
 # The desert town's baked bounced light (adaptive probe volumes, FPSKitTownGI): 40-80 MB binary cells.
 Assets/FPSKit_Generated/Scenes/*_APV*.bytes filter=lfs diff=lfs merge=lfs -text
+# Baked occlusion culling (FPSKitTownOcclusion): ~22 MB of serialized Umbra data for the desert town.
+Assets/FPSKit_Generated/Scenes/*/OcclusionCullingData.asset filter=lfs diff=lfs merge=lfs -text

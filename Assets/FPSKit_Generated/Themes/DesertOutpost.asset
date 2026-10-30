@@ -130,8 +130,8 @@ MonoBehaviour:
   ambienceVolume: 0.35
   enablePostProcessing: 1
   bloomIntensity: 0.45
-  postExposure: 0.25
-  saturation: 0
+  postExposure: -0.2
+  saturation: 10
   contrast: 10
   colorFilter: {r: 1, g: 0.975, b: 0.94, a: 1}
   vignetteIntensity: 0.2

@@ -729,7 +729,11 @@ namespace FPSKit.EditorTools
                     }
                     Plinth(from, len + 0.03f, pTop);
                 }
-                if (kind != FaceKind.Blank) Weather(det, b, a0, u, len, nrm, holes, floorOf, bottom, floorGaps, side);
+                // No weathering quads (2026-10-30, his Part A: "remove the transparent Town_WeatherDark strips"): a see-through
+                // dark band of one height with a hard top edge on 124 buildings' walls, 21 % darker where it lay. The walls'
+                // own shader is to darken toward the ground instead (the realism pass, step 2). Weather() draws from its
+                // own random sequence, so leaving it out moves nothing else.
+                if (kind != FaceKind.Blank && WeatherQuads) Weather(det, b, a0, u, len, nrm, holes, floorOf, bottom, floorGaps, side);
             }
 
             // ---- roof, parapet, coping ----

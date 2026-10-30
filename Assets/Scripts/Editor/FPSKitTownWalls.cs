@@ -29,6 +29,8 @@ namespace FPSKit.EditorTools
     {
         private static Material[] _brickWalls, _ashlarWalls, _plasterExtra, _baseCladding, _oldExtra, _sideRenders;
         private static Material _bareBlock, _weatherDark, _weatherLight;
+        /// <summary>The weathering quads over the walls (grime band, streaks, patches): off, see FPSKitTownBuildings.</summary>
+        private const bool WeatherQuads = false;
         private static readonly float[] BrickWeights = { 0.20f, 0.10f, 0.22f, 0.16f, 0.18f, 0.14f };
         private static readonly float[] AshlarWeights = { 0.30f, 0.20f, 0.28f, 0.22f };
 

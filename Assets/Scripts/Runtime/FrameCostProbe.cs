@@ -230,7 +230,7 @@ public class FrameCostProbe : MonoBehaviour
             var full = configs[0];
             float baseMs = Med(full.ms);
             r.AppendLine($"frame cost: {viewsDone} of {views.Count} views {ViewSpacing:0} m apart on WalkRoute, {Measure} frames each way | api {SystemInfo.graphicsDeviceType} | {Screen.width}x{Screen.height} | " +
-                          $"quality {QualitySettings.names[QualitySettings.GetQualityLevel()]} | render scale {QualityTiers.TierRenderScale:0.00} | dev build {Debug.isDebugBuild} | power {WalkProbe.PowerSource()}");
+                          $"quality {QualitySettings.names[QualitySettings.GetQualityLevel()]} | render scale {QualityTiers.TierRenderScale:0.00} | vsync {QualitySettings.vSyncCount} | dev build {Debug.isDebugBuild} | power {WalkProbe.PowerSource()}");
             r.AppendLine($"everything on: frame {baseMs:0.0} ms median (gpu {(full.gpu.Count > 0 ? Med(full.gpu).ToString("0.0") : "not reported")}) | " +
                           string.Join(" | ", WalkProbe.DrawCounters.Names.Select((n, i) => $"{n.Replace(" Count", "").ToLowerInvariant()} {(MedL(full.counters[i]) < 0 ? "not reported" : WalkProbe.Big(MedL(full.counters[i])))}")));
             r.AppendLine("what each thing costs (frame time saved without it, median over the views; and what is drawn without it):");
@@ -239,6 +239,15 @@ public class FrameCostProbe : MonoBehaviour
                 float saved = baseMs - Med(c.ms);
                 r.AppendLine($"  {saved,6:0.0} ms ({saved / Mathf.Max(0.01f, baseMs):P0})  {c.name}  -> {Med(c.ms):0.0} ms | " +
                               string.Join(", ", new[] { 0, 1, 3, 5 }.Select(i => $"{WalkProbe.DrawCounters.Names[i].Replace(" Count", "").ToLowerInvariant()} {(MedL(c.counters[i]) < 0 ? "-" : WalkProbe.Big(MedL(c.counters[i])))}")));
+            }
+            // The slowest view on its own: an average hides the stretch of the walk where the 1% lows come from.
+            int worst = Enumerable.Range(0, viewsDone).OrderByDescending(v => Slice(full.ms, v)).FirstOrDefault();
+            if (viewsDone > 0)
+            {
+                float wb = Slice(full.ms, worst);
+                r.AppendLine($"at the slowest view, {worst + 1} ({views[worst].pos.x:0}, {views[worst].pos.z:0}): {wb:0.0} ms with everything; saved without each:");
+                foreach (var c in configs.Skip(1).OrderBy(c => Slice(c.ms, worst)).Take(12))
+                    r.AppendLine($"  {wb - Slice(c.ms, worst),6:0.0} ms  {c.name}");
             }
             r.AppendLine($"rooms' furniture drawn from outside: {roomsOutsideDrawn} room-views of {roomsOutsideTotal} ({(float)roomsOutsideDrawn / Mathf.Max(1, viewsDone):0.0} rooms a view, of {rooms.Count} rooms)");
             r.AppendLine("groups in the scene: " + string.Join("; ", groups.Values.OrderByDescending(g => g.tris.Sum()).Select(g => $"{g.name} {g.rs.Count} renderers, {WalkProbe.Big(g.tris.Sum())} tris, {g.casters} cast shadows")));
@@ -261,6 +270,10 @@ public class FrameCostProbe : MonoBehaviour
         for (int v = 0; v < views.Count; v++)
         {
             var (pos, dir) = views[v];
+            // Unpaced: the tier puts the player's vsync back when it is applied (the 2026-10-30 run read 17 ms, one refresh,
+            // for everything), and a paced frame cannot show what anything costs.
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = -1;
             // Ten minutes of measuring in a level whose clock may be two and a half.
             if (level != null) level.HoldClockForBenchmark(120f);
             if (player == null) { census.AppendLine($"view {v + 1}: the player is gone (the level ended?); stopped here"); break; }
@@ -291,6 +304,7 @@ public class FrameCostProbe : MonoBehaviour
                 // Things are destroyed in play (a prop shot apart): a config that throws must not end the run.
                 try { c.on(); }
                 catch (Exception e) { Debug.LogWarning($"[FrameCostProbe] {c.name}: {e.Message}"); }
+                QualitySettings.vSyncCount = 0;
                 for (int k = 0; k < Settle; k++) { if (health) health.Heal(1000f); yield return null; }
                 for (int k = 0; k < Measure; k++)
                 {

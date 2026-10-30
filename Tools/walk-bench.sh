@@ -24,7 +24,7 @@ for TIER in "${TIERS[@]}"; do
   while [ "$(cpu_temp)" != "" ] && [ "$(cpu_temp)" -ge 70 ]; do sleep 10; done
   echo "walk-bench: $TAG $TIER (cpu $(cpu_temp) C)"
   "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "$PWD/Build/Perf/walk/${TAG}_${TIER}.log" \
-         -fpskitwalk "$PWD/$OUT" -fpskitquality "$TIER" "${EXTRA[@]}" &
+         -fpskitwalk "$PWD/$OUT" -fpskitquality "$TIER" -fpskitshots "$PWD/Build/Perf/walk/${TAG}_${TIER}_shots" "${EXTRA[@]}" &
   PID=$!; MAX=0
   for i in $(seq 1 300); do
     [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break

@@ -133,6 +133,9 @@ public class FrameCostProbe : MonoBehaviour
         var terrains = FindObjectsByType<Terrain>(FindObjectsInactive.Exclude);
         var sun = FindObjectsByType<Light>(FindObjectsInactive.Exclude).FirstOrDefault(l => l.type == LightType.Directional && l.enabled);
         var camData = cam.GetUniversalAdditionalCameraData();
+        // The camera that runs post-processing: the stack's last (QualityTiers.ApplyPost), else the world's.
+        var postData = camData;
+        foreach (var o in camData.cameraStack) if (o != null && o.isActiveAndEnabled && o.GetUniversalAdditionalCameraData().renderPostProcessing) postData = o.GetUniversalAdditionalCameraData();
         var transparent = all.Where(r => r != null).SelectMany(r => r.sharedMaterials).Where(m => m != null && m.renderQueue > 2500).Distinct().ToList();
         string[] passes = { "UniversalForward", "UniversalForwardOnly", "SRPDefaultUnlit", "ShadowCaster", "DepthOnly", "DepthNormals" };
         void Passes(bool on) { foreach (var m in transparent) foreach (var p in passes) m.SetShaderPassEnabled(p, on); }
@@ -149,7 +152,7 @@ public class FrameCostProbe : MonoBehaviour
         {
             new Config { name = "everything", on = () => { }, off = () => { } },
             new Config { name = "no sun shadows", on = () => { if (sun) sun.shadows = LightShadows.None; }, off = () => { if (sun) sun.shadows = sunShadows; } },
-            new Config { name = "no post-processing", on = () => camData.renderPostProcessing = false, off = () => camData.renderPostProcessing = true },
+            new Config { name = "no post-processing", on = () => postData.renderPostProcessing = false, off = () => postData.renderPostProcessing = true },
             new Config { name = "no renderer features (" + string.Join(", ", features.Select(f => f.name)) + ")",
                          on = () => { foreach (var f in features) f.SetActive(false); }, off = () => { foreach (var f in features) f.SetActive(true); } },
             new Config { name = $"no transparent surfaces ({transparent.Count} materials)", on = () => Passes(false), off = () => Passes(true) },
@@ -192,8 +195,15 @@ public class FrameCostProbe : MonoBehaviour
                                  off = () => { for (int i = 0; i < terrainMats.Count; i++) terrainMats[i].renderQueue = queues[i]; } });
         configs.Add(new Config { name = "terrain drawn first (queue 1900)", on = () => { foreach (var m in terrainMats) m.renderQueue = 1900; },
                                  off = () => { for (int i = 0; i < terrainMats.Count; i++) terrainMats[i].renderQueue = queues[i]; } });
-        var aa = camData.antialiasing;
-        configs.Add(new Config { name = $"no post anti-aliasing (now {aa})", on = () => camData.antialiasing = AntialiasingMode.None, off = () => camData.antialiasing = aa });
+        var aa = postData.antialiasing;
+        configs.Add(new Config { name = $"no post anti-aliasing (now {aa})", on = () => postData.antialiasing = AntialiasingMode.None, off = () => postData.antialiasing = aa });
+        configs.Add(new Config { name = "post anti-aliasing FXAA", on = () => postData.antialiasing = AntialiasingMode.FastApproximateAntialiasing, off = () => postData.antialiasing = aa });
+        var aaq = postData.antialiasingQuality;
+        configs.Add(new Config { name = "SMAA at low quality", on = () => { postData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing; postData.antialiasingQuality = AntialiasingQuality.Low; },
+                                 off = () => { postData.antialiasing = aa; postData.antialiasingQuality = aaq; } });
+        int cascades = urpAsset != null ? urpAsset.shadowCascadeCount : 1;
+        configs.Add(new Config { name = $"one shadow cascade (now {cascades})", on = () => { if (urpAsset) urpAsset.shadowCascadeCount = 1; }, off = () => { if (urpAsset) urpAsset.shadowCascadeCount = cascades; } });
+        configs.Add(new Config { name = $"shadows to 60 m (now {shadowDist:0})", on = () => { if (urpAsset) urpAsset.shadowDistance = 60f; }, off = () => { if (urpAsset) urpAsset.shadowDistance = shadowDist; } });
         var grain = FindObjectsByType<Volume>(FindObjectsInactive.Exclude).Where(v => v.isGlobal && v.sharedProfile != null)
             .Select(v => v.sharedProfile.TryGet<FilmGrain>(out var f) ? f : null).Where(f => f != null && f.active).ToList();
         configs.Add(new Config { name = "no film grain", on = () => { foreach (var f in grain) f.active = false; }, off = () => { foreach (var f in grain) f.active = true; } });

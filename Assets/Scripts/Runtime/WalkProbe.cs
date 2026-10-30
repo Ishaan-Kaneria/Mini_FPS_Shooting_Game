@@ -24,7 +24,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public class WalkProbe : MonoBehaviour
 {
-    string _out, _tier;
+    string _out, _tier, _shots;
     float _seconds = 120f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -39,6 +39,8 @@ public class WalkProbe : MonoBehaviour
         probe._out = args[i + 1];
         int q = Array.IndexOf(args, "-fpskitquality");
         if (q >= 0 && q + 1 < args.Length) probe._tier = args[q + 1];
+        int sh = Array.IndexOf(args, "-fpskitshots");
+        if (sh >= 0 && sh + 1 < args.Length) probe._shots = args[sh + 1];
         int s = Array.IndexOf(args, "-fpskitseconds");
         if (s >= 0 && s + 1 < args.Length && float.TryParse(args[s + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sec)) probe._seconds = sec;
     }
@@ -141,6 +143,13 @@ public class WalkProbe : MonoBehaviour
         sb.AppendLine($"cpu {SystemInfo.processorModel} x{SystemInfo.processorCount} | ram {SystemInfo.systemMemorySize} MB | power {PowerSource()} (battery {SystemInfo.batteryLevel:P0})");
         foreach (var n in notes) sb.AppendLine("route: " + n);
 
+        // -fpskitpostboth: post-processing on the world's camera as well as the stack's last (as before 2026-10-30), for a
+        // before/after of QualityTiers.ApplyPost in one build.
+        if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fpskitpostboth") >= 0 && Camera.main != null)
+        {
+            UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(Camera.main).renderPostProcessing = true;
+            sb.AppendLine("post-processing on the world's camera as well (-fpskitpostboth)");
+        }
         MobileInput.Reset();
         MobileInput.Active = true;
         var dt = new List<float>(); var cpu = new List<float>(); var gpu = new List<float>();
@@ -152,6 +161,10 @@ public class WalkProbe : MonoBehaviour
         float start = Time.realtimeSinceStartup, walked = 0f, stuckSince = start;
         Vector3 lastPos = player != null ? player.transform.position : Vector3.zero, checkPos = lastPos;
         int lastGc = gcStart;
+        // -fpskitshots <dir>: the screen as played at a few fixed moments (the same ones every run), to compare by eye.
+        float[] shotAt = { 8f, 35f, 60f, 95f };
+        int nextShot = 0; bool shotFrame = false;
+        if (_shots != null) Directory.CreateDirectory(_shots);
         while (player != null && line.Count > 1 && Time.realtimeSinceStartup - start < _seconds)
         {
             var pos = player.transform.position;
@@ -178,6 +191,13 @@ public class WalkProbe : MonoBehaviour
             }
             yield return null;
             float ms = Time.unscaledDeltaTime * 1000f;
+            // The frame that wrote a screenshot is not a frame of play: left out of the timing.
+            if (shotFrame) { shotFrame = false; continue; }
+            if (_shots != null && nextShot < shotAt.Length && Time.realtimeSinceStartup - start >= shotAt[nextShot])
+            {
+                ScreenCapture.CaptureScreenshot(Path.Combine(_shots, $"walk_{shotAt[nextShot++]:00}s.png"));
+                shotFrame = true;
+            }
             walked += Vector3.Distance(lastPos, player.transform.position);
             lastPos = player.transform.position;
             int gcNow = GC.CollectionCount(0);

@@ -256,12 +256,12 @@ public class ViewModelRig : MonoBehaviour
         // The town's shade on the gun comes from FirstPersonShade, which dims the sun for this camera in shadow.
         data.renderShadows = true;
         if (go.GetComponent<FirstPersonShade>() == null) go.AddComponent<FirstPersonShade>();
-        // Post-processing on: the stack's tonemapping and grading are applied after its last camera,
-        // so without it the arms and gun were drawn untonemapped over a graded world (white gloves,
-        // a flat grey rifle).
-        data.renderPostProcessing = true;
         var stack = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(main).cameraStack;
         if (!stack.Contains(_armsCam)) stack.Add(_armsCam);
+        // Post-processing on this, the stack's last camera, and off on the world's: URP runs it for each camera that has
+        // it, so on both every frame was graded twice (5.3 ms on Medium); here it grades the world and the arms together
+        // once. Without it here the arms were drawn untonemapped over a graded world (white gloves, a flat grey rifle).
+        QualityTiers.ApplyPost(main);
         main.cullingMask &= ~(1 << _firstPerson);
         PlaceArmsCamera();
     }

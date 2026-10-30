@@ -170,6 +170,39 @@ public static class QualityTiers
         }
     }
 
+    /// <summary>
+    /// Post-processing and its anti-aliasing for a base camera and its stack, on the stack's last camera only. URP runs
+    /// post-processing for every camera in a stack that has it on: with it on both the world's camera and the arms'
+    /// (ViewModelRig), every frame was tonemapped, bloomed and smoothed twice, and the arms' pass alone cost 5.3 ms of a
+    /// 31 ms frame on Medium (FrameCostProbe, 2026-10-30). On the last camera it is done once, over the world and the
+    /// arms together; and on Low it is now off for the arms too (it was on there regardless).
+    /// </summary>
+    public static void ApplyPost(Camera baseCamera)
+    {
+        var data = baseCamera != null ? baseCamera.GetUniversalAdditionalCameraData() : null;
+        if (data == null || data.renderType != CameraRenderType.Base) return;
+        bool post = Current != GameSettings.Quality.Low && !GameSettings.BatterySaver;
+        UniversalAdditionalCameraData last = data;
+        foreach (var overlay in data.cameraStack)
+        {
+            if (overlay == null || !overlay.isActiveAndEnabled) continue;
+            var od = overlay.GetUniversalAdditionalCameraData();
+            if (od == null) continue;
+            od.renderPostProcessing = false;
+            last = od;
+        }
+        data.renderPostProcessing = false;
+        last.renderPostProcessing = post;
+        // Medium has no MSAA (6.9 ms at 1080p on an integrated GPU): its edges are smoothed in post instead, by the camera
+        // that runs it.
+        foreach (var d in last == data ? new[] { data } : new[] { data, last })
+        {
+            bool smaa = post && d == last && Current == GameSettings.Quality.Medium;
+            if (smaa) { d.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing; d.antialiasingQuality = AntialiasingQuality.Medium; }
+            else if (d.antialiasing == AntialiasingMode.SubpixelMorphologicalAntiAliasing) d.antialiasing = AntialiasingMode.None;
+        }
+    }
+
     /// <summary>Post-processing, particles and dynamic resolution, for what is loaded now.</summary>
     public static void ApplyScene()
     {
@@ -179,17 +212,7 @@ public static class QualityTiers
         foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
         {
             var data = cam.GetUniversalAdditionalCameraData();
-            if (data != null && data.renderType == CameraRenderType.Base)
-            {
-                data.renderPostProcessing = post;
-                // Medium has no MSAA (6.9 ms at 1080p on an integrated GPU): its edges are smoothed in post instead.
-                if (post && Current == GameSettings.Quality.Medium)
-                {
-                    data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
-                    data.antialiasingQuality = AntialiasingQuality.Medium;
-                }
-                else if (data.antialiasing == AntialiasingMode.SubpixelMorphologicalAntiAliasing) data.antialiasing = AntialiasingMode.None;
-            }
+            if (data != null && data.renderType == CameraRenderType.Base) ApplyPost(cam);
         }
 
         foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsInactive.Include))

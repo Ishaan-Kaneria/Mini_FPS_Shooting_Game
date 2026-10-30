@@ -92,7 +92,8 @@ public class EyeAdaptation : MonoBehaviour
         float best = float.MinValue, value = 0f;
         foreach (var v in FindObjectsByType<Volume>())
         {
-            if (v == _volume || !v.isGlobal || v.sharedProfile == null || v.priority < best) continue;
+            // Not the player's hurt effect (PlayerCondition): it lowers the exposure while hurt, it is not the scene's.
+            if (v == _volume || !v.isGlobal || v.sharedProfile == null || v.priority < best || v.gameObject.name == "PlayerCondition") continue;
             if (v.sharedProfile.TryGet<ColorAdjustments>(out var c) && c.postExposure.overrideState) { best = v.priority; value = c.postExposure.value; }
         }
         return value;

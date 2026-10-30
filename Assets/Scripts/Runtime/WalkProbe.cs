@@ -228,7 +228,7 @@ public class WalkProbe : MonoBehaviour
                           $"frames over 33 ms: {dt.Count(x => x > 33.3f)} | over 25 ms: {dt.Count(x => x > 25f)}");
             sb.AppendLine($"frame time p50 {P(0.5f):0.0} / p95 {P(0.95f):0.0} / p99 {P(0.99f):0.0} ms | cpu p50 {Pc(cpu, 0.5f):0.0} / p99 {Pc(cpu, 0.99f):0.0} ms | gpu p50 {Pc(gpu, 0.5f):0.0} / p99 {Pc(gpu, 0.99f):0.0} ms");
             // The main thread waiting on present is the GPU (or vsync) holding it up; its own work is main minus the wait.
-            sb.AppendLine($"threads p50: main {Pc(main, 0.5f):0.0} ms (of which waiting to present {Pc(presentWait, 0.5f):0.0}), render thread {Pc(render, 0.5f):0.0} ms" +
+            sb.AppendLine($"threads p50: main {Pc(main, 0.5f):0.0} ms (and waiting to present {Pc(presentWait, 0.5f):0.0} more), render thread {Pc(render, 0.5f):0.0} ms" +
                           (FrameTimingManager.IsFeatureEnabled() ? "" : " (frame timing stats off in this build)"));
             sb.AppendLine("drawn a frame: " + draws.Report());
             sb.AppendLine($"garbage collections: {GC.CollectionCount(0) - gcStart} | memory: allocated {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, reserved {UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / 1048576} MB, mono {UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() / 1048576} MB | {ProcessMemory()}");

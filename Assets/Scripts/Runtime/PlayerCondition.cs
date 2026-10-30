@@ -92,18 +92,31 @@ public class PlayerCondition : MonoBehaviour
         _profile.name = "PlayerCondition";
         volume.sharedProfile = _profile;
 
-        _vignette = _profile.Add<Vignette>(true);
-        _vignette.color.Override(Settings.edgeColour);
-        _vignette.smoothness.Override(0.85f);
-        _vignette.intensity.Override(0f);
+        // Only what it animates, and only while it shows (Update): with every value overridden at full weight and a
+        // priority over the scene's, it replaced the arena's own grade in play -- the desert's exposure (+0.25), contrast
+        // (10) and vignette (0.28) never showed, and EyeAdaptation took its 0 as the scene's exposure (found 2026-10-30).
+        // Saturation and exposure are the scene's, then lowered from there.
+        _vignette = _profile.Add<Vignette>(false);
+        _vignette.color.value = Settings.edgeColour;
+        _vignette.color.overrideState = true;
+        _vignette.smoothness.value = 0.85f;
+        _vignette.smoothness.overrideState = true;
 
-        _colour = _profile.Add<ColorAdjustments>(true);
-        _colour.saturation.Override(0f);
-        _colour.postExposure.Override(0f);
+        _colour = _profile.Add<ColorAdjustments>(false);
+        _chroma = _profile.Add<ChromaticAberration>(false);
 
-        _chroma = _profile.Add<ChromaticAberration>(true);
-        _chroma.intensity.Override(0f);
+        _baseSaturation = 0f; _baseExposure = 0f;
+        float satFrom = float.MinValue, expFrom = float.MinValue;
+        foreach (var v in FindObjectsByType<Volume>())
+        {
+            if (v == volume || !v.isGlobal || v.sharedProfile == null || !v.sharedProfile.TryGet<ColorAdjustments>(out var c)) continue;
+            if (v.gameObject.name == "EyeAdaptationVolume") continue;
+            if (c.saturation.overrideState && v.priority > satFrom) { satFrom = v.priority; _baseSaturation = c.saturation.value; }
+            if (c.postExposure.overrideState && v.priority > expFrom) { expFrom = v.priority; _baseExposure = c.postExposure.value; }
+        }
     }
+
+    float _baseSaturation, _baseExposure;
 
     void BuildSound()
     {
@@ -155,10 +168,15 @@ public class PlayerCondition : MonoBehaviour
 
         if (_vignette != null)
         {
-            _vignette.intensity.value = Mathf.Clamp01(s.edgeAtWorst * hurt + s.edgeOnHit * _hit);
-            _colour.saturation.value = -s.drainAtWorst * critical;
-            _colour.postExposure.value = -s.dimAtWorst * critical;
-            _chroma.intensity.value = Mathf.Clamp01(s.splitOnHit * _hit + 0.15f * critical);
+            float edge = Mathf.Clamp01(s.edgeAtWorst * hurt + s.edgeOnHit * _hit);
+            float split = Mathf.Clamp01(s.splitOnHit * _hit + 0.15f * critical);
+            _vignette.intensity.overrideState = edge > 0.001f;
+            _vignette.intensity.value = edge;
+            _colour.saturation.overrideState = _colour.postExposure.overrideState = critical > 0.001f;
+            _colour.saturation.value = _baseSaturation - s.drainAtWorst * critical;
+            _colour.postExposure.value = _baseExposure - s.dimAtWorst * critical;
+            _chroma.intensity.overrideState = split > 0.001f;
+            _chroma.intensity.value = split;
         }
 
         // Blown from sprinting counts as well as hurt, for the breathing.

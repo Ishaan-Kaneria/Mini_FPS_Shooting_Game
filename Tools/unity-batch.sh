@@ -74,13 +74,17 @@ done
 #     efficient cores (0-7 are its four performance cores' threads, 4.5 GHz and the hottest): on 0-7 a
 #     compile check still went over 95 C three times. Fewer or cooler threads, less heat, a longer job.
 #   UNITY_START_BELOW (default 80): wait for the package to cool below this before starting.
-#   UNITY_HOT / UNITY_COOL (default 95 / 80): freeze Unity and its children above UNITY_HOT, let them
-#     go on again below UNITY_COOL. A frozen job loses nothing; it only takes longer.
+#   UNITY_HOT / UNITY_COOL (default 95 / 80): freeze Unity and its children above UNITY_HOT on the package, or 75 C on
+#     a board sensor (Tools/heat.sh), and let them go on again below UNITY_COOL / 68 C. A frozen job loses nothing.
+#   Every run also logs the temperatures to Build/Perf/heat.log and runs on the "balanced" power profile
+#   (Tools/heat.sh: the laptop switched itself off on 2026-10-30, the firmware's thermal protection by the look of it).
 cpu_temp() { sensors 2>/dev/null | grep 'Package id' | grep -o '+[0-9]*' | head -1 | tr -d + || true; }
+. "$(dirname "$0")/heat.sh"
 CPUS="${UNITY_CPUS:-8-15}"
 START_BELOW="${UNITY_START_BELOW:-80}"
 HOT="${UNITY_HOT:-95}"
 COOL="${UNITY_COOL:-80}"
+HEAT_HOT="$HOT"; HEAT_COOL="$COOL"
 if command -v sensors >/dev/null; then
   t="$(cpu_temp)"
   if [ -n "$t" ] && [ "$t" -ge "$START_BELOW" ]; then
@@ -101,6 +105,9 @@ fi
 tree() { local p; for p in "$@"; do echo "$p"; tree $(pgrep -P "$p" || true); done; }
 
 set +e
+power_balanced
+heat_log_start "unity-batch $METHOD"
+trap 'heat_log_stop; power_restore' EXIT
 "${PIN[@]}" "$UNITY" -batchmode "${GFX[@]}" -projectPath "$PROJECT" \
          -executeMethod "$METHOD" -logFile "$LOG" "${JOBS[@]}" "$@" &
 UPID=$!
@@ -109,20 +116,19 @@ if command -v sensors >/dev/null; then
   (
     paused=0; pauses=0
     while kill -0 "$UPID" 2>/dev/null; do
-      t="$(cpu_temp)"
-      if [ -n "$t" ]; then
-        if [ "$paused" = 0 ] && [ "$t" -ge "$HOT" ]; then kill -STOP $(tree "$UPID") 2>/dev/null; paused=1; pauses=$((pauses + 1)); fi
-        if [ "$paused" = 1 ] && [ "$t" -le "$COOL" ]; then kill -CONT $(tree "$UPID") 2>/dev/null; paused=0; fi
-      fi
+      if [ "$paused" = 0 ] && heat_hot; then kill -STOP $(tree "$UPID") 2>/dev/null; paused=1; pauses=$((pauses + 1)); echo "unity-batch: paused for heat ($(heat_now))"; fi
+      if [ "$paused" = 1 ] && heat_cool; then kill -CONT $(tree "$UPID") 2>/dev/null; paused=0; fi
       sleep 3
     done
-    [ "$pauses" -gt 0 ] && echo "unity-batch: paused $pauses time(s) for heat (over $HOT C until under $COOL C)"
+    [ "$pauses" -gt 0 ] && echo "unity-batch: paused $pauses time(s) for heat (package over $HOT C or a board sensor over $HEAT_SEN_HOT C, until under $COOL / $HEAT_SEN_COOL C)"
   ) &
   GUARD=$!
 fi
 wait "$UPID"
 CODE=$?
 [ -n "$GUARD" ] && wait "$GUARD" 2>/dev/null
+heat_log_stop
+power_restore
 set -e
 
 # Batchmode is quiet on success, so surface the lines that actually matter.

@@ -25,7 +25,9 @@ while kill -0 $PID 2>/dev/null; do
   [ "$a" -lt "$MIN_AVAIL" ] && MIN_AVAIL=$a
   [ "$s" -gt "$MAX_SWAP" ] && MAX_SWAP=$s
   [ "$j" -gt "$MAX_JOB" ] && MAX_JOB=$j
-  echo "$(date '+%T') avail ${a} MB swap ${s} MB job ${j} MB" >> "$LOG"
+  # The job's biggest processes, so a peak says who holds it (the editor, the light baker, shader compilers ...).
+  top=$(for p in $(tree $PID); do r=$(awk '/VmRSS/ {print int($2/1024)}' /proc/$p/status 2>/dev/null); [ -n "$r" ] && [ "$r" -gt 150 ] && echo "$r $(cat /proc/$p/comm 2>/dev/null)"; done | sort -rn | head -4 | tr '\n' ',' )
+  echo "$(date '+%T') avail ${a} MB swap ${s} MB job ${j} MB [${top%,}]" >> "$LOG"
   if [ "$a" -lt "$STOP_MB" ]; then
     echo "mem-guard: available memory ${a} MB is under ${STOP_MB} MB: stopping $LABEL" | tee -a "$LOG"
     kill -TERM $(tree $PID) 2>/dev/null

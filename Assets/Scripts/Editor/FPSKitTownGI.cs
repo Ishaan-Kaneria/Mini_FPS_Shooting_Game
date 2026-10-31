@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using Object = UnityEngine.Object;
@@ -319,13 +320,64 @@ namespace FPSKit.EditorTools
             FPSKitBatch.Exit(0);
         }
 
+        /// <summary>
+        /// Takes out of memory, for a bake, every renderer that bounces no light (Contribute GI off): the props, the
+        /// furniture, the people and cars, the facades' fine work -- their renderers and mesh filters destroyed and the
+        /// assets nothing then uses unloaded. Returns what was taken, for the log. The scene must not be saved after it.
+        /// </summary>
+        public static int StripForBake()
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            long before = Profiler.GetTotalAllocatedMemoryLong();
+            int taken = 0;
+            foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if ((GameObjectUtility.GetStaticEditorFlags(r.gameObject) & StaticEditorFlags.ContributeGI) != 0) continue;
+                if (r is ParticleSystemRenderer) continue;
+                var mf = r.GetComponent<MeshFilter>();
+                Object.DestroyImmediate(r);
+                if (mf != null) Object.DestroyImmediate(mf);
+                taken++;
+            }
+            foreach (var lod in Object.FindObjectsByType<LODGroup>(FindObjectsInactive.Include, FindObjectsSortMode.None)) Object.DestroyImmediate(lod);
+            EditorUtility.UnloadUnusedAssetsImmediate();
+            GC.Collect();
+            Debug.Log($"[FPSKit] stripped for the bake: {taken} renderers that bounce no light; allocated {before / 1048576} -> {Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, {clock.Elapsed.TotalSeconds:0} s");
+            return taken;
+        }
+
+        /// <summary>Batch: the stripping alone on the saved desert scene, its memory before and after (a dry run for the
+        /// bakes; nothing is saved).</summary>
+        public static void BatchStripProbe()
+        {
+            EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
+            Debug.Log($"[FPSKit] strip probe: scene open, allocated {Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, resident {Resident()} MB");
+            System.Threading.Thread.Sleep(5000);
+            StripForBake();
+            Debug.Log($"[FPSKit] strip probe: stripped, resident {Resident()} MB");
+            System.Threading.Thread.Sleep(5000);
+            FPSKitBatch.Exit(0);
+        }
+
+        static long Resident()
+        {
+            foreach (var line in System.IO.File.ReadAllLines("/proc/self/status"))
+                if (line.StartsWith("VmRSS:")) return long.Parse(new string(line.Where(char.IsDigit).ToArray())) / 1024;
+            return -1;
+        }
+
         /// <summary>Opens the saved desert scene, bakes its APV, saves it, and exits (batch).</summary>
         public static void BatchBakeSaved()
         {
             var scene = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
-            Bake(scene, DesertScene, done: ok =>
+            // Baked stripped (what bounces no light taken out of memory, see Bake): the scene is saved before it is
+            // stripped, the bake writes the probe data itself, and the stripped scene is thrown away -- the saved one is
+            // opened again and the pilot rooms' reflections, captured at the bake's end, put into it.
+            Bake(scene, DesertScene, strip: true, done: ok =>
             {
-                EditorSceneManager.SaveScene(scene, DesertScene);
+                var full = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
+                if (ok) FPSKitTownLightmaps.ApplyReflections();
+                EditorSceneManager.SaveScene(full, DesertScene);
                 AssetDatabase.SaveAssets();
                 FPSKitBatch.Exit(ok ? 0 : 1);
             });
@@ -346,7 +398,7 @@ namespace FPSKit.EditorTools
         /// Prepares the open town scene for APV and bakes it (asynchronously, on the editor's update, unless
         /// <paramref name="synchronous"/>); <paramref name="done"/> is told whether it baked.
         /// </summary>
-        public static void Bake(UnityEngine.SceneManagement.Scene scene, string path, Action<bool> done, bool synchronous = false)
+        public static void Bake(UnityEngine.SceneManagement.Scene scene, string path, Action<bool> done, bool synchronous = false, bool strip = false)
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
             FPSKitQualityTiers.Ensure();
@@ -508,6 +560,12 @@ namespace FPSKit.EditorTools
                 EditorUtility.SetDirty(v.sharedProfile);
             }
 
+            // strip: the scene saved as it is now (what the bake set up and keeps), then everything that bounces no light
+            // taken out of memory for the bake -- not only switched off: the editor still held 28,000 renderers' meshes and
+            // materials, and the bake came within 1.8 GB of the 14.5 GB (2026-10-31, stopped by Tools/mem-guard.sh). The
+            // caller throws the stripped scene away. Only for a bake of the saved scene: inside a build the scene goes on.
+            if (strip) { EditorSceneManager.SaveScene(scene, path); StripForBake(); }
+
             // The lighting settings: the classic probes' bake keeps its own strength; this bake its own.
             float ambientWas = RenderSettings.ambientIntensity;
             RenderSettings.ambientIntensity = ambientWas * ApvSky;
@@ -589,7 +647,8 @@ namespace FPSKit.EditorTools
                 foreach (var f in System.IO.Directory.GetFiles(dir, stem + "*.bytes")) bytes += new System.IO.FileInfo(f).Length;
                 Debug.Log($"[FPSKit] town GI (APV) {(ok ? "baked" : "FAILED")}: {cells} cells, {bytes / 1048576f:0} MB of probe data, {statics} static renderers ({bouncing} bouncing, {idle.Count} switched off for it), {interiorVolumes} 1 m interior volumes, " +
                           $"{clock.Elapsed.TotalMinutes:0.0} min, {(settings != null ? settings.lightmapper.ToString() : "?")}");
-                // The lightmapped rooms' reflections, captured from the rooms as they are now lit (FPSKitTownLightmaps).
+                // The lightmapped rooms' reflections, captured from the rooms as they are now lit (FPSKitTownLightmaps), the
+                // lightmaps and the new probe data in memory; put into the scene by ApplyReflections.
                 if (ok) FPSKitTownLightmaps.CaptureReflections(path);
                 done(ok);
             }

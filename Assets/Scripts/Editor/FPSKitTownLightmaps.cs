@@ -436,6 +436,7 @@ namespace FPSKit.EditorTools
             int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian");
             var maps = ReadableLightmaps();
             var lines = new List<string>();
+            _captured.Clear();
             foreach (Transform view in pilot.transform)
             {
                 var look = view.Find("Look");
@@ -492,13 +493,71 @@ namespace FPSKit.EditorTools
                 if (lums.Count == 0 || inside == null) continue;
                 float median = lums[lums.Count / 2], arriving = LightmapMean(inside, maps), albedo = AlbedoMean(inside);
                 probe.intensity = Mathf.Clamp(arriving * albedo / Mathf.Max(1e-5f, median), 0.005f, 1f);
+                _captured.Add(new Captured
+                {
+                    name = view.name, probeName = probe.name, shop = shop, capture = capture,
+                    box = new Bounds(probe.transform.position + probe.center, probe.size), texture = path, intensity = probe.intensity,
+                });
                 lines.Add($"{view.name}: capture median {median:0.000}, the room {arriving:0.000} arriving x albedo {albedo:0.00} = {arriving * albedo:0.000}, intensity {probe.intensity:0.000}");
             }
             foreach (var m in maps) if (m != null) Object.DestroyImmediate(m);
             Debug.Log($"[FPSKit] lightmap pilot: {lines.Count} room reflections captured and set to their rooms (under {QualitySettings.names[QualitySettings.GetQualityLevel()]}): " + string.Join("; ", lines));
         }
 
-        /// <summary>The lightmap atlases, readable: blitted to half floats and read back.</summary>
+        /// <summary>A pilot room's capture, kept to be put into the scene again (ApplyReflections): the bake that captures it
+        /// runs on a stripped copy of the scene that is not saved.</summary>
+        sealed class Captured
+        {
+            public string name, probeName, texture;
+            public bool shop;
+            public Vector3 capture;
+            public Bounds box;
+            public float intensity;
+        }
+        static readonly List<Captured> _captured = new List<Captured>();
+
+        /// <summary>
+        /// The pilot rooms' captures (CaptureReflections) put into the open scene: each room's own probe made again, boxed,
+        /// box projected, its capture and its level; the shop's probe given its capture and level. Returns how many.
+        /// </summary>
+        public static int ApplyReflections()
+        {
+            var root = Object.FindAnyObjectByType<IndoorReflections>(FindObjectsInactive.Include);
+            if (root == null || _captured.Count == 0) return 0;
+            int applied = 0;
+            foreach (var c in _captured)
+            {
+                var tex = AssetDatabase.LoadAssetAtPath<Texture>(c.texture);
+                if (tex == null) continue;
+                ReflectionProbe probe;
+                if (c.shop) probe = root.GetComponentsInChildren<ReflectionProbe>(true).FirstOrDefault(p => p.name == c.probeName);
+                else
+                {
+                    var old = root.transform.Find(c.probeName);
+                    if (old != null) Object.DestroyImmediate(old.gameObject);
+                    var go = new GameObject(c.probeName);
+                    go.transform.SetParent(root.transform, false);
+                    probe = go.AddComponent<ReflectionProbe>();
+                    probe.mode = ReflectionProbeMode.Custom;
+                    probe.blendDistance = 0.05f;
+                    probe.importance = 3;
+                    probe.enabled = false;              // IndoorReflections switches them on near the eye
+                }
+                if (probe == null) continue;
+                probe.transform.position = c.capture;
+                probe.size = c.box.size;
+                probe.center = c.box.center - c.capture;
+                probe.boxProjection = true;
+                probe.resolution = 128;
+                probe.customBakedTexture = tex;
+                probe.intensity = c.intensity;
+                applied++;
+            }
+            Debug.Log($"[FPSKit] lightmap pilot: {applied} room reflections put into the scene");
+            return applied;
+        }
+
+        /// <summary>The lightmap atlases, readable: blitted to half floats and read back.</summary>        /// <summary>The lightmap atlases, readable: blitted to half floats and read back.</summary>
         static Texture2D[] ReadableLightmaps() => LightmapSettings.lightmaps.Select(m =>
         {
             if (m.lightmapColor == null) return null;

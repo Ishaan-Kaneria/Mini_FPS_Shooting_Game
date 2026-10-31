@@ -4168,3 +4168,33 @@ with evidence images in `Build/Realism/<Arena>/` (not in git).
 * Each diagnostic `Lightmapping.Bake()` writes the scene's lighting data to disk whether the scene is saved or not: re-bake
   after experimenting. The probe read after an adaptive probe bake returns the ambient itself (1.00): the classic probes are
   not read while the volumes are on; VerifyTown reads them on the saved scene.
+
+## Part A on mains, and the interior lighting pilot (2026-10-31)
+
+* **Part A, the release walk on mains** (`Tools/walk-bench.sh`, before the pilot): Medium 16.5 -> 47.0 fps (1% low 20.4,
+  frames over 33 ms 5 %), main thread 47 -> 9.8 ms; High 11.8 -> 19.8. The GPU is the limit now (Medium 19.9 ms a frame,
+  High 49.6). The walk holds the CPU package at its own 100-103 C limit within 20 s; the 95 C guard stopped every run, so
+  the benches now stop only on the board sensors (his choice; `HEAT_BENCH_PKG=1` restores the package check).
+* **The people's probes and where the bake runs.** Baked inside the build, the classic probes came out at 0.34 of the
+  walls' ambient; the same scene saved, opened and baked gave 0.80 at the same strength. `BakeTownProbes` always bakes
+  the saved scene re-opened (12 s), and calibrates itself (a second bake at the strength scaled by what it missed) if a
+  bake still misses 0.8 by more than 0.1. The log gives the light from below beside it, so a lost sun bounce shows.
+* **The pilot** (`FPSKitTownLightmaps`): the two old houses' first rooms and the lit shop nearest the start
+  (`ViewProbe.PilotViews`) take their indirect light from lightmaps (5 cm texels, AO 0.6 m, directional); the sun stays
+  Mixed / Baked Indirect, so its direct light and shadows are real-time; furniture shades the bake but stays on probes;
+  the houses' lamps are off by day (`CeilingLampOff`); a trading shop has tube fittings (`ShopTubes`) and, in the pilot,
+  baked area lights under them (20). Shop insides are their own objects per 64 m block (`ShopInteriors/ShopInside_x_y`).
+  The adaptive probe volume bake (`AdaptiveProbeVolumes.BakeAsync`, APV only) keeps the lightmaps, and leaves
+  lightmapped renderers' Receive GI alone. VerifyTown allows lightmaps only on houses' and shops' insides with a pilot.
+* **Lightmaps at the probe volumes' strength.** At the people's 1.15 the lightmapped rooms drew at half their old
+  brightness; the rooms round them are lit by probes baked at 1.8 bounce and the sky at 1.3. The pilot's bake runs at
+  those, and the people's probes from the same bake are scaled down in place to 0.8 (`bakedProbes`, persists through a
+  save; Unity 6.6 refuses `BakeLightProbesOnly`).
+* **Seen in the release views** (`ViewProbe`, `-fpskitviews <dir> -fpskitquality High`; Build/Pilot): room 1 mean 36 ->
+  26 of 255 (lamp off, lit from the door, corners darker); room 2 19 -> 12: its bright stair underside and orange wall
+  were probe light leaking through the 3 m grid (a downward face no sun reaches), gone; the shop 103 -> 102, now lit by
+  its tubes. The rooms are 30-40 % darker than the probe-lit ones were: his call (the review page).
+* **Cost**: 3,000 m² at 20 texels/m, two 1024 and one 512 lightmap (9.5 MB on disk), the classic bake 35 -> 236 s;
+  Medium walk 47.0 -> 45.2 fps (the walk does not pass the pilot rooms: the separate shop insides or heat noise), High
+  19.8 -> 19.6, resident memory +33 MB. The whole town (about 250,000 m²) from the pilot's rate: 20/m ~510 MB and ~5 h,
+  10/m ~130 MB and ~1.2 h, 8/m ~80 MB and ~50 min, 5/m ~30 MB and ~20 min.

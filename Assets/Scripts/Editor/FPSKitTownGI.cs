@@ -302,6 +302,7 @@ namespace FPSKit.EditorTools
             var scene = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
             FPSKitQualityTiers.Ensure();   // the tiers' shadows and SSAO as the code has them
             ApplyRealLightLook();
+            FPSKitTownLightmaps.CaptureReflections(DesertScene);   // the indoor probes were placed afresh
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, DesertScene);
             FPSKitBatch.Exit(0);

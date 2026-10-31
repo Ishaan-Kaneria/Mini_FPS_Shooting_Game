@@ -12,10 +12,11 @@ using UnityEngine.Rendering.Universal;
 /// as it really is -- lit only by what comes in at its door and windows, four to six stops under the street's shade -- and
 /// at the street's exposure its floor read black. Eyes, and cameras, open up indoors: so does this.
 ///
-/// It meters what is on the screen. Every few frames the graded picture is shrunk to 48 by 27 on the GPU (a pass added to
-/// the camera that runs post-processing, the last of the player's stack) and read back without a stall; the room's level is
-/// the middle of the view's values, the brightest fifth left out, so a door or a window stays brighter than the room it
-/// lights instead of setting the exposure. Under a roof the exposure opens until that level is <see cref="roomLevel"/>, at
+/// It meters what is on the screen. Every few frames the picture is shrunk to 48 by 27 on the GPU just before
+/// post-processing (a pass added to the camera that runs it, the last of the player's stack) and read back without a
+/// stall; what each part of it would show on the screen is worked out through the exposure and the ACES curve, and the
+/// room's level is the middle of the view's values, the brightest fifth left out, so a door or a window stays brighter
+/// than the room it lights instead of setting the exposure. Under a roof the exposure opens until that level is <see cref="roomLevel"/>, at
 /// most <see cref="indoorBoost"/> stops, over <see cref="adaptInSeconds"/>, and shuts again over
 /// <see cref="adaptOutSeconds"/> going back out (eyes recover from the dark slowly and from glare quickly). How far it may
 /// open follows how much roof is over the eye (rays up and round the upper sky, ten times a second): none in an open street,
@@ -35,7 +36,7 @@ public class EyeAdaptation : MonoBehaviour
     [Range(0f, 8f)] public float indoorBoost = 6.5f;
     [Tooltip("The level a room is brought to once the eye has adapted: the middle of the view's values (its brightest fifth " +
              "left out) as a screen value, 0 black to 255 white.")]
-    [Range(30f, 200f)] public float roomLevel = 100f;
+    [Range(30f, 200f)] public float roomLevel = 94f;
     [Tooltip("Share of the view that may be white before the eye stops opening further (a sunlit patch on a wall).")]
     [Range(0f, 0.5f)] public float whiteShare = 0.06f;
     [Tooltip("Share of the upper sky blocked at which the eye starts to open (an open street sees most of it).")]
@@ -191,10 +192,12 @@ public class EyeAdaptation : MonoBehaviour
     }
 
     /// <summary>
-    /// The shrunk picture back from the GPU: its values as screen values (0-255), the player's gun and arms in the lower
-    /// right left out; the room's level is the mean of the middle three quarters (the darkest twentieth and the brightest
-    /// fifth left out); the stops that would bring it to <see cref="roomLevel"/>, held back while more than
-    /// <see cref="whiteShare"/> of the view is white.
+    /// The shrunk picture back from the GPU, as the scene's light before post-processing (linear, before the exposure and
+    /// the tonemapper), the player's gun and arms in the lower right left out. What each sample would show on the screen
+    /// at a given exposure is worked out here (the exposure, then the ACES curve the arena grades with, then the screen's
+    /// encoding), and the exposure is found that brings the room's level -- the mean of the middle three quarters of the
+    /// samples, the darkest twentieth and the brightest fifth left out -- to <see cref="roomLevel"/>, held where no more
+    /// than <see cref="whiteShare"/> of the view would be white.
     /// </summary>
     void OnMetered(AsyncGPUReadbackRequest request)
     {
@@ -203,7 +206,6 @@ public class EyeAdaptation : MonoBehaviour
         var data = request.GetData<ushort>();
         var samples = Samples;
         samples.Clear();
-        int white = 0;
         for (int y = 0; y < MeterHeight; y++)
             for (int x = 0; x < MeterWidth; x++)
             {
@@ -211,23 +213,59 @@ public class EyeAdaptation : MonoBehaviour
                 if (x >= MeterWidth / 2 && y < MeterHeight / 2) continue;
                 int i = (y * MeterWidth + x) * 4;
                 float lum = 0.2126f * Mathf.HalfToFloat(data[i]) + 0.7152f * Mathf.HalfToFloat(data[i + 1]) + 0.0722f * Mathf.HalfToFloat(data[i + 2]);
-                float shown = 255f * Mathf.LinearToGammaSpace(Mathf.Clamp01(lum));
-                if (shown >= 250f) white++;
-                samples.Add(shown);
+                if (float.IsNaN(lum) || float.IsInfinity(lum)) continue;
+                samples.Add(Mathf.Max(0f, lum));
             }
-        if (samples.Count == 0) return;
+        if (samples.Count < 8) return;
         samples.Sort();
         int from = samples.Count / 20, to = Mathf.Max(from + 1, samples.Count * 4 / 5);
-        float sum = 0f;
-        for (int i = from; i < to; i++) sum += samples[i];
-        Level = sum / (to - from);
-        // Stops between the level and the wanted one, in light (the screen values are gamma-encoded).
-        float stops = Mathf.Log(Mathf.GammaToLinearSpace(roomLevel / 255f) / Mathf.GammaToLinearSpace(Mathf.Max(1f, Level) / 255f), 2f);
-        if (white > samples.Count * whiteShare) stops = Mathf.Min(stops, -0.25f);
-        _metered = Mathf.Clamp(_offset + stops, 0f, indoorBoost);
+        float bright = samples[Mathf.Clamp(Mathf.CeilToInt(samples.Count * (1f - whiteShare)) - 1, 0, samples.Count - 1)];
+        float LevelAt(float exposure)
+        {
+            float k = Mathf.Pow(2f, exposure), sum = 0f;
+            for (int i = from; i < to; i++) sum += Shown(samples[i] * k);
+            return sum / (to - from);
+        }
+        Level = LevelAt(_base + _offset);
+        // The exposure that brings the level to the wanted one: the level rises with it, so halve the interval.
+        float lo = _base, hi = _base + indoorBoost;
+        if (LevelAt(hi) <= roomLevel) lo = hi;
+        else if (LevelAt(lo) < roomLevel)
+            for (int n = 0; n < 18; n++) { float mid = (lo + hi) * 0.5f; if (LevelAt(mid) < roomLevel) lo = mid; else hi = mid; }
+        // No further than leaves the brightest whiteShare of the view the only white in it.
+        float exposureAt = lo;
+        if (bright > 1e-6f && Shown(bright * Mathf.Pow(2f, exposureAt)) >= 250f)
+        {
+            float a = _base, b = exposureAt;
+            for (int n = 0; n < 18; n++) { float mid = (a + b) * 0.5f; if (Shown(bright * Mathf.Pow(2f, mid)) >= 250f) b = mid; else a = mid; }
+            exposureAt = a;
+        }
+        _metered = Mathf.Clamp(exposureAt - _base, 0f, indoorBoost);
     }
 
-    /// <summary>Shrinks the graded picture to the metering texture in two bilinear steps (to a tenth, then to 48 by 27).</summary>
+    /// <summary>
+    /// How much darker the screen shows a room than Narkowicz's fit of ACES does: URP's ACES with the desert's grade (contrast
+    /// 10, vignette 0.20) puts a room's middle values about 0.9 stops lower. Measured 2026-10-31 on the same seven views: the
+    /// picture metered after post-processing to 100 gave screen means 94-123, metered here with the plain fit 69-93, a
+    /// steady 1.32-1.39 apart.
+    /// </summary>
+    const float GradeStops = -0.9f;
+
+    /// <summary>A scene light (linear, after the exposure) as a screen value 0-255: the grade's offset, the ACES curve
+    /// (Narkowicz's fit) and the screen's encoding.</summary>
+    static float Shown(float light)
+    {
+        float x = light * 0.6f * Mathf.Pow(2f, GradeStops);
+        float aces = Mathf.Clamp01(x * (2.51f * x + 0.03f) / (x * (2.43f * x + 0.59f) + 0.14f));
+        return 255f * Mathf.LinearToGammaSpace(aces);
+    }
+
+    /// <summary>
+    /// Shrinks the picture, before post-processing, to the metering texture in two bilinear steps (to a tenth, then to 48 by
+    /// 27). Before post-processing the camera's colour is always its own texture (post-processing reads it), so nothing
+    /// changes in how the frame is drawn: metered after post-processing it had to be kept off the screen's buffer
+    /// (requiresIntermediateTexture), and on Medium post-processing went from 1.1 to 6.8 ms (FrameCostProbe, 2026-10-31).
+    /// </summary>
     sealed class MeterPass : ScriptableRenderPass
     {
         public RenderTexture Target;
@@ -236,8 +274,7 @@ public class EyeAdaptation : MonoBehaviour
 
         public MeterPass()
         {
-            renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
-            requiresIntermediateTexture = true;
+            renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
         }
 
         public void Release() { _handle?.Release(); _handle = null; _wrapped = null; }

@@ -32,8 +32,14 @@ for TIER in "${TIERS[@]}"; do
       [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break
       t="$(cpu_temp)"; [ -n "$t" ] && [ "$t" -gt "$MAX" ] && MAX=$t
       b="$(heat_sen)"; [ "$b" -gt "$SEN" ] && SEN=$b
-      # As walk-bench: only the board sensors stop it (HEAT_BENCH_PKG=1: the package too, held hot for 6 s).
-      if heat_sen_hot; then HOT=1; break; fi
+      # A board sensor at its limit freezes it until they cool (the board reached 75 C on its fixed views, 2026-10-31, and
+      # every run stopped): each of its numbers is a median of 20 frames, so the one long frame after a pause is left out,
+      # where the walk's averages would count it (walk-bench stops instead). HEAT_BENCH_PKG=1: the package stops it too.
+      if heat_sen_hot; then
+        kill -STOP $PID 2>/dev/null; echo "cost-bench: paused for heat ($(heat_now))"
+        until [ "$(heat_sen)" -le "$HEAT_SEN_COOL" ]; do sleep 5; done
+        kill -CONT $PID 2>/dev/null
+      fi
       if [ "${HEAT_BENCH_PKG:-0}" = 1 ] && heat_pkg_hot; then HOTFOR=$((HOTFOR + 1)); else HOTFOR=0; fi
       if [ "$HOTFOR" -ge 3 ]; then HOT=1; break; fi
       sleep 2

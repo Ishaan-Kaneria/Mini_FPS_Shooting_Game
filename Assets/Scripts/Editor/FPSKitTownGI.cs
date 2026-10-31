@@ -51,8 +51,8 @@ namespace FPSKit.EditorTools
         /// </summary>
         internal const float ApvSky = 1.3f;
 
-        /// <summary>Probe levels in the baking set: 1 m (the lightmapped insides' own volumes) up to 81 m in open air. The
-        /// town's volume stops at the level above, 3 m.</summary>
+        /// <summary>Probe levels in the baking set above the finest: 1 m (level 0, the lightmapped insides' own volumes) up to
+        /// 81 m (level 4) in open air. The town's volume starts at level 1, 3 m.</summary>
         const int InteriorProbeDepth = 4;
 
         /// <summary>Metres the probe volume spans across the town (the arena is a kilometre; a little over for its edge).</summary>
@@ -374,7 +374,8 @@ namespace FPSKit.EditorTools
 
             // One global volume over everything.
             var arena = GameObject.Find("Arena");
-            var volume = Object.FindAnyObjectByType<ProbeVolume>();
+            // The town's own volume, by name: the lightmapped insides have volumes of their own (InteriorProbes_*).
+            var volume = Object.FindObjectsByType<ProbeVolume>(FindObjectsSortMode.None).FirstOrDefault(v => v.name == "TownProbeVolume");
             if (volume == null)
             {
                 var go = new GameObject("TownProbeVolume");
@@ -392,11 +393,12 @@ namespace FPSKit.EditorTools
             volume.fillEmptySpaces = false;
             // 3 m over the town as before, 1 m inside the rooms with lightmaps: the arms, the gun and the soldiers in a room
             // are lit by the probes, and at 3 m a room's probes were half in the street at its doors (the hands read pale
-            // there, his report 2026-10-31). The set's finest spacing is 1 m; the town's volume stops a level short of it
-            // (3 m), and each lightmapped inside has a volume of its own that does not.
+            // there, his report 2026-10-31). Level 0 is the set's finest spacing (1 m), each level up three times coarser;
+            // the town's volume keeps levels 1-4 (3-81 m), and each lightmapped inside has a volume of its own with all of
+            // them. (The other way round -- highest level 3 -- cut the 81 m level and allowed 1 m: 11.1 M probes.)
             volume.overridesSubdivLevels = true;
-            volume.lowestSubdivLevelOverride = 0;
-            volume.highestSubdivLevelOverride = InteriorProbeDepth - 1;
+            volume.lowestSubdivLevelOverride = 1;
+            volume.highestSubdivLevelOverride = InteriorProbeDepth;
             foreach (var old in Object.FindObjectsByType<ProbeVolume>(FindObjectsSortMode.None).Where(v => v.name.StartsWith("InteriorProbes_")).ToList())
                 Object.DestroyImmediate(old.gameObject);
             int interiorVolumes = 0;

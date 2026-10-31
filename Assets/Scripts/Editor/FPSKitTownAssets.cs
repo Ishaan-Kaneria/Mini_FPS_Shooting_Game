@@ -490,7 +490,20 @@ namespace FPSKit.EditorTools
                 imp.AddRemap(source, mat);
                 changed = true;
             }
-            // Materials the importer did not expose (none embedded): nothing to remap, the prefab pass assigns.
+            // Once remapped, a model lists no embedded materials: its own materials are refreshed through the remap table
+            // (a change of smoothness reached none of them, 2026-10-31).
+            if (embedded.Count == 0)
+                foreach (var kv in map)
+                {
+                    if (!(kv.Value is Material mapped) || kv.Key.type != typeof(Material)) continue;
+                    string key = sets.Keys.FirstOrDefault(k => string.Equals(k, kv.Key.name, System.StringComparison.OrdinalIgnoreCase))
+                              ?? sets.Keys.FirstOrDefault(k => kv.Key.name.ToLowerInvariant().Contains(k.ToLowerInvariant()))
+                              ?? sets.Keys.FirstOrDefault(k => k.ToLowerInvariant().Contains(kv.Key.name.ToLowerInvariant()))
+                              ?? sets.Keys.OrderBy(k => k.Length).First();
+                    var s = sets[key];
+                    LitFromMaps(AssetDatabase.GetAssetPath(mapped), s.diff, s.nor, s.mask, Color.white, Vector2.one,
+                                IsPlant(id) || HasAlpha(s.diff), smoothness: PropSmoothness(id));
+                }
             if (changed) imp.SaveAndReimport();
         }
 

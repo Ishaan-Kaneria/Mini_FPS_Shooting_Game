@@ -49,7 +49,49 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static Transform _shopMarks;
 
-        private static Material _foundation, _stallriser, _shopGlass, _shopInside, _stallMarble;
+        private static Material _foundation, _stallriser, _shopGlass, _shopInside, _stallMarble, _shopTube, _tubeBatten;
+
+        /// <summary>
+        /// The shops' insides (floor, walls, ceiling, tube fittings), one object for each 64 m block's shops under
+        /// "ShopInteriors", not in the block's own mesh: so a shop's inside can take a lightmap of its own (the interior
+        /// lighting pilot, FPSKitTownLightmaps) without the block's 64 m of facades going into it.
+        /// </summary>
+        private static readonly Dictionary<Vector2Int, TownMesh> _shopInsides = new Dictionary<Vector2Int, TownMesh>();
+
+        /// <summary>How far under the ceiling a shop's tube is (its middle): a batten 4 cm deep on the ceiling, the tube under it.</summary>
+        private const float ShopTubeDrop = 0.055f, ShopTubeLength = 1.2f;
+
+        private static TownMesh ShopInside(Vector3 p)
+        {
+            var key = new Vector2Int(Mathf.FloorToInt(p.x / 64f), Mathf.FloorToInt(p.z / 64f));
+            if (!_shopInsides.TryGetValue(key, out var m)) { m = new TownMesh(); _shopInsides[key] = m; }
+            return m;
+        }
+
+        private static void BuildShopInsides(Transform group, int layer)
+        {
+            if (_shopInsides.Count == 0) return;
+            var parent = new GameObject("ShopInteriors").transform;
+            parent.SetParent(group, false);
+            foreach (var kv in _shopInsides)
+                kv.Value.Build(parent, $"ShopInside_{kv.Key.x}_{kv.Key.y}", layer, "Concrete", compression: UnityEditor.ModelImporterMeshCompression.Low);
+            _shopInsides.Clear();
+        }
+
+        /// <summary>
+        /// A lit shop's ceiling tubes: one for every 1.8 m or so of its width (one to four), each running 1.2 m back from the
+        /// middle of its depth, just under the ceiling. Given the shop's inside as a box -- its middle, the way across it,
+        /// the way out to the street, its width and height -- so the fittings (built here) and the baked lights over them
+        /// (FPSKitTownLightmaps, from the shop's mark, which is that box) come from the same numbers.
+        /// </summary>
+        internal static List<(Vector3 at, Vector3 along)> ShopTubes(Vector3 centre, Vector3 across, Vector3 outward, float width, float height)
+        {
+            var tubes = new List<(Vector3, Vector3)>();
+            int n = Mathf.Clamp(Mathf.RoundToInt(width / 1.8f), 1, 4);
+            for (int i = 0; i < n; i++)
+                tubes.Add((centre + across * (((i + 0.5f) / n - 0.5f) * width) + Vector3.up * (height * 0.5f - ShopTubeDrop), outward));
+            return tubes;
+        }
         /// <summary>The shutters' paints and the storefronts' four frame finishes (FPSKitTownShopfront.ShopLook).</summary>
         private static Material[] _shutterPaints, _frameAccents, _risers;
 
@@ -83,6 +125,9 @@ namespace FPSKit.EditorTools
             // Inside an open shop: painted walls in its own light, darker than the street, not the black of a shut room.
             // Painted plaster, about 0.50 linear (it was 0.085: darker than any real plaster).
             _shopInside = TownFlat("ShopInsideLit", new Color(0.74f, 0.71f, 0.65f), 0.25f);
+            // A trading shop's tube lights: on by day, a cool white; what they light is baked (FPSKitTownLightmaps).
+            _shopTube = EmissiveFlat("ShopTube", new Color(0.94f, 0.97f, 1f), 3f);
+            _tubeBatten = TownFlat("TubeBatten", new Color(0.82f, 0.82f, 0.80f), 0.4f);
             // Variety (2026-10-21, "too many shopfronts look identical"): shutters in the paints they come in here, beside the
             // white and the rusted; four frame finishes -- anodised aluminium, bronze, charcoal, a painted green; three
             // stallriser stones.
@@ -175,11 +220,23 @@ namespace FPSKit.EditorTools
                 Vector3 back = -nrm * 3.2f, a = S(0f, 0f), c = S(W, 0f), top = up * hs;
                 // Behind a half-shut shutter, or a shop open but not lit, the room is dark; a trading one is lit.
                 var inside = lit ? _shopInside : _shopDark;
-                m.Quad(_terrazzo, a, c, c + back, a + back, up);
-                m.Quad(inside, a + back, c + back, c + back + top, a + back + top, nrm);
-                m.Quad(inside, a, a + back, a + back + top, a + top, u);
-                m.Quad(inside, c, c + back, c + back + top, c + top, -u);
-                m.Quad(_shopDark, a + top, c + top, c + back + top, a + back + top, Vector3.down);
+                var room = ShopInside(p0);
+                room.Quad(_terrazzo, a, c, c + back, a + back, up);
+                room.Quad(inside, a + back, c + back, c + back + top, a + back + top, nrm);
+                room.Quad(inside, a, a + back, a + back + top, a + top, u);
+                room.Quad(inside, c, c + back, c + back + top, c + top, -u);
+                room.Quad(_shopDark, a + top, c + top, c + back + top, a + back + top, Vector3.down);
+                if (lit)
+                    foreach (var (at, along) in ShopTubes(S(W * 0.5f, hs * 0.5f) + back * 0.5f, u, nrm, W, hs))
+                    {
+                        // The batten on the ceiling, the tube under it; each in two halves, so both ends are closed.
+                        foreach (float sgn in new[] { 1f, -1f })
+                        {
+                            var end = along * (sgn * ShopTubeLength * 0.5f);
+                            Prism(room, _tubeBatten, at + end + up * (ShopTubeDrop - 0.02f), u * sgn, up, along * sgn, 0.07f, 0.04f, ShopTubeLength * 0.5f + 0.02f);
+                            Prism(room, _shopTube, at + end, u * sgn, up, along * sgn, 0.03f, 0.03f, ShopTubeLength * 0.5f);
+                        }
+                    }
                 if (_shopMarks == null) { _shopMarks = new GameObject("ShopRooms").transform; _shopMarks.SetParent(_volumes.parent, false); }
                 var mark = Mark(_shopMarks, lit ? $"Shop {state}" : $"Shop {state} dark", S(W * 0.5f, hs * 0.5f) + back * 0.5f);
                 mark.rotation = Quaternion.LookRotation(nrm);

@@ -191,6 +191,8 @@ namespace FPSKit.EditorTools
             settings.lightProbeSampleCountMultiplier = 2f;
             settings.ao = false;
             settings.lightmapResolution = 1f;
+            // The interior lighting pilot: a few insides take lightmaps, baked in the same bake (FPSKitTownLightmaps).
+            var pilot = FPSKitTownLightmaps.Prepare(settings);
             EditorUtility.SetDirty(settings);
             Lightmapping.lightingSettings = settings;
 
@@ -243,8 +245,9 @@ namespace FPSKit.EditorTools
             var probes = LightmapSettings.lightProbes;
             float ratio = FPSKitTownTest.PeopleProbeRatio(out float sides, out float ambient, out float below);
             Debug.Log($"[FPSKit] town light probes baked: {(ok ? "done" : "FAILED")}, {probes?.count ?? 0} probes, {contributors} contributing meshes, " +
-                      $"{LightmapSettings.lightmaps.Length} lightmaps (0 wanted), people's sides {ratio:0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00}, " +
-                      $"from below {below:0.00} of the ambient's) at indirect {settings.indirectScale:0.00}, {clock.Elapsed.TotalSeconds:0}s");
+                      $"{LightmapSettings.lightmaps.Length} lightmaps, people's sides {ratio:0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00}, " +
+                      $"from below {below:0.00} of the ambient's) at indirect {settings.indirectScale:0.00}, {clock.Elapsed.TotalSeconds:0}s; " +
+                      FPSKitTownLightmaps.Report(pilot));
             EditorSceneManager.SaveScene(scene, path);
             // Then the real bounced light, for High and Medium (Docs/DESIGN_NOTES.md "Real light: adaptive probe volumes").
             // FPSKIT_SKIP_APV=1: leave the adaptive probe bake to FPSKitBatch.BakeDesertLight on the saved scene. Baked in the

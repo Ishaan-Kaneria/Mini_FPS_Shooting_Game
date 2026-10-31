@@ -81,7 +81,7 @@ namespace FPSKit.EditorTools
         }
 
         private static Material[] _paints, _floors, _cloth;
-        private static Material _paintWash, _paintMud, _wallTile, _bathFloor, _oldFloor, _oldFloor2, _cabinetWhite, _cabinetGreen, _lampGlow, _mattressMat, _interiorCarpet;
+        private static Material _paintWash, _paintMud, _wallTile, _bathFloor, _oldFloor, _oldFloor2, _cabinetWhite, _cabinetGreen, _lampOff, _mattressMat, _interiorCarpet;
 
         private static void ResolveInteriorMaterials()
         {
@@ -115,7 +115,10 @@ namespace FPSKit.EditorTools
             _oldFloor2 = TownMat("FloorOldMosaic", "old_mosaic_floor", new Color(1.45f, 1.42f, 1.38f), 2.0f, 0.3f);
             _cabinetWhite = TownFlat("CabinetWhite", new Color(0.86f, 0.85f, 0.82f), 0.35f);
             _cabinetGreen = TownFlat("CabinetGreen", new Color(0.36f, 0.46f, 0.40f), 0.3f);
-            _lampGlow = EmissiveFlat("LampGlow", new Color(1f, 0.92f, 0.78f), 2.2f);
+            // The ceiling lamps are off by day, an opal glass shade and nothing more: lit, they glowed over rooms they did not
+            // light (his fault list, 2026-10-29). A room is lit by its windows and door; a lamp that is on is baked light
+            // (the interior lighting pilot, FPSKitTownLightmaps). The old "LampGlow" material is left for FPSKitPrune.
+            _lampOff = TownFlat("CeilingLampOff", new Color(0.80f, 0.79f, 0.76f), 0.55f);
             _mattressMat = TownFlat("Mattress", new Color(0.88f, 0.86f, 0.80f), 0.1f);
             _cloth = new[]
             {
@@ -675,7 +678,7 @@ namespace FPSKit.EditorTools
             else
             {
                 m.Cylinder(_frameWhite, c - Vector3.up * 0.08f, 0.16f, 0.08f, 12, false, false);
-                m.Disc(_lampGlow, c - Vector3.up * 0.081f, 0.15f, 12, Vector3.down);
+                m.Disc(_lampOff, c - Vector3.up * 0.081f, 0.15f, 12, Vector3.down);
             }
         }
 

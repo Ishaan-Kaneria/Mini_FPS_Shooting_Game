@@ -53,7 +53,7 @@ namespace FPSKit.EditorTools
 
         private static void ResetTownBuildings()
         {
-            _townLots.Clear(); _chunks.Clear(); _details.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
+            _townLots.Clear(); _chunks.Clear(); _details.Clear(); _shopInsides.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
             _palletPrefab = null; _roomMarks = null; _shopMarks = null;
             _volumes = null; _signNames = null; _roadSignNames = null;
             _interiorGroup = null; _interiorLayer = 0; _interiorCount = 0;
@@ -256,6 +256,7 @@ namespace FPSKit.EditorTools
                 _ = go;
             }
             BuildDetailChunks(group, layer);
+            BuildShopInsides(group, layer);
             Debug.Log($"[FPSKit] town buildings: {_townLots.Count} lots, {solid} solid, {enterable} enterable, {_chunks.Count} chunks");
         }
 

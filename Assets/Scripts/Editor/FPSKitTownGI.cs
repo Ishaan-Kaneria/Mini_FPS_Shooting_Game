@@ -24,8 +24,8 @@ namespace FPSKit.EditorTools
     ///
     /// - High and Medium use APV (their pipeline assets: FPSKitQualityTiers). Low -- the phones and the web build -- keeps the
     ///   classic probes, so the scene carries both: the classic bake first (BakeTownProbes), then this, APV only.
-    /// - Every static mesh renderer in the arena contributes and takes its light from probes (no lightmaps are made); what
-    ///   moves (people, cars, enemies) only takes it.
+    /// - Every static mesh renderer in the arena contributes and takes its light from probes, but for the few insides with a
+    ///   lightmap (FPSKitTownLightmaps, the interior lighting pilot); what moves (people, cars, enemies) only takes it.
     /// - Baked on the GPU when there is a graphics device (UNITY_GRAPHICS=1), else on the CPU (slow).
     ///
     ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKitBatch.BakeDesertLight      (the saved scene, without rebuilding it)
@@ -441,7 +441,9 @@ namespace FPSKit.EditorTools
                     if (r.GetComponentInParent<Civilian>() != null || r.GetComponentInParent<EnemyAI>() != null || r.GetComponentInParent<Rigidbody>() != null) continue;
                     if (r.shadowCastingMode == ShadowCastingMode.ShadowsOnly) continue;
                     if (r.gameObject.layer == backdrop) continue;   // far scenery: the sky ambient, as before
-                    r.receiveGI = ReceiveGI.LightProbes;
+                    // An inside with a lightmap (the classic bake before this one, FPSKitTownLightmaps) keeps it.
+                    bool lightmapped = r.receiveGI == ReceiveGI.Lightmaps && r.lightmapIndex >= 0 && r.lightmapIndex < 0xFFFE;
+                    if (!lightmapped) r.receiveGI = ReceiveGI.LightProbes;
                     r.lightProbeUsage = LightProbeUsage.BlendProbes;
                     statics++;
                     var mf = r.GetComponent<MeshFilter>();

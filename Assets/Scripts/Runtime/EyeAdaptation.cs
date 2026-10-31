@@ -74,6 +74,13 @@ public class EyeAdaptation : MonoBehaviour
 
     /// <summary>Stops added now (for the checks and the tour).</summary>
     public float Offset => _offset;
+
+    // A hold for the checks (NaN: none): the same exposure for two pictures of the same view, one without reflections.
+    float _held = float.NaN;
+    /// <summary>For the checks only: the exposure held at <paramref name="stops"/> over the scene's (NaN lets it adapt).
+    /// ViewProbe holds the exposure a view adapted to while it takes the view again with something taken away, so the two
+    /// can be compared light for light.</summary>
+    public void Hold(float stops) => _held = stops;
     /// <summary>The room's level last metered, 0-255 (the middle of the view, its brightest fifth left out); -1 before any.</summary>
     public float Level { get; private set; } = -1f;
 
@@ -186,7 +193,7 @@ public class EyeAdaptation : MonoBehaviour
 
         float target = Mathf.Min(_metered, _cap);
         float seconds = target > _offset ? adaptInSeconds : adaptOutSeconds;
-        _offset = Mathf.Lerp(_offset, target, 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, seconds)));
+        _offset = !float.IsNaN(_held) ? _held : Mathf.Lerp(_offset, target, 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, seconds)));
         _adjust.postExposure.value = _base + _offset;
         _volume.weight = 1f;
     }

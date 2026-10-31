@@ -437,6 +437,10 @@ namespace FPSKit.EditorTools
             var maps = ReadableLightmaps();
             var lines = new List<string>();
             _captured.Clear();
+            // The sun's direct light off while capturing: a reflection carries the room's bounced and sky light, not the
+            // patch the sun throws on the floor at full strength (his ask, 2026-10-31).
+            var realtimeSun = sun != null && sun.enabled ? sun : null;
+            if (realtimeSun != null) realtimeSun.enabled = false;
             foreach (Transform view in pilot.transform)
             {
                 var look = view.Find("Look");
@@ -461,6 +465,8 @@ namespace FPSKit.EditorTools
                     var max = new Vector3(room.cells.Max(c => c.x) * RoomShape.Cell + half, room.ceilY + 0.1f, room.cells.Max(c => c.y) * RoomShape.Cell + half);
                     var box = new Bounds((min + max) * 0.5f, max - min);
                     capture = room.Centroid + Vector3.up * 1.5f;
+                    var old = root.transform.Find("PilotRoomProbe_" + view.name);
+                    if (old != null) Object.DestroyImmediate(old.gameObject);
                     var go = new GameObject("PilotRoomProbe_" + view.name);
                     go.transform.SetParent(root.transform, false);
                     go.transform.position = capture;
@@ -492,16 +498,114 @@ namespace FPSKit.EditorTools
                     .OrderBy(r => r.bounds.size.sqrMagnitude).FirstOrDefault();
                 if (lums.Count == 0 || inside == null) continue;
                 float median = lums[lums.Count / 2], arriving = LightmapMean(inside, maps), albedo = AlbedoMean(inside);
-                probe.intensity = Mathf.Clamp(arriving * albedo / Mathf.Max(1e-5f, median), 0.005f, 1f);
+                // Captured as the room is lit (its lightmaps, the probe volumes, no direct sun), the reflection is the room:
+                // at full strength. (Scaled to an estimate of the room's brightness it came out three to eight times darker
+                // than the capture, and metal read black.) The estimate is logged beside it for the report.
+                probe.intensity = 1f;
                 _captured.Add(new Captured
                 {
                     name = view.name, probeName = probe.name, shop = shop, capture = capture,
                     box = new Bounds(probe.transform.position + probe.center, probe.size), texture = path, intensity = probe.intensity,
                 });
-                lines.Add($"{view.name}: capture median {median:0.000}, the room {arriving:0.000} arriving x albedo {albedo:0.00} = {arriving * albedo:0.000}, intensity {probe.intensity:0.000}");
+                lines.Add($"{view.name}: capture median {median:0.000} against the room's estimate {arriving:0.000} arriving x albedo {albedo:0.00} = {arriving * albedo:0.000}");
             }
+            if (realtimeSun != null) realtimeSun.enabled = true;
             foreach (var m in maps) if (m != null) Object.DestroyImmediate(m);
-            Debug.Log($"[FPSKit] lightmap pilot: {lines.Count} room reflections captured and set to their rooms (under {QualitySettings.names[QualitySettings.GetQualityLevel()]}): " + string.Join("; ", lines));
+            Debug.Log($"[FPSKit] lightmap pilot: {lines.Count} room reflections captured (under {QualitySettings.names[QualitySettings.GetQualityLevel()]}): " + string.Join("; ", lines));
+        }
+
+        /// <summary>
+        /// Batch (UNITY_GRAPHICS=1, -force-vulkan): the pilot rooms' reflections captured again on the saved scene, without a
+        /// light bake: the lightmaps and the probe volumes' data as they are. The probe data is loaded first -- frames drawn
+        /// under High from each pilot room until no cell is left to load: captured before it was loaded, the rooms came out
+        /// lit by the sky ambient (the wet, grey-blue walls of 2026-10-31). Saves the scene.
+        /// </summary>
+        public static void BatchCaptureReflections()
+        {
+            _captureScene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+            _captureWas = QualitySettings.GetQualityLevel();
+            int low = System.Array.IndexOf(QualitySettings.names, "Low"), high = System.Array.IndexOf(QualitySettings.names, "High");
+            // URP makes the probe volumes when a pipeline that has them first renders (another tier's first).
+            if (low >= 0) { QualitySettings.SetQualityLevel(low, true); DrawFrame(); }
+            if (high >= 0) QualitySettings.SetQualityLevel(high, true);
+            _captureTicks = 0;
+            EditorApplication.update += CaptureTick;
+        }
+
+        static UnityEngine.SceneManagement.Scene _captureScene;
+        static int _captureWas, _captureTicks;
+
+        /// <summary>
+        /// One editor update of BatchCaptureReflections: a frame drawn from one of the pilot rooms in turn, until the editor
+        /// has gone round at least 30 times and the probe data has no cell left to load; then the captures. Captured in the
+        /// same update as the scene was opened, the probes drew the sky and the trees and none of the town (the wet,
+        /// grey-blue walls, and four captures with the same median, 2026-10-31): the town's renderers come in over the
+        /// editor's first updates; the captures at the end of a probe volume bake, many updates later, were right.
+        /// </summary>
+        static void CaptureTick()
+        {
+            try
+            {
+                _captureTicks++;
+                var pilot = GameObject.Find("LightmapPilot");
+                var spots = pilot == null ? new List<Vector3>() : pilot.transform.Cast<Transform>().Select(t => t.position + Vector3.up * 1.6f).ToList();
+                var cam = Camera.main != null ? Camera.main : Object.FindAnyObjectByType<Camera>();
+                if (cam != null && spots.Count > 0) cam.transform.position = spots[_captureTicks % spots.Count];
+                DrawFrame();
+                var pending = typeof(ProbeReferenceVolume).GetProperty("hasUnloadedCells", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                bool loading = pending == null || ProbeReferenceVolume.instance == null || !ProbeReferenceVolume.instance.isInitialized ||
+                               (bool)pending.GetValue(ProbeReferenceVolume.instance);
+                if (_captureTicks < 30 || (loading && _captureTicks < 600)) return;
+                EditorApplication.update -= CaptureTick;
+                Debug.Log($"[FPSKit] lightmap pilot: probe volume data {(loading ? "NOT all loaded" : "loaded")} after {_captureTicks} editor updates");
+                CaptureReflections(FPSKitTownGI.DesertScene);
+                QualitySettings.SetQualityLevel(_captureWas, true);
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(_captureScene, FPSKitTownGI.DesertScene);
+                AssetDatabase.SaveAssets();
+                EditorApplication.Exit(loading ? 2 : 0);
+            }
+            catch (System.Exception e)
+            {
+                EditorApplication.update -= CaptureTick;
+                Debug.LogError("[FPSKit] capture FAILED: " + e);
+                EditorApplication.Exit(1);
+            }
+        }
+
+        static void DrawFrame()
+        {
+            var cam = Camera.main != null ? Camera.main : Object.FindAnyObjectByType<Camera>();
+            if (cam == null) return;
+            var rt = RenderTexture.GetTemporary(128, 128, 24);
+            try { RenderPipeline.SubmitRenderRequest(cam, new RenderPipeline.StandardRequest { destination = rt }); }
+            finally { RenderTexture.ReleaseTemporary(rt); }
+        }
+
+        /// <summary>Batch: each pilot room's captured reflection written out as a picture to look at (its 768 x 128 strip,
+        /// x / (1 + x) tone mapped, gamma encoded) in Build/Pilot/refl_&lt;room&gt;.png.</summary>
+        public static void BatchDumpReflections()
+        {
+            string folder = FPSKitTownGI.DesertScene.Substring(0, FPSKitTownGI.DesertScene.Length - ".unity".Length);
+            System.IO.Directory.CreateDirectory("Build/Pilot");
+            foreach (var name in new[] { "room_1", "room_2", "room_3", "shop" })
+            {
+                string path = $"{folder}/PilotReflection_{name}.exr";
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null) continue;
+                var shape = importer.textureShape; bool readable = importer.isReadable; var comp = importer.textureCompression;
+                importer.textureShape = TextureImporterShape.Texture2D; importer.isReadable = true; importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.SaveAndReimport();
+                var strip = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                var px = strip.GetPixels();
+                var outTex = new Texture2D(strip.width, strip.height, TextureFormat.RGB24, false);
+                outTex.SetPixels(px.Select(c => new Color(Mathf.LinearToGammaSpace(c.r / (1f + c.r)), Mathf.LinearToGammaSpace(c.g / (1f + c.g)), Mathf.LinearToGammaSpace(c.b / (1f + c.b)))).ToArray());
+                outTex.Apply();
+                System.IO.File.WriteAllBytes($"Build/Pilot/refl_{name}.png", outTex.EncodeToPNG());
+                Object.DestroyImmediate(outTex);
+                importer.textureShape = shape; importer.isReadable = readable; importer.textureCompression = comp;
+                importer.SaveAndReimport();
+            }
+            EditorApplication.Exit(0);
         }
 
         /// <summary>A pilot room's capture, kept to be put into the scene again (ApplyReflections): the bake that captures it

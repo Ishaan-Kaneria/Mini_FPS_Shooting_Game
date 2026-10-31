@@ -35,6 +35,13 @@ editor_holds_lock() {
     | grep -q .
 }
 
+# Unity helpers left frozen by the heat guard when their editor was killed (licensing client, package manager, compiler,
+# build backend, import worker: orphaned, state T). A new editor then waits for ever on the frozen licensing client
+# ("Timed-out waiting for HandshakeResponse", 2026-10-31). Woken and ended before starting.
+for p in $(ps -eo pid,ppid,stat,args | awk '$2 == 1 || $2 == '"$(pgrep -u "$USER" -x systemd | head -1)"'' | awk '$3 ~ /T/' | grep -F "$(dirname "$UNITY")" | awk '{print $1}'); do
+  kill -CONT "$p" 2>/dev/null; kill -TERM "$p" 2>/dev/null
+done
+
 if editor_holds_lock; then
   echo "The Unity editor is already running and holds the project lock." >&2
   echo "Close it before running a batch job." >&2

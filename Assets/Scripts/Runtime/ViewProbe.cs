@@ -130,6 +130,18 @@ public class ViewProbe : MonoBehaviour
                 indoor.enabled = false;
                 foreach (var rp in indoor.GetComponentsInChildren<ReflectionProbe>(true)) rp.enabled = false;
             }
+        // -fpskitviewshold <views.txt>: each view's exposure held at what it adapted to in that earlier run (the "eye" on each
+        // line), so a run without something (reflections) compares light for light.
+        var held = new Dictionary<string, float>();
+        int hold = Array.IndexOf(args, "-fpskitviewshold");
+        if (hold >= 0 && hold + 1 < args.Length && File.Exists(args[hold + 1]))
+            foreach (var earlier in File.ReadAllLines(args[hold + 1]))
+            {
+                int colon = earlier.IndexOf(':'), eyeAt = earlier.LastIndexOf(" eye ");
+                if (colon > 0 && eyeAt > 0 && float.TryParse(earlier.Substring(eyeAt + 5), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float stops))
+                    held[earlier.Substring(0, colon)] = stops;
+            }
+        var eye = FindAnyObjectByType<EyeAdaptation>();
         if (without.Contains("refl"))
         {
             RenderSettings.reflectionIntensity = 0f;
@@ -153,6 +165,7 @@ public class ViewProbe : MonoBehaviour
         var log = new List<string>();
         foreach (var v in views)
         {
+            if (eye != null) eye.Hold(held.TryGetValue(v.name, out float stops) ? stops : float.NaN);
             if (cc) cc.enabled = false;
             player.transform.position = v.pos + Vector3.up * 0.05f;
             if (cc) cc.enabled = true;
@@ -167,7 +180,40 @@ public class ViewProbe : MonoBehaviour
             var tex = ScreenCapture.CaptureScreenshotAsTexture();
             File.WriteAllBytes(Path.Combine(_dir, $"view_{v.name}.png"), tex.EncodeToPNG());
             Destroy(tex);
-            log.Add($"{v.name}: at {v.pos} looking at {v.target}");
+            float adapted = eye != null ? eye.Offset : 0f;
+            log.Add($"{v.name}: at {v.pos} looking at {v.target} eye {adapted.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)}");
+            // -fpskitviewsreflpair: the same moment again with every reflection off, the exposure held, the world stopped
+            // (view_<name>_refloff.png): what the reflections add, light for light, with nothing else changed.
+            if (Array.IndexOf(args, "-fpskitviewsreflpair") >= 0)
+            {
+                float scale = Time.timeScale, intensity = RenderSettings.reflectionIntensity;
+                var probes = FindObjectsByType<ReflectionProbe>().Where(p => p.enabled).ToList();
+                var indoor = FindObjectsByType<IndoorReflections>().Where(i => i.enabled).ToList();
+                Time.timeScale = 0f;
+                if (eye != null) eye.Hold(adapted);
+                foreach (var i in indoor) i.enabled = false;
+                foreach (var p in probes) p.enabled = false;
+                RenderSettings.reflectionIntensity = 0f;
+                for (int k = 0; k < 3; k++) yield return null;
+                yield return new WaitForEndOfFrame();
+                var bare = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(_dir, $"view_{v.name}_refloff.png"), bare.EncodeToPNG());
+                Destroy(bare);
+                RenderSettings.reflectionIntensity = intensity;
+                foreach (var p in probes) p.enabled = true;
+                foreach (var i in indoor) i.enabled = true;
+                Time.timeScale = scale;
+                // ... and the first again in the same stopped moment, so the pair differs only in the reflections.
+                if (eye != null) eye.Hold(adapted);
+                Time.timeScale = 0f;
+                for (int k = 0; k < 3; k++) yield return null;
+                yield return new WaitForEndOfFrame();
+                var again = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(_dir, $"view_{v.name}_reflon.png"), again.EncodeToPNG());
+                Destroy(again);
+                Time.timeScale = scale;
+                if (eye != null) eye.Hold(held.TryGetValue(v.name, out float h) ? h : float.NaN);
+            }
         }
         log.Add($"quality {QualitySettings.names[QualitySettings.GetQualityLevel()]}");
         File.WriteAllLines(Path.Combine(_dir, "views.txt"), log);

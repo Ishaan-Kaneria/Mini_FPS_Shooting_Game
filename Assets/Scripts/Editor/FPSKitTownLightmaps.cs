@@ -429,21 +429,10 @@ namespace FPSKit.EditorTools
             string folder = scenePath.Substring(0, scenePath.Length - ".unity".Length);
             var probes = root.GetComponentsInChildren<ReflectionProbe>(true);
             int done = 0;
-            // Captured as High draws the rooms (the probe volumes on, which light the furniture and the people): under Low
-            // the furniture took the flat sky ambient and a refreshed room's reflection came out bright enough that the eye
-            // could not bring the room down to its level (137 of 255, 2026-10-31). URP makes the probe volumes when a camera
-            // first renders under the tier, so one is rendered first.
-            int was = QualitySettings.GetQualityLevel(), high = System.Array.IndexOf(QualitySettings.names, "High");
-            if (high >= 0) QualitySettings.SetQualityLevel(high, true);
-            var cam = Camera.main != null ? Camera.main : Object.FindAnyObjectByType<Camera>();
-            if (cam != null)
-            {
-                var rt = RenderTexture.GetTemporary(64, 64, 24);
-                try { RenderPipeline.SubmitRenderRequest(cam, new RenderPipeline.StandardRequest { destination = rt }); }
-                finally { RenderTexture.ReleaseTemporary(rt); }
-            }
-            try
-            {
+            // Captured as the probe volume bake leaves the editor, at its end (FPSKitTownGI.Bake), the rooms reflect as they are
+            // lit. Switched to Medium or High for it, or captured in the light-look refresh right after the indoor probes
+            // were placed, the mud walls' relief read wet and grey-blue; under Low a room came out too bright for the eye
+            // to bring down (137 of 255; all 2026-10-31).
             foreach (Transform view in pilot.transform)
             {
                 var look = view.Find("Look");
@@ -471,9 +460,7 @@ namespace FPSKit.EditorTools
                 }
                 probe.enabled = enabledWas;
             }
-            }
-            finally { QualitySettings.SetQualityLevel(was, true); }
-            Debug.Log($"[FPSKit] lightmap pilot: {done} room reflections captured (under {(high >= 0 ? "High" : QualitySettings.names[was])})");
+            Debug.Log($"[FPSKit] lightmap pilot: {done} room reflections captured (under {QualitySettings.names[QualitySettings.GetQualityLevel()]})");
         }
 
         /// <summary>After the bake: the lightmaps made, their size and memory, and what they cover.</summary>

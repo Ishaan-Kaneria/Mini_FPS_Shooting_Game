@@ -26,3 +26,17 @@ Real photographs the realism audit (`Docs/REALISM_AUDIT_*.md`) compares the aren
 | ref_08.jpg | Jabal Amman Second round-about.JPG | Producer (talk) | [CC BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0/) | https://commons.wikimedia.org/wiki/File:Jabal_Amman_Second_round-about.JPG |
 | ref_09.jpg | Facade in Old City - Yazd - Central Iran - 01 (7429747598) (2).jpg | Adam Jones from Kelowna, BC, Canada | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) | https://commons.wikimedia.org/wiki/File:Facade_in_Old_City_-_Yazd_-_Central_Iran_-_01_(7429747598)_(2).jpg |
 | ref_10.jpg | Ceiling made of date palm trunks.JPG | Michael Hermann | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | https://commons.wikimedia.org/wiki/File:Ceiling_made_of_date_palm_trunks.JPG |
+
+The interior lighting pilot (Part B) compares two old-house rooms and a lit shop against these, kept in
+`Build/Realism/reference_interiors/` (git-ignored; credits also in its `references.json`):
+
+| File | Photo | Author | Licence | Source |
+|---|---|---|---|---|
+| int_03.jpg | Kasbah Taourirt Ouarzazate interior DSCF6753.jpg | R Prazeres | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | https://commons.wikimedia.org/wiki/File:Kasbah_Taourirt_Ouarzazate_interior_DSCF6753.jpg |
+| int_04.jpg | Kasbah Taourirt Ouarzazate interior DSCF6815.jpg | R Prazeres | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | https://commons.wikimedia.org/wiki/File:Kasbah_Taourirt_Ouarzazate_interior_DSCF6815.jpg |
+| int_07.jpg | Nizwa Fort-Shawi room.JPG | Ji-Elle | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | https://commons.wikimedia.org/wiki/File:Nizwa_Fort-Shawi_room.JPG |
+| int_10.jpg | Yazd khane lariha (2).jpg | Shirvanbeigi | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | https://commons.wikimedia.org/wiki/File:Yazd_khane_lariha_(2).jpg |
+| shop_01.jpg | Grocery store in Medina Rabat 08.jpg | Mounir Neddi | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | https://commons.wikimedia.org/wiki/File:Grocery_store_in_Medina_Rabat_08.jpg |
+| shop_02.jpg | Grocery store in Medina Rabat 09.jpg | Mounir Neddi | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | https://commons.wikimedia.org/wiki/File:Grocery_store_in_Medina_Rabat_09.jpg |
+| shop_03.jpg | Fez, Marruecos - panoramio (42).jpg | Pilar Romero Meza | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | https://commons.wikimedia.org/wiki/File:Fez,_Marruecos_-_panoramio_(42).jpg |
+| shop_04.jpg | 7anot.jpg | Digoure | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | https://commons.wikimedia.org/wiki/File:7anot.jpg |

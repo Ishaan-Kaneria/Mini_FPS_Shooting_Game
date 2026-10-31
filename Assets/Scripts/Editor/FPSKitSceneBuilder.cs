@@ -577,7 +577,7 @@ namespace FPSKit.EditorTools
             EditorSceneManager.MarkSceneDirty(scene);
             SaveSceneAndRegister(scene, sceneName);
 
-            Selection.activeGameObject = player;
+            if (player != null) Selection.activeGameObject = player;     // the desert's bake re-opens the saved scene
 
             ReportMissingClips();
 

@@ -59,16 +59,29 @@ namespace FPSKit.EditorTools
         /// </summary>
         /// <summary>The light probes where people walk, from the side, against the sky ambient the walls take (0.6-1.4
         /// wanted; the bake logs it too, so a bad bake shows before VerifyTown). Needs the desert scene open.</summary>
-        public static float PeopleProbeRatio(out float probes, out float ambient)
+        public static float PeopleProbeRatio(out float probes, out float ambient) => PeopleProbeRatio(out probes, out ambient, out _);
+
+        /// <summary>The same, and the probes' light from below against the ambient's from below: mostly the sun thrown back
+        /// off the street, so a bake that lost the sun's bounce shows here and is not just scaled up.</summary>
+        public static float PeopleProbeRatio(out float probes, out float ambient, out float below)
         {
+            float Lum(Color x) => 0.2126f * x.r + 0.7152f * x.g + 0.0722f * x.b;
             float Side(UnityEngine.Rendering.SphericalHarmonicsL2 sh)
             {
                 var c = new Color[4];
                 sh.Evaluate(new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right }, c);
-                return c.Average(x => 0.2126f * x.r + 0.7152f * x.g + 0.0722f * x.b);
+                return c.Average(Lum);
+            }
+            float Below(UnityEngine.Rendering.SphericalHarmonicsL2 sh)
+            {
+                var c = new Color[1];
+                sh.Evaluate(new[] { Vector3.down }, c);
+                return Lum(c[0]);
             }
             ambient = Side(RenderSettings.ambientProbe);
+            float ambientBelow = Below(RenderSettings.ambientProbe);
             probes = 0f;
+            below = 0f;
             var walks = new[] { new Vector2(0f, -100f), new Vector2(11.5f, -60f), new Vector2(11.5f, -200f), new Vector2(135f, -60f),
                                 new Vector2(-130f, 20f), new Vector2(-200f, 0f), new Vector2(200f, 25f) };
             foreach (var w in walks)
@@ -76,7 +89,9 @@ namespace FPSKit.EditorTools
                 float y = Physics.Raycast(new Vector3(w.x, 300f, w.y), Vector3.down, out var hit, 600f) ? hit.point.y : 0f;
                 LightProbes.GetInterpolatedProbe(new Vector3(w.x, y + 1.2f, w.y), null, out var sh);
                 probes += Side(sh) / walks.Length;
+                below += Below(sh) / walks.Length;
             }
+            below /= Mathf.Max(0.001f, ambientBelow);
             return probes / Mathf.Max(0.001f, ambient);
         }
 

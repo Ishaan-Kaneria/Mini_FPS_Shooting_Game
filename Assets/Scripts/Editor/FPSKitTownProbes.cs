@@ -32,9 +32,12 @@ namespace FPSKit.EditorTools
         /// the pavers' albedo was 0.10 and the sand's 0.18; with the ground at its real 0.25-0.32 (the realism pass, step 1)
         /// the same 2.75 gave people 1.9 of the walls' ambient, most of it bounced up off the street (from below 1.70, sun
         /// off 0.69; the old ground 0.14-0.29). The bake is linear in it (0.62 at 2.75, 0.22 at 1.0): 1.15 brings the sides
-        /// back to about 0.8 of the walls' ambient, 2026-10-29.
+        /// back to about 0.8 of the walls' ambient, 2026-10-29. Only where the bake starts: it then calibrates itself to
+        /// TownProbeRatio (the same code baked 0.34 on 2026-10-30).
         /// </summary>
         private const float TownProbeIndirect = 1.15f;
+        /// <summary>What the bake aims the people's probes at, from the side, against the walls' ambient (VerifyTown: 0.6-1.4).</summary>
+        private const float TownProbeRatio = 0.8f;
 
         private static void PlaceTownLightProbes(Transform root)
         {
@@ -132,13 +135,12 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static void BakeTownProbes(UnityEngine.SceneManagement.Scene scene, string path)
         {
-            // BakeSavedTownProbes: the saved scene, opened here.
-            if (!scene.IsValid()) scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
-            if (_townProbeCount == 0)
-            {
-                var placed = GameObject.Find("TownLightProbes")?.GetComponent<LightProbeGroup>();
-                _townProbeCount = placed != null ? placed.probePositions.Length : 0;
-            }
+            // Always the saved scene, opened again (about 12 s). Baked in the build's own copy of it, the people's probes came
+            // out at 0.34 of the walls' ambient; the same scene saved, opened and baked gave 0.80 at the same strength
+            // (2026-10-30/31; the light from below was intact in the second). Everything after works on a saved scene too.
+            scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            var placed = GameObject.Find("TownLightProbes")?.GetComponent<LightProbeGroup>();
+            _townProbeCount = placed != null ? placed.probePositions.Length : 0;
             if (_townProbeCount == 0) return;
             var clock = System.Diagnostics.Stopwatch.StartNew();
             int contributors = 0;
@@ -217,6 +219,20 @@ namespace FPSKit.EditorTools
                     Lightmapping.ClearDiskCache();
                     ok = Lightmapping.Bake();
                 }
+                // Then to its level. Rebuilds of the same code baked the people's sides at 1.9, 0.8 and 0.34 of the walls'
+                // ambient (2026-10-30), and the bake is linear in its indirect strength, so one more bake at the strength
+                // scaled by what it missed lands it (twice at most). The strength is set per bake, not kept.
+                for (int pass = 1; pass <= 2 && ok && (LightmapSettings.lightProbes?.count ?? 0) > 0; pass++)
+                {
+                    float measured = FPSKitTownTest.PeopleProbeRatio(out float s0, out float a0, out float b0);
+                    if (measured >= TownProbeRatio - 0.1f && measured <= TownProbeRatio + 0.1f) break;
+                    float was = settings.indirectScale;
+                    settings.indirectScale = Mathf.Clamp(was * TownProbeRatio / Mathf.Max(0.05f, measured), 0.25f, 6f);
+                    Debug.Log($"[FPSKit] town light probes: people's sides {measured:0.00} of the walls' ambient ({s0:0.00} against {a0:0.00}, " +
+                              $"from below {b0:0.00} of the ambient's) at indirect {was:0.00}; baking again at {settings.indirectScale:0.00} ({pass})");
+                    EditorUtility.SetDirty(settings);
+                    ok = Lightmapping.Bake();
+                }
             }
             finally { foreach (var p in reflection) p.enabled = true; QualitySettings.SetQualityLevel(quality, true); }
             if ((LightmapSettings.lightProbes?.count ?? 0) == 0) Debug.LogError("[FPSKit] town light probes: none baked (VerifyTown fails on it)");
@@ -225,9 +241,10 @@ namespace FPSKit.EditorTools
                 foreach (var guid in AssetDatabase.FindAssets("ReflectionProbe-", new[] { dataFolder }))
                     AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(guid));
             var probes = LightmapSettings.lightProbes;
-            float ratio = FPSKitTownTest.PeopleProbeRatio(out float sides, out float ambient);
+            float ratio = FPSKitTownTest.PeopleProbeRatio(out float sides, out float ambient, out float below);
             Debug.Log($"[FPSKit] town light probes baked: {(ok ? "done" : "FAILED")}, {probes?.count ?? 0} probes, {contributors} contributing meshes, " +
-                      $"{LightmapSettings.lightmaps.Length} lightmaps (0 wanted), people's sides {ratio:0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00}), {clock.Elapsed.TotalSeconds:0}s");
+                      $"{LightmapSettings.lightmaps.Length} lightmaps (0 wanted), people's sides {ratio:0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00}, " +
+                      $"from below {below:0.00} of the ambient's) at indirect {settings.indirectScale:0.00}, {clock.Elapsed.TotalSeconds:0}s");
             EditorSceneManager.SaveScene(scene, path);
             // Then the real bounced light, for High and Medium (Docs/DESIGN_NOTES.md "Real light: adaptive probe volumes").
             // FPSKIT_SKIP_APV=1: leave the adaptive probe bake to FPSKitBatch.BakeDesertLight on the saved scene. Baked in the
@@ -235,7 +252,9 @@ namespace FPSKit.EditorTools
             if (System.Environment.GetEnvironmentVariable("FPSKIT_SKIP_APV") == "1") Debug.Log("[FPSKit] town GI: skipped (FPSKIT_SKIP_APV); bake it with FPSKitBatch.BakeDesertLight");
             else if (!FPSKitTownGI.BakeNow(scene, path)) Debug.LogError("[FPSKit] town GI: the adaptive probe volume bake failed");
             else Debug.Log($"[FPSKit] town light probes after the adaptive probe bake: people's sides {FPSKitTownTest.PeopleProbeRatio(out sides, out ambient):0.00} of the walls' ambient ({sides:0.00} against {ambient:0.00})");
-            FPSKitTownOcclusion.Bake();     // what the streets' buildings hide is not drawn
+            // FPSKIT_SKIP_OCCLUSION=1: a re-bake of the probes alone keeps the occlusion data it has (210 s, 22 MB rewritten).
+            if (System.Environment.GetEnvironmentVariable("FPSKIT_SKIP_OCCLUSION") != "1")
+                FPSKitTownOcclusion.Bake();     // what the streets' buildings hide is not drawn
             EditorSceneManager.SaveScene(scene, path);
         }
     }

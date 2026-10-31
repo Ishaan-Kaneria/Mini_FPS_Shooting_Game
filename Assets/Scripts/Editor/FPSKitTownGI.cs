@@ -41,7 +41,7 @@ namespace FPSKit.EditorTools
         /// its brightness on screen (lighting tour, 150 to 110), the soldier in face_shade went nearly black and rooms
         /// 5-34 %; the brighter street does not make it up, a shaded wall being lit by the sky and the other walls. 1.8 kept.
         /// </summary>
-        const float ApvIndirect = 1.8f;
+        internal const float ApvIndirect = 1.8f;
 
         /// <summary>
         /// The sky's share of the bake against the scene's own ambient strength. With everything on probes a shaded street
@@ -49,7 +49,7 @@ namespace FPSKit.EditorTools
         /// the plain sky a man in a building's shade read darker than the old flat ambient left him (the lighting tour,
         /// face_shade): his face was the thing asked to be more visible. 1.8 and 1.3.
         /// </summary>
-        const float ApvSky = 1.3f;
+        internal const float ApvSky = 1.3f;
 
         /// <summary>Metres the probe volume spans across the town (the arena is a kilometre; a little over for its edge).</summary>
         const float TownSpan = 1060f;

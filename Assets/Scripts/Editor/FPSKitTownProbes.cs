@@ -208,9 +208,23 @@ namespace FPSKit.EditorTools
             int quality = QualitySettings.GetQualityLevel();
             int low = System.Array.IndexOf(QualitySettings.names, "Low");
             if (low >= 0) QualitySettings.SetQualityLevel(low, true);
+            // With the lightmap pilot the bake runs at the adaptive probe volumes' strength (their bounce and sky: a
+            // lightmapped room next to a probe-lit one must not be the darker for it; at the people's 1.15 the pilot's rooms
+            // came out at half the brightness, 2026-10-31), and the people's probes are then scaled down to their level in
+            // place (Unity 6.6 has no probes-only bake: BakeLightProbesOnly is obsolete and refused).
+            float sky = RenderSettings.ambientIntensity;
+            bool BakeAll()
+            {
+                if (pilot == null) return Lightmapping.Bake();
+                float probeIndirect = settings.indirectScale;
+                settings.indirectScale = FPSKitTownGI.ApvIndirect;
+                RenderSettings.ambientIntensity = sky * FPSKitTownGI.ApvSky;
+                try { return Lightmapping.Bake(); }
+                finally { settings.indirectScale = probeIndirect; RenderSettings.ambientIntensity = sky; EditorUtility.SetDirty(settings); }
+            }
             try
             {
-                ok = Lightmapping.Bake();
+                ok = BakeAll();
                 // Now and then (one build in five on 2026-10-21) the bake finishes and keeps no probes at all; the gun, the
                 // civilians and the cars then had no light but the sun. Baked again from a clear cache, it keeps them.
                 for (int again = 1; again <= 2 && (LightmapSettings.lightProbes?.count ?? 0) < _townProbeCount * 0.9f; again++)
@@ -219,12 +233,24 @@ namespace FPSKit.EditorTools
                                      $"clearing the GI cache and baking again ({again})");
                     Lightmapping.Clear();
                     Lightmapping.ClearDiskCache();
-                    ok = Lightmapping.Bake();
+                    ok = BakeAll();
                 }
                 // Then to its level. Rebuilds of the same code baked the people's sides at 1.9, 0.8 and 0.34 of the walls'
                 // ambient (2026-10-30), and the bake is linear in its indirect strength, so one more bake at the strength
                 // scaled by what it missed lands it (twice at most). The strength is set per bake, not kept.
-                for (int pass = 1; pass <= 2 && ok && (LightmapSettings.lightProbes?.count ?? 0) > 0; pass++)
+                if (pilot != null && ok && (LightmapSettings.lightProbes?.count ?? 0) > 0)
+                {
+                    float measured = FPSKitTownTest.PeopleProbeRatio(out float s0, out float a0, out float b0);
+                    float k = TownProbeRatio / Mathf.Max(0.05f, measured);
+                    var sh = LightmapSettings.lightProbes.bakedProbes;
+                    for (int i = 0; i < sh.Length; i++) sh[i] *= k;
+                    LightmapSettings.lightProbes.bakedProbes = sh;
+                    EditorUtility.SetDirty(LightmapSettings.lightProbes);
+                    if (Lightmapping.lightingDataAsset != null) EditorUtility.SetDirty(Lightmapping.lightingDataAsset);
+                    Debug.Log($"[FPSKit] town light probes: baked with the lightmaps at {measured:0.00} of the walls' ambient ({s0:0.00} against {a0:0.00}, " +
+                              $"from below {b0:0.00} of the ambient's); scaled by {k:0.000} to {TownProbeRatio:0.00}");
+                }
+                for (int pass = 1; pass <= 2 && pilot == null && ok && (LightmapSettings.lightProbes?.count ?? 0) > 0; pass++)
                 {
                     float measured = FPSKitTownTest.PeopleProbeRatio(out float s0, out float a0, out float b0);
                     if (measured >= TownProbeRatio - 0.1f && measured <= TownProbeRatio + 0.1f) break;

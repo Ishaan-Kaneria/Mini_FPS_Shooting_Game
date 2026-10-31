@@ -21,16 +21,18 @@ namespace FPSKit.EditorTools
     ///   * the furniture in them shades the bake (Contribute GI) but stays on the probes (no lightmap of its own);
     ///   * by day the houses' lamps are off (FPSKitTownInterior); a trading shop's tubes are on, as baked lights over the
     ///     fittings (FPSKitTownShopfront.ShopTubes), so they cost nothing to draw.
-    /// Run inside the classic probe bake (FPSKitTownProbes.BakeTownProbes), which is one bake for both. The adaptive probe
-    /// volume bake after it leaves anything with a lightmap on it (FPSKitTownGI).
+    /// Run inside the classic probe bake (FPSKitTownProbes.BakeTownProbes), at the adaptive probe volumes' strength; the
+    /// people's probes from the same bake are then scaled down to their own level. The adaptive probe volume bake after it leaves anything with a
+    /// lightmap on it (FPSKitTownGI).
     /// </summary>
     public static class FPSKitTownLightmaps
     {
         /// <summary>Lightmap texels a metre on the pilot's surfaces: 5 cm, a skirting's height; a corner's darkening reads.</summary>
         public const float TexelsPerMetre = 20f;
 
-        /// <summary>A shop tube's brightness as a baked area light (a 6 cm by 1.2 m strip under the tube).</summary>
-        const float TubeIntensity = 8f;
+        /// <summary>A shop tube's brightness as a baked area light (a 6 cm by 1.2 m strip under the tube). At 8 the tubes showed
+        /// and lit almost nothing: the back wall came out darker than the flat paint it replaced (2026-10-31).</summary>
+        const float TubeIntensity = 20f;
 
         /// <summary>A cool white, as the tubes in the reference shops (Build/Realism/reference_interiors/shop_01-03).</summary>
         static readonly Color TubeColour = new Color(0.94f, 0.97f, 1f);

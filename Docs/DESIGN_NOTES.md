@@ -4198,3 +4198,40 @@ with evidence images in `Build/Realism/<Arena>/` (not in git).
   Medium walk 47.0 -> 45.2 fps (the walk does not pass the pilot rooms: the separate shop insides or heat noise), High
   19.8 -> 19.6, resident memory +33 MB. The whole town (about 250,000 m²) from the pilot's rate: 20/m ~510 MB and ~5 h,
   10/m ~130 MB and ~1.2 h, 8/m ~80 MB and ~50 min, 5/m ~30 MB and ~20 min.
+
+### Pilot 2: the eye meters, the light comes from the openings (2026-10-31, after his review)
+
+* **His answers to pilot 1**: too dark (room 2 at 12 of 255); fix it with the eye adapting, not more bounce; rooms 90-120
+  adapted, crushed under 5 %, no clipped walls; a soldier in the darkest corner visible from the doorway; show the light
+  coming from the openings; 10 cm texels where you can walk in, 20 cm where you only look in; not the whole town yet;
+  push first; then the 60 fps costs.
+* **The eye meters the picture** (`EyeAdaptation`): a pass added at render time to the player's post-processing camera
+  shrinks the colour, **before post-processing**, to 48 x 27 on the GPU; read back every third frame without a stall. Each
+  sample's screen value is worked out through the exposure, ACES (Narkowicz's fit) and a measured grade offset (-0.9
+  stops: the fit alone read 1.32-1.39x brighter than the screen on the same seven views); the exposure is found by halving
+  that brings the middle of the view (the darkest twentieth and the brightest fifth left out) to 94, held where no more
+  than 6 % would be white; opened at most 6.5 stops, capped by the roof test (0 under open sky: the streets are as they
+  were). Metered **after** post-processing first: the pass needed `requiresIntermediateTexture` and Medium's post went
+  1.1 -> 6.8 ms; before it, 0.4 ms. A flat +0.6 stops left a room lit by two small windows at 12; 1.6 burned white rooms.
+* **The light did come from the openings** (`FPSKitTownLightmaps.BatchLightReport`: a 25 cm flood fill of each room held
+  in by the door heads, its openings and which the sun enters, the lightmap read back through the GPU): the baked light
+  falls 8-27x from an opening to the far side and the ceiling over the sun's patch is 2-3x the rest. Pilot 1's views stood
+  at each room's way in looking away from its door. Each room now has a second view from its far side facing its light,
+  and a third room was added whose door the sun comes in at (`ViewProbe.PilotViews`).
+* **The rooms' own reflections.** Every house and shop shows one warm room cubemap; under the opened eye it laid an even
+  sheen over a lightmapped room (with all reflections off the fall-off showed; with only the indoor probes off the walls
+  reflected the sky). The pilot rooms' probes are captured box-projected from the room's middle **at the end of the probe
+  volume bake** (`CaptureReflections`). Captured in the light-look refresh right after the probes were placed (any tier)
+  the mud walls read wet and grey-blue; under Low a room was too bright for the eye to bring down (137).
+* **The arms indoors**: in the shade they keep the sun's share less by the stops the eye opened (`FirstPersonShade`). At a
+  doorway they still read pale: the 3 m probe grid there sees the street (physically, a hand in a doorway is in its light).
+* **Results** (release build, High, adapted): rooms 100-114 from their way in, 107-126 facing their openings, clipped 0-6 %
+  (the openings), crushed under 0.5 %; the shop 107; streets 130/90/90 unchanged. The tour: unlit old-house rooms 55-74
+  -> about 100, crushed 20-25 % -> 0-3 % (the second old house's majlis 11.7 %). Soldiers in the far corners visible from
+  the doorways (room 2 the weakest by brightness; he reads by colour).
+* **Town at his split** (10 cm walk-in, 20 cm seen-only): houses 264,700 m², walk-in shops 8,900, seen-only 23,500; 28 M
+  texels, about 47 lightmaps of 1024² at the pilot's 57 % packing, about 130 MB (65 without direction), 1.4-2.4 h to bake.
+* **GPU on Medium** (`FrameCostProbe`, median of seven views, ±2-3 ms between runs at this laptop's heat): sun shadows
+  6.5-7.5 ms (small props' 0.3-3.4 of it), SMAA 1.7-3.0, the arms camera 0.8-2.8, transparent 2.1, shadows 80 -> 50 m 1.1,
+  post 0.4. `cost-bench` freezes the player while a board sensor is at its 75 C limit (its numbers are medians); the walk
+  bench stops instead (a pause would count as one long frame).

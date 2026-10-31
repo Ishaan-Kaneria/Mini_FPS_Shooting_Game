@@ -109,10 +109,7 @@ namespace FPSKit.EditorTools
             // The gloved arms and the sleeve only: the pack's bare-armed mesh lies under the gloved one,
             // and with both drawn the skin showed through the gloves in white patches.
             var arms = BuildArmsPrefab();
-            // The player's own body: what is seen looking down, and the leg that kicks. No
-            // head and no arms (the first-person arms are separate); one vest.
-            bool BodyPart(string n) => n.Contains("Pants") || n.Contains("Boots") || n == "SK_Military_Shirt3" || n == "SK_Military_Vest1";
-            var legs = BuildBody(BodySource, "FP_Body", keep: BodyPart, enable: BodyPart);
+            var legs = BuildBodyPrefab();
             if (AssetDatabase.LoadAssetAtPath<GameObject>(Folder + "/FP_Legs.prefab") != null)
                 AssetDatabase.DeleteAsset(Folder + "/FP_Legs.prefab");
             var material = GunMaterial();
@@ -179,6 +176,23 @@ namespace FPSKit.EditorTools
             BuildArmsPrefab();
         }
 
+        /// <summary>The player's own body: what is seen looking down, and the leg that kicks. No head and no arms (the
+        /// first-person arms are separate); one vest. In the cloth and leather copies, as the arms are.</summary>
+        static GameObject BuildBodyPrefab()
+        {
+            bool BodyPart(string n) => n.Contains("Pants") || n.Contains("Boots") || n == "SK_Military_Shirt3" || n == "SK_Military_Vest1";
+            return BuildBody(BodySource, "FP_Body", keep: BodyPart, enable: BodyPart, cloth: true);
+        }
+
+        /// <summary>The first-person arms and body alone (FPSKitBatch.BuildPlayerBody): the guns reference both prefabs, so
+        /// remaking them changes no gun.</summary>
+        public static void BuildArmsAndBody()
+        {
+            EnsureFolder(Folder);
+            BuildArmsPrefab();
+            BuildBodyPrefab();
+        }
+
         static GameObject BuildArmsPrefab()
         {
             // The gloved arms and the sleeve only: the pack's bare-armed mesh lies under the gloved one,
@@ -242,14 +256,14 @@ namespace FPSKit.EditorTools
         /// The arms' gloves and sleeve as the realism audit asked (2026-10-28): the pack's gloves went down to albedo 0.000
         /// and 0.01 on average (blacker than black leather or cloth, about 0.04; URP's validation flagged them) with a
         /// smoothness of 0.70 (Autodesk Interactive, roughness 0.3), and the shirt to 0.000 in patches. A URP Lit copy under
-        /// FPSKit_Generated: the albedo lifted so its darkest texels are 0.035, the pack's normal and occlusion kept,
-        /// smoothness 0.30 (gloves) and 0.15 (shirt). The pack's own files are left as they are.
+        /// FPSKit_Generated: the albedo lifted so its darkest texels are 0.035, the pack's normal and occlusion kept, the
+        /// smoothness of the real surface (ClothSmoothness). The pack's own files are left as they are.
         /// </summary>
         static Material Cloth(Material src)
         {
             if (src == null) return null;
-            bool gloves = src.name.Contains("Gloves");
-            if (!gloves && !src.name.Contains("Shirt")) return src;
+            float smooth = ClothSmoothness(src.name);
+            if (smooth < 0f) return src;
             string dir = Folder + "/Cloth";
             EnsureFolder(dir);
             var tex = src.HasProperty("_MainTex") ? src.GetTexture("_MainTex") as Texture2D : null;
@@ -269,10 +283,20 @@ namespace FPSKit.EditorTools
             m.SetTexture("_MetallicGlossMap", null);
             m.DisableKeyword("_METALLICSPECGLOSSMAP");
             m.SetFloat("_Metallic", 0f);
-            m.SetFloat("_Smoothness", gloves ? 0.30f : 0.15f);
+            m.SetFloat("_Smoothness", smooth);
             if (create) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
             return m;
         }
+
+        /// <summary>
+        /// The smoothness each of the player's parts is drawn with, from its real surface, or -1 to leave the pack's
+        /// material: leather gloves 0.30, the skin of the hands 0.35, boots 0.30, the vest's nylon 0.20, trousers, shirt and
+        /// cap 0.15. The pack's own (Autodesk Interactive, roughness 0.5) left the hands and the body at 0.50, and indoors,
+        /// under a room's reflection, the gloves read pale and silvery (his report, 2026-10-31).
+        /// </summary>
+        static float ClothSmoothness(string name) =>
+            name.Contains("Gloves") ? 0.30f : name.Contains("Hands") ? 0.35f : name.Contains("Boots") ? 0.30f :
+            name.Contains("Vest") ? 0.20f : name.Contains("Shirt") || name.Contains("Pants") || name.Contains("Cap") ? 0.15f : -1f;
 
         /// <summary>A copy of <paramref name="src"/> with its darkest texels lifted to <paramref name="floor"/> (linear), the
         /// rest scaled to keep its whites: read from the file, written beside the cloth materials, imported as sRGB.</summary>

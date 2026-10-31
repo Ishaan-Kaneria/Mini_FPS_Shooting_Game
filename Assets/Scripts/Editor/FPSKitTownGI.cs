@@ -51,6 +51,10 @@ namespace FPSKit.EditorTools
         /// </summary>
         internal const float ApvSky = 1.3f;
 
+        /// <summary>Probe levels in the baking set: 1 m (the lightmapped insides' own volumes) up to 81 m in open air. The
+        /// town's volume stops at the level above, 3 m.</summary>
+        const int InteriorProbeDepth = 4;
+
         /// <summary>Metres the probe volume spans across the town (the arena is a kilometre; a little over for its edge).</summary>
         const float TownSpan = 1060f;
 
@@ -154,7 +158,7 @@ namespace FPSKit.EditorTools
                 }
                 if (!any) continue;
                 box.Expand(2f * RoomPad);
-                Probe("RoomProbe_" + house.GetSiblingIndex(), box, 1f);
+                Probe("RoomProbe_" + house.GetSiblingIndex(), box, HouseReflection);
                 houses++;
             }
             // A shop: its mark is its inside as a unit box (FPSKitTownShopfront); the probe's box is world-aligned, as the
@@ -171,7 +175,7 @@ namespace FPSKit.EditorTools
                 for (int c = 0; c < 8; c++)
                     box.Encapsulate(shop.TransformPoint(new Vector3((c & 1) != 0 ? sx : -sx, (c & 2) != 0 ? sy : -sy, (c & 4) != 0 ? front : back)));
                 bool isDark = shop.name.EndsWith(" dark");
-                Probe("ShopProbe_" + shop.GetSiblingIndex(), box, isDark ? ShopDarkReflection : 1f);
+                Probe("ShopProbe_" + shop.GetSiblingIndex(), box, isDark ? ShopDarkReflection : ShopLitReflection);
                 if (isDark) dark++; else lit++;
             }
             root.AddComponent<IndoorReflections>();
@@ -250,9 +254,17 @@ namespace FPSKit.EditorTools
         /// of the room takes the whole of it.</summary>
         const float RoomBlend = 0.05f;
 
-        /// <summary>How bright the room a dark shop reflects is against a lit one's: its walls are the dark interior paint
-        /// (0.16 against 0.34).</summary>
-        const float ShopDarkReflection = 0.45f;
+        /// <summary>How bright a dark shop reflects (its walls the dark interior paint, 0.16 against 0.34, and less light).</summary>
+        const float ShopDarkReflection = 0.25f;
+
+        /// <summary>
+        /// How bright a house's rooms reflect, against the room cubemap's own values (walls 0.23, ceiling 0.33): the light in
+        /// a room is far less. Measured on the lightmapped pilot rooms (FPSKitTownLightmaps.BatchGlossAudit, 2026-10-31): 0.014
+        /// to 0.024 arriving, a wall giving back half, so about 0.01 -- a twentieth to a fortieth of the cubemap, which at
+        /// full strength laid a milky sheen over every wall under the adapted eye. A lit shop has about 0.34 arriving (0.17
+        /// back): <see cref="ShopLitReflection"/>; a dark one (shut half way, or unlit) a third of that.
+        /// </summary>
+        const float HouseReflection = 0.04f, ShopLitReflection = 0.7f;
 
         /// <summary>
         /// The room every indoor surface reflects: a lit ceiling overhead, pale walls round, a darker floor below, warm, at about
@@ -378,6 +390,30 @@ namespace FPSKit.EditorTools
             volume.transform.localScale = Vector3.one;
             volume.size = new Vector3(TownSpan, 90f, TownSpan);
             volume.fillEmptySpaces = false;
+            // 3 m over the town as before, 1 m inside the rooms with lightmaps: the arms, the gun and the soldiers in a room
+            // are lit by the probes, and at 3 m a room's probes were half in the street at its doors (the hands read pale
+            // there, his report 2026-10-31). The set's finest spacing is 1 m; the town's volume stops a level short of it
+            // (3 m), and each lightmapped inside has a volume of its own that does not.
+            volume.overridesSubdivLevels = true;
+            volume.lowestSubdivLevelOverride = 0;
+            volume.highestSubdivLevelOverride = InteriorProbeDepth - 1;
+            foreach (var old in Object.FindObjectsByType<ProbeVolume>(FindObjectsSortMode.None).Where(v => v.name.StartsWith("InteriorProbes_")).ToList())
+                Object.DestroyImmediate(old.gameObject);
+            int interiorVolumes = 0;
+            foreach (var group in new[] { "Arena/Buildings/HouseInteriors", "Arena/Buildings/ShopInteriors" })
+                if (GameObject.Find(group) is GameObject insides)
+                    foreach (var r in insides.GetComponentsInChildren<MeshRenderer>(true))
+                    {
+                        if (r.name.StartsWith("Detail_") || r.receiveGI != ReceiveGI.Lightmaps || r.lightmapIndex < 0 || r.lightmapIndex >= 0xFFFE) continue;
+                        var go = new GameObject("InteriorProbes_" + r.name);
+                        go.transform.SetParent(volume.transform.parent, false);
+                        go.transform.position = r.bounds.center;
+                        var pv = go.AddComponent<ProbeVolume>();
+                        pv.mode = ProbeVolume.Mode.Local;
+                        pv.size = r.bounds.size + Vector3.one * 1f;
+                        pv.fillEmptySpaces = false;     // a room's air is never 3 m from a wall, floor or ceiling: all of it is fine
+                        interiorVolumes++;
+                    }
 
             // The baking set: this scene alone.
             string setPath = path.Replace(".unity", "_APV.asset");
@@ -391,8 +427,8 @@ namespace FPSKit.EditorTools
             }
             // 3 m wherever there is geometry (a room gets two or three across; the contact shading under and round small
             // things is SSAO's), up to 81 m in open air. At 1 m the town wanted more than Unity's 67,180,350 probes a set.
-            set.minDistanceBetweenProbes = 3f;
-            set.simplificationLevels = 3;
+            set.minDistanceBetweenProbes = 1f;
+            set.simplificationLevels = InteriorProbeDepth;     // 1, 3, 9, 27, 81 m: the same 243 m cells as 3 m with 3 levels
             // The grid lifted half a spacing: from the ground at 0 its layers fell at 0, 3 and 6 m, in the floor slabs of
             // the town's 3.2 m storeys, and floors read probes buried in them (dark, sky-blue floors under bright walls, the
             // lighting tour). At 1.5 and 4.5 m they are in the middle of each storey's rooms.
@@ -549,7 +585,7 @@ namespace FPSKit.EditorTools
                 // The set's data lies beside it: <set>.Cell*.bytes and <set>-<scenario>.Cell*.bytes.
                 string dir = System.IO.Path.GetDirectoryName(setPath), stem = System.IO.Path.GetFileNameWithoutExtension(setPath);
                 foreach (var f in System.IO.Directory.GetFiles(dir, stem + "*.bytes")) bytes += new System.IO.FileInfo(f).Length;
-                Debug.Log($"[FPSKit] town GI (APV) {(ok ? "baked" : "FAILED")}: {cells} cells, {bytes / 1048576f:0} MB of probe data, {statics} static renderers ({bouncing} bouncing, {idle.Count} switched off for it), " +
+                Debug.Log($"[FPSKit] town GI (APV) {(ok ? "baked" : "FAILED")}: {cells} cells, {bytes / 1048576f:0} MB of probe data, {statics} static renderers ({bouncing} bouncing, {idle.Count} switched off for it), {interiorVolumes} 1 m interior volumes, " +
                           $"{clock.Elapsed.TotalMinutes:0.0} min, {(settings != null ? settings.lightmapper.ToString() : "?")}");
                 // The lightmapped rooms' reflections, captured from the rooms as they are now lit (FPSKitTownLightmaps).
                 if (ok) FPSKitTownLightmaps.CaptureReflections(path);

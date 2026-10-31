@@ -45,6 +45,16 @@ public class ViewProbe : MonoBehaviour
         {
             foreach (Transform v in baked.transform)
                 if (v.Find("Look") is Transform look) views.Add((v.name, v.position, look.position));
+            // Each room from its house's front doorway, on the threshold, looking in: the hands in the doorway's light (his
+            // ask, 2026-10-31). Worked out here, from the house's door mark, so any build of the scene can show it.
+            var houses = GameObject.Find("HouseRooms");
+            foreach (var (name, pos, target) in views.Where(v => v.Item1.StartsWith("room_") && !v.Item1.Contains("_openings")).ToList())
+            {
+                var house = houses == null ? null : houses.transform.Cast<Transform>()
+                    .FirstOrDefault(h => h.Cast<Transform>().Any(r => r.name.StartsWith("Room ") && (r.position - pos).sqrMagnitude < 0.01f));
+                if (house != null && house.Find("Door") is Transform door)
+                    views.Add((name + "_doorway", Vector3.Lerp(new Vector3(door.position.x, pos.y, door.position.z), pos, 0.5f), target + Vector3.up * 1.1f));
+            }
             if (views.Count > 0) return views;
         }
         var rooms = GameObject.Find("HouseRooms");

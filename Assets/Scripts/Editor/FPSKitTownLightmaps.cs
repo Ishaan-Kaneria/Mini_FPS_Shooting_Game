@@ -231,7 +231,7 @@ namespace FPSKit.EditorTools
             {
                 var look = view.Find("Look");
                 // The rooms (each from its way in) and the shop; not the second views facing the light.
-                if (look != null && !view.name.EndsWith("_openings")) RoomReport(sb, view.name, view.name == "shop" ? look.position : view.position, toSun, mask, Baked);
+                if (look != null && !view.name.EndsWith("_openings") && !view.name.EndsWith("_doorway")) RoomReport(sb, view.name, view.name == "shop" ? look.position : view.position, toSun, mask, Baked);
             }
             return sb.ToString();
         }
@@ -413,12 +413,16 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The pilot's rooms reflect themselves. Every house and shop has a box reflection probe showing one small warm room
-        /// cubemap (FPSKitTownGI.PlaceIndoorReflections), set for the rooms' old brightness; under the adapted eye it laid an
-        /// even milky sheen over a lightmapped room's walls and floor that hid the fall-off from its openings (the views with
-        /// every reflection off showed it, 2026-10-31). The pilot's rooms' probes are captured from the room's middle at
-        /// 1.5 m (the shop's middle), with box projection, after the bakes, so they reflect the room as lit. Needs a graphics
-        /// device (UNITY_GRAPHICS=1): captured headless, probes drew everything flat white.
+        /// The pilot's rooms reflect themselves, as bright as they are lit. Every house and shop has a box reflection probe
+        /// showing one small warm room cubemap (FPSKitTownGI.PlaceIndoorReflections). Each pilot room gets a probe of its own,
+        /// boxed to the room (its floor as FindRoom finds it, floor to ceiling), box projected, captured from the room's
+        /// middle at 1.5 m at the end of the probe volume bake (the shop keeps its own shop's probe). The capture is then set
+        /// to the room's own brightness: its typical texel (the median of the 768 x 128 strip) brought to the light the
+        /// room's lightmap says arrives, times the room's albedo. Captured as it came, a room's reflection was 17-24x the
+        /// room (median 0.28-0.41 against 0.014-0.024 arriving: the walls in it looked lit by the open sky, and the
+        /// reflection's sheen matched the walls' own light, the milky look he saw, 2026-10-31). Captured in the light-look
+        /// refresh right after the probes were placed, the mud walls read wet and grey-blue; under Low a room came out too
+        /// bright for the eye to bring down. Needs a graphics device (UNITY_GRAPHICS=1).
         /// </summary>
         public static void CaptureReflections(string scenePath)
         {
@@ -427,40 +431,247 @@ namespace FPSKit.EditorTools
             if (pilot == null || root == null) return;
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null) { Debug.LogWarning("[FPSKit] lightmap pilot: no graphics device, room reflections not captured"); return; }
             string folder = scenePath.Substring(0, scenePath.Length - ".unity".Length);
-            var probes = root.GetComponentsInChildren<ReflectionProbe>(true);
-            int done = 0;
-            // Captured as the probe volume bake leaves the editor, at its end (FPSKitTownGI.Bake), the rooms reflect as they are
-            // lit. Switched to Medium or High for it, or captured in the light-look refresh right after the indoor probes
-            // were placed, the mud walls' relief read wet and grey-blue; under Low a room came out too bright for the eye
-            // to bring down (137 of 255; all 2026-10-31).
+            var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).FirstOrDefault(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
+            Vector3 toSun = sun != null ? -sun.transform.forward : Vector3.up;
+            int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian");
+            var maps = ReadableLightmaps();
+            var lines = new List<string>();
             foreach (Transform view in pilot.transform)
             {
                 var look = view.Find("Look");
-                if (look == null || view.name.EndsWith("_openings")) continue;
+                if (look == null || view.name.EndsWith("_openings") || view.name.EndsWith("_doorway")) continue;
                 bool shop = view.name == "shop";
-                Vector3 inRoom = shop ? look.position : look.position + Vector3.up * 0.2f;
-                // The probe whose box holds the room: the smallest.
-                var probe = probes.Where(p => new Bounds(p.transform.position + p.center, p.size).Contains(inRoom))
-                                  .OrderBy(p => p.size.x * p.size.y * p.size.z).FirstOrDefault();
-                if (probe == null) { Debug.LogWarning($"[FPSKit] lightmap pilot: no room probe at {view.name}"); continue; }
-                var box = new Bounds(probe.transform.position + probe.center, probe.size);
-                var capture = shop ? look.position : look.position + Vector3.up * 1.2f;
+                ReflectionProbe probe;
+                Vector3 capture;
+                if (shop)
+                {
+                    probe = root.GetComponentsInChildren<ReflectionProbe>(true).Where(p => new Bounds(p.transform.position + p.center, p.size).Contains(look.position))
+                                .OrderBy(p => p.size.x * p.size.y * p.size.z).FirstOrDefault();
+                    if (probe == null) { Debug.LogWarning("[FPSKit] lightmap pilot: no shop probe"); continue; }
+                    capture = look.position;
+                }
+                else
+                {
+                    var room = FindRoom(view.position, toSun, mask);
+                    if (room.cells.Count * RoomShape.Cell * RoomShape.Cell < 4f) room = FindRoom(look.position, toSun, mask);
+                    if (room.cells.Count == 0) continue;
+                    float half = RoomShape.Cell * 0.5f + 0.1f;
+                    var min = new Vector3(room.cells.Min(c => c.x) * RoomShape.Cell - half, room.floorY - 0.1f, room.cells.Min(c => c.y) * RoomShape.Cell - half);
+                    var max = new Vector3(room.cells.Max(c => c.x) * RoomShape.Cell + half, room.ceilY + 0.1f, room.cells.Max(c => c.y) * RoomShape.Cell + half);
+                    var box = new Bounds((min + max) * 0.5f, max - min);
+                    capture = room.Centroid + Vector3.up * 1.5f;
+                    var go = new GameObject("PilotRoomProbe_" + view.name);
+                    go.transform.SetParent(root.transform, false);
+                    go.transform.position = capture;
+                    probe = go.AddComponent<ReflectionProbe>();
+                    probe.mode = ReflectionProbeMode.Custom;
+                    probe.size = box.size;
+                    probe.center = box.center - capture;
+                    probe.blendDistance = 0.05f;
+                    probe.importance = 3;               // over its house's probe
+                }
                 probe.transform.position = capture;
-                probe.center = box.center - capture;
                 probe.boxProjection = true;
                 probe.resolution = 128;
+                probe.intensity = 1f;
                 bool enabledWas = probe.enabled;
                 probe.enabled = true;
                 string path = $"{folder}/PilotReflection_{view.name}.exr";
-                if (Lightmapping.BakeReflectionProbe(probe, path))
-                {
-                    AssetDatabase.ImportAsset(path);
-                    var tex = AssetDatabase.LoadAssetAtPath<Texture>(path);
-                    if (tex != null) { probe.customBakedTexture = tex; done++; }
-                }
-                probe.enabled = enabledWas;
+                bool baked = Lightmapping.BakeReflectionProbe(probe, path);
+                probe.enabled = shop && enabledWas;     // IndoorReflections switches them on near the eye
+                if (!baked) continue;
+                AssetDatabase.ImportAsset(path);
+                var tex = AssetDatabase.LoadAssetAtPath<Texture>(path);
+                if (tex == null) continue;
+                probe.customBakedTexture = tex;
+                // To the room's brightness: the light arriving (its lightmap) times what its surfaces give back.
+                var lums = StripLuminances(path);
+                var inside = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)
+                    .Where(r => r.lightmapIndex >= 0 && r.lightmapIndex < maps.Length && maps[r.lightmapIndex] != null && r.bounds.Contains(look.position) && !r.name.StartsWith("Detail_"))
+                    .OrderBy(r => r.bounds.size.sqrMagnitude).FirstOrDefault();
+                if (lums.Count == 0 || inside == null) continue;
+                float median = lums[lums.Count / 2], arriving = LightmapMean(inside, maps), albedo = AlbedoMean(inside);
+                probe.intensity = Mathf.Clamp(arriving * albedo / Mathf.Max(1e-5f, median), 0.005f, 1f);
+                lines.Add($"{view.name}: capture median {median:0.000}, the room {arriving:0.000} arriving x albedo {albedo:0.00} = {arriving * albedo:0.000}, intensity {probe.intensity:0.000}");
             }
-            Debug.Log($"[FPSKit] lightmap pilot: {done} room reflections captured (under {QualitySettings.names[QualitySettings.GetQualityLevel()]})");
+            foreach (var m in maps) if (m != null) Object.DestroyImmediate(m);
+            Debug.Log($"[FPSKit] lightmap pilot: {lines.Count} room reflections captured and set to their rooms (under {QualitySettings.names[QualitySettings.GetQualityLevel()]}): " + string.Join("; ", lines));
+        }
+
+        /// <summary>The lightmap atlases, readable: blitted to half floats and read back.</summary>
+        static Texture2D[] ReadableLightmaps() => LightmapSettings.lightmaps.Select(m =>
+        {
+            if (m.lightmapColor == null) return null;
+            var t = m.lightmapColor;
+            var rt = RenderTexture.GetTemporary(t.width, t.height, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            Graphics.Blit(t, rt);
+            var copy = new Texture2D(t.width, t.height, TextureFormat.RGBAHalf, false, true);
+            var was = RenderTexture.active; RenderTexture.active = rt;
+            copy.ReadPixels(new Rect(0, 0, t.width, t.height), 0, 0); copy.Apply();
+            RenderTexture.active = was; RenderTexture.ReleaseTemporary(rt);
+            return copy;
+        }).ToArray();
+
+        static float Lum(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+
+        /// <summary>The mean light arriving over a lightmapped renderer: its own part of the atlas, its empty texels left out.</summary>
+        static float LightmapMean(MeshRenderer r, Texture2D[] maps)
+        {
+            var tex = maps[r.lightmapIndex]; var so = r.lightmapScaleOffset;
+            int x0 = Mathf.Clamp(Mathf.FloorToInt(so.z * tex.width), 0, tex.width - 1), y0 = Mathf.Clamp(Mathf.FloorToInt(so.w * tex.height), 0, tex.height - 1);
+            int w = Mathf.Clamp(Mathf.CeilToInt(Mathf.Abs(so.x) * tex.width), 1, tex.width - x0), h = Mathf.Clamp(Mathf.CeilToInt(Mathf.Abs(so.y) * tex.height), 1, tex.height - y0);
+            var block = tex.GetPixels(x0, y0, w, h).Select(Lum).Where(v => v > 1e-5f).ToList();
+            return block.Count > 0 ? block.Average() : 0f;
+        }
+
+        /// <summary>A renderer's surfaces' mean albedo (linear): each material's colour times its base map's mean.</summary>
+        static float AlbedoMean(Renderer r)
+        {
+            var values = r.sharedMaterials.Where(m => m != null).Select(m =>
+            {
+                var c = m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : Color.white;
+                var map = m.HasProperty("_BaseMap") ? m.GetTexture("_BaseMap") : null;
+                return Lum(c.linear) * (map != null ? Lum(TextureMean(map)) : 1f);
+            }).ToList();
+            return values.Count > 0 ? Mathf.Clamp(values.Average(), 0.05f, 0.9f) : 0.5f;
+        }
+
+        /// <summary>A captured reflection's texels' luminance, sorted: its 768 x 128 strip read through a readable 2D import
+        /// of the file, the cube import then put back.</summary>
+        static List<float> StripLuminances(string path)
+        {
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer == null) return new List<float>();
+            var shape = importer.textureShape; bool readable = importer.isReadable; var comp = importer.textureCompression;
+            importer.textureShape = TextureImporterShape.Texture2D; importer.isReadable = true; importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+            var strip = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            var lums = strip != null ? strip.GetPixels().Select(Lum).OrderBy(v => v).ToList() : new List<float>();
+            importer.textureShape = shape; importer.isReadable = readable; importer.textureCompression = comp;
+            importer.SaveAndReimport();
+            return lums;
+        }
+
+        /// <summary>
+        /// Batch (UNITY_GRAPHICS=1, -force-vulkan): why the insides look glossy (his report, 2026-10-31). Two lists, written to
+        /// Build/Pilot/gloss_audit.txt:
+        ///   * every material on what the four pilot views show (the pilot insides, their fine work and the furniture in
+        ///     them), on the player's arms, body and guns, and on the soldier: its shader, and the smoothness and metallic it
+        ///     really renders with -- a map's channel averaged on the GPU times the slider, where the material takes them
+        ///     from a map;
+        ///   * each pilot room's captured reflection (its 768 x 128 strip read back) against the room: its typical texel and
+        ///     its brightest hundredth, the probe's intensity, and the light the room's lightmap says arrives.
+        /// </summary>
+        public static void BatchGlossAudit()
+        {
+            try
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+                var sb = new System.Text.StringBuilder();
+                MaterialAudit(sb);
+                ProbeAudit(sb);
+                System.IO.Directory.CreateDirectory("Build/Pilot");
+                System.IO.File.WriteAllText("Build/Pilot/gloss_audit.txt", sb.ToString());
+                Debug.Log("[FPSKit] gloss audit:\n" + sb);
+                EditorApplication.Exit(0);
+            }
+            catch (System.Exception e) { Debug.LogError("[FPSKit] gloss audit FAILED: " + e); EditorApplication.Exit(1); }
+        }
+
+        /// <summary>A texture's mean, channel by channel, read back through the GPU at 64 x 64 (linear).</summary>
+        static Color TextureMean(Texture tex)
+        {
+            if (tex == null) return Color.clear;
+            var rt = RenderTexture.GetTemporary(64, 64, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            Graphics.Blit(tex, rt);
+            var copy = new Texture2D(64, 64, TextureFormat.RGBAHalf, false, true);
+            var was = RenderTexture.active;
+            RenderTexture.active = rt;
+            copy.ReadPixels(new Rect(0, 0, 64, 64), 0, 0);
+            copy.Apply();
+            RenderTexture.active = was;
+            RenderTexture.ReleaseTemporary(rt);
+            var px = copy.GetPixels();
+            Object.DestroyImmediate(copy);
+            var sum = Color.clear;
+            foreach (var c in px) sum += c;
+            return sum / px.Length;
+        }
+
+        /// <summary>What a material renders with: (smoothness, metallic, where from).</summary>
+        static (float smooth, float metal, string from) Surface(Material m)
+        {
+            float slider = m.HasProperty("_Smoothness") ? m.GetFloat("_Smoothness") : m.HasProperty("_Glossiness") ? m.GetFloat("_Glossiness") : -1f;
+            float metal = m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0f;
+            var map = m.HasProperty("_MetallicGlossMap") ? m.GetTexture("_MetallicGlossMap") : null;
+            bool albedoAlpha = m.IsKeywordEnabled("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A") || (m.HasProperty("_SmoothnessTextureChannel") && m.GetFloat("_SmoothnessTextureChannel") > 0.5f);
+            if (albedoAlpha && m.HasProperty("_BaseMap") && m.GetTexture("_BaseMap") != null)
+                return (slider * TextureMean(m.GetTexture("_BaseMap")).a, map != null ? TextureMean(map).r : metal, "base map alpha x slider");
+            if (map != null)
+            {
+                var mean = TextureMean(map);
+                return (slider * mean.a, mean.r, "metallic map (r, a x slider)");
+            }
+            return (slider, metal, "sliders");
+        }
+
+        static void MaterialAudit(System.Text.StringBuilder sb)
+        {
+            var seen = new Dictionary<Material, string>();
+            void Take(string where, IEnumerable<Renderer> rs)
+            {
+                foreach (var r in rs)
+                    foreach (var m in r.sharedMaterials)
+                        if (m != null && !seen.ContainsKey(m)) seen[m] = where + ": " + r.name;
+            }
+            var arena = GameObject.Find("Arena");
+            var spaces = new List<Bounds>();
+            foreach (var group in new[] { "Arena/Buildings/HouseInteriors", "Arena/Buildings/ShopInteriors" })
+                if (GameObject.Find(group) is GameObject g)
+                    foreach (var r in g.GetComponentsInChildren<MeshRenderer>(true))
+                        if (r.receiveGI == ReceiveGI.Lightmaps && r.lightmapIndex >= 0 && r.lightmapIndex < 0xFFFE) spaces.Add(r.bounds);
+            if (arena != null)
+                Take("room", arena.GetComponentsInChildren<Renderer>(true).Where(r => spaces.Any(b => b.Contains(r.bounds.center)) && !(r is ParticleSystemRenderer)));
+            foreach (var path in new[] { "Assets/FPSKit_Generated/ViewModels/FP_Arms.prefab", "Assets/FPSKit_Generated/ViewModels/FP_Body.prefab" })
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) is GameObject arms) Take("player", arms.GetComponentsInChildren<Renderer>(true));
+            foreach (var guid in AssetDatabase.FindAssets("VM_ t:Prefab", new[] { "Assets/FPSKit_Generated/ViewModels" }))
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid)) is GameObject gun) Take("gun", gun.GetComponentsInChildren<Renderer>(true));
+            if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab") is GameObject foe) Take("soldier", foe.GetComponentsInChildren<Renderer>(true));
+            sb.AppendLine($"== materials: {seen.Count} (smoothness and metallic as rendered; sorted by smoothness)");
+            sb.AppendLine("   smooth  metal  shader                               material  (where: first renderer)  [from]");
+            foreach (var kv in seen.Select(kv => (kv.Key, kv.Value, s: Surface(kv.Key))).OrderByDescending(x => x.s.smooth))
+                sb.AppendLine($"   {kv.s.smooth,6:0.00} {kv.s.metal,6:0.00}  {kv.Key.shader.name,-36} {kv.Key.name}  ({kv.Value})  [{kv.s.from}]");
+        }
+
+        static void ProbeAudit(System.Text.StringBuilder sb)
+        {
+            string folder = FPSKitTownGI.DesertScene.Substring(0, FPSKitTownGI.DesertScene.Length - ".unity".Length);
+            sb.AppendLine("\n== pilot rooms' reflections against their rooms (linear; a reflection shows texel x intensity)");
+            var maps = ReadableLightmaps();
+            var root = Object.FindAnyObjectByType<IndoorReflections>(FindObjectsInactive.Include);
+            foreach (var name in new[] { "room_1", "room_2", "room_3", "shop" })
+            {
+                string path = $"{folder}/PilotReflection_{name}.exr";
+                var lums = StripLuminances(path);
+                if (lums.Count == 0) { sb.AppendLine($"  {name}: no capture at {path}"); continue; }
+                float Q(float q) => lums[Mathf.Clamp((int)(q * lums.Count), 0, lums.Count - 1)];
+                var look = GameObject.Find("LightmapPilot")?.transform.Find(name)?.Find("Look");
+                var tex = AssetDatabase.LoadAssetAtPath<Texture>(path);
+                var probe = root != null && tex != null ? root.GetComponentsInChildren<ReflectionProbe>(true).FirstOrDefault(p => p.customBakedTexture == tex) : null;
+                float intensity = probe != null ? probe.intensity : 1f;
+                float arriving = -1f, albedo = -1f;
+                if (look != null)
+                {
+                    var inside = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)
+                        .Where(r => r.lightmapIndex >= 0 && r.lightmapIndex < maps.Length && maps[r.lightmapIndex] != null && r.bounds.Contains(look.position) && !r.name.StartsWith("Detail_"))
+                        .OrderBy(r => r.bounds.size.sqrMagnitude).FirstOrDefault();
+                    if (inside != null) { arriving = LightmapMean(inside, maps); albedo = AlbedoMean(inside); }
+                }
+                sb.AppendLine($"  {name}: capture median {Q(0.5f):0.000}, top 1 % from {Q(0.99f):0.00}, max {lums[lums.Count - 1]:0.0}; probe intensity {intensity:0.000} -> " +
+                              $"reflected median {Q(0.5f) * intensity:0.000}; the room: {arriving:0.000} arriving x albedo {albedo:0.00} = {arriving * albedo:0.000} " +
+                              $"(reflection / room {Q(0.5f) * intensity / Mathf.Max(1e-5f, arriving * albedo):0.0}x)");
+            }
+            foreach (var m in maps) if (m != null) Object.DestroyImmediate(m);
         }
 
         /// <summary>After the bake: the lightmaps made, their size and memory, and what they cover.</summary>

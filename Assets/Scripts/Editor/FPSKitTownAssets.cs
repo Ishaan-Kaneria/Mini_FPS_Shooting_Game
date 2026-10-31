@@ -482,7 +482,7 @@ namespace FPSKit.EditorTools
                           ?? sets.Keys.OrderBy(k => k.Length).First();
                 var s = sets[key];
                 var mat = LitFromMaps($"{MatFolder}/PH_{key}.mat", s.diff, s.nor, s.mask, Color.white, Vector2.one,
-                                      IsPlant(id) || HasAlpha(s.diff));
+                                      IsPlant(id) || HasAlpha(s.diff), smoothness: PropSmoothness(id));
                 var source = new AssetImporter.SourceAssetIdentifier(typeof(Material), m.name);
                 if (map.TryGetValue(source, out var existing) && existing == mat) continue;
                 imp.AddRemap(source, mat);
@@ -491,6 +491,33 @@ namespace FPSKit.EditorTools
             // Materials the importer did not expose (none embedded): nothing to remap, the prefab pass assigns.
             if (changed) imp.SaveAndReimport();
         }
+
+        /// <summary>
+        /// How much of a scan's own smoothness its material keeps (the mask's smoothness is 1 - Poly Haven's roughness,
+        /// scaled by this). Measured as rendered, the room props' were well over the real surfaces' (FPSKitTownLightmaps.
+        /// BatchGlossAudit, 2026-10-31: cardboard 0.42, wicker 0.44-0.61, a leather suitcase 0.58, varnished cabinets 0.72-0.74),
+        /// and under a room's reflection they read as plastic. Each scaled to the middle of its real range: cardboard
+        /// 0.1-0.2, wicker 0.15-0.3, worn leather 0.3-0.4, varnished or painted wood 0.3-0.5, painted steel 0.35-0.45, glazed
+        /// ceramic 0.7-0.85, unglazed 0.2-0.35, enamel 0.6-0.7, aged brass 0.5-0.65 (metal, from its map since 2026-10-31).
+        /// </summary>
+        static float PropSmoothness(string id) => id switch
+        {
+            "cardboard_box_01" => 0.36f,
+            "wicker_basket_01" => 0.5f,
+            "wicker_basket_02" => 0.36f,
+            "vintage_suitcase" => 0.6f,
+            "vintage_cabinet_01" => 0.62f,
+            "painted_wooden_chair_01" => 0.62f,
+            "wooden_stool_01" => 0.64f,
+            "wooden_display_shelves_01" => 0.68f,
+            "steel_frame_shelves_01" or "steel_frame_shelves_02" => 0.7f,
+            "ceramic_pot" => 0.65f,
+            "tea_set_01" or "jug_01" or "antique_ceramic_vase_01" => 0.88f,
+            "pot_enamel_01" => 0.9f,
+            "brass_pot_01" or "brass_pot_02" or "brass_vase_01" or "brass_vase_02" or "brass_vase_03" or "brass_goblets" => 0.78f,
+            "brass_diya_lantern" => 0.72f,
+            _ => 1f,
+        };
 
         static bool HasAlpha(Texture2D t)
         {

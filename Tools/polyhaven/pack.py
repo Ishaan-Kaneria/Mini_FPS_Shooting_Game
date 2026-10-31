@@ -20,7 +20,7 @@ def L(path, size=None):
     return im.resize(size, Image.BILINEAR) if size and im.size != size else im
 
 
-def mask_from(arm=None, rough=None, ao=None, disp=None, size=None):
+def mask_from(arm=None, rough=None, ao=None, disp=None, size=None, metal=None):
     if arm:
         a = Image.open(arm).convert("RGB")
         size = size or a.size
@@ -31,7 +31,9 @@ def mask_from(arm=None, rough=None, ao=None, disp=None, size=None):
         size = size or Image.open(ref).size
         rough_c = L(rough, size) if rough else Image.new("L", size, 200)
         ao_c = L(ao, size) if ao else Image.new("L", size, 255)
-        metal_c = Image.new("L", size, 0)
+        # A separate metalness map (the brass pieces ship one): without it they were packed as metal 0 and drew as
+        # glossy plastic (2026-10-31).
+        metal_c = L(metal, size) if metal else Image.new("L", size, 0)
     height_c = L(disp, size) if disp else Image.new("L", size, 128)
     smooth_c = rough_c.point(lambda v: 255 - v)
     return Image.merge("RGBA", (metal_c, ao_c, height_c, smooth_c))
@@ -95,7 +97,7 @@ for mid, sets in man["models"].items():
             stage(diff, os.path.join(d, f"{prefix}_diff.jpg"))
         if get("nor_gl"): normal_jpg(get("nor_gl"), os.path.join(d, f"{prefix}_nor.jpg"))
         if get("arm") or get("rough"):
-            mask_from(get("arm"), get("rough"), None, None, Image.open(diff).size).save(os.path.join(d, f"{prefix}_mask.png"))
+            mask_from(get("arm"), get("rough"), None, None, Image.open(diff).size, metal=get("metal")).save(os.path.join(d, f"{prefix}_mask.png"))
         staged[prefix] = {"alpha": bool(alpha)}
     out["models"][mid] = staged
 

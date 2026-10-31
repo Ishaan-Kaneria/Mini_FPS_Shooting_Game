@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -924,6 +925,8 @@ namespace FPSKit.EditorTools
 
         static int _tourShot;
         static List<(Vector3 at, Vector3 look, string name)> _tourRooms;
+        /// <summary>The tour's places with a soldier stood in them (the interior lighting pilot's visibility check): where he stands.</summary>
+        static readonly Dictionary<string, Vector3> _tourSoldiers = new Dictionary<string, Vector3>();
 
         /// <summary>The lighting tour, one place after another. True when done.</summary>
         static bool LightingTour()
@@ -946,6 +949,7 @@ namespace FPSKit.EditorTools
                     if (_frame < Frames(1f)) return false;
                     _tourShot = 0;
                     _tourRooms = TourRooms();
+                    PilotPlaces(_tourRooms);
                     // Diagnosis switches: FPSKIT_TOUR_BOUNCE=1 puts the old shadowless bounce light back on, FPSKIT_TOUR_SSAO=0
                     // switches screen-space occlusion off, FPSKIT_TOUR_PROBES=0 takes every static renderer off the probes.
                     if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_BOUNCE") == "1")
@@ -994,14 +998,129 @@ namespace FPSKit.EditorTools
                 default:
                 {
                     int i = _phase - 5;
-                    if (i >= _tourRooms.Count) return true;
+                    if (i >= _tourRooms.Count) { if (_foe != null) Object.Destroy(_foe); _foe = null; return true; }
                     var (at, look, place) = _tourRooms[i];
-                    if (InPhase == 1) Place(at, look);
-                    // Long enough for the eye to adapt to the room (EyeAdaptation, 1.4 s to most of the way).
-                    if (InPhase >= Frames(3f)) { Snap1(Name(place)); Phase(_phase + 1); }
+                    bool soldier = _tourSoldiers.TryGetValue(place, out var stands);
+                    if (InPhase == 1)
+                    {
+                        if (_foe != null) Object.Destroy(_foe);
+                        _foe = null;
+                        Place(at, look);
+                        if (soldier) Soldier(stands, at);
+                    }
+                    // The eye meters what it sees (EyeAdaptation): the view is drawn while it adapts, which takes 1.4 s to
+                    // most of the way.
+                    if (InPhase % 2 == 0) Meter();
+                    if (InPhase >= Frames(3f))
+                    {
+                        if (soldier) SoldierShot(Name(place)); else Snap1(Name(place));
+                        Phase(_phase + 1);
+                    }
                     return false;
                 }
             }
+        }
+
+        /// <summary>
+        /// The interior lighting pilot's places (FPSKitTownLightmaps' LightmapPilot marks): each room from its way in and
+        /// facing its light, the shop; and in each room a soldier in its darkest corner (the floor furthest from its
+        /// openings to the open air), seen from its way in.
+        /// </summary>
+        static void PilotPlaces(List<(Vector3, Vector3, string)> list)
+        {
+            _tourSoldiers.Clear();
+            var pilot = GameObject.Find("LightmapPilot");
+            if (pilot == null) return;
+            var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).FirstOrDefault(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
+            Vector3 toSun = sun != null ? -sun.transform.forward : Vector3.up;
+            int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian");
+            foreach (Transform v in pilot.transform)
+            {
+                var look = v.Find("Look");
+                if (look == null) continue;
+                list.Add((v.position, look.position, "pilot_" + v.name));
+                if (!v.name.StartsWith("room_") || v.name.EndsWith("_openings")) continue;
+                var room = FPSKitTownLightmaps.FindRoom(v.position, toSun, mask);
+                var outside = room.edges.Where(e => e.outside).Select(e => e.at).ToList();
+                if (room.cells.Count == 0 || outside.Count == 0) continue;
+                var corner = room.cells.Select(c => room.World(c, room.floorY)).OrderByDescending(p => outside.Min(o => (o - p).sqrMagnitude)).First();
+                corner = Vector3.MoveTowards(corner, room.Centroid, 0.45f);
+                _tourSoldiers["pilot_" + v.name + "_soldier"] = corner;
+                list.Add((v.position, corner + Vector3.up * 1.3f, "pilot_" + v.name + "_soldier"));
+            }
+        }
+
+        /// <summary>A still Grunt standing at <paramref name="feet"/>, turned to face <paramref name="toward"/>, mind removed.</summary>
+        static void Soldier(Vector3 feet, Vector3 toward)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FPSKit_Generated/Enemy.prefab");
+            var face = Vector3.ProjectOnPlane(toward - feet, Vector3.up);
+            _foe = Object.Instantiate(prefab, feet, Quaternion.LookRotation(face.sqrMagnitude > 1e-4f ? face.normalized : Vector3.forward));
+            _foe.name = "Shots_Corner";
+            FPSKitEnemyRoster.GetOrCreate("Grunt").ApplyTo(_foe);
+            _foeAI = _foe.GetComponent<EnemyAI>();
+            if (_foeAI != null) { _foeAI.target = _motor.transform; _foeAI.enabled = false; }
+            var brain = _foe.GetComponent<EnemyBrain>();
+            if (brain != null) Object.DestroyImmediate(brain);
+            var agent = _foe.GetComponent<NavMeshAgent>();
+            if (agent != null) agent.enabled = false;
+        }
+
+        /// <summary>The game camera drawn into a small target, so EyeAdaptation has a picture to meter while the tour waits.</summary>
+        static void Meter()
+        {
+            var cam = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
+            if (cam == null) return;
+            var rt = RenderTexture.GetTemporary(480, 270, 24, RenderTextureFormat.ARGB32);
+            try { RenderPipeline.SubmitRenderRequest(cam, new RenderPipeline.StandardRequest { destination = rt }); }
+            finally { RenderTexture.ReleaseTemporary(rt); }
+        }
+
+        /// <summary>
+        /// The view with the soldier in it, written as usual, and how well he shows: the frame drawn again without him, the
+        /// pixels that change are his; his mean brightness against the room's round him (the rest of the frame), 0-255.
+        /// </summary>
+        static void SoldierShot(string name)
+        {
+            Snap1(name);
+            var cam = _weapon != null && _weapon.fpsCamera != null ? _weapon.fpsCamera : Camera.main;
+            if (_foe == null || cam == null) { Report += $"{name}: no soldier\n"; return; }
+            Texture2D Draw()
+            {
+                var rt = RenderTexture.GetTemporary(_width, _height, 24, RenderTextureFormat.ARGB32);
+                try
+                {
+                    var request = new RenderPipeline.StandardRequest { destination = rt };
+                    RenderPipeline.SubmitRenderRequest(cam, request);
+                    RenderPipeline.SubmitRenderRequest(cam, request);
+                    var prev = RenderTexture.active;
+                    RenderTexture.active = rt;
+                    var tex = new Texture2D(_width, _height, TextureFormat.RGB24, false);
+                    tex.ReadPixels(new Rect(0, 0, _width, _height), 0, 0);
+                    tex.Apply();
+                    RenderTexture.active = prev;
+                    return tex;
+                }
+                finally { RenderTexture.ReleaseTemporary(rt); }
+            }
+            var with = Draw();
+            var rends = _foe.GetComponentsInChildren<Renderer>().Where(r => r.enabled).ToList();
+            foreach (var r in rends) r.enabled = false;
+            var without = Draw();
+            foreach (var r in rends) r.enabled = true;
+            var a = with.GetPixels32(); var b = without.GetPixels32();
+            Object.DestroyImmediate(with); Object.DestroyImmediate(without);
+            float Luma(Color32 c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+            double him = 0, room = 0; int n = 0, m = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (Mathf.Abs(Luma(a[i]) - Luma(b[i])) > 6f) { him += Luma(a[i]); n++; }
+                else { room += Luma(b[i]); m++; }
+            }
+            var eye = Object.FindAnyObjectByType<EyeAdaptation>();
+            Report += n == 0 ? $"{name}: the soldier is not in the frame\n"
+                             : $"{name}: soldier {n * 100.0 / a.Length:0.0}% of the frame, his mean {him / n:0} against the room's {room / Mathf.Max(1, m):0} (of 255), " +
+                               $"eye +{(eye != null ? eye.Offset : 0f):0.00} stops (level {(eye != null ? eye.Level : -1f):0})\n";
         }
 
         /// <summary>Only the player's view (the tour does not need a side camera).</summary>

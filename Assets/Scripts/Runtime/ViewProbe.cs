@@ -34,7 +34,8 @@ public class ViewProbe : MonoBehaviour
 
     /// <summary>The pilot's rooms and shop: the two old houses' first rooms and the lit shop nearest <paramref name="start"/>
     /// (the player's start). The lightmap bake (FPSKitTownLightmaps) chooses them with this, from the scene's player, and
-    /// leaves what it chose as marks ("LightmapPilot": room_1, room_2, shop, each with its "Look"), which are used when
+    /// leaves what it chose as marks ("LightmapPilot": room_1, room_2, room_3, shop, each with its "Look", and a second
+    /// view of each room facing its openings, "*_openings"), which are used when
     /// they are there, so the views are of what was baked wherever the level starts the player.</summary>
     public static List<(string name, Vector3 pos, Vector3 target)> PilotViews(Vector3 start)
     {
@@ -47,14 +48,34 @@ public class ViewProbe : MonoBehaviour
             if (views.Count > 0) return views;
         }
         var rooms = GameObject.Find("HouseRooms");
+        var used = new List<Transform>();
         if (rooms != null)
             foreach (var house in rooms.transform.Cast<Transform>().Where(h => h.name == "OldHouse").OrderBy(h => (h.position - start).sqrMagnitude))
             {
                 var room = house.Cast<Transform>().FirstOrDefault(r => r.name.StartsWith("Room ") && r.Find("Look") != null);
                 if (room == null) continue;
                 views.Add(($"room_{views.Count + 1}", room.position, room.Find("Look").position));
+                used.Add(house);
                 if (views.Count >= 2) break;
             }
+        // A third: the front room of the house nearest the start whose doorway the sun comes in at (his ask, 2026-10-31),
+        // seen from its way in.
+        var sun = FindObjectsByType<Light>().FirstOrDefault(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
+        if (rooms != null && sun != null)
+        {
+            Vector3 toSun = -sun.transform.forward;
+            bool Sunlit(Vector3 p) => !Physics.Raycast(p, toSun, 300f, ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast"), QueryTriggerInteraction.Ignore);
+            foreach (var house in rooms.transform.Cast<Transform>().Where(h => h.Find("Door") != null && !used.Contains(h))
+                                       .OrderBy(h => (h.Find("Door").position - start).sqrMagnitude))
+            {
+                var door = house.Find("Door").position;
+                var room = house.Cast<Transform>().Where(r => r.name.StartsWith("Room ") && r.name.EndsWith(" f0") && r.Find("Look") != null)
+                                .OrderBy(r => (r.position - door).sqrMagnitude).FirstOrDefault();
+                if (room == null || !(Sunlit(room.position) || Sunlit(Vector3.Lerp(door, room.position, 0.75f) + Vector3.up * 0.1f))) continue;
+                views.Add(("room_3", room.position, room.Find("Look").position));
+                break;
+            }
+        }
         var shops = GameObject.Find("ShopRooms");
         if (shops != null)
         {

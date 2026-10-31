@@ -52,18 +52,20 @@ namespace FPSKit.EditorTools
         private static Material _foundation, _stallriser, _shopGlass, _shopInside, _stallMarble, _shopTube, _tubeBatten;
 
         /// <summary>
-        /// The shops' insides (floor, walls, ceiling, tube fittings), one object for each 64 m block's shops under
-        /// "ShopInteriors", not in the block's own mesh: so a shop's inside can take a lightmap of its own (the interior
-        /// lighting pilot, FPSKitTownLightmaps) without the block's 64 m of facades going into it.
+        /// The shops' insides (floor, walls, ceiling, tube fittings), under "ShopInteriors", not in the block's own mesh: so a
+        /// shop's inside can take a lightmap of its own (FPSKitTownLightmaps) without the block's 64 m of facades going into
+        /// it. One object for each 64 m block's open-fronted shops, which can be walked into (ShopInside_x_y), and one for
+        /// those only seen through glass or under a half-shut shutter (ShopWindow_x_y): their lightmaps are finer (10 cm a
+        /// texel, against 20; his split, 2026-10-31).
         /// </summary>
-        private static readonly Dictionary<Vector2Int, TownMesh> _shopInsides = new Dictionary<Vector2Int, TownMesh>();
+        private static readonly Dictionary<(Vector2Int block, bool walkIn), TownMesh> _shopInsides = new Dictionary<(Vector2Int, bool), TownMesh>();
 
         /// <summary>How far under the ceiling a shop's tube is (its middle): a batten 4 cm deep on the ceiling, the tube under it.</summary>
         private const float ShopTubeDrop = 0.055f, ShopTubeLength = 1.2f;
 
-        private static TownMesh ShopInside(Vector3 p)
+        private static TownMesh ShopInside(Vector3 p, bool walkIn)
         {
-            var key = new Vector2Int(Mathf.FloorToInt(p.x / 64f), Mathf.FloorToInt(p.z / 64f));
+            var key = (new Vector2Int(Mathf.FloorToInt(p.x / 64f), Mathf.FloorToInt(p.z / 64f)), walkIn);
             if (!_shopInsides.TryGetValue(key, out var m)) { m = new TownMesh(); _shopInsides[key] = m; }
             return m;
         }
@@ -74,7 +76,8 @@ namespace FPSKit.EditorTools
             var parent = new GameObject("ShopInteriors").transform;
             parent.SetParent(group, false);
             foreach (var kv in _shopInsides)
-                kv.Value.Build(parent, $"ShopInside_{kv.Key.x}_{kv.Key.y}", layer, "Concrete", compression: UnityEditor.ModelImporterMeshCompression.Low);
+                kv.Value.Build(parent, $"{(kv.Key.walkIn ? "ShopInside" : "ShopWindow")}_{kv.Key.block.x}_{kv.Key.block.y}", layer, "Concrete",
+                               compression: UnityEditor.ModelImporterMeshCompression.Low);
             _shopInsides.Clear();
         }
 
@@ -220,7 +223,7 @@ namespace FPSKit.EditorTools
                 Vector3 back = -nrm * 3.2f, a = S(0f, 0f), c = S(W, 0f), top = up * hs;
                 // Behind a half-shut shutter, or a shop open but not lit, the room is dark; a trading one is lit.
                 var inside = lit ? _shopInside : _shopDark;
-                var room = ShopInside(p0);
+                var room = ShopInside(p0, walkIn: state == ShopState.Stall);
                 room.Quad(_terrazzo, a, c, c + back, a + back, up);
                 room.Quad(inside, a + back, c + back, c + back + top, a + back + top, nrm);
                 room.Quad(inside, a, a + back, a + back + top, a + top, u);

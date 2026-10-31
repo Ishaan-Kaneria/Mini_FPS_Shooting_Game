@@ -10,12 +10,13 @@ using UnityEngine.SceneManagement;
 /// The same views every time, for a before and after in the game itself: started with <c>-fpskitviews &lt;dir&gt;</c>, it
 /// stands the player at three street views on WalkRoute (40, 200 and 420 m), in the two old houses' rooms nearest the
 /// player's start (GradeProbe's room views), and in front of the lit shop nearest the start, lets the eye adapt, and
-/// writes each screen without the HUD (view_*.png), then quits. The rooms and the shop are the interior lighting pilot's
+/// writes each screen without the HUD (view_*.png), then quits. <c>-fpskitquality Low|Medium|High</c> picks the tier for the
+/// run (else the player's own). The rooms and the shop are the interior lighting pilot's
 /// (2026-10-30). Holds no static state.
 /// </summary>
 public class ViewProbe : MonoBehaviour
 {
-    string _dir;
+    string _dir, _tier;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -25,7 +26,10 @@ public class ViewProbe : MonoBehaviour
         if (i < 0 || i + 1 >= args.Length) return;
         var go = new GameObject("ViewProbe");
         DontDestroyOnLoad(go);
-        go.AddComponent<ViewProbe>()._dir = args[i + 1];
+        var probe = go.AddComponent<ViewProbe>();
+        probe._dir = args[i + 1];
+        int q = Array.IndexOf(args, "-fpskitquality");      // as WalkProbe: set as the player's own, put back after
+        if (q >= 0 && q + 1 < args.Length) probe._tier = args[q + 1];
     }
 
     /// <summary>The pilot's rooms and shop: the two old houses' first rooms and the lit shop nearest <paramref name="start"/>
@@ -71,6 +75,8 @@ public class ViewProbe : MonoBehaviour
     IEnumerator Start()
     {
         Directory.CreateDirectory(_dir);
+        int savedTier = GameSettings.QualityTier;
+        if (_tier != null && Enum.TryParse(_tier, true, out GameSettings.Quality wanted)) GameSettings.QualityTier = (int)wanted;
         if (SceneManager.GetActiveScene().name != "DesertOutpost") { SceneManager.LoadScene("DesertOutpost"); yield return new WaitForSecondsRealtime(1f); }
         float until = Time.realtimeSinceStartup + 60f;
         LevelManager level = null;
@@ -80,7 +86,7 @@ public class ViewProbe : MonoBehaviour
         var motor = player != null ? player.GetComponent<PlayerMotor>() : null;
         var health = player != null ? player.GetComponent<Health>() : null;
         var cc = player != null ? player.GetComponent<CharacterController>() : null;
-        if (player == null || motor == null) { File.WriteAllText(Path.Combine(_dir, "views.txt"), "no player"); Application.Quit(1); yield break; }
+        if (player == null || motor == null) { File.WriteAllText(Path.Combine(_dir, "views.txt"), "no player"); GameSettings.QualityTier = savedTier; Application.Quit(1); yield break; }
         foreach (var c in FindObjectsByType<Canvas>()) c.enabled = false;
 
         var start = player.transform.position;
@@ -116,7 +122,9 @@ public class ViewProbe : MonoBehaviour
             Destroy(tex);
             log.Add($"{v.name}: at {v.pos} looking at {v.target}");
         }
+        log.Add($"quality {QualitySettings.names[QualitySettings.GetQualityLevel()]}");
         File.WriteAllLines(Path.Combine(_dir, "views.txt"), log);
+        GameSettings.QualityTier = savedTier;
         Application.Quit();
     }
 }

@@ -24,6 +24,8 @@ heat_sen() {
   echo "$max"
 }
 
+heat_pkg_hot() { local p; p="$(heat_pkg)"; [ -n "$p" ] && [ "$p" -ge "$HEAT_HOT" ]; }
+heat_sen_hot() { [ "$(heat_sen)" -ge "$HEAT_SEN_HOT" ]; }
 heat_hot()  { local p s; p="$(heat_pkg)"; s="$(heat_sen)"; { [ -n "$p" ] && [ "$p" -ge "$HEAT_HOT" ]; } || [ "$s" -ge "$HEAT_SEN_HOT" ]; }
 heat_cool() { local p s; p="$(heat_pkg)"; s="$(heat_sen)"; { [ -z "$p" ] || [ "$p" -le "$HEAT_COOL" ]; } && [ "$s" -le "$HEAT_SEN_COOL" ]; }
 heat_now()  { echo "package $(heat_pkg) C, board $(heat_sen) C"; }

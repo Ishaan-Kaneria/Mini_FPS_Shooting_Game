@@ -27,12 +27,15 @@ for TIER in "${TIERS[@]}"; do
     echo "cost-bench: $TAG $KIND $TIER (cpu $(cpu_temp) C, board $(heat_sen) C)"
     "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "$PWD/Build/Perf/cost/${TAG}_${KIND}_${TIER}.log" \
            -fpskitcost "$PWD/$OUT" -fpskitquality "$TIER" "${EXTRA[@]}" &
-    PID=$!; MAX=0; SEN=0; HOT=0
+    PID=$!; MAX=0; SEN=0; HOT=0; HOTFOR=0
     for i in $(seq 1 600); do
       [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break
       t="$(cpu_temp)"; [ -n "$t" ] && [ "$t" -gt "$MAX" ] && MAX=$t
       b="$(heat_sen)"; [ "$b" -gt "$SEN" ] && SEN=$b
-      if heat_hot; then HOT=1; break; fi
+      # As walk-bench: only the board sensors stop it (HEAT_BENCH_PKG=1: the package too, held hot for 6 s).
+      if heat_sen_hot; then HOT=1; break; fi
+      if [ "${HEAT_BENCH_PKG:-0}" = 1 ] && heat_pkg_hot; then HOTFOR=$((HOTFOR + 1)); else HOTFOR=0; fi
+      if [ "$HOTFOR" -ge 3 ]; then HOT=1; break; fi
       sleep 2
     done
     sleep 2; kill $PID 2>/dev/null || true

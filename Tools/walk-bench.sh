@@ -32,13 +32,18 @@ for TIER in "${TIERS[@]}"; do
     echo "walk-bench: $TAG $TIER (cpu $(cpu_temp) C, board $(heat_sen) C)"
     "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "$PWD/Build/Perf/walk/${TAG}_${TIER}.log" \
            -fpskitwalk "$PWD/$OUT" -fpskitquality "$TIER" -fpskitshots "$PWD/Build/Perf/walk/${TAG}_${TIER}_shots" "${EXTRA[@]}" &
-    PID=$!; MAX=0; SEN=0; HOT=0
+    PID=$!; MAX=0; SEN=0; HOT=0; HOTFOR=0
     for i in $(seq 1 300); do
       [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break
       t="$(cpu_temp)"; [ -n "$t" ] && [ "$t" -gt "$MAX" ] && MAX=$t
       b="$(heat_sen)"; [ "$b" -gt "$SEN" ] && SEN=$b
-      # Too hot for this laptop: stopped, not frozen (a frozen run would count the pause as one long frame).
-      if heat_hot; then HOT=1; break; fi
+      # Too hot for this laptop: stopped, not frozen (a frozen run would count the pause as one long frame). Only the board
+      # sensors stop it (the ones with the 80 C critical limit): the walk holds the package at its own 100-103 C limit, where
+      # it throttles itself, within 20 s, and every run stopped there (2026-10-31; his choice: run it, board-guarded).
+      # HEAT_BENCH_PKG=1 stops it on the package too, held over HEAT_HOT for 6 s.
+      if heat_sen_hot; then HOT=1; break; fi
+      if [ "${HEAT_BENCH_PKG:-0}" = 1 ] && heat_pkg_hot; then HOTFOR=$((HOTFOR + 1)); else HOTFOR=0; fi
+      if [ "$HOTFOR" -ge 3 ]; then HOT=1; break; fi
       sleep 2
     done
     kill $PID 2>/dev/null || true

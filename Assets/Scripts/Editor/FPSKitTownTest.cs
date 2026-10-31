@@ -201,7 +201,17 @@ namespace FPSKit.EditorTools
             if (placed == 0) problems.Add("no light probes placed");
             else if (baked < placed * 0.9f) problems.Add($"light probes not baked: {baked} of {placed} placed");
             else notes.AppendLine($"  light probes: {baked} baked of {placed} placed");
-            if (LightmapSettings.lightmaps.Length > 0) problems.Add($"{LightmapSettings.lightmaps.Length} lightmaps baked (probes only wanted)");
+            // Lightmaps only on the insides the interior lighting pilot chose (FPSKitTownLightmaps: houses' and shops' insides),
+            // and each of those has one; anything else with a lightmap is a bake that took in what it should not have
+            // (the terrain and some prop prefabs are saved static, and the first probe bake made lightmaps of them).
+            var mapped = UnityEngine.Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)
+                .Where(r => r.lightmapIndex >= 0 && r.lightmapIndex < 0xFFFE).ToList();
+            var stray = mapped.Where(r => r.transform.parent == null || (r.transform.parent.name != "HouseInteriors" && r.transform.parent.name != "ShopInteriors")).ToList();
+            bool pilot = GameObject.Find("LightmapPilot") != null;
+            if (LightmapSettings.lightmaps.Length > 0 && !pilot) problems.Add($"{LightmapSettings.lightmaps.Length} lightmaps baked with no lightmap pilot (probes only wanted)");
+            else if (stray.Count > 0) problems.Add($"{stray.Count} renderers lightmapped that are not a house's or shop's inside, e.g. {stray[0].name}");
+            else if (pilot && mapped.Count == 0) problems.Add("the lightmap pilot's insides have no lightmap");
+            else if (pilot) notes.AppendLine($"  lightmap pilot: {mapped.Count} insides on {LightmapSettings.lightmaps.Length} lightmaps ({string.Join(", ", mapped.Select(r => r.name))})");
 
             // ---- cover outside the shops (FPSKitTownCover): there, and each piece with a place to crouch beside it on
             // the navmesh, where EnemyBrain.FindCover looks ----

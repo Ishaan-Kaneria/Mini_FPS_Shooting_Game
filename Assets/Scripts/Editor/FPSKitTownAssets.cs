@@ -352,12 +352,14 @@ namespace FPSKit.EditorTools
             {
                 string id = Path.GetFileNameWithoutExtension(fbx);
                 string prefabPath = $"{PropFolder}/{id}.prefab";
+                // The materials as the code has them, made prefab or not (a smoothness change reached no prop before,
+                // 2026-10-31): only a changed mapping reimports the model.
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(fbx) != null) RemapMaterials(fbx, id);
                 if (!rebuild && AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null) { made++; continue; }
 
                 var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
                 if (model == null) { Debug.LogWarning($"[FPSKit] Poly Haven model did not import: {fbx}"); continue; }
 
-                RemapMaterials(fbx, id);
                 model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
 
                 var model0 = (GameObject)PrefabUtility.InstantiatePrefab(model);

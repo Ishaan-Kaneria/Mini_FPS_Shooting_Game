@@ -412,6 +412,53 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>
+        /// The pilot's rooms reflect themselves. Every house and shop has a box reflection probe showing one small warm room
+        /// cubemap (FPSKitTownGI.PlaceIndoorReflections), set for the rooms' old brightness; under the adapted eye it laid an
+        /// even milky sheen over a lightmapped room's walls and floor that hid the fall-off from its openings (the views with
+        /// every reflection off showed it, 2026-10-31). The pilot's rooms' probes are captured from the room's middle at
+        /// 1.5 m (the shop's middle), with box projection, after the bakes, so they reflect the room as lit. Needs a graphics
+        /// device (UNITY_GRAPHICS=1): captured headless, probes drew everything flat white.
+        /// </summary>
+        public static void CaptureReflections(string scenePath)
+        {
+            var pilot = GameObject.Find("LightmapPilot");
+            var root = Object.FindAnyObjectByType<IndoorReflections>(FindObjectsInactive.Include);
+            if (pilot == null || root == null) return;
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null) { Debug.LogWarning("[FPSKit] lightmap pilot: no graphics device, room reflections not captured"); return; }
+            string folder = scenePath.Substring(0, scenePath.Length - ".unity".Length);
+            var probes = root.GetComponentsInChildren<ReflectionProbe>(true);
+            int done = 0;
+            foreach (Transform view in pilot.transform)
+            {
+                var look = view.Find("Look");
+                if (look == null || view.name.EndsWith("_openings")) continue;
+                bool shop = view.name == "shop";
+                Vector3 inRoom = shop ? look.position : look.position + Vector3.up * 0.2f;
+                // The probe whose box holds the room: the smallest.
+                var probe = probes.Where(p => new Bounds(p.transform.position + p.center, p.size).Contains(inRoom))
+                                  .OrderBy(p => p.size.x * p.size.y * p.size.z).FirstOrDefault();
+                if (probe == null) { Debug.LogWarning($"[FPSKit] lightmap pilot: no room probe at {view.name}"); continue; }
+                var box = new Bounds(probe.transform.position + probe.center, probe.size);
+                var capture = shop ? look.position : look.position + Vector3.up * 1.2f;
+                probe.transform.position = capture;
+                probe.center = box.center - capture;
+                probe.boxProjection = true;
+                probe.resolution = 128;
+                bool was = probe.enabled;
+                probe.enabled = true;
+                string path = $"{folder}/PilotReflection_{view.name}.exr";
+                if (Lightmapping.BakeReflectionProbe(probe, path))
+                {
+                    AssetDatabase.ImportAsset(path);
+                    var tex = AssetDatabase.LoadAssetAtPath<Texture>(path);
+                    if (tex != null) { probe.customBakedTexture = tex; done++; }
+                }
+                probe.enabled = was;
+            }
+            Debug.Log($"[FPSKit] lightmap pilot: {done} room reflections captured");
+        }
+
         /// <summary>After the bake: the lightmaps made, their size and memory, and what they cover.</summary>
         public static string Report(Plan plan)
         {

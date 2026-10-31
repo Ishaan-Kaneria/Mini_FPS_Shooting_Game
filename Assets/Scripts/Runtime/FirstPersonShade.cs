@@ -14,6 +14,8 @@ using UnityEngine.Rendering;
 /// The share in full shade was the sun's shadow strength (0.8, leaving 20%: 0.33 of the desert's 1.65), what a shadow
 /// takes off a lit wall; the gun is close and its detail is what the player reads, so it keeps 30% (0.50 of 1.65).
 ///
+/// Indoors the shaded share drops further, by as many stops as the eye has opened for the room (EyeAdaptation).
+///
 /// Sits on the arms camera (ViewModelRig adds it). Costs three raycasts every 0.05 s.
 /// </summary>
 [DisallowMultipleComponent]
@@ -33,7 +35,8 @@ public class FirstPersonShade : MonoBehaviour
     [Range(0f, 1f)] public float shadedSunShare = 0.3f;
 
     Light _sun;
-    float _shade, _target, _next, _saved;
+    EyeAdaptation _eyeAdaptation;
+    float _shade, _target, _next, _saved, _nextFind;
     bool _dimmed;
     int _mask;
 
@@ -84,6 +87,7 @@ public class FirstPersonShade : MonoBehaviour
             _target = blocked / 3f;
         }
         _shade = Mathf.MoveTowards(_shade, _target, ease * Time.deltaTime);
+        if (_eyeAdaptation == null && Time.time >= _nextFind) { _nextFind = Time.time + 1f; _eyeAdaptation = FindAnyObjectByType<EyeAdaptation>(); }
     }
 
     void OnBeginCamera(ScriptableRenderContext context, Camera cam)
@@ -92,7 +96,12 @@ public class FirstPersonShade : MonoBehaviour
         var sun = Sun();
         if (sun == null) return;
         _saved = sun.intensity;
-        sun.intensity = _saved * Mathf.Lerp(1f, shadedSunShare, _shade);
+        // Indoors the shade is deeper than a street's: the room has a thirtieth to a sixtieth of the outdoor light, and the
+        // eye has opened that many stops (EyeAdaptation) to see it. The gun's share of the sun in the shade drops by as
+        // much, or it glared, lit as if in a street's shade under the room's exposure (2026-10-31). In a sunlit patch on
+        // the floor it is in the sun and keeps it.
+        float indoors = _eyeAdaptation != null ? Mathf.Pow(2f, -_eyeAdaptation.Offset) : 1f;
+        sun.intensity = _saved * Mathf.Lerp(1f, shadedSunShare * indoors, _shade);
         _dimmed = true;
     }
 

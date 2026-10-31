@@ -109,6 +109,22 @@ public class ViewProbe : MonoBehaviour
         var cc = player != null ? player.GetComponent<CharacterController>() : null;
         if (player == null || motor == null) { File.WriteAllText(Path.Combine(_dir, "views.txt"), "no player"); GameSettings.QualityTier = savedTier; Application.Quit(1); yield break; }
         foreach (var c in FindObjectsByType<Canvas>()) c.enabled = false;
+        // Diagnosis: -fpskitviewsoff indoor (the rooms' and shops' reflection probes), refl (every reflection), and the views
+        // name the folder they go in, so a set can be taken with a part of the light taken away.
+        var args = Environment.GetCommandLineArgs();
+        int off = Array.IndexOf(args, "-fpskitviewsoff");
+        var without = off >= 0 && off + 1 < args.Length ? args[off + 1].Split(',') : new string[0];
+        if (without.Contains("indoor") || without.Contains("refl"))
+            foreach (var indoor in FindObjectsByType<IndoorReflections>(FindObjectsInactive.Include))
+            {
+                indoor.enabled = false;
+                foreach (var rp in indoor.GetComponentsInChildren<ReflectionProbe>(true)) rp.enabled = false;
+            }
+        if (without.Contains("refl"))
+        {
+            RenderSettings.reflectionIntensity = 0f;
+            foreach (var rp in FindObjectsByType<ReflectionProbe>()) rp.enabled = false;
+        }
 
         var start = player.transform.position;
         var line = WalkRoute.Line(start, WalkRoute.Desert, new List<string>());

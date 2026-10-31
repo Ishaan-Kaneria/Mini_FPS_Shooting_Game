@@ -551,6 +551,8 @@ namespace FPSKit.EditorTools
                 foreach (var f in System.IO.Directory.GetFiles(dir, stem + "*.bytes")) bytes += new System.IO.FileInfo(f).Length;
                 Debug.Log($"[FPSKit] town GI (APV) {(ok ? "baked" : "FAILED")}: {cells} cells, {bytes / 1048576f:0} MB of probe data, {statics} static renderers ({bouncing} bouncing, {idle.Count} switched off for it), " +
                           $"{clock.Elapsed.TotalMinutes:0.0} min, {(settings != null ? settings.lightmapper.ToString() : "?")}");
+                // The lightmapped rooms' reflections, captured from the rooms as they are now lit (FPSKitTownLightmaps).
+                if (ok) FPSKitTownLightmaps.CaptureReflections(path);
                 done(ok);
             }
 

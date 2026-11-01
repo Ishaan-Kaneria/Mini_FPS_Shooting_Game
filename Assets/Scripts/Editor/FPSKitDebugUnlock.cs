@@ -19,14 +19,16 @@ namespace FPSKit.EditorTools
 
         static FPSKitDebugUnlock()
         {
+            // The old switch lived in EditorPrefs and outlived every restart; it is gone for good.
+            if (EditorPrefs.HasKey(DebugUnlock.PrefKey)) EditorPrefs.DeleteKey(DebugUnlock.PrefKey);
             EditorApplication.playModeStateChanged -= OnPlayModeChanged;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
         }
 
         static bool Enabled
         {
-            get => EditorPrefs.GetBool(DebugUnlock.PrefKey, false);
-            set => EditorPrefs.SetBool(DebugUnlock.PrefKey, value);
+            get => SessionState.GetBool(DebugUnlock.PrefKey, false);
+            set => SessionState.SetBool(DebugUnlock.PrefKey, value);
         }
 
         [MenuItem(MenuPath, false, 40)]
@@ -34,7 +36,7 @@ namespace FPSKit.EditorTools
         {
             Enabled = !Enabled;
             Debug.Log(Enabled
-                ? "[FPSKit] Debug unlock ON: every zone and level is open in the editor. Nothing in the save is changed."
+                ? "[FPSKit] Debug unlock ON for this editor session: every zone and level is open. Off again when the editor restarts; never in a build."
                 : "[FPSKit] Debug unlock OFF: the campaign gates are back to what the save says.");
         }
 

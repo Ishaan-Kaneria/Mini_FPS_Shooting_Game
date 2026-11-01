@@ -46,13 +46,12 @@ namespace FPSKit.EditorTools
                 AssetDatabase.CreateAsset(library, LibraryPath);
             }
 
-            // Fresh blood is nearly black-red in daylight. Some smoothness, so a pool catches
-            // a highlight and reads as wet -- but not much: on a flat floor a transparent
-            // surface reflects the sky across its whole face, and at 0.6 every splat came
-            // out a pale lilac instead of red.
-            library.splatMaterial = Surface("Blood_Splat", splat, new Color(0.17f, 0.004f, 0.007f, 0.97f), 0.22f);
-            library.poolMaterial = Surface("Blood_Pool", pool, new Color(0.14f, 0.003f, 0.006f, 0.98f), 0.3f);
-            library.woundMaterial = Surface("Blood_Wound", wound, new Color(0.24f, 0.008f, 0.01f, 1f), 0.25f);
+            // Fresh blood is nearly black-red, wet and smooth (BloodSurface: the room's light, reflections brought to it).
+            // Under URP Lit the sheen was the sky's at outdoor strength: lilac at 0.6 smoothness outdoors, and cream-white
+            // indoors once the eye opened up for the room (2026-10-31). Values: smoothness where thick, at the thin edge.
+            library.splatMaterial = BloodSurface("Blood_Splat", splat, new Color(0.17f, 0.004f, 0.007f, 0.97f), 0.84f, 0.5f);
+            library.poolMaterial = BloodSurface("Blood_Pool", pool, new Color(0.14f, 0.003f, 0.006f, 0.98f), 0.9f, 0.6f);
+            library.woundMaterial = BloodSurface("Blood_Wound", wound, new Color(0.24f, 0.008f, 0.01f, 1f), 0.72f, 0.45f);
             // A bruise is skin, not blood: dark purple-red, mostly matte, its edge fading out uneven.
             library.bruiseMaterial = Surface("Blood_Bruise", bruise, new Color(0.30f, 0.07f, 0.13f, 0.78f), 0.15f);
 
@@ -133,6 +132,26 @@ namespace FPSKit.EditorTools
         // ==================================================================
 
         /// <summary>
+        /// Blood on a surface: FPSKit/BloodSurface (Assets/Shaders/Blood), lit by the probes where it lies, its reflection
+        /// brought to the light that reaches it, so a pool indoors is as dark and as wet as the floor's light allows.
+        /// </summary>
+        static Material BloodSurface(string name, Texture2D texture, Color color, float smoothness, float edgeSmoothness)
+        {
+            var shader = Shader.Find("FPSKit/BloodSurface");
+            if (shader == null) return Surface(name, texture, color, 0.3f);
+            var mat = LoadOrCreate(name, shader);
+            mat.shaderKeywords = new string[0];
+            mat.SetTexture("_BaseMap", texture);
+            mat.SetColor("_BaseColor", color);
+            mat.SetFloat("_Smoothness", smoothness);
+            mat.SetFloat("_EdgeSmoothness", edgeSmoothness);
+            mat.SetFloat("_Reflectance", 0.02f);       // water's: blood is mostly plasma
+            mat.renderQueue = (int)RenderQueue.Transparent;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>
         /// A lit, alpha-blended surface for blood lying on something. Lit, not unlit: a
         /// splat in a dark subway corner has to be as dark as the corner, and an unlit one
         /// glows. Blend state written out for the reason FPSKitVolcanic's particles give:
@@ -171,8 +190,10 @@ namespace FPSKit.EditorTools
 
         static Material Particle(string name, Texture2D texture)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
-                         ?? Shader.Find("Universal Render Pipeline/Unlit")
+            // Lit (the impacts' shader): unlit droplets kept their own brightness indoors, where the eye opens up several
+            // stops for the room, and glowed pink.
+            var shader = Shader.Find("Universal Render Pipeline/Particles/Simple Lit")
+                         ?? Shader.Find("Universal Render Pipeline/Particles/Unlit")
                          ?? Shader.Find("Sprites/Default");
             var mat = LoadOrCreate(name, shader);
 
@@ -288,7 +309,8 @@ namespace FPSKit.EditorTools
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.sharedMaterial = material;
             renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
+            renderer.receiveShadows = true;     // a spray under a roof is in the roof's shade
+            renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
             renderer.sortMode = ParticleSystemSortMode.None;
 
             if (spray)

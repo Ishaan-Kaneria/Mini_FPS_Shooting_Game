@@ -326,8 +326,10 @@ public static class BloodFX
             decal = go.AddComponent<MeshRenderer>();
             decal.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             decal.receiveShadows = true;
-            decal.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
-            decal.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            // The light where it lies, as the floor under it gets. Off, it took the sky's ambient and the sky's sheen at
+            // outdoor strength, and indoors (the eye opened up for the room) every pool came out cream-white (2026-10-31).
+            decal.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.BlendProbes;
+            decal.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.BlendProbes;
             ring.Add(decal);
         }
         else if (pool)

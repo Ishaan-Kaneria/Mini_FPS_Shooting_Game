@@ -9,8 +9,10 @@
 /// gates <i>answer</i> and nothing that is stored, so switching it off puts the player
 /// exactly where they were.
 ///
-/// It lives in EditorPrefs, so it is a preference of whoever is at the keyboard rather
-/// than of the repo, and it compiles out of every player build. It is ignored in batch
+/// It lives in the editor's SessionState: on for this editor session only, off again
+/// whenever the editor starts (2026-11-01: left on in EditorPrefs it stayed on across
+/// days of play-tests). It compiles out of every player build: outside the editor
+/// <see cref="Active"/> is the constant false, so no build can ship with it on. It is ignored in batch
 /// mode: EditorPrefs are shared between the editor and a headless run on the same
 /// machine, so leaving it on would silently fail every check that asserts a level is
 /// still locked. No static is held, so there is nothing to reset between play sessions.
@@ -28,7 +30,7 @@ public static class DebugUnlock
         {
 #if UNITY_EDITOR
             return !UnityEngine.Application.isBatchMode
-                && UnityEditor.EditorPrefs.GetBool(PrefKey, false);
+                && UnityEditor.SessionState.GetBool(PrefKey, false);
 #else
             return false;
 #endif

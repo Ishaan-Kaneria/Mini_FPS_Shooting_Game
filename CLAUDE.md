@@ -93,7 +93,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
 - Stars: weighted fraction (boss weight 5+); three stars only for a full clear. `LevelProgress`
   keeps the best; unlocking is only `LevelProgress.IsUnlocked`; zones only `Campaign.ArenaUnlocked`
   (previous holder down **and** star threshold). A level/zone with stars is always open.
-  "Everything unlocked" reports: check the **FPSKit > Debug > Unlock All** EditorPref first.
+  "Everything unlocked" reports: check **FPSKit > Debug > Unlock All Zones** first (SessionState: this editor session only, compiled out of builds).
 - Child defeated and achievements are *derived*, never stored. Rank/XP derived.
 - Coins: only `Wallet` moves them, `TrySpend` refuses negatives; buy = refuse, charge, then grant.
   Banked once in `GameSession.RecordResult` (every ending passes there); not combo-multiplied.
@@ -123,7 +123,7 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   freezes values): weapons are root children laid on sockets each frame. Write Defaults stays off.
   Standing still is its own state: no long idle at a movement blend tree's centre. Enemy body changes:
   FPSKit > Enemy > Build Rigged Soldier, then FPSKit > Enemy AI > Run Limb Test (open editor).
-  Blood materials: `_BlendModePreserveSpecular` 0, low smoothness. Blood obeys `GameSettings.Blood`.
+  Blood on surfaces is `FPSKit/BloodSurface` (probe-lit, reflection normalised to the light where it lies, F0 0.02); its quads use BlendProbes, never Off (sky light indoors came out white). Particles are Simple Lit. Blood obeys `GameSettings.Blood`.
   A limb comes off a living body only to a heavy blow (`WeaponData.damageClass` Heavy within
   `heavyRange`, or a blast) on a limb already crippled, with Blood on, never a boss (`EnemyBrutality`);
   pieces are capped (`SeveredPiece`). A melee blow's reaction starts on its contact frame: never slow

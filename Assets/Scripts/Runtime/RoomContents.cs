@@ -40,6 +40,26 @@ public class RoomContents : MonoBehaviour
 
     public int ShellCount => _shells.Length;
 
+    /// <summary>Each room's box, contents and house inside, room by room (the generator splits them by district).</summary>
+    public System.Collections.Generic.IEnumerable<(Bounds room, Renderer[] contents, Renderer[] shell)> Rooms()
+    {
+        bool shells = _shellFirst != null && _shellFirst.Length == _rooms.Length;
+        for (int i = 0; i < _rooms.Length; i++)
+        {
+            int end = i + 1 < _first.Length ? _first[i + 1] : _renderers.Length;
+            var contents = new Renderer[Mathf.Max(0, end - _first[i])];
+            System.Array.Copy(_renderers, _first[i], contents, 0, contents.Length);
+            var shell = new Renderer[0];
+            if (shells)
+            {
+                int send = i + 1 < _shellFirst.Length ? _shellFirst[i + 1] : _shells.Length;
+                shell = new Renderer[Mathf.Max(0, send - _shellFirst[i])];
+                System.Array.Copy(_shells, _shellFirst[i], shell, 0, shell.Length);
+            }
+            yield return (_rooms[i], contents, shell);
+        }
+    }
+
     void OnEnable() { _on = null; _next = 0f; }
 
     void OnDisable()

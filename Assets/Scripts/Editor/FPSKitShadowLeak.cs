@@ -55,6 +55,72 @@ namespace FPSKit.EditorTools
             EditorApplication.Exit(0);
         }
 
+        /// <summary>
+        /// Where the upper-walls-lit band comes from: four ordinary (not lightmapped) house rooms, each seen from its way in, as
+        /// it is, with the sun off, and with occlusion culling off. The band going with the sun is sun past the roof (and with
+        /// culling off too, the culling dropping the roof from the shadow map); the band staying with the sun off is the
+        /// probes' light. Writes Build/Pilot/leaktest/*.png and the upper and lower wall levels to leaktest.txt.
+        ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitShadowLeak.BatchBand -force-vulkan
+        /// </summary>
+        public static void BatchBand()
+        {
+            try
+            {
+                EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, OpenSceneMode.Single);
+                DynamicGI.UpdateEnvironment();
+                var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).First(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
+                var pilot = GameObject.Find("LightmapPilot");
+                var houses = GameObject.Find("HouseRooms").transform;
+                var rooms = houses.Cast<Transform>()
+                    .Select(h => h.Cast<Transform>().FirstOrDefault(r => r.name.StartsWith("Room ") && r.name.EndsWith(" f0") && r.Find("Look") != null))
+                    .Where(r => r != null && (pilot == null || pilot.transform.Cast<Transform>().All(v => (v.position - r.position).sqrMagnitude > 4f)))
+                    .Take(4).ToList();
+                const int W = 640, H = 360;
+                var dir = "Build/Pilot/leaktest";
+                System.IO.Directory.CreateDirectory(dir);
+                var camGo = new GameObject("LeakCam") { hideFlags = HideFlags.DontSave };
+                var cam = camGo.AddComponent<Camera>();
+                cam.fieldOfView = 75f; cam.nearClipPlane = 0.05f; cam.farClipPlane = 600f;
+                var data = camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+                data.renderPostProcessing = true;
+                var sb = new StringBuilder("level of the upper and lower thirds of the view (0-255), as is / sun off / culling off\n");
+                int i = 0;
+                foreach (var room in rooms)
+                {
+                    var look = room.Find("Look").position;
+                    cam.transform.position = room.position + Vector3.up * 1.6f;
+                    cam.transform.LookAt(look + Vector3.up * 1.4f);
+                    string Shot(string tag)
+                    {
+                        var rt = RenderTexture.GetTemporary(W, H, 24, RenderTextureFormat.ARGB32);
+                        var req = new RenderPipeline.StandardRequest { destination = rt };
+                        RenderPipeline.SubmitRenderRequest(cam, req);
+                        RenderPipeline.SubmitRenderRequest(cam, req);
+                        var prev = RenderTexture.active; RenderTexture.active = rt;
+                        var tex = new Texture2D(W, H, TextureFormat.RGB24, false);
+                        tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply();
+                        RenderTexture.active = prev; RenderTexture.ReleaseTemporary(rt);
+                        System.IO.File.WriteAllBytes($"{dir}/room{i}_{tag}.png", tex.EncodeToPNG());
+                        float Band(int y0, int y1) { float s = 0; int n = 0; for (int y = y0; y < y1; y += 4) for (int x = 0; x < W; x += 4) { var c = tex.GetPixel(x, y); s += 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b; n++; } return 255f * s / n; }
+                        string r = $"{Band(H * 2 / 3, H):0}/{Band(H / 3, H * 2 / 3):0}";       // ReadPixels rows run bottom up: upper first
+                        Object.DestroyImmediate(tex);
+                        return r;
+                    }
+                    string a = Shot("asis");
+                    sun.enabled = false; string b = Shot("sunoff"); sun.enabled = true;
+                    float was = sun.intensity; sun.intensity = was * 3f; string b3 = Shot("sun3x"); sun.intensity = was;
+                    cam.useOcclusionCulling = false; string c = Shot("nocull"); cam.useOcclusionCulling = true;
+                    sb.AppendLine($"room{i} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c}");
+                    i++;
+                }
+                Object.DestroyImmediate(camGo);
+                System.IO.File.WriteAllText($"{dir}/leaktest.txt", sb.ToString());
+                Debug.Log("[FPSKit] band test:\n" + sb);
+                EditorApplication.Exit(0);
+            }
+            catch (System.Exception e) { Debug.LogError("[FPSKit] band test FAILED: " + e); EditorApplication.Exit(1); }
+        }
+
         /// <summary>Why a renderer draws nothing into the sun's shadow map from this face, or null when it does.</summary>
         static string NoShadow(Renderer r, Vector3 faceNormal, Vector3 toSun)
         {

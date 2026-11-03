@@ -398,6 +398,72 @@ namespace FPSKit.EditorTools
         /// Prepares the open town scene for APV and bakes it (asynchronously, on the editor's update, unless
         /// <paramref name="synchronous"/>); <paramref name="done"/> is told whether it baked.
         /// </summary>
+        /// <summary>Rendering layer of the rooms' insides for the probe volumes (bit 1). Their surfaces read only probes that see an inside.</summary>
+        public const uint IndoorLayer = 1u << 1;
+        /// <summary>Rendering layer of everything else in the town (bit 2). Its surfaces read only probes that see the outside.</summary>
+        public const uint OutdoorLayer = 1u << 2;
+
+        /// <summary>
+        /// Indoors and outdoors as two probe layers (his play-test, 2026-10-31: in rooms the upper walls lit, the lower dark, a
+        /// hard line between, as if there were no roof). It was not the sun (the rooms rendered the same with the sun off or at
+        /// three times its strength; FPSKitShadowLeak: every roof casts): the probe grid's layers lie at 1.5 and 4.5 m, and in a
+        /// one-storey house the upper layer is above the roof in the open, sunlit, so every upper wall blended toward the
+        /// outside's light. With rendering layers each probe is given the layers of the surfaces it sees (the baker's rays), and a
+        /// surface reads only probes of its own layers: a room's walls never the probes over its roof, a facade never a room's.
+        /// Both layers keep bit 0 (Default), so every light, which lights Default, lights them as before; what is on neither
+        /// (anything that moves, and what is made in play) reads every probe as before.
+        /// </summary>
+        static void ApplyIndoorLayers(ProbeVolumeBakingSet set, GameObject arena)
+        {
+            var so = new SerializedObject(set);
+            var use = so.FindProperty("useRenderingLayers");
+            var masks = so.FindProperty("renderingLayerMasks");
+            if (use == null || masks == null) { Debug.LogWarning("[FPSKit] town GI: this Unity has no probe rendering layers; rooms keep reading the outside's probes"); return; }
+            use.boolValue = true;
+            masks.arraySize = 2;
+            void Mask(int i, string name, uint bits)
+            {
+                var m = masks.GetArrayElementAtIndex(i);
+                m.FindPropertyRelative("name").stringValue = name;
+                var b = m.FindPropertyRelative("mask").FindPropertyRelative("m_Bits");
+                b.uintValue = bits;
+            }
+            Mask(0, "Outdoors", OutdoorLayer);
+            Mask(1, "Indoors", IndoorLayer);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(set);
+            if (arena == null) return;
+
+            // The insides: the houses' and shops' shells and what stands in the rooms (RoomContents' lists).
+            var inside = new HashSet<Renderer>();
+            foreach (var group in new[] { "HouseInteriors", "ShopInteriors" })
+                foreach (var t in arena.GetComponentsInChildren<Transform>(true).Where(t => t.name == group))
+                    inside.UnionWith(t.GetComponentsInChildren<Renderer>(true));
+            var contents = arena.GetComponentInChildren<RoomContents>(true) ?? Object.FindAnyObjectByType<RoomContents>(FindObjectsInactive.Include);
+            if (contents != null)
+            {
+                var rc = new SerializedObject(contents);
+                foreach (var field in new[] { "_renderers", "_shells" })
+                {
+                    var list = rc.FindProperty(field);
+                    for (int i = 0; list != null && i < list.arraySize; i++)
+                        if (list.GetArrayElementAtIndex(i).objectReferenceValue is Renderer r) inside.Add(r);
+                }
+            }
+            int indoor = 0, outdoor = 0;
+            foreach (var r in arena.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer) continue;
+                if (r.GetComponentInParent<Civilian>() != null || r.GetComponentInParent<EnemyAI>() != null || r.GetComponentInParent<Rigidbody>() != null) continue;
+                uint m = r.renderingLayerMask & ~(IndoorLayer | OutdoorLayer);
+                r.renderingLayerMask = m | 1u | (inside.Contains(r) ? IndoorLayer : OutdoorLayer);
+                if (inside.Contains(r)) indoor++; else outdoor++;
+            }
+            foreach (var t in Object.FindObjectsByType<Terrain>(FindObjectsInactive.Include))
+                t.renderingLayerMask = (t.renderingLayerMask & ~(IndoorLayer | OutdoorLayer)) | 1u | OutdoorLayer;
+            Debug.Log($"[FPSKit] town GI: probe layers on: {indoor} renderers indoors, {outdoor} outdoors (each keeps Default for the lights)");
+        }
+
         public static void Bake(UnityEngine.SceneManagement.Scene scene, string path, Action<bool> done, bool synchronous = false, bool strip = false)
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -546,6 +612,8 @@ namespace FPSKit.EditorTools
                 var flags = GameObjectUtility.GetStaticEditorFlags(t.gameObject);
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, flags | StaticEditorFlags.ContributeGI);
             }
+
+            ApplyIndoorLayers(set, arena);
 
             // How the probes are read (the scene's global post-processing profile): at 3 m apart the defaults' offsets
             // (0.05 along the normal, 0.1 towards the eye) are too short, and a surface read probes buried in the wall or the

@@ -1010,6 +1010,8 @@ namespace FPSKit.EditorTools
 
                 staged.Add(copy);
                 scenes.Add(copy);
+                // The town's rooms (RoomScenes loads them by name): shared, not staged.
+                if (theme != null && theme.desertTownZone) scenes.AddRange(FPSKitTownRoomScenes.ExistingPaths());
             }
 
             if (scenes.Count < 2) throw new Exception("no arenas were available to build.");

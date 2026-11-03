@@ -55,6 +55,20 @@ namespace FPSKit.EditorTools
             catch (System.Exception e) { Debug.LogError("[FPSKit] room scenes FAILED: " + e); EditorApplication.Exit(1); }
         }
 
+        /// <summary>The district scenes on disk, in order (empty before the first split).</summary>
+        public static List<string> ExistingPaths()
+            => Enumerable.Range(0, Count).Select(ScenePath).Where(System.IO.File.Exists).ToList();
+
+        /// <summary>The district scenes in Build Settings, right after the town (RoomScenes loads them by name).</summary>
+        public static void Register(string townPath)
+        {
+            var list = EditorBuildSettings.scenes.Where(s => !ExistingPaths().Contains(s.path)).ToList();
+            int at = list.FindIndex(s => s.path == townPath);
+            var rooms = ExistingPaths().Select(p => new EditorBuildSettingsScene(p, true)).ToList();
+            if (at < 0) list.AddRange(rooms); else list.InsertRange(at + 1, rooms);
+            EditorBuildSettings.scenes = list.ToArray();
+        }
+
         /// <summary>Splits the saved town at <paramref name="townPath"/>; saves it and the district scenes. Returns a report.</summary>
         public static string Split(string townPath, bool save = true)
         {
@@ -129,8 +143,12 @@ namespace FPSKit.EditorTools
                 EditorSceneManager.SaveScene(scene, ScenePath(k));     // always: Unity makes no second new scene while one is untitled (nothing loads them until the level does)
                 lines.Add($"{k + 1}: {moves[k].Count} objects, {renderers} renderers, {rooms[k].Count} rooms");
             }
-            // The town keeps no RoomContents: every room's contents and inside are in a district now.
+            // The town keeps no RoomContents: every room's contents and inside are in a district now. It loads its districts.
             if (contents != null) Object.DestroyImmediate(contents.gameObject);
+            var loader = arena.GetComponentInChildren<RoomScenes>(true) ?? new GameObject("RoomScenes").AddComponent<RoomScenes>();
+            loader.transform.SetParent(arena.transform, false);
+            loader.sceneNames = Enumerable.Range(0, Count).Select(k => System.IO.Path.GetFileNameWithoutExtension(ScenePath(k))).ToArray();
+            if (save) Register(townPath);
             if (save) { EditorSceneManager.MarkSceneDirty(town); EditorSceneManager.SaveScene(town, townPath); }
             int left = arena.transform.Find("Buildings/HouseInteriors")?.childCount ?? 0;
             return $"{(save ? "" : "(dry run, nothing saved) ")}{taken.Count} objects moved into {Count} districts ({string.Join("; ", lines)}); left in the town's HouseInteriors: {left}";

@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -58,7 +59,7 @@ namespace FPSKit.EditorTools
                 System.GC.Collect();
                 var opts = new BuildPlayerOptions
                 {
-                    scenes = new[] { MenuScene, scene },
+                    scenes = new[] { MenuScene, scene }.Concat(FPSKitTownRoomScenes.ExistingPaths()).ToArray(),     // the town's rooms (RoomScenes)
                     locationPathName = $"{dir}/{name}.x86_64",
                     target = BuildTarget.StandaloneLinux64,
                     options = options,

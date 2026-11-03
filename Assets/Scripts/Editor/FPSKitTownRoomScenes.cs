@@ -76,6 +76,16 @@ namespace FPSKit.EditorTools
             var arena = GameObject.Find("Arena");
             if (arena == null) return "FAILED: no Arena";
             var contents = Object.FindAnyObjectByType<RoomContents>(FindObjectsInactive.Include);
+            // The rooms and what is in each are found by the light look (FPSKitTownGI.ApplyRealLightLook, with the rooms'
+            // reflection probes), which runs at the start of the probe volume bake: a build without that bake
+            // (FPSKIT_SKIP_APV) had none, and the split moved the insides but left every piece of furniture in the town
+            // (2026-11-03). Found here first when missing.
+            if (contents == null)
+            {
+                FPSKitQualityTiers.Ensure();
+                FPSKitTownGI.ApplyRealLightLook();
+                contents = Object.FindAnyObjectByType<RoomContents>(FindObjectsInactive.Include);
+            }
 
             // What goes where: top objects (a whole inside, a whole prop), by district.
             var moves = new List<GameObject>[Count];

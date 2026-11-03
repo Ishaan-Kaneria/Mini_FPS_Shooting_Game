@@ -146,6 +146,10 @@ namespace FPSKit.EditorTools
 
             // ---- Out again: only the rooms and their lightmaps are saved ----
             Object.DestroyImmediate(context);
+            // The bake gives a scene with no probe volume set one of its own ("<scene> Baking Set"), and a scene can be in one
+            // set only: left, the town's probe bake could not take the district in and its probes saw empty houses (2026-11-03).
+            foreach (var guid in AssetDatabase.FindAssets("t:ProbeVolumeBakingSet", new[] { System.IO.Path.ChangeExtension(path, null) }))
+                AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(guid));
             RenderSettings.ambientIntensity = env.ambientIntensity;
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, path);

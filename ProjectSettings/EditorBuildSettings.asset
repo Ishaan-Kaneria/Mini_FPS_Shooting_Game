@@ -15,6 +15,24 @@ EditorBuildSettings:
     path: Assets/FPSKit_Generated/Scenes/DesertOutpost.unity
     guid: f9da13b8ab0e5fe4bae5e273c3dc8e64
   - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost_Rooms_1.unity
+    guid: b06858bd29230c9c5a4d0d45f5d306f4
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost_Rooms_2.unity
+    guid: d1272db687bf05bceb9355935123cac1
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost_Rooms_3.unity
+    guid: 0a69c242dc7a0c2f79adbfab989c02f5
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost_Rooms_4.unity
+    guid: c3db8766b41c5368aae641bdc90a2ab0
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost_Rooms_5.unity
+    guid: 98a8c9b68b994c886a78c771cc917b9c
+  - enabled: 1
+    path: Assets/FPSKit_Generated/Scenes/DesertOutpost_Rooms_6.unity
+    guid: bf896263c55ad9d34afa80b7f27b75e3
+  - enabled: 1
     path: Assets/FPSKit_Generated/Scenes/SnowboundStation.unity
     guid: 47ed480e9bf82324fa77bce50f7b74e9
   - enabled: 1

@@ -67,11 +67,12 @@ namespace FPSKit.EditorTools
             try
             {
                 EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, OpenSceneMode.Single);
+                foreach (var district in FPSKitTownRoomScenes.ExistingPaths()) EditorSceneManager.OpenScene(district, OpenSceneMode.Additive);
                 DynamicGI.UpdateEnvironment();
                 var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).First(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
                 var pilot = GameObject.Find("LightmapPilot");
                 var houses = GameObject.Find("HouseRooms").transform;
-                var insides = GameObject.Find("Arena/Buildings/HouseInteriors")?.GetComponentsInChildren<MeshRenderer>(true).Where(r => !r.name.StartsWith("Detail_")).ToArray() ?? new MeshRenderer[0];
+                var insides = Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include).Where(r => r.name.StartsWith("Interior_")).ToArray();
                 bool Lightmapped(Transform room) => insides.Where(r => r.bounds.Contains(room.position + Vector3.up * 0.5f))
                     .OrderBy(r => r.bounds.size.sqrMagnitude).FirstOrDefault() is MeshRenderer m && m.lightmapIndex >= 0 && m.lightmapIndex < 0xFFFE;
                 var candidates = houses.Cast<Transform>()

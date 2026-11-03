@@ -71,10 +71,15 @@ namespace FPSKit.EditorTools
                 var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).First(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
                 var pilot = GameObject.Find("LightmapPilot");
                 var houses = GameObject.Find("HouseRooms").transform;
-                var rooms = houses.Cast<Transform>()
+                var insides = GameObject.Find("Arena/Buildings/HouseInteriors")?.GetComponentsInChildren<MeshRenderer>(true).Where(r => !r.name.StartsWith("Detail_")).ToArray() ?? new MeshRenderer[0];
+                bool Lightmapped(Transform room) => insides.Where(r => r.bounds.Contains(room.position + Vector3.up * 0.5f))
+                    .OrderBy(r => r.bounds.size.sqrMagnitude).FirstOrDefault() is MeshRenderer m && m.lightmapIndex >= 0 && m.lightmapIndex < 0xFFFE;
+                var candidates = houses.Cast<Transform>()
                     .Select(h => h.Cast<Transform>().FirstOrDefault(r => r.name.StartsWith("Room ") && r.name.EndsWith(" f0") && r.Find("Look") != null))
                     .Where(r => r != null && (pilot == null || pilot.transform.Cast<Transform>().All(v => (v.position - r.position).sqrMagnitude > 4f)))
-                    .Take(4).ToList();
+                    .ToList();
+                // The first two of the old set (outside the district, room 1 is the banded one) and two in the district.
+                var rooms = candidates.Where(r => !Lightmapped(r)).Take(2).Concat(candidates.Where(Lightmapped).Take(2)).ToList();
                 const int W = 640, H = 360;
                 var dir = "Build/Pilot/leaktest";
                 System.IO.Directory.CreateDirectory(dir);
@@ -115,7 +120,7 @@ namespace FPSKit.EditorTools
                     foreach (var (x, _) in masked) x.renderingLayerMask = 1u;
                     string d = Shot("nolayers");
                     foreach (var (x, m0) in masked) x.renderingLayerMask = m0;
-                    sb.AppendLine($"room{i} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c} | no layers {d}");
+                    sb.AppendLine($"room{i} {(Lightmapped(room) ? "LIGHTMAPPED" : "probes")} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c} | no layers {d}");
                     i++;
                 }
                 Object.DestroyImmediate(camGo);

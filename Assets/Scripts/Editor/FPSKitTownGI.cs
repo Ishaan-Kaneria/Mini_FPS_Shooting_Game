@@ -528,7 +528,7 @@ namespace FPSKit.EditorTools
             // memory than this laptop has (stopped three times at its integration step, 8.8 GB and swap); the 1 m volumes
             // served only the four lightmapped pilot insides, and the layers keep a room's probes from the street's anyway.
             // The set is 3 m at its finest again (3, 9, 27, 81 m: the same 81 m cells), the town's volume all of it.
-            volume.overridesSubdivLevels = !InteriorProbes;
+            volume.overridesSubdivLevels = InteriorProbes;     // with the 1 m level, the town keeps to 3 m and up
             volume.lowestSubdivLevelOverride = 1;
             volume.highestSubdivLevelOverride = InteriorProbeDepth;
             foreach (var old in Object.FindObjectsByType<ProbeVolume>(FindObjectsSortMode.None).Where(v => v.name.StartsWith("InteriorProbes_")).ToList())
@@ -540,6 +540,9 @@ namespace FPSKit.EditorTools
                     foreach (var r in insides.GetComponentsInChildren<MeshRenderer>(true))
                     {
                         if (r.name.StartsWith("Detail_") || r.receiveGI != ReceiveGI.Lightmaps || r.lightmapIndex < 0 || r.lightmapIndex >= 0xFFFE) continue;
+                        // Only the pilot's insides (full texel scale): the district's (FPSKitTownLightmaps.DistrictScale) gave 105
+                        // volumes and 11.1 M probes, over the set's 4 M (2026-11-03).
+                        if (r.scaleInLightmap < 0.99f) continue;
                         var go = new GameObject("InteriorProbes_" + r.name);
                         go.transform.SetParent(volume.transform.parent, false);
                         go.transform.position = r.bounds.center;

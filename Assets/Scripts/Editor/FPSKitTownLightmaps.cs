@@ -34,6 +34,13 @@ namespace FPSKit.EditorTools
         /// <summary>The share of that for insides only seen through glass or under a shutter (ShopWindow_*): 20 cm.</summary>
         const float SeenOnlyScale = 0.5f;
 
+        /// <summary>Half the side of the district round the player's start whose insides are lightmapped too (0: the pilot's
+        /// four alone). 200 m: about a sixth of the town, the first district (2026-11-03).</summary>
+        const float DistrictHalf = 200f;
+
+        /// <summary>The district's texels against the pilot's: 0.5, 20 cm, so a sixth of the town fits this laptop's bake.</summary>
+        const float DistrictScale = 0.5f;
+
         /// <summary>A shop tube's brightness as a baked area light (a 6 cm by 1.2 m strip under the tube). At 8 the tubes showed
         /// and lit almost nothing: the back wall came out darker than the flat paint it replaced (2026-10-31).</summary>
         const float TubeIntensity = 20f;
@@ -44,7 +51,7 @@ namespace FPSKit.EditorTools
         public sealed class Plan
         {
             public readonly List<MeshRenderer> lit = new List<MeshRenderer>();
-            public int shading, tubes;
+            public int shading, tubes, district;
             public float area;
         }
 
@@ -68,6 +75,7 @@ namespace FPSKit.EditorTools
             var root = new GameObject("LightmapPilot").transform;
             root.SetParent(arena.transform, false);
             var plan = new Plan();
+            var props = arena.transform.Find("Buildings/BuildingProps")?.GetComponentsInChildren<MeshRenderer>(true) ?? new MeshRenderer[0];
             var houses = GameObject.Find("Arena/Buildings/HouseInteriors");
             var shops = GameObject.Find("Arena/Buildings/ShopInteriors");
             foreach (var (name, pos, target) in views)
@@ -88,13 +96,40 @@ namespace FPSKit.EditorTools
                     if (shape.cells.Count * RoomShape.Cell * RoomShape.Cell < 4f) shape = FindRoom(target, toSun, mask);
                     if (FacingTheLight(shape) is var (feet, toward)) Mark(root, name + "_openings", feet, toward);
                 }
-                if (plan.lit.Contains(inside)) continue;
+                LightInside(inside, shop, 1f);
+            }
+
+            // The district (2026-11-03, his pick: "one district first"): every house's and shop's inside within DistrictHalf of
+            // the player's start, at 20 cm (DistrictScale), so the rooms there take their light from lightmaps as the pilot's
+            // do (daylight factor 2-6 % near the openings, 0.5-1.8 % at the back, as real rooms) instead of the 3 m probes,
+            // which leak the light over the roofs into the upper walls and hold almost none of a room's own.
+            int district = 0;
+            if (DistrictHalf > 0f)
+            {
+                var start = player.transform.position;
+                foreach (var (group, shop) in new[] { (houses, false), (shops, true) })
+                    if (group != null)
+                        foreach (var r in group.GetComponentsInChildren<MeshRenderer>(true))
+                        {
+                            if (r.name.StartsWith("Detail_") || plan.lit.Contains(r)) continue;
+                            var c = r.bounds.center;
+                            if (Mathf.Abs(c.x - start.x) > DistrictHalf || Mathf.Abs(c.z - start.z) > DistrictHalf) continue;
+                            LightInside(r, shop, DistrictScale);
+                            district++;
+                        }
+            }
+            plan.district = district;
+
+            void LightInside(MeshRenderer inside, bool shop, float scale)
+            {
+                if (plan.lit.Contains(inside)) return;
                 plan.lit.Add(inside);
                 plan.area += Lightmapped(inside);
+                inside.scaleInLightmap *= scale;
 
                 // The furniture in it shades the bake, lit itself by the probes as before.
                 var space = inside.bounds;
-                foreach (var r in arena.transform.Find("Buildings/BuildingProps")?.GetComponentsInChildren<MeshRenderer>(true) ?? new MeshRenderer[0])
+                foreach (var r in props)
                 {
                     if (!r.enabled || !space.Contains(r.bounds.center)) continue;
                     GameObjectUtility.SetStaticEditorFlags(r.gameObject, GameObjectUtility.GetStaticEditorFlags(r.gameObject) | StaticEditorFlags.ContributeGI);
@@ -879,7 +914,7 @@ namespace FPSKit.EditorTools
             }
             string town = $"; the town's insides: houses {Area("HouseInteriors", "Interior_"):0} m², walk-in shops {Area("ShopInteriors", "ShopInside_"):0} m², " +
                           $"shops seen only {Area("ShopInteriors", "ShopWindow_"):0} m²";
-            return $"lightmap pilot: {got} of {plan.lit.Count} insides lightmapped ({string.Join(", ", plan.lit.Select(r => r.name))}), {plan.area:0} m² at {TexelsPerMetre:0} texels/m, " +
+            return $"lightmap pilot: {got} of {plan.lit.Count} insides lightmapped ({string.Join(", ", plan.lit.Take(plan.lit.Count - plan.district).Select(r => r.name))}{(plan.district > 0 ? $" and {plan.district} in the district at {TexelsPerMetre * DistrictScale:0}/m" : "")}), {plan.area:0} m² at {TexelsPerMetre:0} texels/m, " +
                    $"{plan.shading} pieces of furniture shading, {plan.tubes} lit shops' tubes; {maps.Length} lightmaps ({string.Join("; ", sizes)}), {bytes / 1048576f:0.0} MB" + town;
         }
     }

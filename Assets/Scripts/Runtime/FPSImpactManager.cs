@@ -187,6 +187,8 @@ public class FPSImpactManager : MonoBehaviour
     {
         if (hit.collider == null || surface == ImpactSurface.Flesh || !Built) return;
         Vector3 p = hit.point, n = hit.normal.sqrMagnitude > 0.5f ? hit.normal : Vector3.up;
+        // The thing struck answers too (a door shudders, a bin jumps, glass breaks): every gun comes through here.
+        WorldHit.Send(hit.collider, new WorldHitInfo { kind = WorldHitKind.Bullet, point = p, normal = n, direction = -n, impulse = WorldHit.BulletImpulse });
         bool mark = hit.rigidbody == null;
         var s = _s;
         switch (surface)

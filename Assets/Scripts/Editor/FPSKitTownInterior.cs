@@ -974,8 +974,12 @@ namespace FPSKit.EditorTools
                 Vector3 n2 = Iw(Inward(wall)), along = Iw(new Vector2(-Inward(wall).y, Inward(wall).x));
                 Vector3 c = f.P(at.x, at.y, r.y + 1.65f) + n2 * 0.07f;
                 float w2 = Rand(own, 0.45f, 0.8f), h2 = w2 * Rand(own, 0.7f, 1.2f);
-                Prism(det, old ? _woodBeam : _frameDark, c, along, Vector3.up, n2, w2 + 0.06f, h2 + 0.06f, 0.025f);
                 var u0 = new[] { new Vector2(0.5f, 0f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f) }[own.Next(3)] + new Vector2(0.1f, 0.1f);
+                // Never over a doorway (his play-test, 2026-11-03: a framed carpet hung across a door, in the air): the room's
+                // doorways, the front door and the stair are its keep rects, which meet the wall where the opening is. Skipped
+                // after its draws, so the room's later pieces keep their places.
+                if (r.keep.Any(k => new Rect(k.xMin - 0.5f, k.yMin - 0.5f, k.width + 1f, k.height + 1f).Contains(at))) continue;
+                Prism(det, old ? _woodBeam : _frameDark, c, along, Vector3.up, n2, w2 + 0.06f, h2 + 0.06f, 0.025f);
                 det.QuadUV(_interiorCarpet, c - along * (w2 * 0.5f) - Vector3.up * (h2 * 0.5f) + n2 * 0.002f, c + along * (w2 * 0.5f) - Vector3.up * (h2 * 0.5f) + n2 * 0.002f,
                            c + along * (w2 * 0.5f) + Vector3.up * (h2 * 0.5f) + n2 * 0.002f, c - along * (w2 * 0.5f) + Vector3.up * (h2 * 0.5f) + n2 * 0.002f, n2,
                            u0, u0 + new Vector2(0.3f, 0f), u0 + new Vector2(0.3f, 0.3f), u0 + new Vector2(0f, 0.3f));

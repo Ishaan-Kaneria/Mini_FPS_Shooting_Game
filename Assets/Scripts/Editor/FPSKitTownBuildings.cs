@@ -56,7 +56,7 @@ namespace FPSKit.EditorTools
             _townLots.Clear(); _chunks.Clear(); _details.Clear(); _shopInsides.Clear(); _townDoors.Clear(); _yardCars.Clear(); _shopFronts.Clear(); _shopFaces.Clear();
             _palletPrefab = null; _roomMarks = null; _shopMarks = null;
             _volumes = null; _signNames = null; _roadSignNames = null;
-            _interiorGroup = null; _interiorLayer = 0; _interiorCount = 0;
+            _interiorGroup = null; _interiorLayer = 0; _interiorCount = 0; _doorGroup = null;
             _oldSquares.Clear(); _vacantLots.Clear();
         }
 
@@ -877,6 +877,66 @@ namespace FPSKit.EditorTools
             m.Box(_coping, c + nrm * (d * 0.5f - 0.05f) + Vector3.up * 1.03f, new Vector3(w + 0.04f, 0.06f, 0.16f), rot);
         }
 
+        private static Transform _doorGroup;
+
+        /// <summary>
+        /// A front door that works (Door): one leaf, or two in a doorway over 1.4 m, each its own object on a hinge at its
+        /// jamb, shut across the opening just inside the inner face, swinging into the house. Not in the navmesh's bake (the
+        /// doorway is baked open, as before): a NavMeshObstacle across the doorway carves it while the door is bolted.
+        /// </summary>
+        private static void HouseDoor(Material leafMat, Vector3 p0, Vector3 p1, Vector3 inn, Vector3 nrm, float h)
+        {
+            if (_doorGroup == null)
+            {
+                _doorGroup = new GameObject("HouseDoors").transform;
+                _doorGroup.SetParent(_interiorGroup != null ? _interiorGroup.parent : null, false);
+            }
+            Vector3 u = (p1 - p0).normalized;
+            float w = Vector3.Distance(p0, p1);
+            Vector3 into = -nrm;                                    // into the house
+            Vector3 plane = inn + into * 0.03f;                     // the leaf's middle plane, just in from the inner face
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/impact_wood.wav");
+            var way = new GameObject("Doorway");
+            way.transform.SetParent(_doorGroup, false);
+            way.transform.SetPositionAndRotation((p0 + p1) * 0.5f + plane + Vector3.up * (h * 0.5f), Quaternion.LookRotation(into));
+            var obstacle = way.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            obstacle.shape = UnityEngine.AI.NavMeshObstacleShape.Box;
+            obstacle.size = new Vector3(w, h, 0.3f);
+            obstacle.carving = true;
+            obstacle.carveOnlyStationary = true;
+            var ignore = way.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
+            ignore.ignoreFromBuild = true;
+
+            Door Leaf(Vector3 hinge, Vector3 across, float lw)
+            {
+                var pivot = new GameObject("Leaf").transform;
+                pivot.SetParent(way.transform, false);
+                pivot.SetPositionAndRotation(hinge + plane, Quaternion.LookRotation(into));
+                float side = Mathf.Sign(Vector3.Dot(pivot.right, across));          // which local x the leaf spans
+                var lm = new TownMesh();
+                lm.Box(leafMat, new Vector3(side * lw * 0.5f, h * 0.5f, 0f), new Vector3(lw, h - 0.02f, 0.05f), Quaternion.identity);
+                var go = lm.Build(pivot, "DoorLeaf", 0, "Wood");
+                if (go != null) GameObjectUtility.SetStaticEditorFlags(go, 0);
+                var body = pivot.gameObject.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                var door = pivot.gameObject.AddComponent<Door>();
+                // Opening is the leaf's far edge going into the house: the angle about up that turns local +side x toward +z.
+                float probe = Vector3.Dot(Quaternion.AngleAxis(30f, Vector3.up) * (Vector3.right * side), Vector3.forward);
+                door.openAngle = probe > 0f ? 95f : -95f;
+                door.kickClip = clip;
+                door.obstacle = obstacle;
+                return door;
+            }
+            if (w > 1.4f)
+            {
+                float lw = w * 0.5f - 0.01f;
+                var a = Leaf(p0, u, lw);
+                var c = Leaf(p1, -u, lw);
+                a.partner = c; c.partner = a;
+            }
+            else Leaf(p0, u, w - 0.02f);
+        }
+
         private static void OpenDoor(TownMesh m, Mass b, Vector3 p0, Vector3 p1, Vector3 q0, Vector3 inn, Vector3 nrm)
         {
             // The leaves swung right back against the inside of the wall, either side of the doorway, so it is clear: stood
@@ -885,16 +945,9 @@ namespace FPSKit.EditorTools
             Vector3 u = (p1 - p0).normalized;
             float w = Vector3.Distance(p0, p1), h = Vector3.Distance(p0, q0);
             var leaf = b.rng.NextDouble() < 0.5 ? _doorWood : _doorMetal;
-            var rot = Quaternion.LookRotation(nrm);
-            Vector3 back = inn - nrm * 0.035f + Vector3.up * (h * 0.5f);
-            if (w > 1.4f)
-            {
-                float lw = w * 0.5f - 0.02f;
-                m.Box(leaf, p0 + back - u * (lw * 0.5f + 0.02f), new Vector3(lw, h, 0.05f), rot);
-                m.Box(leaf, p1 + back + u * (lw * 0.5f + 0.02f), new Vector3(lw, h, 0.05f), rot);
-            }
-            else
-                m.Box(leaf, p0 + back - u * (w * 0.5f), new Vector3(w - 0.04f, h, 0.05f), rot);
+            // Real doors (his brief, 2026-11-03): shut and bolted in the doorway, on their hinges, kicked in (Door). They
+            // used to be leaves folded back against the inside wall in the block's mesh.
+            HouseDoor(leaf, p0, p1, inn, nrm, h);
             // A step down to the pavement or yard if the floor stands above the ground.
             float g = GroundHeightAt((p0.x + p1.x) * 0.5f, (p0.z + p1.z) * 0.5f);
             if (b.baseY - g > 0.12f)

@@ -844,7 +844,27 @@ public partial class MeleeStrike : MonoBehaviour
             Feel(strike, target.IsDead);
             Landed?.Invoke(this, strike, target);
         }
+        else if (HitWorld(strike)) { if (_motor != null) _motor.AddShake(Settings.kickShake); }   // the thing struck makes its own sound
         else Missed?.Invoke(this, strike);
+    }
+
+    /// <summary>
+    /// No man in reach: the boot or the fist meets what is in front of the crosshair, if anything is (WorldHit: a door
+    /// bursts after a few kicks, a bin goes over). The kick is aimed a little low, where a boot lands.
+    /// </summary>
+    bool HitWorld(Strike strike)
+    {
+        if (fpsCamera == null) return false;
+        bool kick = strike == Strike.Kick;
+        var cam = fpsCamera.transform;
+        Vector3 dir = kick ? Quaternion.AngleAxis(12f, cam.right) * cam.forward : cam.forward;
+        if (!Physics.Raycast(cam.position, dir, out var hit, _pendingRange + Settings.impactTolerance, _blockMask, QueryTriggerInteraction.Ignore))
+            return false;
+        return WorldHit.Send(hit.collider, new WorldHitInfo
+        {
+            kind = kick ? WorldHitKind.Kick : WorldHitKind.Punch, point = hit.point, normal = hit.normal, direction = dir,
+            impulse = kick ? WorldHit.KickImpulse : WorldHit.PunchImpulse, source = gameObject,
+        });
     }
 
     /// <summary>

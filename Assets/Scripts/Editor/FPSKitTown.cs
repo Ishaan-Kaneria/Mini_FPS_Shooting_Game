@@ -372,6 +372,10 @@ namespace FPSKit.EditorTools
         private static string SurfaceFor(string name)
         {
             string n = name.ToLowerInvariant();
+            // Before the metal words: "cardboard" and "carpet" hold "car", and every cardboard box sparked like a car body
+            // (VerifyImpacts' crate stack, 2026-11-03). Paper and cloth take the wood's dull puff, the nearest there is.
+            if (n.Contains("cardboard") || n.Contains("carpet") || n.Contains("paper") || n.Contains("rug") || n.Contains("cushion") ||
+                n.Contains("pillow") || n.Contains("mattress") || n.Contains("cloth") || n.Contains("sofa")) return "Wood";
             if (n.Contains("wood") || n.Contains("crate") || n.Contains("table") || n.Contains("chair") || n.Contains("stool") ||
                 n.Contains("shelf") || n.Contains("shelves") || n.Contains("ladder") || n.Contains("basket") || n.Contains("bench") ||
                 n.Contains("cabinet") || n.Contains("bookshelf") || n.Contains("palm") || n.Contains("trunk") || n.Contains("branch") ||

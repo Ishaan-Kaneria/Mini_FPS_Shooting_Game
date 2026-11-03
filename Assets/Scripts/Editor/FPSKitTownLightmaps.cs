@@ -36,7 +36,7 @@ namespace FPSKit.EditorTools
 
         /// <summary>Half the side of the district round the player's start whose insides are lightmapped too (0: the pilot's
         /// four alone). 200 m: about a sixth of the town, the first district (2026-11-03).</summary>
-        const float DistrictHalf = 200f;
+        const float DistrictHalf = 0f;     // 0 since the room scenes (FPSKitTownRoomScenes) bake every room, district by district
 
         /// <summary>The district's texels against the pilot's: 0.5, 20 cm, so a sixth of the town fits this laptop's bake.</summary>
         internal const float DistrictScale = 0.5f;

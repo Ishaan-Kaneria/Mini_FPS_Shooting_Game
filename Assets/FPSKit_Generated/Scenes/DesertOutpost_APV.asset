@@ -57,8 +57,8 @@ MonoBehaviour:
       bounds:
         m_Center: {x: 0, y: 0, z: 0}
         m_Extent: {x: 0, y: 0, z: 0}
-  singleSceneMode: 1
-  dialogNoProbeVolumeInSetShown: 0
+  singleSceneMode: 0
+  dialogNoProbeVolumeInSetShown: 1
   settings:
     m_Version: 1
     dilationSettings:

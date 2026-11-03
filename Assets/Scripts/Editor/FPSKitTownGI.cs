@@ -195,6 +195,8 @@ namespace FPSKit.EditorTools
         /// </summary>
         static void PlaceRoomContents(Transform arena, List<Bounds> boxes)
         {
+            // With the district room scenes loaded, each holds its rooms' contents (FPSKitTownRoomScenes): left as they are.
+            if (FPSKitTownRoomScenes.ExistingPaths().Any(p => UnityEngine.SceneManagement.SceneManager.GetSceneByPath(p).isLoaded)) return;
             foreach (var old in Object.FindObjectsByType<RoomContents>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 Object.DestroyImmediate(old.gameObject);
             var props = GameObject.Find("Arena/Buildings/BuildingProps");
@@ -478,6 +480,11 @@ namespace FPSKit.EditorTools
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
             FPSKitQualityTiers.Ensure();
+            // The district room scenes open first: the light look finds each house's rooms by their walls, and since the
+            // split those are in the districts (with the town alone it found 5 houses of 160, and every other room mirrored
+            // the sky: "everything is shiny", 2026-11-03).
+            foreach (var rooms in FPSKitTownRoomScenes.ExistingPaths())
+                if (!UnityEngine.SceneManagement.SceneManager.GetSceneByPath(rooms).isLoaded) EditorSceneManager.OpenScene(rooms, OpenSceneMode.Additive);
             ApplyRealLightLook();
 
             // Textures at an eighth of their size for the bake: the GPU here shares the system's memory, so every texture

@@ -68,6 +68,8 @@ namespace FPSKit.EditorTools
             {
                 EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, OpenSceneMode.Single);
                 foreach (var district in FPSKitTownRoomScenes.ExistingPaths()) EditorSceneManager.OpenScene(district, OpenSceneMode.Additive);
+                int high = System.Array.IndexOf(QualitySettings.names, "High");
+                if (high >= 0) QualitySettings.SetQualityLevel(high, true);       // his tier
                 DynamicGI.UpdateEnvironment();
                 var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).First(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
                 var pilot = GameObject.Find("LightmapPilot");
@@ -112,6 +114,10 @@ namespace FPSKit.EditorTools
                         Object.DestroyImmediate(tex);
                         return r;
                     }
+                    // The rooms' probes as the game has them on High (IndoorReflections: those within 45 m of the eye on).
+                    foreach (var p in Object.FindObjectsByType<ReflectionProbe>(FindObjectsInactive.Include))
+                        if (p.name.StartsWith("RoomProbe_") || p.name.StartsWith("ShopProbe_") || p.name.StartsWith("Pilot"))
+                            p.enabled = (p.bounds.ClosestPoint(cam.transform.position) - cam.transform.position).sqrMagnitude < 45f * 45f;
                     string a = Shot("asis");
                     sun.enabled = false; string b = Shot("sunoff"); sun.enabled = true;
                     float was = sun.intensity; sun.intensity = was * 3f; string b3 = Shot("sun3x"); sun.intensity = was;
@@ -121,7 +127,19 @@ namespace FPSKit.EditorTools
                     foreach (var (x, _) in masked) x.renderingLayerMask = 1u;
                     string d = Shot("nolayers");
                     foreach (var (x, m0) in masked) x.renderingLayerMask = m0;
-                    sb.AppendLine($"room{i} {(Lightmapped(room) ? "LIGHTMAPPED" : "probes")} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c} | no layers {d}");
+                    // Every reflection off: what the reflections add to the room (his 'everything is shiny', 2026-11-03).
+                    var probesOn = Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None).Where(p => p.enabled).ToList();
+                    float reflWas = RenderSettings.reflectionIntensity;
+                    foreach (var p in probesOn) p.enabled = false;
+                    RenderSettings.reflectionIntensity = 0f;
+                    string e = Shot("refloff");
+                    foreach (var p in probesOn) p.enabled = true;
+                    RenderSettings.reflectionIntensity = reflWas;
+                    var here = cam.transform.position;
+                    var cover = Object.FindObjectsByType<ReflectionProbe>(FindObjectsInactive.Include).Where(p => p.bounds.Contains(here))
+                        .Select(p => $"{p.name}({(p.enabled ? "on" : "off")} {p.intensity:0.00} {(p.customBakedTexture != null ? p.customBakedTexture.name : p.bakedTexture != null ? p.bakedTexture.name : "no texture")})").ToList();
+                    sb.AppendLine($"  probes over room{i}: {(cover.Count == 0 ? "none (the sky)" : string.Join(", ", cover))}; default reflection {RenderSettings.defaultReflectionMode}, intensity {RenderSettings.reflectionIntensity:0.00}");
+                    sb.AppendLine($"room{i} {(Lightmapped(room) ? "LIGHTMAPPED" : "probes")} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c} | no layers {d} | reflections off {e}");
                     i++;
                 }
                 Object.DestroyImmediate(camGo);

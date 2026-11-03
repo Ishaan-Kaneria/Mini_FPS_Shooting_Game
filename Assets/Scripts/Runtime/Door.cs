@@ -74,6 +74,9 @@ public class Door : MonoBehaviour, IWorldHit
         // Which way it was struck, against the way it opens: a kick from inside only shakes it.
         Vector3 inward = transform.rotation * Vector3.forward;   // the leaf's face normal, pointing into the house when shut
         bool fromOutside = Vector3.Dot(hit.direction, inward) > 0f;
+        // Pushed the way the blow goes: into the house (the opening way, openAngle's sign) from outside. Unsigned, a leaf
+        // hinged on its left swung out at the kicker first and then in (his play-test, 2026-11-03).
+        float push = (fromOutside ? 1f : -1f) * Mathf.Sign(openAngle);
         switch (hit.kind)
         {
             case WorldHitKind.Kick:
@@ -81,21 +84,21 @@ public class Door : MonoBehaviour, IWorldHit
                 Play(kickClip, 0.85f, Random.Range(0.75f, 0.9f));
                 if (_bolted)
                 {
-                    _rattleSpeed += (fromOutside ? 1f : -1f) * rattle * 18f;
+                    _rattleSpeed += push * rattle * 18f;
                     if (fromOutside || hit.kind == WorldHitKind.Blast) _kicks++;
                     if (_kicks >= kicksToBreak || hit.kind == WorldHitKind.Blast) Burst(fromOutside ? 1f : 1f);
                 }
-                else _speed += (fromOutside ? 1f : -1f) * burstSpeed * 0.6f;   // open: a kick swings it
+                else _speed += push * burstSpeed * 0.6f;   // open: a kick swings it
                 break;
             case WorldHitKind.Bullet:
                 Play(kickClip, 0.35f, Random.Range(1.2f, 1.45f));
-                if (_bolted) _rattleSpeed += (fromOutside ? 1f : -1f) * rattle * 4f;
-                else _speed += (fromOutside ? 1f : -1f) * 25f;
+                if (_bolted) _rattleSpeed += push * rattle * 4f;
+                else _speed += push * 25f;
                 break;
             default:
                 Play(kickClip, 0.5f, 1f);
-                if (!_bolted) _speed += (fromOutside ? 1f : -1f) * burstSpeed * 0.25f;
-                else _rattleSpeed += rattle * 8f;
+                if (!_bolted) _speed += push * burstSpeed * 0.25f;
+                else _rattleSpeed += push * rattle * 8f;
                 break;
         }
     }

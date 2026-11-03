@@ -110,7 +110,12 @@ namespace FPSKit.EditorTools
                     sun.enabled = false; string b = Shot("sunoff"); sun.enabled = true;
                     float was = sun.intensity; sun.intensity = was * 3f; string b3 = Shot("sun3x"); sun.intensity = was;
                     cam.useOcclusionCulling = false; string c = Shot("nocull"); cam.useOcclusionCulling = true;
-                    sb.AppendLine($"room{i} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c}");
+                    // Off the probe layers for one shot: every renderer back on Default alone, so each reads every probe.
+                    var masked = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None).Where(x => (x.renderingLayerMask & (FPSKitTownGI.IndoorLayer | FPSKitTownGI.OutdoorLayer)) != 0).Select(x => (x, x.renderingLayerMask)).ToList();
+                    foreach (var (x, _) in masked) x.renderingLayerMask = 1u;
+                    string d = Shot("nolayers");
+                    foreach (var (x, m0) in masked) x.renderingLayerMask = m0;
+                    sb.AppendLine($"room{i} {room.parent.name}/{room.name} at {room.position}: upper/middle {a} | sun off {b} | sun 3x {b3} | culling off {c} | no layers {d}");
                     i++;
                 }
                 Object.DestroyImmediate(camGo);

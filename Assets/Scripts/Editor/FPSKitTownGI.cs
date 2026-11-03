@@ -56,6 +56,10 @@ namespace FPSKit.EditorTools
         /// 81 m (level 4) in open air. The town's volume starts at level 1, 3 m.</summary>
         const int InteriorProbeDepth = 4;
 
+        /// <summary>The 1 m probe volumes in the lightmapped insides (off since 2026-11-03: the bake with the indoor/outdoor
+        /// probe layers did not fit in memory with them).</summary>
+        const bool InteriorProbes = true;
+
         /// <summary>Metres the probe volume spans across the town (the arena is a kilometre; a little over for its edge).</summary>
         const float TownSpan = 1060f;
 
@@ -398,6 +402,12 @@ namespace FPSKit.EditorTools
         /// Prepares the open town scene for APV and bakes it (asynchronously, on the editor's update, unless
         /// <paramref name="synchronous"/>); <paramref name="done"/> is told whether it baked.
         /// </summary>
+        /// <summary>Indoors/outdoors probe layers in the bake. Off (2026-11-03): baked with them, the ordinary rooms' walls
+        /// went black (FPSKitShadowLeak.BatchBand, room 1 upper/middle 0/4 against 87/44 with the layers off): at 3 m the probes
+        /// that see only a room's inside hold almost none of its light, and the walls had been lit by the outside's probes
+        /// leaking in. A 3 m grid cannot light the town's 900 small rooms; their own lightmaps (the pilot's, in range) can.</summary>
+        const bool ProbeLayers = false;
+
         /// <summary>Rendering layer of the rooms' insides for the probe volumes (bit 1). Their surfaces read only probes that see an inside.</summary>
         public const uint IndoorLayer = 1u << 1;
         /// <summary>Rendering layer of everything else in the town (bit 2). Its surfaces read only probes that see the outside.</summary>
@@ -514,12 +524,17 @@ namespace FPSKit.EditorTools
             // there, his report 2026-10-31). Level 0 is the set's finest spacing (1 m), each level up three times coarser;
             // the town's volume keeps levels 1-4 (3-81 m), and each lightmapped inside has a volume of its own with all of
             // them. (The other way round -- highest level 3 -- cut the 81 m level and allowed 1 m: 11.1 M probes.)
-            volume.overridesSubdivLevels = true;
+            // 2026-11-03: the 1 m level is dropped. With the probe rendering layers (ApplyIndoorLayers) the bake needed more
+            // memory than this laptop has (stopped three times at its integration step, 8.8 GB and swap); the 1 m volumes
+            // served only the four lightmapped pilot insides, and the layers keep a room's probes from the street's anyway.
+            // The set is 3 m at its finest again (3, 9, 27, 81 m: the same 81 m cells), the town's volume all of it.
+            volume.overridesSubdivLevels = !InteriorProbes;
             volume.lowestSubdivLevelOverride = 1;
             volume.highestSubdivLevelOverride = InteriorProbeDepth;
             foreach (var old in Object.FindObjectsByType<ProbeVolume>(FindObjectsSortMode.None).Where(v => v.name.StartsWith("InteriorProbes_")).ToList())
                 Object.DestroyImmediate(old.gameObject);
             int interiorVolumes = 0;
+            if (InteriorProbes)
             foreach (var group in new[] { "Arena/Buildings/HouseInteriors", "Arena/Buildings/ShopInteriors" })
                 if (GameObject.Find(group) is GameObject insides)
                     foreach (var r in insides.GetComponentsInChildren<MeshRenderer>(true))
@@ -547,8 +562,8 @@ namespace FPSKit.EditorTools
             }
             // 3 m wherever there is geometry (a room gets two or three across; the contact shading under and round small
             // things is SSAO's), up to 81 m in open air. At 1 m the town wanted more than Unity's 67,180,350 probes a set.
-            set.minDistanceBetweenProbes = 1f;
-            set.simplificationLevels = InteriorProbeDepth;     // 1, 3, 9, 27, 81 m: the same 243 m cells as 3 m with 3 levels
+            set.minDistanceBetweenProbes = InteriorProbes ? 1f : 3f;
+            set.simplificationLevels = InteriorProbes ? InteriorProbeDepth : 3;   // 1-81 m with the 1 m level, 3-81 m without: 81 m cells either way
             // The grid lifted half a spacing: from the ground at 0 its layers fell at 0, 3 and 6 m, in the floor slabs of
             // the town's 3.2 m storeys, and floors read probes buried in them (dark, sky-blue floors under bright walls, the
             // lighting tour). At 1.5 and 4.5 m they are in the middle of each storey's rooms.
@@ -613,7 +628,7 @@ namespace FPSKit.EditorTools
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, flags | StaticEditorFlags.ContributeGI);
             }
 
-            ApplyIndoorLayers(set, arena);
+            if (ProbeLayers) ApplyIndoorLayers(set, arena);
 
             // How the probes are read (the scene's global post-processing profile): at 3 m apart the defaults' offsets
             // (0.05 along the normal, 0.1 towards the eye) are too short, and a surface read probes buried in the wall or the

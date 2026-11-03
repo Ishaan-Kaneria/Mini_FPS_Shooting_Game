@@ -612,6 +612,7 @@ namespace FPSKit.EditorTools
             bool transportFailed = false;
             void Watch(string message, string trace, LogType type)
             {
+                if (type is not (LogType.Error or LogType.Exception)) return;
                 if (message.Contains("Light baking could not be started") || message.Contains("PostProcessingOutput/APVBake")) transportFailed = true;
             }
             Application.logMessageReceived += Watch;
@@ -639,8 +640,8 @@ namespace FPSKit.EditorTools
                 foreach (var p in reflection) p.enabled = true;
                 if (settings != null) { settings.indirectScale = classicIndirect; settings.lightmapper = lightmapper; EditorUtility.SetDirty(settings); }
                 QualitySettings.SetQualityLevel(was, true);
-                var descs = typeof(ProbeVolumeBakingSet).GetField("cellDescs", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(set) as System.Collections.ICollection;
-                int cells = descs?.Count ?? 0;
+                var descs = typeof(ProbeVolumeBakingSet).GetField("cellDescs", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(set);
+                int cells = (int)(descs?.GetType().GetProperty("Count")?.GetValue(descs) ?? 0);
                 long bytes = 0;
                 // The set's data lies beside it: <set>.Cell*.bytes and <set>-<scenario>.Cell*.bytes.
                 string dir = System.IO.Path.GetDirectoryName(setPath), stem = System.IO.Path.GetFileNameWithoutExtension(setPath);

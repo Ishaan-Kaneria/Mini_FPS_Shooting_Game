@@ -193,12 +193,22 @@ namespace FPSKit.EditorTools
             catch (System.Exception e) { Debug.LogError("[FPSKit] light report FAILED: " + e); EditorApplication.Exit(1); }
         }
 
+        static float s_outdoor;     // the open ground's light for the report in progress (set at its start)
+
         static string LightReport()
         {
             var sb = new System.Text.StringBuilder();
             var sun = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).FirstOrDefault(l => l.type == LightType.Directional && l.shadows != LightShadows.None);
             Vector3 toSun = sun != null ? -sun.transform.forward : Vector3.up;
             sb.AppendLine($"sun: elevation {Mathf.Asin(toSun.y) * Mathf.Rad2Deg:0.0}, from azimuth {Mathf.Atan2(toSun.x, toSun.z) * Mathf.Rad2Deg:0} (0 north, 90 east)");
+            // The open ground's light, in the lightmap's units (what multiplies the albedo): the sun on a level floor plus the
+            // sky from above (the ambient probe). A room's floor against it is its daylight factor -- real rooms lit from one
+            // side run about 2-5 % near the window and 0.5-2 % at the back (CIBSE LG10; a room under 0.5 % reads as unlit).
+            float sunOnGround = sun != null ? Lum(sun.color.linear) * sun.intensity * Mathf.Max(0f, toSun.y) : 0f;
+            var skyUp = new Vector3[] { Vector3.up }; var skyCol = new Color[1];
+            RenderSettings.ambientProbe.Evaluate(skyUp, skyCol);
+            s_outdoor = sunOnGround + Lum(skyCol[0]);
+            sb.AppendLine($"open ground: {s_outdoor:0.000} (sun {sunOnGround:0.000} + sky {Lum(skyCol[0]):0.000}); daylight factor = floor / open ground");
             // The lightmaps, readable: blitted to half floats and read back.
             var maps = LightmapSettings.lightmaps.Select(m =>
             {
@@ -373,7 +383,8 @@ namespace FPSKit.EditorTools
             foreach (var (from, to) in new[] { (0f, 1f), (1f, 2f), (2f, 3f), (3f, 4f), (4f, 6f), (6f, 99f) })
             {
                 var band = bands.Where(x => x.dist >= from && x.dist < to).Select(x => x.baked).ToList();
-                if (band.Count > 0) sb.AppendLine($"    {from:0}-{(to > 50 ? "" : to.ToString("0"))} m from an opening to the open air: mean {band.Average():0.000} ({band.Count})");
+                if (band.Count > 0) sb.AppendLine($"    {from:0}-{(to > 50 ? "" : to.ToString("0"))} m from an opening to the open air: mean {band.Average():0.000} ({band.Count})" +
+                                                  (s_outdoor > 0f ? $", daylight factor {100f * band.Average() / s_outdoor:0.00} %" : ""));
             }
             // The ceiling over the sun's patch (within 2 m of it) and away from it; the walls near the openings and away.
             var patch = cells.Where(kv => kv.Value.lit).Select(kv => kv.Key).ToList();

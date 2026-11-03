@@ -596,6 +596,13 @@ namespace FPSKit.EditorTools
             set.skyOcclusion = false;
             EditorUtility.SetDirty(set);
             set.TryAddScene(AssetDatabase.AssetPathToGUID(path));   // false when it is in the set already
+            // The district room scenes (FPSKitTownRoomScenes) open with the town and in the set: without their walls a house's
+            // probes see an empty shell and light the arms, the soldiers and the furniture in it as if out in the street.
+            foreach (var rooms in FPSKitTownRoomScenes.ExistingPaths())
+            {
+                if (!UnityEngine.SceneManagement.SceneManager.GetSceneByPath(rooms).isLoaded) EditorSceneManager.OpenScene(rooms, OpenSceneMode.Additive);
+                set.TryAddScene(AssetDatabase.AssetPathToGUID(rooms));
+            }
 
             // Every static mesh in the arena takes its light from the probes (nothing gets a lightmap). Only the town's own
             // geometry -- buildings, their insides, landmarks, roads, the edge's structures -- shades and bounces light in

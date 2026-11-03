@@ -39,7 +39,7 @@ namespace FPSKit.EditorTools
         const float DistrictHalf = 200f;
 
         /// <summary>The district's texels against the pilot's: 0.5, 20 cm, so a sixth of the town fits this laptop's bake.</summary>
-        const float DistrictScale = 0.5f;
+        internal const float DistrictScale = 0.5f;
 
         /// <summary>A shop tube's brightness as a baked area light (a 6 cm by 1.2 m strip under the tube). At 8 the tubes showed
         /// and lit almost nothing: the back wall came out darker than the flat paint it replaced (2026-10-31).</summary>
@@ -171,7 +171,7 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>The inside takes a lightmap: lightmap UVs made for it (its surface area back, for the report).</summary>
-        static float Lightmapped(MeshRenderer r)
+        internal static float Lightmapped(MeshRenderer r)
         {
             var mesh = r.GetComponent<MeshFilter>().sharedMesh;
             float area = 0f;
@@ -192,7 +192,7 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>A tube's light: a strip as long as the tube, just under it, facing down, baked only.</summary>
-        static void Tube(Transform root, Vector3 at, Vector3 along)
+        internal static void Tube(Transform root, Vector3 at, Vector3 along)
         {
             var go = new GameObject("ShopTube");
             go.transform.SetParent(root, false);

@@ -1264,7 +1264,9 @@ public class EnemyAI : MonoBehaviour
         if (from == null) return;
 
         Vector3 travel = endPoint - from.position;
-        if (travel.sqrMagnitude < 0.0001f) return;
+        // Not a number fails every comparison, so "too short" alone let a NaN shot through: LookRotation asserted and the
+        // tracer stood at NaN (an invalid worldAABB every frame it lived).
+        if (!(travel.sqrMagnitude >= 0.0001f) || float.IsInfinity(travel.sqrMagnitude)) return;
 
         var tracer = Instantiate(tracerPrefab, from.position, Quaternion.LookRotation(travel));
 

@@ -251,6 +251,9 @@ public class FPSImpactManager : MonoBehaviour
             _mesh.vertices = _verts;
             _mesh.normals = _normals;
             _mesh.uv = _uvs;
+            // Assigning vertices keeps the old bounds (only triangles recompute them): the marks' own box, a few hundred
+            // quads, so the renderer is culled as what it is and never as the 100 km box it used to carry all level.
+            _mesh.RecalculateBounds();
             _geometryDirty = false;
             _colorsDirty = true;
         }
@@ -400,8 +403,8 @@ public class FPSImpactManager : MonoBehaviour
         _mesh.MarkDynamic();
         _mesh.vertices = _verts; _mesh.normals = _normals; _mesh.uv = _uvs; _mesh.colors32 = _colors;
         _mesh.triangles = tris;
-        // Marks can be anywhere: never culled as a whole (its quads are what is drawn, a few hundred at most).
-        _mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 100000f);
+        // Its bounds follow the marks (Tick recalculates them when a mark is laid); empty until the first.
+        _mesh.bounds = new Bounds(Vector3.zero, Vector3.one);
         var go = new GameObject("Marks");
         go.transform.SetParent(transform, false);
         go.AddComponent<MeshFilter>().sharedMesh = _mesh;

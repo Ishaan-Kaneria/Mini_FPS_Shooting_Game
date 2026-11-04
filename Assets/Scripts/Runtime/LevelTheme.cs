@@ -412,6 +412,33 @@ public class LevelTheme : ScriptableObject
     [Range(0f, 1f)] public float vignetteIntensity = 0.28f;
     [Range(0f, 1f)] public float filmGrain = 0.2f;
 
+    [Header("Grade: warm light, cool shade (neutral values add nothing)")]
+    [Tooltip("White balance temperature. Negative cools the whole picture, positive warms it. 0 adds nothing. A few points " +
+             "either way: the sun's colour does the real work.")]
+    [Range(-100f, 100f)] public float whiteBalanceTemperature = 0f;
+    [Tooltip("White balance tint: negative toward green, positive toward magenta. 0 adds nothing.")]
+    [Range(-100f, 100f)] public float whiteBalanceTint = 0f;
+    [Tooltip("Split toning, the colour pushed into the darks. Mid grey (0.5, 0.5, 0.5) adds nothing. A slightly blue grey " +
+             "makes shade read as lit by the sky, as it is outdoors.")]
+    public Color splitShadows = new Color(0.5f, 0.5f, 0.5f);
+    [Tooltip("Split toning, the colour pushed into the lights. Mid grey adds nothing. A slightly amber grey warms what the sun touches.")]
+    public Color splitHighlights = new Color(0.5f, 0.5f, 0.5f);
+    [Tooltip("Where split toning divides darks from lights: negative gives the highlight colour more of the picture.")]
+    [Range(-100f, 100f)] public float splitBalance = 0f;
+
+    [Header("Cloud shadows (CloudShadows on the sun)")]
+    [Tooltip("Slow cloud shadows drifting over the ground, through a cookie on the sun. Only with a sky that has clouds in it: " +
+             "under a clear sky they make no sense.")]
+    public bool cloudShadows = false;
+    [Tooltip("How much of the sun a cloud takes away at its thickest. 0.3-0.45 reads as a desert's thin cumulus.")]
+    [Range(0f, 0.9f)] public float cloudShadowStrength = 0.35f;
+    [Tooltip("Share of the sky's area under cloud, 0-1.")]
+    [Range(0f, 1f)] public float cloudCover = 0.35f;
+    [Tooltip("Metres the cloud pattern repeats over. Real cumulus shadows are 200-800 m across.")]
+    [Min(50f)] public float cloudScale = 600f;
+    [Tooltip("Wind, metres per second over the ground (x east, y north).")]
+    public Vector2 cloudWind = new Vector2(3.5f, 1.2f);
+
     public Color RandomCoverColor(System.Random rng)
     {
         if (coverColors == null || coverColors.Length == 0) return wallColor;

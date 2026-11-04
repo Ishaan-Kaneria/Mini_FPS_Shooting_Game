@@ -1,6 +1,7 @@
 # Desert Outpost: full review (bugs, realism, fixes)
 
-Written 2026-11-04 by Claude Code (cloud session) for the developer and for Claude Code on the laptop. Repo state reviewed:
+Written 2026-11-04 by Claude Code (cloud session) for the developer and for Claude Code on the laptop. Lighting fixes
+and the look: `Docs/DESERT_LIGHTING.md` (A2 and A4 are now in code). Repo state reviewed:
 `261c706` (same as GitHub `main`).
 
 ## 0. Read this first (for the Claude Code session that carries it out)
@@ -32,7 +33,7 @@ Written 2026-11-04 by Claude Code (cloud session) for the developer and for Clau
 | A6 | S2 | Arms and gun lit by moving the sun for the arms camera (a stand-in, not a light system) | Confirmed (code) | L |
 | A7 | S2 | The eye's probe dimming is global: probe-lit things anywhere in view dim with the room | Confirmed (code) | M |
 | A8 | S2 | Door frames, skirting, front doors and small props glow in dark rooms | Confirmed (commit 0c296f6) | M |
-| A9 | S2 | Window glass is opaque metal (metallic 0.85): renders as black holes | Confirmed (code) | S |
+| A9 | S2 | Window glass renders as black holes (nothing behind it, dim reflections) | Likely | M |
 | A10 | S2 | Low, phones and web: no eye adaptation, outdoor probes inside rooms | Confirmed (code) | M |
 | A11 | S3 | APV sky occlusion off | Check | S |
 | A12 | S3 | Medium shares its renderer asset with Low and phones | Confirmed (assets) | S |
@@ -187,15 +188,17 @@ How the desert is lit today, from the code:
   mesh copies with UVs for furniture, `1cfad04`). Moving door leaves stay on probes: after A1 they read indoor probes.
 
 ### A9 (S2) Window glass renders as black holes
-* **Cause:** `Editor/FPSKitTownBuildings.cs:121-122`:
-  `TownFlat("GlassDark", ..., 0.96f, 0.85f)` and `TownFlat("GlassBlue", ..., 0.96f, 0.85f)`. The 4th argument is
-  **metallic 0.85**, and the material is opaque. Glass is a dielectric; a dark metallic mirror with a mostly sky-blind
-  probe reads black (audit: "renders as a black hole: 4 % of the brightness round it").
-* **Fix:** metallic 0, smoothness 0.95, a dark tint, and either transparent with something behind it (real interiors
-  where the house is enterable) or an interior-mapping shader (fake room, cubemap of a room, parallax) for the shut
-  houses. Shop glass (`Town_ShopGlass`, `FPSKitTownShopfront.cs:119`) is already transparent: keep it, check its alpha.
-* **Check:** audit light test for `Town_GlassDark` / `Town_GlassBlue` passes; street views show reflections of the
-  street at grazing angles and a dim room at normal angles.
+* **Corrected 2026-11-04** (the first version blamed metallic 0.85; the comment at `FPSKitTownBuildings.cs:117-120`
+  shows it was chosen on purpose: as a plain dark dielectric the windows read as flat navy cards).
+* **What the audit saw:** `Town_GlassDark`, `Town_GlassBlue` FAKE, "renders as a black hole: 4 % of the brightness round
+  it: almost no reflection and nothing seen behind it".
+* **Likely cause:** the glass is opaque, so nothing is behind it, and what it reflects is a street probe captured near the
+  ground (a dim, sky-blind view). A metallic surface shows only its reflection, so a dim probe gives a black window.
+* **Fix:** an interior-mapping shader (a fake room behind the glass, from a small cubemap atlas, chosen per window by a
+  hash) under a dielectric glass layer (metallic 0, smoothness 0.95, Fresnel), and street reflection probes placed at
+  window height so the glass reflects the buildings opposite. See `Docs/DESERT_LIGHTING.md`, "Windows".
+* **Check:** audit light test for both materials passes; street views show reflections at grazing angles and a dim
+  room face-on.
 
 ### A10 (S2) Low, phones and web: rooms on outdoor probes, no adaptation
 * **Cause:** `EyeAdaptation.cs:179` sets the eye to 0 when probe volumes are off; the classic probes are deliberately
@@ -477,7 +480,7 @@ every object is in section 13.
 3. **Albedo and smoothness (DARK 64, ALB 75, SMOOTH 46, METAL 12).** Mostly imported pack materials (cars' `RMCar*`,
    Poly Haven props): fix in `FPSKitTownAssets`'s remap table (tint = wanted / image mean; metallic 0 on paint).
    Re-audit first: the Oct 31 gloss fix changed many of these.
-4. **Glass (A9).**
+4. **Glass (A9): interior mapping, see `Docs/DESERT_LIGHTING.md`.**
 5. **Unrecognised names (59).** Rename materials so the audit can judge them (e.g. `Town_TownSigns` -> `_Paint`).
    Until then they are UNCERTAIN, never fine.
 6. **Guns (6, FAKE).** The weapon-pack purchase (handoff 5.5).
@@ -524,7 +527,7 @@ Each step: one change, rebuild what it needs, run its check, commit, then the de
 1. **Quick code fixes, no rebuild** (one commit each): D1, D2, C1, B1, B2, B3, B4, B6, B7, B8, B11, B12, D4-D7, E2, F2.
    Checks: `VerifyCombat`, `VerifyWounds`, `FPSKitNeckWoundTest.Batch`, `VerifyStatics`, `VerifyControls`, a drive test.
 2. **Re-run the realism audit** and regenerate sections 12-13 with `Tools/desert_review_objects.py`.
-3. **A9 glass, E1 fallback material**: generator fixes, desert rebuild.
+3. **E1 fallback material**: generator fix, desert rebuild. (A9 glass: with the window shader, step 9.)
 4. **A2 + A12** (Medium Forward+ renderer): measure Medium GPU.
 5. **A4 then A3** (per-room probes, then per-room captures in the district bakes), A5.
 6. **A1** (probe layers + indoor probe density + runtime layer for characters), then **A7, A6, A8** (in that order: each

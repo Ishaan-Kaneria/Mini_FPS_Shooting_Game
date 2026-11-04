@@ -124,7 +124,7 @@ namespace FPSKit.EditorTools
             if (arena != null) root.transform.SetParent(arena, false);
             int mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian", "PlayerBounds");
             Physics.SyncTransforms();
-            void Probe(string name, Bounds box, float intensity)
+            void Probe(string name, Bounds box, float intensity, bool project = false)
             {
                 var go = new GameObject(name);
                 go.transform.SetParent(root.transform, false);
@@ -134,19 +134,19 @@ namespace FPSKit.EditorTools
                 probe.customBakedTexture = cube;
                 probe.size = box.size;
                 probe.center = Vector3.zero;
-                probe.boxProjection = false;
+                probe.boxProjection = project;
                 probe.blendDistance = RoomBlend;
                 probe.importance = 2;                // over the street probes where they overlap
                 probe.intensity = intensity;
                 probe.enabled = false;               // IndoorReflections switches them on near the eye
-                boxes.Add(box);
             }
-            int houses = 0;
+            int houses = 0, roomProbes = 0;
             if (rooms != null)
             foreach (Transform house in rooms.transform)
             {
                 bool any = false;
                 var box = new Bounds();
+                var roomBoxes = new List<Bounds>();
                 foreach (Transform room in house)
                 {
                     if (!room.name.StartsWith("Room ")) continue;
@@ -159,11 +159,26 @@ namespace FPSKit.EditorTools
                     if (xp < 0f || xn < 0f || zp < 0f || zn < 0f || up < 0f) continue;   // open to the sky one way: not a room
                     var rb = new Bounds();
                     rb.SetMinMax(new Vector3(from.x - xn, floor.y - 0.05f, from.z - zn), new Vector3(from.x + xp, floor.y + up, from.z + zp));
+                    roomBoxes.Add(rb);
                     if (!any) { box = rb; any = true; } else box.Encapsulate(rb);
                 }
                 if (!any) continue;
                 box.Expand(2f * RoomPad);
-                Probe("RoomProbe_" + house.GetSiblingIndex(), box, HouseReflection);
+                // RoomContents keeps the whole house's box: its shells (floors, stairs) and the props between rooms belong to it.
+                boxes.Add(box);
+                if (PerRoomProbes)
+                {
+                    // One box-projected probe per room (Docs/DESERT_REVIEW.md A4): the union of a house's rooms also took in
+                    // its yard, the street in front of an L-shaped house and both floors, and all of it mirrored the room.
+                    for (int i = 0; i < roomBoxes.Count; i++)
+                    {
+                        var rb = roomBoxes[i];
+                        rb.Expand(2f * RoomPad);
+                        Probe($"RoomProbe_{house.GetSiblingIndex()}_{i}", rb, HouseReflection, project: true);
+                        roomProbes++;
+                    }
+                }
+                else { Probe("RoomProbe_" + house.GetSiblingIndex(), box, HouseReflection); roomProbes++; }
                 houses++;
             }
             // A shop: its mark is its inside as a unit box (FPSKitTownShopfront); the probe's box is world-aligned, as the
@@ -180,11 +195,12 @@ namespace FPSKit.EditorTools
                 for (int c = 0; c < 8; c++)
                     box.Encapsulate(shop.TransformPoint(new Vector3((c & 1) != 0 ? sx : -sx, (c & 2) != 0 ? sy : -sy, (c & 4) != 0 ? front : back)));
                 bool isDark = shop.name.EndsWith(" dark");
-                Probe("ShopProbe_" + shop.GetSiblingIndex(), box, isDark ? ShopDarkReflection : ShopLitReflection);
+                Probe("ShopProbe_" + shop.GetSiblingIndex(), box, isDark ? ShopDarkReflection : ShopLitReflection, project: PerRoomProbes);
+                boxes.Add(box);
                 if (isDark) dark++; else lit++;
             }
             root.AddComponent<IndoorReflections>();
-            Debug.Log($"[FPSKit] indoor reflections: {houses} house probes, {lit + dark} shop probes ({dark} dark)");
+            Debug.Log($"[FPSKit] indoor reflections: {roomProbes} room probes in {houses} houses{(PerRoomProbes ? " (one per room, box projected)" : "")}, {lit + dark} shop probes ({dark} dark)");
             PlaceRoomContents(arena, boxes);
         }
 
@@ -256,6 +272,10 @@ namespace FPSKit.EditorTools
 
         /// <summary>How far a room's probe box reaches past its surfaces, into the walls, floor and ceiling.</summary>
         const float RoomPad = 0.1f;
+
+        /// <summary>A reflection probe per room, box projected, rather than one per house over all its rooms (2026-11-04,
+        /// Docs/DESERT_REVIEW.md A4). False puts back the house-wide boxes. Shops are box projected with it too.</summary>
+        const bool PerRoomProbes = true;
 
         /// <summary>How far in from its box's faces a room's probe fades in; less than <see cref="RoomPad"/>, so every surface
         /// of the room takes the whole of it.</summary>

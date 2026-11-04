@@ -617,6 +617,18 @@ namespace FPSKit.EditorTools
             // ones, and the shadows, as they were.
             if (_theme.desertTownZone) AimTownSun(sun);
 
+            // Drifting cloud shadows (CloudShadows), only where the theme's sky has clouds to cast them.
+            var clouds = sunGo.GetComponent<CloudShadows>();
+            if (_theme.cloudShadows)
+            {
+                if (clouds == null) clouds = sunGo.AddComponent<CloudShadows>();
+                clouds.strength = _theme.cloudShadowStrength;
+                clouds.cover = _theme.cloudCover;
+                clouds.scale = _theme.cloudScale;
+                clouds.wind = _theme.cloudWind;
+            }
+            else if (clouds != null) Object.DestroyImmediate(clouds);
+
             if (IsDesertArena() || _theme.desertTownZone)
             {
                 var bounce = new GameObject("Bounce Light").AddComponent<Light>();
@@ -3165,6 +3177,28 @@ namespace FPSKit.EditorTools
             grain.type.value = FilmGrainLookup.Medium1;
             grain.intensity.overrideState = true;
             grain.intensity.value = _theme.filmGrain;
+
+            // The warm-light, cool-shade grade (LevelTheme "Grade"), only where a theme asks for it: neutral values add nothing.
+            if (Mathf.Abs(_theme.whiteBalanceTemperature) > 0.01f || Mathf.Abs(_theme.whiteBalanceTint) > 0.01f)
+            {
+                var balance = profile.Add<WhiteBalance>(true);
+                balance.temperature.overrideState = true;
+                balance.temperature.value = _theme.whiteBalanceTemperature;
+                balance.tint.overrideState = true;
+                balance.tint.value = _theme.whiteBalanceTint;
+            }
+            var grey = new Color(0.5f, 0.5f, 0.5f);
+            bool Toned(Color c) => Mathf.Abs(c.r - grey.r) > 0.005f || Mathf.Abs(c.g - grey.g) > 0.005f || Mathf.Abs(c.b - grey.b) > 0.005f;
+            if (Toned(_theme.splitShadows) || Toned(_theme.splitHighlights))
+            {
+                var split = profile.Add<SplitToning>(true);
+                split.shadows.overrideState = true;
+                split.shadows.value = _theme.splitShadows;
+                split.highlights.overrideState = true;
+                split.highlights.value = _theme.splitHighlights;
+                split.balance.overrideState = true;
+                split.balance.value = _theme.splitBalance;
+            }
 
             // <b>The effects have to be saved into the asset, not just added to the list.</b> VolumeProfile.Add
             // creates the components in memory; without AddObjectToAsset the profile file holds a list of

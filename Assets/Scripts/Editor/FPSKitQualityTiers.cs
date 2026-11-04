@@ -18,7 +18,7 @@ namespace FPSKit.EditorTools
     ///             The phone and browser default.
     ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 80m on two
     ///             cascades, no MSAA (SMAA on the camera), full resolution, and the cheaper
-    ///             renderer, with no ambient occlusion.
+    ///             renderer, with no ambient occlusion: its own copy of Low's, in Forward+ (MediumForwardPlus).
     ///   High   -- PC_RPAsset: shadows to 150m on four cascades at 4096, adaptive probe volumes, 2x MSAA, rendered at 85% and upscaled with
     ///             FSR 1, and ambient occlusion at half resolution with eight samples and a bilateral blur. Measured on
     ///             the Intel Arc laptop: MSAA 4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass
@@ -78,13 +78,50 @@ namespace FPSKit.EditorTools
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
             // No MSAA on Medium: 6.9 ms of a 38 ms frame on the Arc laptop at 1080p (FrameCostProbe, 2026-10-30); its edges are
             // smoothed by SMAA on the camera instead (QualityTiers.ApplyScene).
+            var mediumRenderer = MediumRendererData(ref changed);   // before the |=, which reads changed first
             changed |= Configure(medium, shadows: true, distance: 80f, cascades: 2, msaa: 1, hdr: true, scale: 1f, soft: false,
-                                 renderer: AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer), shadowResolution: 2048,
+                                 renderer: mediumRenderer, shadowResolution: 2048,
                                  probeVolumes: true);
             changed |= Levels(low, medium, high);
             changed |= LevelLodBias();
             if (changed) AssetDatabase.SaveAssets();
             return changed;
+        }
+
+        const string MediumRenderer = "Assets/Settings/Medium_Renderer.asset";
+
+        /// <summary>
+        /// Medium's own renderer, Forward+ (2026-11-04, Docs/DESERT_REVIEW.md A2). On Low's Forward renderer IndoorReflections
+        /// switched every room's reflection probe off (Forward picks probes per object, and the town's facades were one object
+        /// per 64 m block), so on Medium every room mirrored the street and the sky. Forward+ picks them per pixel. A copy of
+        /// Low's renderer (no ambient occlusion, as before), so phones and the web keep theirs untouched. False goes back to
+        /// sharing Low's. Measure Medium's frame with FrameCostProbe after changing it.
+        /// </summary>
+        const bool MediumForwardPlus = true;
+
+        static ScriptableRendererData MediumRendererData(ref bool changed)
+        {
+            if (!MediumForwardPlus) return AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer);
+            var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(MediumRenderer);
+            if (data == null)
+            {
+                if (!AssetDatabase.CopyAsset(LowRenderer, MediumRenderer))
+                {
+                    Debug.LogWarning($"[FPSKit] quality tiers: could not copy {LowRenderer} to {MediumRenderer}; Medium keeps Low's renderer.");
+                    return AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer);
+                }
+                data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(MediumRenderer);
+                changed = true;
+            }
+            if (data == null) return AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(LowRenderer);
+            var so = new SerializedObject(data);
+            if (SetInt(so, "m_RenderingMode", (int)RenderingMode.ForwardPlus))
+            {
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(data);
+                changed = true;
+            }
+            return data;
         }
 
         static bool Configure(UniversalRenderPipelineAsset asset, bool shadows, float distance, int cascades,

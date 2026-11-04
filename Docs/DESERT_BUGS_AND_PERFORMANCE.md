@@ -91,6 +91,14 @@ Measured numbers come from `Docs/DESIGN_NOTES.md` ("Part A on mains"); sizes fro
 | N2 | The minimap is pale and has no roads or names; there is no full map | Plan | 7 |
 | U1-U24 | 24 things that look generated (no bevels, straight grid, tiling, flat colours, box furniture, clean streets, placeholders, no animals, no town sound, ...) | Plan | 8 |
 
+### The player's body
+| ID | Bug | Status | Where |
+|---|---|---|---|
+| H1 | Punching or kicking a wall did nothing to the player | Fixed (pain, injury that builds) | `DESERT_BODY.md` |
+| H2 | Fist, stock and kicking leg went into walls | Fixed (strikes stop at the wall) | |
+| H3 | Legs went into walls when standing at one | Fixed | |
+| H4 | The rifle's muzzle went into walls | Fixed (drawn back, muzzle lifted) | |
+
 ### Checks and code health
 | ID | Bug | Status | Where |
 |---|---|---|---|

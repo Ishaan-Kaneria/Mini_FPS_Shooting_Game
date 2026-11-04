@@ -185,12 +185,22 @@ public class PlayerBody : MonoBehaviour
         foreach (var t in new[] { _lThigh, _rThigh }) if (t != null) foreach (var c in t.GetComponentsInChildren<Transform>(true)) legs.Add(c);
         var hips = _anim.GetBoneTransform(HumanBodyBones.Hips);
         if (hips != null) legs.Add(hips);
+        // The belly too (his brief, 2026-11-04: "my whole body is not visible"): this bone only, not what hangs from it. Any
+        // higher and the eye stood inside the vest, which draws as a black hollow; the arms are the view model's.
+        if (_anim.GetBoneTransform(HumanBodyBones.Spine) is Transform belly) legs.Add(belly);
 
         foreach (var smr in _body.GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
             if (!smr.enabled || !smr.gameObject.activeInHierarchy || smr.sharedMesh == null) continue;
             var mesh = smr.sharedMesh;
             smr.gameObject.layer = _playerLayer;
+            // Worn on the chest, in the shadow only: from the eye it is the inside of a vest.
+            if (smr.name.Contains("Vest"))
+            {
+                smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                smr.updateWhenOffscreen = true;
+                continue;
+            }
             smr.updateWhenOffscreen = true;
             if (!mesh.isReadable) { smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly; continue; }
 
@@ -336,6 +346,41 @@ public class PlayerBody : MonoBehaviour
     }
 
     /// <summary>
+    /// The kick's foot, laid over its clip for the blow: a push kick lands at a man's belly with the sole flat on him. The clip's
+    /// foot went up to the height of the eyes, a whole leg standing up the middle of the view (his note, 2026-11-04: "looks very
+    /// artificial"). The clip keeps the wind-up and the recovery; this takes the middle of it. Target height and reach are
+    /// <see cref="PlayerBodySettings.kickFootHeight"/> and <see cref="PlayerBodySettings.kickFootReach"/>.
+    /// </summary>
+    void PlaceKickFoot()
+    {
+        if (_d.strike != MeleeStrike.Strike.Kick || _d.strikeProgress < 0f || _rThigh == null) return;
+        var calf = _anim.GetBoneTransform(HumanBodyBones.RightLowerLeg);
+        var foot = _anim.GetBoneTransform(HumanBodyBones.RightFoot);
+        var toes = _anim.GetBoneTransform(HumanBodyBones.RightToes);
+        if (calf == null || foot == null) return;
+        float impact = MeleeStrike.ImpactAt(MeleeStrike.Strike.Kick);
+        float k = _d.strikeProgress;
+        float w = k < impact ? Smooth(Mathf.InverseLerp(impact * 0.25f, impact, k)) : 1f - Smooth(Mathf.InverseLerp(impact + 0.08f, 0.85f, k));
+        if (w <= 0.001f) return;
+
+        Vector3 ahead = Vector3.ProjectOnPlane(_cam.transform.forward, Vector3.up).normalized;
+        Vector3 aside = Vector3.Cross(Vector3.up, ahead);
+        Vector3 ground = transform.position;
+        Vector3 target = ground + Vector3.up * S.kickFootHeight + ahead * S.kickFootReach + aside * 0.1f;
+        Quaternion restThigh = _rThigh.rotation, restCalf = calf.rotation, restFoot = foot.rotation;
+        LimbIK.Solve(_rThigh, calf, foot, target, _rThigh.position + ahead + Vector3.up * 0.9f);
+        _rThigh.rotation = Quaternion.Slerp(restThigh, _rThigh.rotation, w);
+        calf.rotation = Quaternion.Slerp(restCalf, calf.rotation, w);
+        foot.rotation = Quaternion.Slerp(restFoot, foot.rotation, w);
+        if (toes != null)
+        {
+            // The sole square to the target: toes up and a little out.
+            Vector3 along = (toes.position - foot.position).normalized;
+            foot.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(along, (Vector3.up + ahead * 0.35f + aside * 0.2f).normalized), w) * foot.rotation;
+        }
+    }
+
+    /// <summary>
     /// The clip's time for a share of the strike: the clip's own moment of contact falls on the
     /// strike's (so the foot lands where the damage does), the rest of its range shared out either side.
     /// </summary>
@@ -364,6 +409,7 @@ public class PlayerBody : MonoBehaviour
     void LateTick(float dt)
     {
         PlaceBody(dt);
+        PlaceKickFoot();
         PlaceShadowGun();
     }
 

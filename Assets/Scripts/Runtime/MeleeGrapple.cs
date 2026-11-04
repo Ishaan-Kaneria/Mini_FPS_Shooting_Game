@@ -91,6 +91,18 @@ public partial class MeleeStrike
         var ai = target.GetComponent<EnemyAI>();
         if (ai == null) return false;
 
+        // With the fists up, aimed clearly at the belly, it is the hook, whatever the head's nearness: on a man his own height the
+        // head was inside the grab's cone from a belly-high crosshair, and every hook came out as a grab.
+        if ((_fists || Disarmed) && GunAway > 0.5f && !ai.DoubledOver)
+        {
+            AimPoint(target, fpsCamera.transform, out BodyPart aimed);
+            if (aimed == BodyPart.LowerTorso)
+            {
+                hit = Throw(Strike.BodyBlow, 0f, target);
+                return true;
+            }
+        }
+
         if (CanGrab(target, ai) && (ai.DoubledOver ? HeadDistance(target) <= s.grabRange + 0.25f : FaceToFace(target, ai)))
         {
             // Into the fists first (the rifle onto the back), as the punch chain does.

@@ -24,19 +24,21 @@ namespace FPSKit.EditorTools
         const string Folder = "Assets/FPSKit_Generated/Player";
         const string PrefabPath = Folder + "/PlayerBody.prefab";
         const string ControllerPath = Folder + "/PlayerBody.controller";
-        const string Source = "Assets/Survivalist/Prefab/Survivalist (1).prefab";
+        const string Source = "Assets/Characters/HumanSoldier/Human_Soldier.fbx";
 
-        /// <summary>Metres from the floor to the player's eyes standing: PlayerMotor's 1.8 m height less its 0.15 m to the top.</summary>
-        const float EyeHeight = 1.65f;
+        /// <summary>Metres from the floor to the player's eyes standing: PlayerBodySettings.playerHeight less PlayerMotor's 0.15 m to the top. Level with a standard enemy's (his pick, 2026-11-04).</summary>
+        const float EyeHeight = 1.62f;
 
         /// <summary>His outfit: the same garments as the enemies, in a mix none of them wears.</summary>
         static readonly (string mesh, string skin)[] Outfit =
         {
-            ("SK_Military_Head1", null),
-            ("SK_Military_Male_Arms1", null),
-            ("SK_Military_Shirt3", "Shirt3_Skin1"),
-            ("SK_Military_Pants2", "Pants2_Skin2"),
-            ("SK_Military_Boots3", "Boots3_Skin1"),
+            ("Human_Head", "Human_Skin"),
+            ("Human_Eyes", "Human_Eyes"),
+            ("Human_Hair", "Human_Hair"),
+            ("Human_Brows", "Human_Brows"),
+            ("Human_Body", "Human_Skin"),
+            ("Outfit_Worksuit", "Human_Worksuit_Olive"),
+            ("Outfit_Boots", "Human_Boots"),
             ("SK_Military_Vest1", "Vest1_Skin2"),
         };
 
@@ -210,6 +212,7 @@ namespace FPSKit.EditorTools
 
         static void Dress(GameObject model)
         {
+            var animator = model.GetComponent<Animator>();
             foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 int index = System.Array.FindIndex(Outfit, o => o.mesh == smr.name);
@@ -218,9 +221,11 @@ namespace FPSKit.EditorTools
                 smr.updateWhenOffscreen = true;
                 smr.quality = SkinQuality.Bone2;
                 var mats = smr.sharedMaterials;
+                if (mats == null || mats.Length == 0) mats = new Material[1];      // the model comes in with none
                 for (int i = 0; i < mats.Length; i++) mats[i] = FPSKitRiggedSoldier.Lit(mats[i] != null ? mats[i].name : null);
                 if (Outfit[index].skin != null) mats[0] = FPSKitRiggedSoldier.Lit(Outfit[index].skin);
                 smr.sharedMaterials = mats;
+                if (animator != null && animator.GetBoneTransform(HumanBodyBones.Hips) is Transform hips) smr.rootBone = hips;
             }
         }
 

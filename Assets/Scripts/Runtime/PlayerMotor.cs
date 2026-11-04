@@ -265,6 +265,12 @@ public class PlayerMotor : MonoBehaviour
 
         // The controller's own height is the source of truth; the inspector value is
         // only a fallback for a rig assembled without one.
+        // Sized by the settings, so no arena needs rebuilding for it.
+        if (PlayerBodySettings.Active != null && PlayerBodySettings.Active.playerHeight > 0f)
+        {
+            _cc.height = PlayerBodySettings.Active.playerHeight;
+            _cc.center = new Vector3(0f, _cc.height * 0.5f, 0f);
+        }
         standHeight = _cc.height;
         _yaw = transform.eulerAngles.y;
 

@@ -13,24 +13,26 @@ MonoBehaviour:
   m_Name: PlayerBodySettings
   m_EditorClassIdentifier: Assembly-CSharp::PlayerBodySettings
   bodyPrefab: {fileID: 5035369957263337243, guid: ae0502a576ae7b72ea1d320e22384361, type: 3}
+  playerHeight: 1.77
   eyeAhead: 0.09
-  eyeUp: 0.06
+  eyeUp: 0.04
   followRate: 14
   liftRate: 3
   liftLimits: {x: -0.15, y: 0.1}
-  lookDownBack: 0.22
-  sprintClipSpeed: 6.3285913
+  lookDownBack: 0.12
+  sprintClipSpeed: 6.6246934
+  legPace: {x: 1.17, y: 1.12, z: 0.894}
   kickLean: 8
   kickAside: 8
   kick:
     state: Kick
-    range: {x: 0.20338982, y: 0.86440676}
+    range: {x: 0.20338982, y: 0.8305085}
     impact: 0.3898305
-    turn: 23.294739
+    turn: 30.766441
   eyeBack: 0.07
   armsNearClip: 0.01
-  armsScale: 1
-  gunScale: 1
+  armsScale: 0.93
+  gunScale: 0.96
   hipNudge: {x: 0.04, y: 0.05, z: 0.06}
   handsetHipNudge: {x: -0.1, y: -0.02, z: 0}
   hipTurnNudge: {x: 0, y: 2, z: 0}
@@ -39,3 +41,15 @@ MonoBehaviour:
   rightGuard: {x: 0.12, y: -0.16, z: 0.26}
   rightReach: {x: 0, y: -0.05, z: 0.56}
   doubleJabReach: 0.75
+  fightBlend: 0.1
+  hipFireLift: {x: -0.035, y: 0.04, z: -0.01}
+  hipFireTurn: {x: 0, y: -2, z: 0}
+  fireHold: 0.4
+  buttLift: {x: -0.025, y: 0.035, z: 0}
+  punchArms: {x: 0, y: -0.04, z: 0.05}
+  punchWiden: 0.045
+  punchLower: 0.035
+  handsetKickGun: {x: -0.12, y: -0.05, z: 0}
+  kickRise: 4
+  kickReach: 0.08
+  capturedOffHand: 0.3

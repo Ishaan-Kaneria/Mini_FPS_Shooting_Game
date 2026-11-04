@@ -77,6 +77,8 @@ public class EyeCameraSettings : ScriptableObject
     [Range(0f, 1f)] public float aimedBreath = 0.35f;
 
     [Header("Motion blur (Settings > Video, off by default)")]
+    [Tooltip("How much the head goes with a kick or a punch. 0 holds the eye still through a blow.")]
+    [Range(0f, 2f)] public float blowMotion = 1f;
     [Range(0f, 1f)] public float blurIntensity = 0.22f;
     [Range(0f, 0.2f)] public float blurClamp = 0.05f;
 

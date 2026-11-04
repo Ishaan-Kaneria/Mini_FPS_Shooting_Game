@@ -21,10 +21,13 @@ public class PlayerBodySettings : ScriptableObject
     [Tooltip("The player's full body (built by FPSKit > Player > Build Body). Empty turns it off: the view " +
              "model's own legs are used instead.")]
     public GameObject bodyPrefab;
+
+    [Tooltip("The player's height, metres, top of the head (the capsule): the eyes are 0.15 under it. 1.77 sets them level with a standard enemy's.")]
+    [Range(1.4f, 2f)] public float playerHeight = 1.77f;
     [Tooltip("Metres the eyes sit ahead of the head bone's centre.")]
     [Range(0f, 0.2f)] public float eyeAhead = 0.09f;
     [Tooltip("Metres the eyes sit above the head bone.")]
-    [Range(-0.1f, 0.2f)] public float eyeUp = 0.06f;
+    [Range(-0.1f, 0.2f)] public float eyeUp = 0.04f;
     [Tooltip("How quickly the body slides under the camera when the head moves in its clip (per second). " +
              "The camera never follows the head: the body follows the camera, so a step never shakes the view.")]
     [Range(1f, 40f)] public float followRate = 14f;
@@ -34,13 +37,13 @@ public class PlayerBodySettings : ScriptableObject
     public Vector2 liftLimits = new Vector2(-0.15f, 0.1f);
     [Tooltip("Metres the body stands back from where the eyes are, looking straight down. The vest's front " +
              "is 15 cm ahead of the eye standing: back this far, the eye clears it and the forward boot is seen.")]
-    [Range(0f, 0.6f)] public float lookDownBack = 0.22f;
+    [Range(0f, 0.6f)] public float lookDownBack = 0.12f;
     [Tooltip("Metres a second the forward sprint clip moves at, at the body's size (measured by the builder).")]
     [Min(0.5f)] public float sprintClipSpeed = 6.8f;
     [Tooltip("Share of the body's speed the legs' movement clips are asked for, at a walk (3 m/s), a jog (5.1) and a sprint " +
              "(7.6), blended between. The clips' feet do not move at their measured speeds (the planted foot slid forward " +
              "at a walk and back 18-20% at a jog and a sprint, FPSKitEyeCamTest); these put it back under the body.")]
-    public Vector3 legPace = new Vector3(1.17f, 0.99f, 0.835f);
+    public Vector3 legPace = new Vector3(1.17f, 1.12f, 0.894f);
 
     /// <summary>The legs' pace at a speed, metres a second: <see cref="legPace"/> blended between walk, jog and sprint.</summary>
     public float LegPaceAt(float speed) => speed <= 3f ? legPace.x
@@ -54,6 +57,10 @@ public class PlayerBodySettings : ScriptableObject
     [Range(0f, 25f)] public float kickAside = 8f;
     [Tooltip("The kick's clip, where in it the foot lands and which way it goes (filled by the builder).")]
     public StrikeClip kick;
+    [Tooltip("Height of the kicking foot at the blow, metres off the ground. About 1.15 is a man's upper belly, and just in the view looking straight ahead; lower is under the bottom of the screen.")]
+    [Range(0.4f, 1.6f)] public float kickFootHeight = 1.2f;
+    [Tooltip("How far ahead of the body the kicking foot lands, metres.")]
+    [Range(0.3f, 1.3f)] public float kickFootReach = 1f;
 
     [Header("First-person view (arms and weapon)")]
     [Tooltip("Metres the eye is set back from the camera for the arms and weapon, so they are seen the way " +
@@ -62,9 +69,9 @@ public class PlayerBodySettings : ScriptableObject
     [Tooltip("Near clip plane of the arms camera, metres.")]
     [Range(0.005f, 0.1f)] public float armsNearClip = 0.01f;
     [Tooltip("Size of the arms against life. 1 is true size.")]
-    [Range(0.8f, 1.3f)] public float armsScale = 1f;
+    [Range(0.8f, 1.3f)] public float armsScale = 0.93f;
     [Tooltip("Size of the gun against life. 1 is true size.")]
-    [Range(0.8f, 1.3f)] public float gunScale = 1f;
+    [Range(0.8f, 1.3f)] public float gunScale = 0.96f;
     [Tooltip("Metres added to each gun's own hip position (right, up, ahead): the whole hip carry moved at once.")]
     public Vector3 hipNudge = new Vector3(0.04f, 0.05f, 0.06f);
     [Tooltip("Metres added to the hip carry on a phone (right, up, ahead): its own framing, clear of the fire " +

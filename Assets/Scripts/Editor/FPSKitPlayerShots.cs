@@ -179,6 +179,13 @@ namespace FPSKit.EditorTools
         /// through its front (&lt;tag&gt;_light_NN_&lt;place&gt;.png).
         ///   UNITY_GRAPHICS=1 Tools/unity-batch.sh FPSKit.EditorTools.FPSKitPlayerShots.BatchLightingTour [-fpskitTag before]
         /// </summary>
+        public static void BatchBodyPoses()
+        {
+            _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "body")) });
+            _onlyPoses = "stand,down,walk,sprint,kick";
+            EditorApplication.update += NextArena;
+        }
+
         public static void BatchLightingTour()
         {
             _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "desert")) });

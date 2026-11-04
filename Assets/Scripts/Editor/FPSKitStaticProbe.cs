@@ -52,6 +52,8 @@ namespace FPSKit.EditorTools
         /// </summary>
         private static readonly (string Type, string Member, string Why)[] Exempt =
         {
+            ("DrawCounters", "Names", "a fixed list of counter names, never written"),
+            ("WalkRoute", "Desert", "the walk's fixed waypoints, never written"),
             ("UITheme", "Signals",
              "a readonly array of colours, written once where it is declared and never " +
              "again: SignalFor only indexes it, so there is nothing to go stale"),

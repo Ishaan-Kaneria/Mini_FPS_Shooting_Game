@@ -377,8 +377,7 @@ namespace FPSKit.EditorTools
                             return;
                         }
 
-                        Face(player, nearest.transform.position);
-                        Physics.SyncTransforms();
+                        HoldAtArmsLength(player, nearest.transform);
 
                         var target = nearest.GetComponent<Health>();
                         _punchPoolBefore = target.Current + target.Shield;
@@ -413,6 +412,7 @@ namespace FPSKit.EditorTools
                         var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
                         if (melee != null && (melee.FistsUp > 0.3f || (melee.weapon != null && melee.weapon.HandsRotation.magnitude > 5f)))
                             _fistShown = true;
+                        if (_punchTarget != null && !_punchTarget.IsDead) HoldAtArmsLength(player, _punchTarget.transform);
 
                         // Past the jab's recovery, still inside the window for the cross.
                         // The second press of the fight: the gun goes on the back and a fist lands.
@@ -429,8 +429,6 @@ namespace FPSKit.EditorTools
 
                         if (melee != null && _punchTarget != null && !_punchTarget.IsDead)
                         {
-                            // Still facing it, as a player keeps the enemy in the crosshair after the butt.
-                            if (player != null) { Face(player, _punchTarget.transform.position); Physics.SyncTransforms(); }
                             var hit = melee.TryPunch();
                             Notes.Append($"\n  punch thrown at {(hit != null ? hit.name : "nothing")}");
                             if (hit == null)
@@ -460,6 +458,7 @@ namespace FPSKit.EditorTools
                         var ms = MeleeSettings.Active;
                         if (melee != null && Time.time < Mathf.Max(melee.ReadyAt, _punchAt + ms.crossSeconds) + 0.05f)
                         {
+                            if (_punchTarget != null && !_punchTarget.IsDead) HoldAtArmsLength(player, _punchTarget.transform);
                             if (Waiting()) return;
                             Notes.Append("\n  punch: game time never passed the cooldown");
                         }
@@ -712,6 +711,50 @@ namespace FPSKit.EditorTools
             return nearest;
         }
 
+        /// <summary>
+        /// On the ground, facing him, just outside grab reach, for the butt-then-punch pair: nearer, the butt folds him, his head comes
+        /// within MeleeSettings.grabRange, and the next press is rightly the grab (the 2026-11-04 failures: five runs in six), which
+        /// VerifyGrapple measures and which never finishes a man. He keeps walking in, so this is asked again until the punch has landed.
+        /// </summary>
+        static void HoldAtArmsLength(GameObject player, Transform target) => StandBy(player, target, 1.6f);
+
+        /// <summary>
+        /// Stands the player this far from the target, on his level and facing him, on the side they are already on unless something
+        /// solid is between. A blow rightly does not land through a wall, and a teleport can cross one (a hangar wall, 2026-11-04: the
+        /// butt was blocked, one run in eight), so the check walks round him to the nearest side that is clear.
+        /// </summary>
+        static void StandBy(GameObject player, Transform target, float metres)
+        {
+            Vector3 away = Vector3.ProjectOnPlane(player.transform.position - target.position, Vector3.up);
+            away = away.sqrMagnitude > 0.01f ? away.normalized : target.forward;
+            for (int i = 0; i < 12; i++)
+            {
+                // 0, +30, -30, +60, -60 ... degrees from where the player already is.
+                int step = (i + 1) / 2 * (i % 2 == 1 ? 1 : -1);
+                Vector3 side = Quaternion.AngleAxis(step * 30f, Vector3.up) * away;
+                if (!ClearSide(target.position, side, metres)) continue;
+                away = side;
+                break;
+            }
+            var controller = player.GetComponent<CharacterController>();
+            if (controller != null) controller.enabled = false;
+            player.transform.position = target.position + away * metres + Vector3.up * 0.05f;
+            if (controller != null) controller.enabled = true;
+            Face(player, target.position);
+            Physics.SyncTransforms();
+        }
+
+        static bool ClearSide(Vector3 at, Vector3 side, float metres)
+        {
+            int solid = ~LayerMask.GetMask("Enemy", "Player");
+            foreach (float height in new[] { 0.4f, 1f, 1.7f })
+            {
+                Vector3 from = at + Vector3.up * height;
+                if (Physics.Linecast(from, from + side * (metres + 0.4f), solid, QueryTriggerInteraction.Ignore)) return false;
+            }
+            return true;
+        }
+
         static void Face(GameObject player, Vector3 at)
         {
             Vector3 to = Vector3.ProjectOnPlane(at - player.transform.position, Vector3.up);
@@ -928,16 +971,9 @@ namespace FPSKit.EditorTools
 
                     var health = _rxTarget.GetComponent<Health>();
                     health.ResetHealth();
-                    Vector3 away = Vector3.ProjectOnPlane(player.transform.position - _rxTarget.transform.position, Vector3.up);
-                    away = away.sqrMagnitude > 0.01f ? away.normalized : _rxTarget.transform.forward;
-                    var controller = player.GetComponent<CharacterController>();
-                    if (controller != null) controller.enabled = false;
                     // 1.6 m, just outside grab reach: at 1.3 m the butt folded him, his head came into the crosshair within
                     // MeleeSettings.grabRange, and the next press was rightly the grab, not the jab this measures.
-                    player.transform.position = _rxTarget.transform.position + away * 1.6f + Vector3.up * 0.05f;
-                    if (controller != null) controller.enabled = true;
-                    Face(player, _rxTarget.transform.position);
-                    Physics.SyncTransforms();
+                    StandBy(player, _rxTarget.transform, 1.6f);
 
                     _rxHitBefore = _rxBody.LastHitFrame;
                     var hit = strike == MeleeStrike.Strike.Kick ? melee.TryKick() : melee.TryPunch();
@@ -973,18 +1009,11 @@ namespace FPSKit.EditorTools
                     // during the wind-up read as "no reaction" when the strike had simply missed. This times the reaction.
                     if (!landed && _rxTarget != null && melee.Current != MeleeStrike.Strike.None)
                     {
-                        Vector3 back = Vector3.ProjectOnPlane(player.transform.position - _rxTarget.transform.position, Vector3.up);
-                        back = back.sqrMagnitude > 0.01f ? back.normalized : _rxTarget.transform.forward;
-                        var cc = player.GetComponent<CharacterController>();
-                        if (cc != null) cc.enabled = false;
-                        player.transform.position = _rxTarget.transform.position + back * 1.3f + Vector3.up * 0.05f;
-                        if (cc != null) cc.enabled = true;
-                        Face(player, _rxTarget.transform.position);
-                        Physics.SyncTransforms();
+                        StandBy(player, _rxTarget.transform, 1.3f);
                     }
                     if (_rxFrame > 120)
                     {
-                        Notes.Append($"\n  reaction to {strike}: no blow landed, or no answer within 2 s");
+                        Notes.Append($"\n  reaction to {strike}: no blow landed, or no answer within 2 s (hit frame {_rxBody?.LastHitFrame} before {_rxHitBefore}, latency {_rxBody?.ReactionLatencyFrames}, state {_rxTarget?.CurrentState}, down {_rxBody?.IsDown})");
                         Errors.Add($"a {strike} at arm's length never got a visible reaction");
                         _rxStep++;
                         _rxStage = 0;

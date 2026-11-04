@@ -22,8 +22,8 @@ using UnityEngine;
 public class FacialDamageHandler : MonoBehaviour
 {
     /// <summary>The baked head (FPSKitFaceDamage.Bake), under a Resources folder.</summary>
-    public const string ResourcePath = "FaceDamage/SK_Military_Head1";
-    public const string HeadMeshName = "SK_Military_Head1";
+    public const string ResourcePath = "FaceDamage/Human_Head";
+    public const string HeadMeshName = "Human_Head";
 
     [Header("How much a hit does")]
     [Tooltip("Weight (of 100) the cave-in on the struck side gains per share of the enemy's whole pool a hit takes: a punch " +

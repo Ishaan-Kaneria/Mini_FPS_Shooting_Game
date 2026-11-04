@@ -43,6 +43,7 @@ namespace FPSKit.EditorTools
         static float _profileChance;
         static bool _bloodWas;
         static int _eKicks, _eShotsDown;
+        static string _eFaces = "";
         static bool _eFired, _eUpAfter, _eWasProne;
         static float _eLastShot, _eNextKick;
         static RagdollController _fRag;
@@ -216,6 +217,7 @@ namespace FPSKit.EditorTools
 
             if (_eUpAfter || t > 150f)
             {
+                Note($"E: last falls (U face up, D face down, one behind) {_eFaces}");
                 Note($"E: {_eKicks} throws; fired from the ground {_eWasProne}, {_eShotsDown} rounds lying down; got up after {_eUpAfter}; last refusal '{ai.GroundFireRefusal}'; ended by '{body.GroundFireEnd}'; muzzle {(ai.muzzlePoint != null ? ai.muzzlePoint.position.ToString() : "none")}");
                 Require(_eWasProne, "E: a body thrown face down, rifle on it, the player ahead, fires from the ground");
                 Require(_eShotsDown > 0, "E: it fires rounds while lying down");
@@ -231,6 +233,7 @@ namespace FPSKit.EditorTools
                 Vector3 toPlayer = (_player.transform.position - _e.transform.position); toPlayer.y = 0f;
                 ai.Knock((toPlayer.normalized * 0.6f + Vector3.up * 0.2f) * 6f, 1.5f);
                 _eKicks++;
+                _eFaces += body.LastFallFaceUp ? "U" : "D";
                 _eNextKick = Time.time + 1f;
                 _eLastShot = ai.LastShotTime;
             }

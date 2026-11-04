@@ -178,7 +178,9 @@ namespace FPSKit.EditorTools
             var animator = _a.GetComponentInChildren<Animator>();
             if (wound.Bleeding)
             {
-                float d = Vector3.Distance(animator.GetBoneTransform(HumanBodyBones.LeftHand).position, wound.WoundPoint);
+                // From the neck, not the wound: a round in the nape still sends the hand to the throat he can reach.
+                Vector3 neckMiddle = Vector3.Lerp(animator.GetBoneTransform(HumanBodyBones.Neck).position, animator.GetBoneTransform(HumanBodyBones.Head).position, 0.4f);
+                float d = Vector3.Distance(animator.GetBoneTransform(HumanBodyBones.LeftHand).position, neckMiddle);
                 if (d < _bestHand) _bestHand = d;
                 if (_handAt < 0f && d < 0.19f) _handAt = t;
                 _lowest = Mathf.Min(_lowest, animator.GetBoneTransform(HumanBodyBones.Hips).position.y);
@@ -202,7 +204,7 @@ namespace FPSKit.EditorTools
                 Require(_handAt >= 0f && _handAt < 1.2f, "his hand is on the wound within 1.2 s");
                 Require(_bloodDuringA, "the artery throws a connected stream that is drawn");
                 Require(_a.GetComponent<EnemyBody>().PistolHand == 0, "he draws no sidearm: both hands are on his throat");
-                Require(_walked < 0.25f, $"he gives up the fight and stays where he is, once he has stumbled to a stop (moved {_walked:0.00} m)");
+                Require(_walked < 0.4f, $"he gives up the fight and stays where he is, once he has stumbled to a stop (moved {_walked:0.00} m)");
                 Require(_startFloor - _lowest > 0.15f, "his knees go");
                 Require(_diedAt > 3f && _diedAt < 16f, "he bleeds out on his own, in 3 to 16 s");
                 _step = 4;

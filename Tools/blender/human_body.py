@@ -50,7 +50,8 @@ for side, s in (("l", "Left"), ("r", "Right")):
             UE_TO_MIXAMO[f"{finger}_0{i}_{side}"] = f"{s}Hand{f}{i}"
 # The cloth under the gear is MPFB's own, fitted and weighted to this body: the pack's shirt and trousers, made for another body, tore and let skin through.
 WEAR = ("SK_Military_Vest1", "SK_Military_Cap1", "SK_Military_Backpack1")
-NATIVE = (("male_worksuit01", "Outfit_Worksuit"), ("shoes03", "Outfit_Boots"))
+NATIVE = (("clothes", "male_worksuit01", "Outfit_Worksuit", "Clothes"), ("clothes", "shoes03", "Outfit_Boots", "Clothes"),
+          ("hair", "short02", "Human_Hair", "Hair"), ("eyebrows", "eyebrow001", "Human_Brows", "Eyebrows"))
 # Each old bone's line runs to this child, and the new skeleton's to its counterpart. Bone tails in the FBX mean nothing here.
 NEXT = {"pelvis": "spine_01", "spine_01": "spine_02", "spine_02": "spine_03", "spine_03": "neck_01", "neck_01": "head"}
 for side in ("l", "r"):
@@ -246,7 +247,7 @@ def dress(body, rig, path, cloth_objects=(), clearance=0.015):
     for o in cloth_objects:
         for m in o.data.materials:
             if m is not None:
-                m.diffuse_color = (0.18, 0.13, 0.09, 1) if "Boots" in o.name else (0.40, 0.38, 0.24, 1)
+                m.diffuse_color = (0.3, 0.3, 0.3, 1)
     return worn
 
 
@@ -280,9 +281,9 @@ height = high - low
 
 native = []
 if opt("--uniform", ""):
-    for folder, label in NATIVE:
+    for kind, folder, label, asset_type in NATIVE:
         try:
-            o = HumanService.add_mhclo_asset(os.path.join(LocationService.get_user_data("clothes"), folder, folder + ".mhclo"), body, asset_type="Clothes", subdiv_levels=0)
+            o = HumanService.add_mhclo_asset(os.path.join(LocationService.get_user_data(kind), folder, folder + ".mhclo"), body, asset_type=asset_type, subdiv_levels=0)
             o.name = label
             native.append(o)
             print("[human] native", label, len(o.data.vertices), "vertices")
@@ -331,6 +332,90 @@ garments = []
 if UNIFORM:
     garments = dress(body, rig, UNIFORM, native) + native
     bpy.context.view_layer.update()
+
+
+def into_t_pose(rig, meshes):
+    """Arms straight out: Unity's Humanoid retargeting reads the rest pose as its T-pose. The meshes are bent by their own weights and the pose made the rest."""
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    for side, x in (("Left", 1.0), ("Right", -1.0)):
+        for bone, child in ((f"{side}Arm", f"{side}ForeArm"), (f"{side}ForeArm", f"{side}Hand"), (f"{side}Hand", f"{side}HandMiddle1")):
+            pb = rig.pose.bones["mixamorig:" + bone]
+            cb = rig.pose.bones["mixamorig:" + child]
+            bpy.context.view_layer.update()
+            d = (cb.head - pb.head).normalized()
+            turn = d.rotation_difference(Vector((x, 0, 0))).to_matrix().to_4x4()
+            from mathutils import Matrix
+            pb.matrix = Matrix.Translation(pb.head) @ turn @ Matrix.Translation(-pb.head) @ pb.matrix
+            bpy.context.view_layer.update()
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for m in meshes:
+        bpy.ops.object.select_all(action="DESELECT")
+        m.select_set(True)
+        bpy.context.view_layer.objects.active = m
+        for mod in list(m.modifiers):
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.armature_apply(selected=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for m in meshes:
+        m.modifiers.new("Armature", "ARMATURE").object = rig
+
+
+def split_head(body):
+    """The head as its own mesh: EnemyBrutality and the face damage find it by its name."""
+    import bmesh
+    head_index = body.vertex_groups["mixamorig:Head"].index
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.duplicate()
+    head = bpy.context.view_layer.objects.active
+    head.name = "Human_Head"
+    body.name = "Human_Body"
+    def keep(obj, want_head):
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        layer = bm.verts.layers.deform.verify()
+        gone = []
+        for f in bm.faces:
+            is_head = all(v[layer].get(head_index, 0.0) > 0.5 for v in f.verts)
+            if is_head != want_head:
+                gone.append(f)
+        bmesh.ops.delete(bm, geom=gone, context="FACES")
+        bm.to_mesh(obj.data)
+        bm.free()
+    keep(head, True)
+    keep(body, False)
+    return head
+
+
+head_mesh = None
+if UNIFORM:
+    meshes = [body] + garments + ([eyes] if eyes is not None else [])
+    into_t_pose(rig, meshes)
+    head_mesh = split_head(body)
+    garments.append(head_mesh)
+    if eyes is not None:
+        eyes.name = "Human_Eyes"
+        mat = bpy.data.materials.new("Human_Eyes")
+        eyes.data.materials.clear()
+        eyes.data.materials.append(mat)
+    NAMES = {"Outfit_Worksuit": ("Human_Worksuit", (0.40, 0.38, 0.24, 1)), "Outfit_Boots": ("Human_Boots", (0.18, 0.13, 0.09, 1)),
+             "Human_Hair": ("Human_Hair", (0.08, 0.06, 0.05, 1)), "Human_Brows": ("Human_Brows", (0.08, 0.06, 0.05, 1))}
+    for o in native:
+        name, colour = NAMES[o.name]
+        mat = bpy.data.materials.new(name)
+        mat.diffuse_color = colour
+        o.data.materials.clear()
+        o.data.materials.append(mat)
+    bpy.context.view_layer.update()
+    print("[human] t-pose done; left hand joint", [round(x, 3) for x in rig.matrix_world @ rig.data.bones["mixamorig:LeftHand"].head_local], "objects", [o.name for o in [rig, body] + garments])
 
 # Two looks at it.
 bpy.context.scene.render.engine = "BLENDER_WORKBENCH"

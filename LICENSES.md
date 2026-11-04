@@ -7,6 +7,7 @@ Unity Asset Store EULA and are not repeated here. Motion-capture tools have thei
 
 | What | Where | Source | Licence |
 |---|---|---|---|
+| Human body, work suit, boots, hair, eyebrows, eyes, skin (generated in Blender by MPFB 2.0.18; `Tools/blender/human_body.py`) | `Assets/Characters/HumanSoldier/` | https://static.makehumancommunity.org/about/license.html (MakeHuman core and system assets; the add-on, GPL, is not shipped) | CC0 1.0 |
 | Models, textures, HDRIs | `Assets/ThirdParty/PolyHaven/` (manifest: `manifest.json`) | https://polyhaven.com | CC0 1.0 (public domain) |
 
 ## Reference photos (not shipped, not in git)

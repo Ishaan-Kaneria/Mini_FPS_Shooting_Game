@@ -326,7 +326,7 @@ namespace FPSKit.EditorTools
 
             // ---- dress by role ----------------------------------------------------------
             foreach (var body in new[] { _arms, _elite, _boss })
-                foreach (var piece in new[] { "Outfit_Head", "Outfit_Hands", "Outfit_Shirt", "Outfit_Pants", "Outfit_Boots", "Outfit_Vest" })
+                foreach (var piece in new[] { "Outfit_Head", "Outfit_Hands", "Outfit_Shirt", "Outfit_Boots", "Outfit_Vest" })
                     Require(Worn(body, piece), $"{body.name} is not wearing {piece}");
             Require(Worn(_arms, "Kit_Human_Cap") && !Worn(_arms, "Kit_Elite_Backpack"),
                     "a grunt is not dressed as an ordinary soldier (cap on, no backpack)");
@@ -363,8 +363,8 @@ namespace FPSKit.EditorTools
             // Every enemy is a person: Ishaan heard the creature growls as evil noise.
             foreach (var name in FPSKitEnemyRoster.Names)
                 Require(FPSKitEnemyRoster.GetOrCreate(name).voice == EnemyVoice.Kind.Human, $"{name} does not have a human voice");
-            Require(prefab != null && Mathf.Abs(prefab.transform.localScale.y - 1.1f) < 0.01f,
-                    $"the enemy prefab is scaled {(prefab != null ? prefab.transform.localScale.y : 0f):0.00}, not 1.10");
+            Require(prefab != null && Mathf.Abs(prefab.transform.localScale.y - 1f) < 0.01f,
+                    $"the enemy prefab is scaled {(prefab != null ? prefab.transform.localScale.y : 0f):0.00}, not 1.00");
         }
 
         // ==================================================================

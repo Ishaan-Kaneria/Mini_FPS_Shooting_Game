@@ -90,6 +90,11 @@ public class LevelManager : MonoBehaviour
     [Tooltip("Only useful once the weapon's infinite reserve is switched off.")]
     public GameObject ammoPickupPrefab;
 
+    [Tooltip("Grenades an enemy may drop (Pickup, Kind.Grenades). A player with no bomb yet is lent frags for the level.")]
+    public GameObject grenadePickupPrefab;
+    [Tooltip("Chance an enemy drops grenades, after the health and shield rolls. From the arena's theme (grenadeDropChance).")]
+    [Range(0f, 1f)] public float grenadeDropChance;
+
     [Header("Placement")]
     public float minSpawnDistanceFromPlayer = 14f;
     public float maxSpawnDistanceFromPlayer = 34f;
@@ -1576,6 +1581,8 @@ public class LevelManager : MonoBehaviour
 
         float shieldChance = archetype != null ? archetype.shieldDropChance : 0.06f;
         if (TrySpawnDrop(shieldPickupPrefab, shieldChance, spot)) return;
+
+        if (TrySpawnDrop(grenadePickupPrefab, grenadeDropChance, spot)) return;
 
         // The level's own bonus on top of the archetype's, never written into it: an
         // EnemyArchetype is one shared asset, so a level that raised a drop chance on it

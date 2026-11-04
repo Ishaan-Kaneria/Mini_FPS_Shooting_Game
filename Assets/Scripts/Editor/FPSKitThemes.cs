@@ -332,6 +332,8 @@ namespace FPSKit.EditorTools
                     t.vignetteIntensity = 0.2f;
                     t.contrast = 10f;
                     t.filmGrain = 0.08f;
+                    // Grenades off fallen soldiers (2026-11-04: "there are no grenades"): one in eight drops one.
+                    t.grenadeDropChance = 0.12f;
                     t.randomSeed = 21;
                     break;
 

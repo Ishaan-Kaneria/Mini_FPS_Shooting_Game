@@ -54,7 +54,7 @@ RULES=[
  (r'low-poly', 'POLY', 'Too few triangles for how close it is seen: higher-detail model or LOD0 from the source pack.'),
  (r'Unity primitive', 'PRIM', 'Unity primitive: replace with a modelled mesh (tyre with tread and sidewall, rim with spokes) or the source pack\'s own part.'),
  (r'not recognised from its name', 'NAME', 'The audit could not tell what it is: rename the material with its kind (e.g. _Plaster, _Fabric, _PaintedMetal) or add it to the audit name map, then re-run the audit so its albedo/smoothness are checked.'),
- (r'black hole', 'GLASS', 'Glass draws as a black hole: give glass a reflection (box-projected probe or SSR on High), Fresnel, and something behind it (interior mapping / fake room, or a real lit interior); alpha and tint so 20-60 % of the surroundings show.'),
+ (r'black hole', 'GLASS', 'Glass draws as a black hole: real glass (Docs/DESERT_GLASS.md): transparent, Fresnel reflection, dust, no shadow, and real space behind it (the real room, or a window room built behind it).'),
  (r'raking light', 'RAKE', 'Flat under raking light: add a subtle normal/height detail so low sun shows relief.'),
  (r'deeper than any real', 'SAT', 'Colour too saturated/deep for the material: desaturate so the weakest channel is >= 5 % of the strongest.'),
  (r'overlay over walls', 'OVER', 'An overlay (dark weathering strips): planned for removal; replace with the anti-tiling shader\'s grime instead.'),

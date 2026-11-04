@@ -426,6 +426,11 @@ public class LevelTheme : ScriptableObject
     [Tooltip("Where split toning divides darks from lights: negative gives the highlight colour more of the picture.")]
     [Range(-100f, 100f)] public float splitBalance = 0f;
 
+    [Header("Grenade drops")]
+    [Tooltip("Chance an enemy drops a grenade (LevelManager.grenadeDropChance). 0 in the arenas before the story hands over " +
+             "the frag; a player with no bomb picking one up is lent frags for the level.")]
+    [Range(0f, 1f)] public float grenadeDropChance = 0f;
+
     [Header("Cloud shadows (CloudShadows on the sun)")]
     [Tooltip("Slow cloud shadows drifting over the ground, through a cookie on the sun. Only with a sky that has clouds in it: " +
              "under a clear sky they make no sense.")]

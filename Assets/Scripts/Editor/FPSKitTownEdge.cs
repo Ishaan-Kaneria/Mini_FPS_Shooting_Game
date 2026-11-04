@@ -83,6 +83,7 @@ namespace FPSKit.EditorTools
                     m.BoxMinMax(TownFlat("FuelGreen", new Color(0.0f, 0.42f, 0.27f), 0.4f), new Vector3(ix - 0.46f, y + 1.7f, pz - 0.31f), new Vector3(ix + 0.46f, y + 2.0f, pz + 0.31f));
                     m.BoxMinMax(_glassDark, new Vector3(ix - 0.3f, y + 1.15f, pz - 0.31f), new Vector3(ix + 0.3f, y + 1.5f, pz + 0.31f));
                     m.Box(_steel, new Vector3(ix + 0.5f, y + 1.0f, pz), new Vector3(0.06f, 1.2f, 0.06f), Quaternion.Euler(0, 0, 20f));
+                    _fuelPumps.Add(new Vector3(ix, y, pz));
                 }
                 _townSolids.Add(Rect.MinMaxRect(ix - 0.8f, cz0 + 3f, ix + 0.8f, cz1 - 3f));
             }

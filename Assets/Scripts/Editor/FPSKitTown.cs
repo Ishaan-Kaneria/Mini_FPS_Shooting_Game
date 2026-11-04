@@ -147,6 +147,9 @@ namespace FPSKit.EditorTools
             Lap("cover");
             BuildTownLife(root, layer, rng);
             Lap("life");
+            // Fuel that burns and blows up (FPSKitTownExplosives): no draws from rng, so nothing above reshuffles.
+            ArmTownExplosives(root);
+            Lap("explosives");
             PlaceStreetProbes(root);
             PlaceTownLightProbes(root);
             AssignTownSurfaces(root);

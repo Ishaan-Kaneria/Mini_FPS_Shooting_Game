@@ -18,8 +18,8 @@ costs a little; it should be under 1 ms on the Arc at this light count. If it is
 
 **A correction to the review:** A9 said the window glass is wrong because it is metallic 0.85. The code's comment
 (`FPSKitTownBuildings.cs:117-120`) shows that was a deliberate choice: as a plain dark dielectric the windows read as
-flat navy cards. The black-hole look is more likely what the glass reflects (a dim or sky-blind probe) and that
-nothing is behind it. The fix is in part 2, "Windows".
+flat navy cards. The black-hole look comes from the glass being opaque with nothing behind it. The fix is real glass:
+`Docs/DESERT_GLASS.md`.
 
 ---
 
@@ -127,17 +127,17 @@ Intel Arc laptop.
   reflections right (part 1) and a sun bright enough against them. Car paint and chrome in the sun, the dome's gold, the
   fountain's water.
 
-### 6. Windows
+### 6. Windows: real glass (work in progress)
 
-Windows are a large share of every street view, and today they are dark mirrors with nothing behind them (audit:
-`Town_GlassDark`, `Town_GlassBlue` FAKE, "renders as a black hole").
-* **Interior mapping** for every window of a house you cannot enter: a shader that draws a fake room behind the glass
-  (a small cubemap atlas of 6-8 room interiors, chosen per window by a hash of its position, with parallax), dimmed by
-  how dark rooms are by day, plus curtains or blinds as a layer. Cost: one pass per window pixel, no geometry.
-* **The glass itself:** a dielectric (metallic 0), smoothness 0.95, its reflection from the street's probe with Fresnel
-  (strong at grazing angles, a few percent face-on), over the interior map. Put the street's reflection probes at
-  window height (about 4 m) so the glass reflects buildings opposite, not the ground.
-* **Enterable houses** keep real interiors behind real transparent glass.
+His rule: every window is real glass, with nothing painted on to fake what is behind it. The full design and the work
+plan are in **`Docs/DESERT_GLASS.md`** (status: not started). In short, for the light:
+* one glass shader (`FPSKit/Glass`): dark thin body, Fresnel reflection at full strength, the sun's glint, desert dust
+  and streaks, a slight refraction on High; two-sided, one pane;
+* glass casts no shadow and blocks no bake, so the sun and the bounce reach the rooms behind it (today the opaque window
+  quads block both);
+* behind every window, real space: the real room where there is one; a real shallow "window room" built behind each
+  window of a solid building, lit in the district bake;
+* street reflection probes at window height, so the glass shows the buildings opposite.
 
 ### 7. Practical lights
 
@@ -174,7 +174,7 @@ stops walls reading as cardboard. Do realism steps 1-3 alongside the lighting, n
 | AO | SSAO contact | baked wall-foot band (or SSAO 1/4 res) | baked band |
 | Atmosphere | height + sun haze pass, dust | haze pass | Unity fog |
 | Shafts | indoor cards + dust, outdoor radial | indoor cards + dust | none |
-| Windows | interior mapping | interior mapping | interior mapping (cheap) |
+| Windows | real glass, window rooms, refraction | real glass, window rooms | real glass, window rooms closer in |
 | Grade | ACES + split toning | same | same |
 
 ## Judging it

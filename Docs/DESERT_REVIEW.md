@@ -1,7 +1,8 @@
 # Desert Outpost: full review (bugs, realism, fixes)
 
 Written 2026-11-04 by Claude Code (cloud session) for the developer and for Claude Code on the laptop. Lighting fixes
-and the look: `Docs/DESERT_LIGHTING.md` (A2 and A4 are now in code). Repo state reviewed:
+and the look: `Docs/DESERT_LIGHTING.md` (A2 and A4 are now in code). Glass: `Docs/DESERT_GLASS.md`. Explosives and
+grenades: `Docs/DESERT_EXPLOSIVES.md`. Roofs, people, shops: `Docs/DESERT_TOWN_FIXES.md`. Repo state reviewed:
 `261c706` (same as GitHub `main`).
 
 ## 0. Read this first (for the Claude Code session that carries it out)
@@ -33,7 +34,7 @@ and the look: `Docs/DESERT_LIGHTING.md` (A2 and A4 are now in code). Repo state 
 | A6 | S2 | Arms and gun lit by moving the sun for the arms camera (a stand-in, not a light system) | Confirmed (code) | L |
 | A7 | S2 | The eye's probe dimming is global: probe-lit things anywhere in view dim with the room | Confirmed (code) | M |
 | A8 | S2 | Door frames, skirting, front doors and small props glow in dark rooms | Confirmed (commit 0c296f6) | M |
-| A9 | S2 | Window glass renders as black holes (nothing behind it, dim reflections) | Likely | M |
+| A9 | S2 | Window glass renders as black holes (opaque, nothing behind it) | Confirmed (code) | L |
 | A10 | S2 | Low, phones and web: no eye adaptation, outdoor probes inside rooms | Confirmed (code) | M |
 | A11 | S3 | APV sky occlusion off | Check | S |
 | A12 | S3 | Medium shares its renderer asset with Low and phones | Confirmed (assets) | S |
@@ -69,6 +70,10 @@ and the look: `Docs/DESERT_LIGHTING.md` (A2 and A4 are now in code). Repo state 
 | F1 | S2 | Medium 1 % low ~20 fps (stutter) | Measured (notes) | L |
 | F2 | S3 | Traffic noise listening allocates every frame per car | Confirmed (code) | S |
 | G | S2 | Realism: 222 objects with knife-sharp edges, 95 flat colours, 66 visible tiling, 64 too dark... | Audit | L |
+| E6 | S1 | No way up to most roofs: only enterable villas get a stair (`PlanStair` in `BuildVilla` alone) | Confirmed (code) | L |
+| C4 | S2 | "No people": 36 on Medium over the whole town, none within 30 m, and every one hides and is removed at the first shot | Confirmed (code) | M |
+| E7 | S2 | Shops too open and nearly empty: whole empty boxes seen from the street | Confirmed (code + audit) | L |
+| D8 | S2 | No grenades unless the Warehouse boss is beaten; no explosive props | Confirmed (code); explosives and grenade drops now in code | M |
 
 Effort: S under an hour, M a few hours, L a day or more.
 
@@ -194,9 +199,10 @@ How the desert is lit today, from the code:
   it: almost no reflection and nothing seen behind it".
 * **Likely cause:** the glass is opaque, so nothing is behind it, and what it reflects is a street probe captured near the
   ground (a dim, sky-blind view). A metallic surface shows only its reflection, so a dim probe gives a black window.
-* **Fix:** an interior-mapping shader (a fake room behind the glass, from a small cubemap atlas, chosen per window by a
-  hash) under a dielectric glass layer (metallic 0, smoothness 0.95, Fresnel), and street reflection probes placed at
-  window height so the glass reflects the buildings opposite. See `Docs/DESERT_LIGHTING.md`, "Windows".
+* **Fix:** real glass (his rule: no painted fake rooms): a transparent two-sided glass shader with Fresnel reflection
+  and dust, no shadow and no GI blocking, real space behind every window (the real room, or a shallow "window room"
+  built behind each window of a solid building), street reflection probes at window height, and breakable panes. Full
+  plan: `Docs/DESERT_GLASS.md`.
 * **Check:** audit light test for both materials passes; street views show reflections at grazing angles and a dim
   room face-on.
 
@@ -480,7 +486,7 @@ every object is in section 13.
 3. **Albedo and smoothness (DARK 64, ALB 75, SMOOTH 46, METAL 12).** Mostly imported pack materials (cars' `RMCar*`,
    Poly Haven props): fix in `FPSKitTownAssets`'s remap table (tint = wanted / image mean; metallic 0 on paint).
    Re-audit first: the Oct 31 gloss fix changed many of these.
-4. **Glass (A9): interior mapping, see `Docs/DESERT_LIGHTING.md`.**
+4. **Glass (A9): real glass, see `Docs/DESERT_GLASS.md`.**
 5. **Unrecognised names (59).** Rename materials so the audit can judge them (e.g. `Town_TownSigns` -> `_Paint`).
    Until then they are UNCERTAIN, never fine.
 6. **Guns (6, FAKE).** The weapon-pack purchase (handoff 5.5).
@@ -527,7 +533,7 @@ Each step: one change, rebuild what it needs, run its check, commit, then the de
 1. **Quick code fixes, no rebuild** (one commit each): D1, D2, C1, B1, B2, B3, B4, B6, B7, B8, B11, B12, D4-D7, E2, F2.
    Checks: `VerifyCombat`, `VerifyWounds`, `FPSKitNeckWoundTest.Batch`, `VerifyStatics`, `VerifyControls`, a drive test.
 2. **Re-run the realism audit** and regenerate sections 12-13 with `Tools/desert_review_objects.py`.
-3. **E1 fallback material**: generator fix, desert rebuild. (A9 glass: with the window shader, step 9.)
+3. **E1 fallback material**: generator fix, desert rebuild. (A9 glass: `Docs/DESERT_GLASS.md`, its own stages G0-G8.)
 4. **A2 + A12** (Medium Forward+ renderer): measure Medium GPU.
 5. **A4 then A3** (per-room probes, then per-room captures in the district bakes), A5.
 6. **A1** (probe layers + indoor probe density + runtime layer for characters), then **A7, A6, A8** (in that order: each
@@ -577,7 +583,7 @@ which is why PALETTE, DARK, TEXEL and POLY look large.
 | **POLY** | 8 | 54.9 % | Too few triangles for how close it is seen: higher-detail model or LOD0 from the source pack. |
 | **PRIM** | 2 | 0.0 % | Unity primitive: replace with a modelled mesh (tyre with tread and sidewall, rim with spokes) or the source pack's own part. |
 | **NAME** | 59 | 3.2 % | The audit could not tell what it is: rename the material with its kind (e.g. _Plaster, _Fabric, _PaintedMetal) or add it to the audit name map, then re-run the audit so its albedo/smoothness are checked. |
-| **GLASS** | 2 | 1.2 % | Glass draws as a black hole: give glass a reflection (box-projected probe or SSR on High), Fresnel, and something behind it (interior mapping / fake room, or a real lit interior); alpha and tint so 20-60 % of the surroundings show. |
+| **GLASS** | 2 | 1.2 % | Glass draws as a black hole: real glass (Docs/DESERT_GLASS.md): transparent, Fresnel reflection, dust, no shadow, and real space behind it (the real room, or a window room built behind it). |
 | **RAKE** | 1 | 2.0 % | Flat under raking light: add a subtle normal/height detail so low sun shows relief. |
 | **SAT** | 3 | 0.2 % | Colour too saturated/deep for the material: desaturate so the weakest channel is >= 5 % of the strongest. |
 | **OVER** | 2 | 3.3 % | An overlay (dark weathering strips): planned for removal; replace with the anti-tiling shader's grime instead. |

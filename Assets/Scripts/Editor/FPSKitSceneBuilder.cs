@@ -540,6 +540,7 @@ namespace FPSKit.EditorTools
             // the same shape as ResetTerrain above, and for the same reason: a static left
             // behind by the previous arena in a six-arena batch is used by the next one.
             _playerStart = null;
+            _fuelPumps.Clear();      // FPSKitTownExplosives: the gas station's pumps, written by BuildGasStation
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
@@ -2917,6 +2918,25 @@ namespace FPSKit.EditorTools
                 new Color(0.25f, 0.95f, 0.45f), PrimitiveType.Sphere);
             manager.shieldPickupPrefab = CreatePickupPrefab("Pickup_Shield", Pickup.Kind.Shield,
                 new Color(0.3f, 0.7f, 1f), PrimitiveType.Cube);
+
+            // Grenades an enemy may drop (Pickup, Kind.Grenades), the theme's chance; the frag lent to a player with no bomb.
+            manager.grenadeDropChance = _theme.grenadeDropChance;
+            manager.grenadePickupPrefab = null;
+            if (_theme.grenadeDropChance > 0f)
+            {
+                var grenades = CreatePickupPrefab("Pickup_Grenade", Pickup.Kind.Grenades, new Color(0.36f, 0.40f, 0.22f), PrimitiveType.Capsule);
+                var lent = AssetDatabase.LoadAssetAtPath<BombData>(FPSKitStore.StoreFolder + "/Bomb_Frag.asset");
+                var pickup = grenades != null ? grenades.GetComponent<Pickup>() : null;
+                if (pickup != null && (pickup.grenadeData != lent || pickup.kind != Pickup.Kind.Grenades))
+                {
+                    pickup.kind = Pickup.Kind.Grenades;
+                    pickup.grenadeData = lent;
+                    pickup.grenadeCount = 1;
+                    EditorUtility.SetDirty(grenades);
+                    AssetDatabase.SaveAssets();
+                }
+                manager.grenadePickupPrefab = grenades;
+            }
 
             // Ammo drops are left unwired on purpose: the generated rifle has an
             // infinite reserve, so they would be pickups that do nothing. Turn that off

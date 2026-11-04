@@ -15,7 +15,9 @@ public class Pickup : MonoBehaviour
     {
         Health,
         Shield,
-        Ammo
+        Ammo,
+        // Appended, never inserted: kinds are saved as their number in every pickup prefab.
+        Grenades
     }
 
     [Header("Payload")]
@@ -29,6 +31,16 @@ public class Pickup : MonoBehaviour
 
     [Tooltip("Rounds added to the reserve. Ignored unless this is an ammo pickup.")]
     public int ammoAmount = 60;
+
+    [Tooltip("Grenades added to the belt. Ignored unless this is a grenade pickup.")]
+    [Min(1)] public int grenadeCount = 1;
+
+    [Tooltip("A grenade pickup for a player who carries no bomb yet: this bomb, for this level only (nothing is bought or " +
+             "owned). A player with a bomb gets charges of their own.")]
+    public BombData grenadeData;
+
+    [Tooltip("Most grenades a grenade pickup fills the belt to.")]
+    [Min(1)] public int grenadeCap = 4;
 
     [Header("Collection")]
     public float collectRadius = 1.6f;
@@ -63,6 +75,7 @@ public class Pickup : MonoBehaviour
     Transform _player;
     Health _playerHealth;
     Weapon _playerWeapon;
+    BombThrower _playerBombs;
     Renderer[] _renderers;
     Vector3 _anchor;
     float _expiry;
@@ -81,6 +94,7 @@ public class Pickup : MonoBehaviour
         _player = player.transform;
         _playerHealth = player.GetComponent<Health>();
         _playerWeapon = player.GetComponentInChildren<Weapon>();
+        _playerBombs = player.GetComponentInChildren<BombThrower>();
     }
 
     void Update()
@@ -157,6 +171,9 @@ public class Pickup : MonoBehaviour
                 // rounds; otherwise they are kept for when it, or one like it, is.
                 if (_playerWeapon.Disarmed) return _playerWeapon.RearmWithAmmo(ammoAmount, _player.position, rearmReach);
                 return _playerWeapon.AddReserveAmmo(ammoAmount) > 0;
+
+            case Kind.Grenades:
+                return _playerBombs != null && _playerBombs.AddCharges(grenadeCount, grenadeData, grenadeCap) > 0;
 
             default:
                 return false;

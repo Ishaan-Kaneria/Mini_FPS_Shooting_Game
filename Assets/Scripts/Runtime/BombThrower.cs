@@ -688,6 +688,27 @@ public class BombThrower : MonoBehaviour
     }
 
     /// <summary>
+    /// Grenades picked up in a level (Pickup, Kind.Grenades). A player carrying no bomb is handed
+    /// <paramref name="ifNone"/> for this level only: nothing is bought or owned, so the store and the story's first
+    /// power are untouched. Otherwise charges of the bomb carried, up to <paramref name="cap"/>. Returns how many were added.
+    /// </summary>
+    public int AddCharges(int count, BombData ifNone, int cap)
+    {
+        if (count <= 0) return 0;
+        if (data == null)
+        {
+            if (ifNone == null) return 0;
+            int given = Mathf.Min(count, Mathf.Max(1, cap));
+            Equip(ifNone, given);
+            return given;
+        }
+        int before = charges;
+        charges = Mathf.Min(Mathf.Max(cap, before), before + count);
+        if (charges != before) ChargesChanged?.Invoke(this);
+        return charges - before;
+    }
+
+    /// <summary>
     /// Arms the thrower for a level. Called by PlayerLoadout once the store selection is
     /// known, which is why the fields above are only defaults.
     /// </summary>

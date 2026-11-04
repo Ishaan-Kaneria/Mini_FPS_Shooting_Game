@@ -28,9 +28,15 @@ MonoBehaviour:
     objective: 1
     objectiveWeight: 11
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.05
@@ -55,9 +61,15 @@ MonoBehaviour:
     objective: 3
     objectiveWeight: 12
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.0774194
     healthMultiplier: 1.0822581
@@ -82,9 +94,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 12
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
     bossName: The Foreman
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.1548387
     healthMultiplier: 1.1145161
@@ -109,9 +127,15 @@ MonoBehaviour:
     objective: 4
     objectiveWeight: 13
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.2322581
     healthMultiplier: 1.1467742
@@ -136,9 +160,15 @@ MonoBehaviour:
     objective: 5
     objectiveWeight: 14
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.3096775
     healthMultiplier: 1.1790322
@@ -163,9 +193,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 14
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: The Shotfirer
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.3870968
     healthMultiplier: 1.2112904
@@ -190,9 +226,15 @@ MonoBehaviour:
     objective: 6
     objectiveWeight: 15
     objectiveStages: 5
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.4645162
     healthMultiplier: 1.2435484
@@ -217,9 +259,15 @@ MonoBehaviour:
     objective: 7
     objectiveWeight: 16
     objectiveStages: 3
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.5419354
     healthMultiplier: 1.2758064
@@ -244,9 +292,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 17
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.6193548
     healthMultiplier: 1.3080645
@@ -271,9 +325,15 @@ MonoBehaviour:
     objective: 2
     objectiveWeight: 18
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.6967742
     healthMultiplier: 1.3403226
@@ -298,9 +358,15 @@ MonoBehaviour:
     objective: 1
     objectiveWeight: 18
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.7741935
     healthMultiplier: 1.3725806
@@ -325,9 +391,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 19
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.8516129
     healthMultiplier: 1.4048387
@@ -352,9 +424,15 @@ MonoBehaviour:
     objective: 3
     objectiveWeight: 20
     objectiveStages: 2
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.9290323
     healthMultiplier: 1.4370967
@@ -379,9 +457,15 @@ MonoBehaviour:
     objective: 4
     objectiveWeight: 21
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 6
     bossHealthMultiplier: 2.0064516
     healthMultiplier: 1.4693549
@@ -406,9 +490,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 23
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 6
     bossHealthMultiplier: 2.083871
     healthMultiplier: 1.5016129
@@ -433,9 +523,15 @@ MonoBehaviour:
     objective: 5
     objectiveWeight: 24
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 6
     bossHealthMultiplier: 2.1612904
     healthMultiplier: 1.5338709
@@ -460,9 +556,15 @@ MonoBehaviour:
     objective: 6
     objectiveWeight: 25
     objectiveStages: 7
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 7
     bossHealthMultiplier: 2.2387097
     healthMultiplier: 1.566129
@@ -487,9 +589,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 26
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 7
     bossHealthMultiplier: 2.3161292
     healthMultiplier: 1.5983871
@@ -514,9 +622,15 @@ MonoBehaviour:
     objective: 7
     objectiveWeight: 27
     objectiveStages: 4
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 7
     bossHealthMultiplier: 2.3935485
     healthMultiplier: 1.6306452
@@ -541,9 +655,15 @@ MonoBehaviour:
     objective: 2
     objectiveWeight: 28
     objectiveStages: 2
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 7
     bossHealthMultiplier: 2.4709678
     healthMultiplier: 1.6629032
@@ -568,9 +688,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 29
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 8
     bossHealthMultiplier: 2.548387
     healthMultiplier: 1.6951612
@@ -595,9 +721,15 @@ MonoBehaviour:
     objective: 1
     objectiveWeight: 31
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 8
     bossHealthMultiplier: 2.6258066
     healthMultiplier: 1.7274194
@@ -622,9 +754,15 @@ MonoBehaviour:
     objective: 3
     objectiveWeight: 32
     objectiveStages: 2
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 8
     bossHealthMultiplier: 2.7032259
     healthMultiplier: 1.7596774
@@ -649,9 +787,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 33
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 9
     bossHealthMultiplier: 2.7806451
     healthMultiplier: 1.7919354
@@ -676,9 +820,15 @@ MonoBehaviour:
     objective: 4
     objectiveWeight: 34
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 9
     bossHealthMultiplier: 2.8580647
     healthMultiplier: 1.8241935
@@ -703,9 +853,15 @@ MonoBehaviour:
     objective: 5
     objectiveWeight: 36
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 10
     bossHealthMultiplier: 2.935484
     healthMultiplier: 1.8564516
@@ -730,9 +886,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 37
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 10
     bossHealthMultiplier: 3.0129032
     healthMultiplier: 1.8887097
@@ -757,9 +919,15 @@ MonoBehaviour:
     objective: 6
     objectiveWeight: 39
     objectiveStages: 10
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 10
     bossHealthMultiplier: 3.0903227
     healthMultiplier: 1.9209677
@@ -784,9 +952,15 @@ MonoBehaviour:
     objective: 7
     objectiveWeight: 40
     objectiveStages: 6
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 11
     bossHealthMultiplier: 3.167742
     healthMultiplier: 1.9532257
@@ -811,9 +985,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 41
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 11
     bossHealthMultiplier: 3.2451613
     healthMultiplier: 1.9854839
@@ -838,9 +1018,15 @@ MonoBehaviour:
     objective: 2
     objectiveWeight: 42
     objectiveStages: 3
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 11
     bossHealthMultiplier: 3.3225806
     healthMultiplier: 2.017742
@@ -865,9 +1051,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 44
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 0674b300a8bef6e2c92b0b2b34a85aba, type: 2}
     bossName: Kestrel Auger
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 12
     bossHealthMultiplier: 3.4
     healthMultiplier: 2.05

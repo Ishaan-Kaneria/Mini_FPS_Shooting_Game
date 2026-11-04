@@ -28,9 +28,15 @@ MonoBehaviour:
     objective: 3
     objectiveWeight: 11
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1
     healthMultiplier: 1.1
@@ -55,9 +61,15 @@ MonoBehaviour:
     objective: 4
     objectiveWeight: 12
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.0774194
     healthMultiplier: 1.132258
@@ -69,8 +81,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 1
-    brief: Aurel's road carries everything the company still owns. 28 hostiles and a boss. The boss is most of the score.
+  - displayName: THE QUARTERMASTER
+    brief: 'Aurel''s road carries everything the company still owns. 28 hostiles and a boss. The boss is most of the score. He is at the gas station with 5 bodyguards: the map marks the place.'
     enemyCount: 28
     timeLimit: 165
     maxAliveAtOnce: 6
@@ -82,9 +94,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 13
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 08bda57f5c648da248c4a976f2628aa9, type: 2}
-    bossName: 
+    bossName: The Quartermaster
+    bossPlace: GasStation
+    bossGuards: 5
+    bossScale: 1.06
     bossWeight: 5
     bossHealthMultiplier: 1.1548387
     healthMultiplier: 1.1645161
@@ -109,9 +127,15 @@ MonoBehaviour:
     objective: 5
     objectiveWeight: 14
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.2322581
     healthMultiplier: 1.1967742
@@ -136,9 +160,15 @@ MonoBehaviour:
     objective: 6
     objectiveWeight: 14
     objectiveStages: 5
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.3096775
     healthMultiplier: 1.2290323
@@ -150,8 +180,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 2
-    brief: Aurel's road carries everything the company still owns. 34 hostiles and a boss. The boss is most of the score.
+  - displayName: THE CUSTOMS MAN
+    brief: 'Aurel''s road carries everything the company still owns. 34 hostiles and a boss. The boss is most of the score. He is at the checkpoint with 6 bodyguards: the map marks the place.'
     enemyCount: 34
     timeLimit: 195
     maxAliveAtOnce: 7
@@ -163,9 +193,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 15
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Customs Man
+    bossPlace: Checkpoint
+    bossGuards: 6
+    bossScale: 1.06
     bossWeight: 5
     bossHealthMultiplier: 1.3870968
     healthMultiplier: 1.2612903
@@ -177,8 +213,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: RECON
-    brief: Aurel's road carries everything the company still owns. 36 hostiles. Reach 3 marked points across the map.
+  - displayName: THE PAYMASTER
+    brief: '36 hostiles. The Paymaster is at the clock square with 4 guards: find him and kill him. The map marks him.'
     enemyCount: 36
     timeLimit: 205
     maxAliveAtOnce: 7
@@ -187,12 +223,18 @@ MonoBehaviour:
     waveSize: 11
     waveRest: 9.935484
     spawnReach: 1.2322581
-    objective: 7
+    objective: 8
     objectiveWeight: 16
-    objectiveStages: 3
+    objectiveStages: 1
+    targetName: The Paymaster
+    targetPlace: ClockSquare
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.4645162
     healthMultiplier: 1.2935483
@@ -217,9 +259,15 @@ MonoBehaviour:
     objective: 2
     objectiveWeight: 18
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.5419354
     healthMultiplier: 1.3258065
@@ -231,8 +279,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 3
-    brief: Aurel's road carries everything the company still owns. 42 hostiles and a boss. The boss is most of the score.
+  - displayName: THE MECHANIC
+    brief: 'Aurel''s road carries everything the company still owns. 42 hostiles and a boss. The boss is most of the score. He is at the garage with 7 bodyguards: the map marks the place.'
     enemyCount: 42
     timeLimit: 230
     maxAliveAtOnce: 8
@@ -244,9 +292,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 19
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Mechanic
+    bossPlace: Garage
+    bossGuards: 7
+    bossScale: 1.06
     bossWeight: 5
     bossHealthMultiplier: 1.6193548
     healthMultiplier: 1.3580645
@@ -271,9 +325,15 @@ MonoBehaviour:
     objective: 1
     objectiveWeight: 20
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 5
     bossHealthMultiplier: 1.6967742
     healthMultiplier: 1.3903226
@@ -298,9 +358,15 @@ MonoBehaviour:
     objective: 3
     objectiveWeight: 21
     objectiveStages: 2
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 6
     bossHealthMultiplier: 1.7741935
     healthMultiplier: 1.4225806
@@ -312,8 +378,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 4
-    brief: Aurel's road carries everything the company still owns. 49 hostiles and a boss. The boss is most of the score.
+  - displayName: THE SCRAP KING
+    brief: 'Aurel''s road carries everything the company still owns. 49 hostiles and a boss. The boss is most of the score. He is at the junkyard with 8 bodyguards: the map marks the place.'
     enemyCount: 49
     timeLimit: 265
     maxAliveAtOnce: 9
@@ -325,9 +391,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 22
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Scrap King
+    bossPlace: Junkyard
+    bossGuards: 8
+    bossScale: 1.06
     bossWeight: 6
     bossHealthMultiplier: 1.8516129
     healthMultiplier: 1.4548388
@@ -352,9 +424,15 @@ MonoBehaviour:
     objective: 4
     objectiveWeight: 23
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 6
     bossHealthMultiplier: 1.9290323
     healthMultiplier: 1.4870968
@@ -379,9 +457,15 @@ MonoBehaviour:
     objective: 5
     objectiveWeight: 25
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 7
     bossHealthMultiplier: 2.0064516
     healthMultiplier: 1.5193548
@@ -393,8 +477,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 5
-    brief: The convoy escort has been doubled since the quarry went quiet. 59 hostiles and a boss. The boss is most of the score.
+  - displayName: THE WATCHMAN
+    brief: 'The convoy escort has been doubled since the quarry went quiet. 59 hostiles and a boss. The boss is most of the score. He is at the water tower with 9 bodyguards: the map marks the place.'
     enemyCount: 59
     timeLimit: 310
     maxAliveAtOnce: 10
@@ -406,9 +490,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 27
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Watchman
+    bossPlace: WaterTower
+    bossGuards: 9
+    bossScale: 1.06
     bossWeight: 7
     bossHealthMultiplier: 2.083871
     healthMultiplier: 1.5516129
@@ -433,9 +523,15 @@ MonoBehaviour:
     objective: 6
     objectiveWeight: 27
     objectiveStages: 8
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 7
     bossHealthMultiplier: 2.1612904
     healthMultiplier: 1.583871
@@ -447,8 +543,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: RECON
-    brief: The convoy escort has been doubled since the quarry went quiet. 64 hostiles. Reach 4 marked points across the map.
+  - displayName: THE SMUGGLER
+    brief: '64 hostiles. The Smuggler is at the farms with 5 guards: find him and kill him. The map marks him.'
     enemyCount: 64
     timeLimit: 335
     maxAliveAtOnce: 10
@@ -457,12 +553,18 @@ MonoBehaviour:
     waveSize: 15
     waveRest: 13.16129
     spawnReach: 1.6193548
-    objective: 7
+    objective: 8
     objectiveWeight: 29
-    objectiveStages: 4
+    objectiveStages: 1
+    targetName: The Smuggler
+    targetPlace: Farms
+    targetGuards: 5
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 8
     bossHealthMultiplier: 2.2387097
     healthMultiplier: 1.616129
@@ -474,8 +576,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 6
-    brief: The convoy escort has been doubled since the quarry went quiet. 68 hostiles and a boss. The boss is most of the score.
+  - displayName: THE COURIER
+    brief: 'The convoy escort has been doubled since the quarry went quiet. 68 hostiles and a boss. The boss is most of the score. He is at the bus stop with 10 bodyguards: the map marks the place.'
     enemyCount: 68
     timeLimit: 350
     maxAliveAtOnce: 11
@@ -487,9 +589,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 31
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Courier
+    bossPlace: BusStop
+    bossGuards: 10
+    bossScale: 1.06
     bossWeight: 8
     bossHealthMultiplier: 2.3161292
     healthMultiplier: 1.6483871
@@ -514,9 +622,15 @@ MonoBehaviour:
     objective: 2
     objectiveWeight: 32
     objectiveStages: 2
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 9
     bossHealthMultiplier: 2.3935485
     healthMultiplier: 1.6806451
@@ -541,9 +655,15 @@ MonoBehaviour:
     objective: 1
     objectiveWeight: 33
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 9
     bossHealthMultiplier: 2.4709678
     healthMultiplier: 1.7129033
@@ -555,8 +675,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 7
-    brief: The convoy escort has been doubled since the quarry went quiet. 78 hostiles and a boss. The boss is most of the score.
+  - displayName: THE FIXER
+    brief: 'The convoy escort has been doubled since the quarry went quiet. 78 hostiles and a boss. The boss is most of the score. He is at the souk with 11 bodyguards: the map marks the place.'
     enemyCount: 78
     timeLimit: 395
     maxAliveAtOnce: 11
@@ -568,9 +688,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 35
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Fixer
+    bossPlace: Souk
+    bossGuards: 11
+    bossScale: 1.06
     bossWeight: 9
     bossHealthMultiplier: 2.548387
     healthMultiplier: 1.7451613
@@ -595,9 +721,15 @@ MonoBehaviour:
     objective: 3
     objectiveWeight: 36
     objectiveStages: 3
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 10
     bossHealthMultiplier: 2.6258066
     healthMultiplier: 1.7774193
@@ -622,9 +754,15 @@ MonoBehaviour:
     objective: 4
     objectiveWeight: 38
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 10
     bossHealthMultiplier: 2.7032259
     healthMultiplier: 1.8096774
@@ -636,8 +774,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 8
-    brief: The convoy escort has been doubled since the quarry went quiet. 89 hostiles and a boss. The boss is most of the score.
+  - displayName: THE WELL KEEPER
+    brief: 'The convoy escort has been doubled since the quarry went quiet. 89 hostiles and a boss. The boss is most of the score. He is at the oasis with 12 bodyguards: the map marks the place.'
     enemyCount: 89
     timeLimit: 445
     maxAliveAtOnce: 12
@@ -649,9 +787,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 40
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Well Keeper
+    bossPlace: Oasis
+    bossGuards: 12
+    bossScale: 1.06
     bossWeight: 11
     bossHealthMultiplier: 2.7806451
     healthMultiplier: 1.8419355
@@ -676,9 +820,15 @@ MonoBehaviour:
     objective: 5
     objectiveWeight: 42
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 11
     bossHealthMultiplier: 2.8580647
     healthMultiplier: 1.8741935
@@ -703,9 +853,15 @@ MonoBehaviour:
     objective: 6
     objectiveWeight: 43
     objectiveStages: 12
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 12
     bossHealthMultiplier: 2.935484
     healthMultiplier: 1.9064516
@@ -717,8 +873,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 9
-    brief: They have stopped moving freight and started moving people. 100 hostiles and a boss. The boss is most of the score.
+  - displayName: THE STEWARD
+    brief: 'They have stopped moving freight and started moving people. 100 hostiles and a boss. The boss is most of the score. He is at the palace with 13 bodyguards: the map marks the place.'
     enemyCount: 100
     timeLimit: 490
     maxAliveAtOnce: 13
@@ -730,9 +886,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 45
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Steward
+    bossPlace: Palace
+    bossGuards: 13
+    bossScale: 1.06
     bossWeight: 12
     bossHealthMultiplier: 3.0129032
     healthMultiplier: 1.9387096
@@ -744,8 +906,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: RECON
-    brief: They have stopped moving freight and started moving people. 105 hostiles. Reach 7 marked points across the map.
+  - displayName: THE RADIO MAN
+    brief: '105 hostiles. The Radio Man is at the old town west with 7 guards: find him and kill him. The map marks him.'
     enemyCount: 105
     timeLimit: 510
     maxAliveAtOnce: 13
@@ -754,12 +916,18 @@ MonoBehaviour:
     waveSize: 21
     waveRest: 16.709677
     spawnReach: 2.0451612
-    objective: 7
+    objective: 8
     objectiveWeight: 47
-    objectiveStages: 7
+    objectiveStages: 1
+    targetName: The Radio Man
+    targetPlace: OldTownWest
+    targetGuards: 7
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 13
     bossHealthMultiplier: 3.0903227
     healthMultiplier: 1.9709678
@@ -784,9 +952,15 @@ MonoBehaviour:
     objective: 2
     objectiveWeight: 49
     objectiveStages: 4
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 13
     bossHealthMultiplier: 3.167742
     healthMultiplier: 2.0032258
@@ -798,8 +972,8 @@ MonoBehaviour:
     ammoDropChance: 0.12
     twoStarScore: 0.8
     oneStarScore: 0.5
-  - displayName: BOSS 10
-    brief: They have stopped moving freight and started moving people. 112 hostiles and a boss. The boss is most of the score.
+  - displayName: THE GATEKEEPER
+    brief: 'They have stopped moving freight and started moving people. 112 hostiles and a boss. The boss is most of the score. He is at the citadel with 14 bodyguards: the map marks the place.'
     enemyCount: 112
     timeLimit: 540
     maxAliveAtOnce: 14
@@ -811,9 +985,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 50
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6e94e4f81bb1b48888b8cf2b645fa24a, type: 2}
-    bossName: 
+    bossName: The Gatekeeper
+    bossPlace: Citadel
+    bossGuards: 14
+    bossScale: 1.06
     bossWeight: 13
     bossHealthMultiplier: 3.2451613
     healthMultiplier: 2.0354838
@@ -838,9 +1018,15 @@ MonoBehaviour:
     objective: 1
     objectiveWeight: 53
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 0
     bossArchetype: {fileID: 0}
     bossName: 
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 14
     bossHealthMultiplier: 3.3225806
     healthMultiplier: 2.0677419
@@ -865,9 +1051,15 @@ MonoBehaviour:
     objective: 0
     objectiveWeight: 54
     objectiveStages: 1
+    targetName: 
+    targetPlace: 
+    targetGuards: 4
     hasBoss: 1
     bossArchetype: {fileID: 11400000, guid: 6dc741d47098d52029bd0e69551d1e60, type: 2}
     bossName: Aurel Auger
+    bossPlace: 
+    bossGuards: 0
+    bossScale: 0
     bossWeight: 15
     bossHealthMultiplier: 3.4
     healthMultiplier: 2.1

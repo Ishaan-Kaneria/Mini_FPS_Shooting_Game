@@ -136,3 +136,14 @@ MonoBehaviour:
   colorFilter: {r: 1, g: 1, b: 1, a: 1}
   vignetteIntensity: 0.3
   filmGrain: 0.35
+  whiteBalanceTemperature: 0
+  whiteBalanceTint: 0
+  splitShadows: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  splitHighlights: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  splitBalance: 0
+  grenadeDropChance: 0
+  cloudShadows: 0
+  cloudShadowStrength: 0.35
+  cloudCover: 0.35
+  cloudScale: 600
+  cloudWind: {x: 3.5, y: 1.2}

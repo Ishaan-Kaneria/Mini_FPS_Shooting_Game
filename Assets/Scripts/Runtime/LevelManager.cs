@@ -1087,6 +1087,9 @@ public class LevelManager : MonoBehaviour
             {
                 var bossAi = boss.GetComponent<EnemyAI>();
                 if (bossAi != null) bossAi.relentless = false;
+                // And stays there: his beat took him 40 m from the place he is waiting at, with his guards after him.
+                var bossBrain = boss.GetComponent<EnemyBrain>();
+                if (bossBrain != null) bossBrain.patrolRadius = Mathf.Min(bossBrain.patrolRadius, StationBeat);
             }
             // Waiting at a named place: marked on the map and in the world, so the player can go and find him.
             if (BossPlaced)
@@ -1271,11 +1274,16 @@ public class LevelManager : MonoBehaviour
             if (enemy == null) continue;
             var ai = enemy.GetComponent<EnemyAI>();
             if (ai != null) ai.relentless = false;
+            var brain = enemy.GetComponent<EnemyBrain>();
+            if (brain != null) brain.patrolRadius = Mathf.Min(brain.patrolRadius, StationBeat);
             made.Add(enemy);
             _pendingSpawns--;
         }
         return made;
     }
+
+    /// <summary>Metres a stationed man may walk from his post before anything has happened.</summary>
+    const float StationBeat = 5f;
 
     EnemyType PickElite()
     {

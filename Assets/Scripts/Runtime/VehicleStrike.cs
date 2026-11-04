@@ -31,8 +31,8 @@ public class VehicleStrike : MonoBehaviour
     /// <summary>Speed along the vehicle's forward, metres per second, this frame.</summary>
     public float Speed { get; private set; }
 
-    Vector3 _last;
-    bool _hasLast;
+    TrafficCar _traffic;
+    Rigidbody _body;
     int _mask;
     Collider[] _hits;
     Dictionary<Health, float> _recent;
@@ -40,18 +40,15 @@ public class VehicleStrike : MonoBehaviour
 
     void OnEnable()
     {
-        _hasLast = false;
         _mask = LayerMask.GetMask("Civilian", "Enemy", "Player");
     }
 
     void FixedUpdate()
     {
-        Vector3 now = transform.position;
-        if (!_hasLast) { _last = now; _hasLast = true; return; }
-        float dt = Time.fixedDeltaTime;
-        Vector3 v = (now - _last) / Mathf.Max(1e-4f, dt);
-        _last = now;
-        Speed = Vector3.Dot(v, transform.forward);
+        // The vehicle's own speed. Worked out here from the position, a traffic car (moved each frame, read each physics step) read 12 m/s
+        // as 20 at 30 fps, and the blow grows with its square.
+        if (_traffic == null && _body == null) { _traffic = GetComponent<TrafficCar>(); _body = GetComponent<Rigidbody>(); }
+        Speed = _traffic != null ? _traffic.Speed : _body != null && !_body.isKinematic ? Vector3.Dot(_body.linearVelocity, transform.forward) : 0f;
         float speed = Mathf.Abs(Speed);
         if (speed < minSpeed || _mask == 0) return;
 

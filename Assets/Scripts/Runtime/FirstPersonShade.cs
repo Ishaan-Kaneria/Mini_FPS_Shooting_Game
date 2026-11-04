@@ -14,7 +14,7 @@ using UnityEngine.Rendering;
 /// The share in full shade was the sun's shadow strength (0.8, leaving 20%: 0.33 of the desert's 1.65), what a shadow
 /// takes off a lit wall; the gun is close and its detail is what the player reads, so it keeps 30% (0.50 of 1.65).
 ///
-/// Indoors the shaded share drops further, by as many stops as the eye has opened for the room (EyeAdaptation).
+/// Under a roof the sun is off them altogether and the light stands in for the room's own (<see cref="roomLight"/>).
 ///
 /// Sits on the arms camera (ViewModelRig adds it). Costs three raycasts every 0.05 s.
 /// </summary>
@@ -34,10 +34,18 @@ public class FirstPersonShade : MonoBehaviour
     [Tooltip("How much of the sun stays on the gun in full shade (a shadowed wall keeps 1 - the sun's shadow strength, 0.2 in the desert).")]
     [Range(0f, 1f)] public float shadedSunShare = 0.3f;
 
+    [Header("Under a roof")]
+    [Tooltip("How bright the room's own light is on the arms and gun once the eye has adapted, as a light from over the left shoulder (1 lights a white surface facing it full white before the tonemapper). No sun reaches them under a roof.")]
+    [Range(0f, 2f)] public float roomLight = 0.3f;
+    [Tooltip("Stops the eye has opened by which the player counts as under a roof.")]
+    [Range(0.25f, 4f)] public float roofStops = 1.5f;
+
     Light _sun;
     EyeAdaptation _eyeAdaptation;
-    float _shade, _target, _next, _saved, _nextFind;
+    float _shade, _target, _next, _saved, _nextFind, _roomShare = 1f;
     bool _dimmed;
+    Quaternion _savedRotation;
+    LightShadows _savedShadows;
     int _mask;
 
     /// <summary>How much of the gun is in shade now, 0 (sun) to 1 (shade).</summary>
@@ -88,6 +96,13 @@ public class FirstPersonShade : MonoBehaviour
         }
         _shade = Mathf.MoveTowards(_shade, _target, ease * Time.deltaTime);
         if (_eyeAdaptation == null && Time.time >= _nextFind) { _nextFind = Time.time + 1f; _eyeAdaptation = FindAnyObjectByType<EyeAdaptation>(); }
+        // How bright the room is on the screen against the level the eye aims for: a room the eye cannot open far enough for
+        // stays dim, and the hands dim with it. Eased, as the meter reads every few frames and turns with the view.
+        if (_eyeAdaptation != null && _eyeAdaptation.Level > 0f)
+        {
+            float share = Mathf.Pow(_eyeAdaptation.Level / Mathf.Max(1f, _eyeAdaptation.roomLevel), 2.2f);
+            _roomShare = Mathf.MoveTowards(_roomShare, Mathf.Clamp(share, 0.2f, 1.25f), Time.deltaTime);
+        }
     }
 
     void OnBeginCamera(ScriptableRenderContext context, Camera cam)
@@ -96,12 +111,26 @@ public class FirstPersonShade : MonoBehaviour
         var sun = Sun();
         if (sun == null) return;
         _saved = sun.intensity;
-        // Indoors the shade is deeper than a street's: the room has a thirtieth to a sixtieth of the outdoor light, and the
-        // eye has opened that many stops (EyeAdaptation) to see it. The gun's share of the sun in the shade drops by as
-        // much, or it glared, lit as if in a street's shade under the room's exposure (2026-10-31). In a sunlit patch on
-        // the floor it is in the sun and keeps it.
-        float indoors = _eyeAdaptation != null ? Mathf.Pow(2f, -_eyeAdaptation.Offset) : 1f;
-        sun.intensity = _saved * Mathf.Lerp(1f, shadedSunShare * indoors, _shade);
+        _savedRotation = sun.transform.rotation;
+        _savedShadows = sun.shadows;
+        // Under a roof no sun reaches the gun, however little: any share of it, multiplied back by the stops the eye has opened
+        // (EyeAdaptation), came out as a street's shade in a dim room, hands blown white with a hard shadow edge across
+        // them (his play-test, 2026-11-03). And the probes alone cannot light them there: on their 3 m grid a room holds
+        // next to nothing (they are what leaves the furniture black). So for this camera the light stands in for the room's
+        // own: soft, no shadow, from over the shoulder, as bright as the room measures on the screen, divided by the stops
+        // the eye has opened so that the two cancel. A real patch of sun on the floor is not shade, and keeps the sun.
+        float stops = _eyeAdaptation != null ? _eyeAdaptation.Offset : 0f;
+        float roof = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(stops / roofStops));
+        float inRoom = roof * _shade;
+        float room = roomLight * _roomShare * Mathf.Pow(2f, -stops);
+        sun.intensity = Mathf.Lerp(_saved, Mathf.Lerp(_saved * shadedSunShare, room, roof), _shade);
+        if (inRoom > 0.001f)
+        {
+            var e = eye != null ? eye : transform;
+            var over = Quaternion.LookRotation(e.forward * 0.55f + e.right * 0.45f - Vector3.up * 0.7f, Vector3.up);
+            sun.transform.rotation = Quaternion.Slerp(_savedRotation, over, inRoom);
+            if (inRoom > 0.5f) sun.shadows = LightShadows.None;
+        }
         _dimmed = true;
     }
 
@@ -113,7 +142,12 @@ public class FirstPersonShade : MonoBehaviour
     void Restore()
     {
         if (!_dimmed) return;
-        if (_sun != null) _sun.intensity = _saved;
+        if (_sun != null)
+        {
+            _sun.intensity = _saved;
+            _sun.transform.rotation = _savedRotation;
+            _sun.shadows = _savedShadows;
+        }
         _dimmed = false;
     }
 }

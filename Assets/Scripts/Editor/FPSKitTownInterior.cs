@@ -33,7 +33,8 @@ namespace FPSKit.EditorTools
     public static partial class FPSKitSceneBuilder
     {
         private const float HouseWall = 0.25f, DoorWidth = 1.8f, DoorHeight = 2.2f, StairWidth = 1.6f, HouseTread = 0.26f, PartitionThick = 0.1f,
-                             HouseDoorEnd = 0.35f;   // the least wall between a doorway and the end of its partition
+                             HouseDoorEnd = 0.35f,   // the least wall between a doorway and the end of its partition
+                             DoorFrameProud = 0.018f; // a door frame's face off the wall, in front of the skirting's 1.2 cm
 
         // The stair's foot is 1.5 m in from the front wall: an agent keeps half a metre off every wall and the rail closes the
         // flight's open side, so the first stair (its foot 0.5 m in) could only be got onto from its top and every room
@@ -579,10 +580,14 @@ namespace FPSKit.EditorTools
                 m.Quad(mat, p0 + u * hl.x - off + Vector3.up * DoorHeight, p0 + u * hl.y - off + Vector3.up * DoorHeight, p0 + u * hl.y + off + Vector3.up * DoorHeight, p0 + u * hl.x + off + Vector3.up * DoorHeight, Vector3.down);
                 foreach (var side in new[] { off, -off })
                 {
+                    // Proud of the wall and clear of the skirting (1.2 cm), its back in the wall. Its face lay exactly on the
+                    // wall's, and the uprights ran up into the head on its plane: two surfaces at one depth flicker as the
+                    // eye moves (his play-test, 2026-11-03). The uprights stop under the head.
                     var n = side.normalized;
-                    Bar(det, _frameWood, p0 + u * (hl.x - 0.04f) + side, p0 + u * (hl.x - 0.04f) + side + Vector3.up * (DoorHeight + 0.04f), n, 0.08f, 0.02f);
-                    Bar(det, _frameWood, p0 + u * (hl.y + 0.04f) + side, p0 + u * (hl.y + 0.04f) + side + Vector3.up * (DoorHeight + 0.04f), n, 0.08f, 0.02f);
-                    Bar(det, _frameWood, p0 + u * (hl.x - 0.08f) + side + Vector3.up * (DoorHeight + 0.04f), p0 + u * (hl.y + 0.08f) + side + Vector3.up * (DoorHeight + 0.04f), n, 0.08f, 0.02f);
+                    var face = side + n * DoorFrameProud;
+                    Bar(det, _frameWood, p0 + u * (hl.x - 0.04f) + face, p0 + u * (hl.x - 0.04f) + face + Vector3.up * DoorHeight, n, 0.08f, DoorFrameProud + 0.02f);
+                    Bar(det, _frameWood, p0 + u * (hl.y + 0.04f) + face, p0 + u * (hl.y + 0.04f) + face + Vector3.up * DoorHeight, n, 0.08f, DoorFrameProud + 0.02f);
+                    Bar(det, _frameWood, p0 + u * (hl.x - 0.08f) + face + Vector3.up * (DoorHeight + 0.04f), p0 + u * (hl.y + 0.08f) + face + Vector3.up * (DoorHeight + 0.04f), n, 0.08f, DoorFrameProud + 0.02f);
                 }
                 if (doorWidth >= DoorWidth - 0.01f)
                 {
@@ -591,7 +596,7 @@ namespace FPSKit.EditorTools
                     float leafW = doorWidth * 0.5f - 0.02f;
                     foreach (var (e, dir) in new[] { (hl.x, -1f), (hl.y, 1f) })
                         if (e + dir * leafW > 0.02f && e + dir * leafW < len - 0.02f)
-                            m.Box(_doorWood, p0 + u * (e + dir * leafW * 0.5f) + off + nA * 0.03f + Vector3.up * (DoorHeight * 0.5f),
+                            m.Box(_doorWood, p0 + u * (e + dir * leafW * 0.5f) + off + nA * (DoorFrameProud + 0.022f) + Vector3.up * (DoorHeight * 0.5f),
                                   new Vector3(leafW, DoorHeight - 0.03f, 0.04f), Quaternion.LookRotation(nA));
                 }
                 else

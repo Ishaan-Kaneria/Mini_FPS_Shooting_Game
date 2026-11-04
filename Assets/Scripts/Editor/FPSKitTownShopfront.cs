@@ -495,8 +495,9 @@ namespace FPSKit.EditorTools
             Vector3 u = (p1 - p0).normalized, up = Vector3.up, at = nrm * (FrameProud - depth);
             const float t = 0.08f;
             float d = FrameProud + 0.04f;
-            Bar(det, mat, p0 + u * (t * 0.5f) + at, p0 + u * (t * 0.5f) + up * H + at, nrm, t, d);
-            Bar(det, mat, p1 - u * (t * 0.5f) + at, p1 - u * (t * 0.5f) + up * H + at, nrm, t, d);
+            // The uprights stop under the head: run up into it, on its plane, the corners flickered.
+            Bar(det, mat, p0 + u * (t * 0.5f) + at, p0 + u * (t * 0.5f) + up * (H - t) + at, nrm, t, d);
+            Bar(det, mat, p1 - u * (t * 0.5f) + at, p1 - u * (t * 0.5f) + up * (H - t) + at, nrm, t, d);
             Bar(det, mat, p0 + up * (H - t * 0.5f) + at, p1 + up * (H - t * 0.5f) + at, nrm, t, d);
         }
     }

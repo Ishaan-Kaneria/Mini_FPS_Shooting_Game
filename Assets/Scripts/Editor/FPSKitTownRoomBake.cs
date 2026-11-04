@@ -23,6 +23,41 @@ namespace FPSKit.EditorTools
     public static class FPSKitTownRoomBake
     {
         const float Margin = 40f;
+        /// <summary>How far the baked contact shadow reaches from where two surfaces meet, in metres. At 0.6 m it drew black
+        /// patches on the walls behind furniture that no real room has (his play-test, 2026-11-03).</summary>
+        const float ContactShadowReach = 0.2f;
+
+        /// <summary>A piece of furniture big enough to show the difference (the shops' small goods stay on the probes), its
+        /// nearest LOD only, and not a dense scan.</summary>
+        const string UvFolder = "Assets/FPSKit_Generated/Scenes/DesertOutpost_FurnitureUVs";
+
+        /// <summary>A copy of a shared mesh with lightmap UVs, kept as an asset and reused by every district: the shared mesh may
+        /// be inside a model file, which keeps nothing written to it.</summary>
+        static Mesh MeshWithLightmapUVs(Mesh mesh)
+        {
+            if (mesh.uv2 != null && mesh.uv2.Length > 0) return mesh;
+            if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long id)) return mesh;
+            if (!AssetDatabase.IsValidFolder(UvFolder)) AssetDatabase.CreateFolder(System.IO.Path.GetDirectoryName(UvFolder), System.IO.Path.GetFileName(UvFolder));
+            string path = $"{UvFolder}/{guid}_{id}.asset";
+            var copy = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (copy != null) return copy;
+            copy = Object.Instantiate(mesh);
+            copy.name = mesh.name + "_uv2";
+            UnwrapParam.SetDefaults(out var p);
+            Unwrapping.GenerateSecondaryUVSet(copy, p);
+            AssetDatabase.CreateAsset(copy, path);
+            return copy;
+        }
+
+        internal static bool FurnitureTakesLightmap(MeshRenderer r)
+        {
+            var mesh = r.GetComponent<MeshFilter>()?.sharedMesh;
+            if (mesh == null || r.bounds.size.magnitude < 1.0f || mesh.triangles.Length / 3 > 40000) return false;
+            var group = r.GetComponentInParent<LODGroup>();
+            if (group == null) return true;
+            var lods = group.GetLODs();
+            return lods.Length > 0 && lods[0].renderers.Contains(r);
+        }
 
         public static void Batch()
         {
@@ -116,7 +151,7 @@ namespace FPSKit.EditorTools
 
             // The insides lightmapped; the furniture shading them; the trading shops' tubes lit.
             var rooms = scene.GetRootGameObjects().FirstOrDefault(g => g.name == "Rooms");
-            float m2 = 0f; int insides = 0, furniture = 0;
+            float m2 = 0f; int insides = 0, furniture = 0, furnitureLit = 0;
             foreach (var r in rooms.GetComponentsInChildren<MeshRenderer>(true))
             {
                 bool inside = !r.name.StartsWith("Detail_") && (r.name.StartsWith("Interior_") || r.name.StartsWith("ShopInside_") || r.name.StartsWith("ShopWindow_"));
@@ -125,6 +160,15 @@ namespace FPSKit.EditorTools
                     m2 += FPSKitTownLightmaps.Lightmapped(r);
                     r.scaleInLightmap *= FPSKitTownLightmaps.DistrictScale;
                     insides++;
+                }
+                else if (!r.name.StartsWith("Detail_") && FurnitureTakesLightmap(r))
+                {
+                    // On the 3 m probes a room holds next to nothing, and a wardrobe drew black against lightmapped walls.
+                    var mf = r.GetComponent<MeshFilter>();
+                    mf.sharedMesh = MeshWithLightmapUVs(mf.sharedMesh);
+                    FPSKitTownLightmaps.Lightmapped(r);
+                    r.scaleInLightmap *= FPSKitTownLightmaps.DistrictScale;
+                    furniture++; furnitureLit++;
                 }
                 else
                 {
@@ -139,7 +183,7 @@ namespace FPSKit.EditorTools
                     FPSKitTownLightmaps.Tube(tubes, at, along);
 
             float indirect = settings != null ? settings.indirectScale : 1f;
-            if (settings != null) { settings.indirectScale = FPSKitTownGI.ApvIndirect; settings.lightmapResolution = FPSKitTownLightmaps.TexelsPerMetre; settings.lightmapMaxSize = 1024; settings.directionalityMode = LightmapsMode.CombinedDirectional; settings.ao = true; settings.aoMaxDistance = 0.6f; }
+            if (settings != null) { settings.indirectScale = FPSKitTownGI.ApvIndirect; settings.lightmapResolution = FPSKitTownLightmaps.TexelsPerMetre; settings.lightmapMaxSize = 1024; settings.directionalityMode = LightmapsMode.CombinedDirectional; settings.ao = true; settings.aoMaxDistance = ContactShadowReach; }
             bool ok;
             try { ok = Lightmapping.Bake(); }
             finally { if (settings != null) { settings.indirectScale = indirect; EditorUtility.SetDirty(settings); } }
@@ -155,7 +199,7 @@ namespace FPSKit.EditorTools
             EditorSceneManager.SaveScene(scene, path);
             int maps = LightmapSettings.lightmaps.Length;
             return $"district {k + 1}: {(ok ? "baked" : "FAILED")}, {insides} insides ({m2:0} m2 at {FPSKitTownLightmaps.TexelsPerMetre * FPSKitTownLightmaps.DistrictScale:0}/m), " +
-                   $"{furniture} pieces of furniture, {shops.Count} lit shops, {pieces.Count} town pieces and no terrain, {maps} lightmaps, {clock.Elapsed.TotalMinutes:0.0} min";
+                   $"{furniture} pieces of furniture ({furnitureLit} lightmapped), {shops.Count} lit shops, {pieces.Count} town pieces and no terrain, {maps} lightmaps, {clock.Elapsed.TotalMinutes:0.0} min";
         }
 
         /// <summary>The district's ground rect (x, z), as FPSKitTownRoomScenes.DistrictOf cuts it.</summary>

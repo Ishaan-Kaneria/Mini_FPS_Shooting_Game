@@ -20,22 +20,22 @@ MonoBehaviour:
     nod: 0.03
   walk:
     speed: 3.2
-    dip: 0.009
-    sway: 0.005
-    roll: 0.18
-    nod: 0.12
+    dip: 0.0045
+    sway: 0.0025
+    roll: 0.09
+    nod: 0.06
   jog:
-    speed: 6
-    dip: 0.018
-    sway: 0.008
-    roll: 0.32
-    nod: 0.25
+    speed: 5.1
+    dip: 0.009
+    sway: 0.004
+    roll: 0.16
+    nod: 0.125
   sprint:
-    speed: 9.5
-    dip: 0.03
-    sway: 0.012
-    roll: 0.55
-    nod: 0.45
+    speed: 7.6
+    dip: 0.015
+    sway: 0.006
+    roll: 0.275
+    nod: 0.225
   dipAfterFootfall: 0.1
   crouched: 0.3
   lagPerAccel: 0.0009

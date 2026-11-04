@@ -16,11 +16,11 @@ public class MovementSettings : ScriptableObject
 {
     [Header("Speeds, metres a second")]
     [Tooltip("Moving normally: a jog with the rifle ready.")]
-    [Range(1f, 8f)] public float jogSpeed = 6.0f;
+    [Range(1f, 8f)] public float jogSpeed = 5.1f;
     [Tooltip("Flat out. Nothing an enemy does outruns this (CLAUDE.md).")]
-    [Range(4f, 12f)] public float sprintSpeed = 9.5f;
+    [Range(4f, 12f)] public float sprintSpeed = 7.6f;
     [Tooltip("Firing or aiming while the sprint is held: a fast jog with the gun up.")]
-    [Range(2f, 8f)] public float combatJogSpeed = 6.4f;
+    [Range(2f, 8f)] public float combatJogSpeed = 5.44f;
     [Range(0.5f, 5f)] public float crouchSpeed = 3.0f;
     [Tooltip("Share of speed when moving straight back.")]
     [Range(0.3f, 1f)] public float backpedal = 0.8f;

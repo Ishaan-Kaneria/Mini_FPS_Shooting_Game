@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a69a2d4d9cf687b6b84b4cdfbe8062e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MovementSettings
-  jogSpeed: 6
-  sprintSpeed: 9.5
-  combatJogSpeed: 6.4
+  jogSpeed: 5.1
+  sprintSpeed: 7.6
+  combatJogSpeed: 5.44
   crouchSpeed: 3
   backpedal: 0.8
   strafe: 0.92

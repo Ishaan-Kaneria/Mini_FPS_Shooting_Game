@@ -28,9 +28,9 @@ public class EyeCameraSettings : ScriptableObject
     [Header("Steps (on the footsteps: the bob is the same event as the sound)")]
     [Tooltip("Barely moving: a careful step is almost still.")]
     public Gait creep = new Gait { speed = 1.2f, dip = 0.002f, sway = 0.001f, roll = 0.03f, nod = 0.03f };
-    public Gait walk = new Gait { speed = 3.2f, dip = 0.009f, sway = 0.005f, roll = 0.18f, nod = 0.12f };
-    public Gait jog = new Gait { speed = 6f, dip = 0.018f, sway = 0.008f, roll = 0.32f, nod = 0.25f };
-    public Gait sprint = new Gait { speed = 9.5f, dip = 0.03f, sway = 0.012f, roll = 0.55f, nod = 0.45f };
+    public Gait walk = new Gait { speed = 3.2f, dip = 0.0045f, sway = 0.0025f, roll = 0.09f, nod = 0.06f };
+    public Gait jog = new Gait { speed = 5.1f, dip = 0.009f, sway = 0.004f, roll = 0.16f, nod = 0.125f };
+    public Gait sprint = new Gait { speed = 7.6f, dip = 0.015f, sway = 0.006f, roll = 0.275f, nod = 0.225f };
     [Tooltip("Share of the stride, after each footfall, at which the head is lowest (the weight landing).")]
     [Range(0f, 0.4f)] public float dipAfterFootfall = 0.1f;
     [Tooltip("The bob crouched, as a share of standing.")]

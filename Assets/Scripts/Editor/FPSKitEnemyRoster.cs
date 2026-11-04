@@ -161,7 +161,7 @@ namespace FPSKit.EditorTools
         // The numbers below are multipliers on the base enemy prefab: 100 health,
         // 12 damage, 3.2 m/s. The level's own difficulty multiplies these again on top.
         //
-        // Speed is read against the player, who walks at 5.6 and sprints at 8.2. Every
+        // Speed is read against the player, who walks at 5.1 and sprints at 7.6. Every
         // multiplier here is set so that nothing outruns a sprint and only the two
         // rushers beat a walk -- disengaging has to stay possible, or positioning stops
         // being a thing the player can do.

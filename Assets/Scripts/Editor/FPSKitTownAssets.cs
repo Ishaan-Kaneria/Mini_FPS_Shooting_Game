@@ -483,7 +483,7 @@ namespace FPSKit.EditorTools
                           ?? sets.Keys.FirstOrDefault(k => k.ToLowerInvariant().Contains(m.name.ToLowerInvariant()))
                           ?? sets.Keys.OrderBy(k => k.Length).First();
                 var s = sets[key];
-                var mat = LitFromMaps($"{MatFolder}/PH_{key}.mat", s.diff, s.nor, s.mask, Color.white, Vector2.one,
+                var mat = LitFromMaps($"{MatFolder}/PH_{key}.mat", s.diff, s.nor, s.mask, PropTint(id), Vector2.one,
                                       IsPlant(id) || HasAlpha(s.diff), smoothness: PropSmoothness(id));
                 var source = new AssetImporter.SourceAssetIdentifier(typeof(Material), m.name);
                 if (map.TryGetValue(source, out var existing) && existing == mat) continue;
@@ -501,7 +501,7 @@ namespace FPSKit.EditorTools
                               ?? sets.Keys.FirstOrDefault(k => k.ToLowerInvariant().Contains(kv.Key.name.ToLowerInvariant()))
                               ?? sets.Keys.OrderBy(k => k.Length).First();
                     var s = sets[key];
-                    LitFromMaps(AssetDatabase.GetAssetPath(mapped), s.diff, s.nor, s.mask, Color.white, Vector2.one,
+                    LitFromMaps(AssetDatabase.GetAssetPath(mapped), s.diff, s.nor, s.mask, PropTint(id), Vector2.one,
                                 IsPlant(id) || HasAlpha(s.diff), smoothness: PropSmoothness(id));
                 }
             if (changed) imp.SaveAndReimport();
@@ -533,6 +533,10 @@ namespace FPSKit.EditorTools
             "brass_diya_lantern" => 0.72f,
             _ => 1f,
         };
+
+        /// <summary>A scan darker than its real surface. The vintage cabinet's map averages 3% reflectance, close to soot; dark
+        /// stained wood is around 8%, and in a lit room the cupboard read as a black hole (his play-test, 2026-11-03).</summary>
+        static Color PropTint(string id) => id == "vintage_cabinet_01" ? new Color(3f, 3f, 3f, 1f) : Color.white;
 
         static bool HasAlpha(Texture2D t)
         {

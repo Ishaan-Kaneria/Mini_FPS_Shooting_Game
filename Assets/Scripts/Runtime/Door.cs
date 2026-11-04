@@ -52,6 +52,8 @@ public class Door : MonoBehaviour, IWorldHit
 
     void Awake()
     {
+        // Saved off, on from the start of play: on in the editor, the block stayed cut into the navmesh for every bake and check.
+        if (obstacle != null) obstacle.enabled = _bolted;
         _shut = transform.localRotation;
         _ready = true;
     }

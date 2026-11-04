@@ -25,6 +25,48 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static partial class FPSKitSceneBuilder
     {
+        /// <summary>
+        /// The saved town's navmesh baked and sealed again with the districts' rooms in and the houses' doors out, and nothing
+        /// else touched, so a navigation fault can be repaired without the hour of lighting bakes. Saves the town scene alone.
+        ///   Tools/unity-batch.sh FPSKit.EditorTools.FPSKitSceneBuilder.BatchReseal
+        /// </summary>
+        public static void BatchReseal()
+        {
+            try
+            {
+                var town = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(FPSKitTownGI.DesertScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+                foreach (var district in FPSKitTownRoomScenes.ExistingPaths())
+                    UnityEditor.SceneManagement.EditorSceneManager.OpenScene(district, UnityEditor.SceneManagement.OpenSceneMode.Additive);
+                var player = Object.FindAnyObjectByType<PlayerMotor>();
+                if (player == null) throw new System.Exception("no player in the town");
+                var doors = GameObject.Find("HouseDoors");
+                int oldSeals = Object.FindObjectsByType<NavMeshModifierVolume>(FindObjectsSortMode.None).Count(v => v.name == "Seal");
+                foreach (var root in town.GetRootGameObjects())
+                    if (root.name == "NavMesh" || root.name == "IslandSeal") Object.DestroyImmediate(root);
+                foreach (var left in Object.FindObjectsByType<NavMeshSurface>(FindObjectsSortMode.None)) Object.DestroyImmediate(left.gameObject);
+                var holder = GameObject.Find("IslandSeal");
+                if (holder != null) Object.DestroyImmediate(holder);
+                if (doors != null) doors.SetActive(false);
+                BakeNavMesh();
+                var bakedNavMesh = GameObject.Find("NavMesh");
+                if (bakedNavMesh != null && bakedNavMesh.scene != town) UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(bakedNavMesh, town);
+                SealTownIslands(player.transform.position);
+                var sealHolder = GameObject.Find("IslandSeal");
+                if (sealHolder != null && sealHolder.scene != town) UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(sealHolder, town);
+                if (doors != null)
+                {
+                    doors.SetActive(true);
+                    foreach (var o in doors.GetComponentsInChildren<NavMeshObstacle>(true)) o.enabled = false;   // Door turns it on in play
+                }
+                int seals = Object.FindObjectsByType<NavMeshModifierVolume>(FindObjectsSortMode.None).Count(v => v.name == "Seal");
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(town);
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(town);
+                Debug.Log($"[FPSKit] town resealed: {oldSeals} seal volumes before, {seals} now, doors {(doors != null ? doors.transform.childCount : 0)}.");
+                UnityEditor.EditorApplication.Exit(0);
+            }
+            catch (System.Exception e) { Debug.LogError("[FPSKit] town reseal FAILED: " + e); UnityEditor.EditorApplication.Exit(1); }
+        }
+
         private static void SealTownIslands(Vector3 playerStart)
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();

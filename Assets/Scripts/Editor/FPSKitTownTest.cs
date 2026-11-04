@@ -137,6 +137,9 @@ namespace FPSKit.EditorTools
             var root = GameObject.Find("HouseRooms");
             if (root == null) { problems.Add("no house interiors (HouseRooms markers) in the scene"); return; }
             int houses = 0, rooms = 0, reached = 0, ups = 0, upsReached = 0, islands = 0;
+            // The question is whether a house opens up once its door is kicked in: the shut doors are out of the way.
+            var houseDoors = GameObject.Find("HouseDoors");
+            if (houseDoors != null) houseDoors.SetActive(false);
             var seals = UnityEngine.Object.FindObjectsByType<Unity.AI.Navigation.NavMeshModifierVolume>(FindObjectsSortMode.None)
                 .Where(v => v.name == "Seal").Select(v => new Bounds(v.transform.TransformPoint(v.center), v.size)).ToList();
             var path = new NavMeshPath();

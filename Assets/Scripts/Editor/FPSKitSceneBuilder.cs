@@ -564,9 +564,14 @@ namespace FPSKit.EditorTools
                                               : BuildEnemyPrefab();
             var spawnPoints = BuildSpawnPoints();
 
+            // The houses' working doors are out of the bake and the seal: shut, each closes its doorway, every room behind
+            // it counted as an island and was sealed for good, so a kicked-in house stayed shut to every agent (2026-11-04).
+            var houseDoors = GameObject.Find("HouseDoors");
+            if (houseDoors != null) houseDoors.SetActive(false);
             BakeNavMesh();
             if (_theme.desertTownZone) SealTownIslands(player.transform.position);
             SnapSpawnPointsToNavMesh(spawnPoints);
+            if (houseDoors != null) houseDoors.SetActive(true);
 
             var levels = BuildLevelManager(enemyPrefab, spawnPoints, player.transform);
             BuildGameDirector();

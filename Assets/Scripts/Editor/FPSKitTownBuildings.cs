@@ -904,6 +904,7 @@ namespace FPSKit.EditorTools
             obstacle.size = new Vector3(w, h, 0.3f);
             obstacle.carving = true;
             obstacle.carveOnlyStationary = true;
+            obstacle.enabled = false;                               // Door turns it on in play
             var ignore = way.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
             ignore.ignoreFromBuild = true;
 

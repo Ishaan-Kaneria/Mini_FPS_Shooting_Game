@@ -47,6 +47,9 @@ public class FirstPersonShade : MonoBehaviour
     Quaternion _savedRotation;
     LightShadows _savedShadows;
     int _mask;
+    Volume _probeVolume;
+    VolumeProfile _probeProfile;
+    ProbeVolumesOptions _probeLight;
 
     /// <summary>How much of the gun is in shade now, 0 (sun) to 1 (shade).</summary>
     public float Shade => _shade;
@@ -56,6 +59,7 @@ public class FirstPersonShade : MonoBehaviour
         if (armsCamera == null) armsCamera = GetComponent<Camera>();
         if (eye == null && transform.parent != null) eye = transform.parent;
         _mask = ~LayerMask.GetMask("Player", "FirstPerson", "PlayerBounds", "Ignore Raycast", "UI");
+        EnsureProbeVolume();
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         RenderPipelineManager.endCameraRendering += OnEndCamera;
     }
@@ -65,6 +69,28 @@ public class FirstPersonShade : MonoBehaviour
         RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
         RenderPipelineManager.endCameraRendering -= OnEndCamera;
         Restore();
+    }
+
+    void OnDestroy()
+    {
+        if (_probeProfile != null) Destroy(_probeProfile);
+    }
+
+    /// <summary>A volume only the arms camera answers to (the FirstPerson layer; ViewModelRig sets the masks), holding how much
+    /// of the probe volumes' light reaches the arms. Runtime only: no shared profile is written.</summary>
+    void EnsureProbeVolume()
+    {
+        if (_probeVolume != null) return;
+        var go = new GameObject("ArmsProbeLight") { hideFlags = HideFlags.DontSave, layer = LayerMask.NameToLayer("FirstPerson") };
+        go.transform.SetParent(transform, false);
+        _probeVolume = go.AddComponent<Volume>();
+        _probeVolume.isGlobal = true;
+        _probeVolume.priority = 1000f;
+        _probeProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+        _probeProfile.hideFlags = HideFlags.DontSave;
+        _probeLight = _probeProfile.Add<ProbeVolumesOptions>(false);
+        _probeLight.intensityMultiplier.overrideState = true;
+        _probeVolume.sharedProfile = _probeProfile;
     }
 
     Light Sun()
@@ -96,6 +122,14 @@ public class FirstPersonShade : MonoBehaviour
         }
         _shade = Mathf.MoveTowards(_shade, _target, ease * Time.deltaTime);
         if (_eyeAdaptation == null && Time.time >= _nextFind) { _nextFind = Time.time + 1f; _eyeAdaptation = FindAnyObjectByType<EyeAdaptation>(); }
+        // The probes' light on the arms is not to be multiplied up by the eye opening: in a room whose walls hold almost no
+        // light the eye opens all the way, and the probes (which see more than the lightmapped walls do) burned the hands
+        // white. Under a roof they keep the level they would have in the street's shade.
+        if (_probeLight != null)
+        {
+            float open = _eyeAdaptation != null ? _eyeAdaptation.Offset : 0f;
+            _probeLight.intensityMultiplier.value = Mathf.Lerp(1f, Mathf.Pow(2f, -open), Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(open / roofStops)));
+        }
         // How bright the room is on the screen against the level the eye aims for: a room the eye cannot open far enough for
         // stays dim, and the hands dim with it. Eased, as the meter reads every few frames and turns with the view.
         if (_eyeAdaptation != null && _eyeAdaptation.Level > 0f)

@@ -256,6 +256,10 @@ public class ViewModelRig : MonoBehaviour
         // The town's shade on the gun comes from FirstPersonShade, which dims the sun for this camera in shadow.
         data.renderShadows = true;
         if (go.GetComponent<FirstPersonShade>() == null) go.AddComponent<FirstPersonShade>();
+        // Its volumes as the world's, plus the FirstPerson layer's, which only this camera answers to (FirstPersonShade).
+        var worldData = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(main);
+        worldData.volumeLayerMask &= ~(1 << _firstPerson);
+        data.volumeLayerMask = worldData.volumeLayerMask | (1 << _firstPerson);
         var stack = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(main).cameraStack;
         if (!stack.Contains(_armsCam)) stack.Add(_armsCam);
         // Post-processing on this, the stack's last camera, and off on the world's: URP runs it for each camera that has

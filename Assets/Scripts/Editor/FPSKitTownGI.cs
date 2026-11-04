@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -97,44 +98,78 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>
-        /// The covered market's own room reflection. Roofed but not a house or a shop, it had none: its stone, and the player's gun and
-        /// gloves in it, mirrored the open sky, and the eye adapting under the roof brightened that into wet walls and chrome
-        /// (his screenshot, 2026-11-04). Its box is the souk's street and shop rows, past the walls, from under the floor to over the vault.
+        /// The covered places' own room reflections. Roofed but neither house nor shop, they had none: their stone, and the player's gun and
+        /// gloves in them, mirrored the open sky, and the eye adapting under the roof brightened that into wet walls and chrome (his
+        /// screenshots, 2026-11-04: the souk, the mosque). Each box runs past its walls, from under the floor to under the roof.
         /// </summary>
         static void AddCoveredPlaces(Transform root, Cubemap cube)
         {
-            const string Souk = "CoveredProbe_Souk";
-            var old = root.Find(Souk);
-            if (old != null) Object.DestroyImmediate(old.gameObject);
-            var box = new Bounds();
-            box.SetMinMax(new Vector3(-232f - RoomPad, -3f, 12f - RoomPad), new Vector3(-34f + RoomPad, 14f, 28f + RoomPad));
-            var go = new GameObject(Souk);
-            go.transform.SetParent(root, false);
-            go.transform.position = box.center;
-            var probe = go.AddComponent<ReflectionProbe>();
-            probe.mode = ReflectionProbeMode.Custom;
-            probe.customBakedTexture = cube;
-            probe.size = box.size;
-            probe.center = Vector3.zero;
-            probe.boxProjection = false;
-            probe.blendDistance = RoomBlend;
-            probe.importance = 2;
-            probe.intensity = ShopLitReflection;
-            probe.enabled = false;   // IndoorReflections switches it on near the eye
+            for (int i = root.childCount - 1; i >= 0; i--)
+                if (root.GetChild(i).name.StartsWith("CoveredProbe_")) Object.DestroyImmediate(root.GetChild(i).gameObject);
+            void Place(string name, Vector3 min, Vector3 max)
+            {
+                var box = new Bounds();
+                box.SetMinMax(min - Vector3.one * RoomPad, max + Vector3.one * RoomPad);
+                var go = new GameObject("CoveredProbe_" + name);
+                go.transform.SetParent(root, false);
+                go.transform.position = box.center;
+                var probe = go.AddComponent<ReflectionProbe>();
+                probe.mode = ReflectionProbeMode.Custom;
+                probe.customBakedTexture = cube;
+                probe.size = box.size;
+                probe.center = Vector3.zero;
+                probe.boxProjection = false;
+                probe.blendDistance = RoomBlend;
+                probe.importance = 2;
+                // Far under a lit shop's: these halls are dim, and at 0.7 the gun still read pale metal in them.
+                probe.intensity = CoveredReflection;
+                probe.enabled = false;   // IndoorReflections switches it on near the eye
+            }
+            // The floor as the navmesh has it, where the plan does not fix it.
+            float Floor(float x, float z) => NavMesh.SamplePosition(new Vector3(x, 2f, z), out var hit, 30f, NavMesh.AllAreas) ? hit.position.y : 0f;
+            Place("Souk", new Vector3(-232f, -3f, 12f), new Vector3(-34f, 14f, 28f));
+            // The mosque (FPSKitTownLandmarks.BuildMosque): the prayer hall and the courtyard's three arcades, roofs at 10 m.
+            Place("MosqueHall", new Vector3(-50f, -3f, 248f), new Vector3(50f, 11f, 296f));
+            Place("MosqueArcadeSouth", new Vector3(-43f, -3f, 192f), new Vector3(41f, 11f, 199f));
+            Place("MosqueArcadeEast", new Vector3(43f, -3f, 199f), new Vector3(50f, 11f, 248f));
+            Place("MosqueArcadeWest", new Vector3(-50f, -3f, 199f), new Vector3(-43f, 11f, 248f));
+            // The palace's domed hall (ground floor 5 m) and the citadel's keep (20 m).
+            float palace = Floor(-385f, -11f);
+            Place("PalaceHall", new Vector3(-394f, palace - 1f, -24f), new Vector3(-376f, palace + 5f, 2f));
+            float keep = Floor(318f, 368f);
+            Place("CitadelKeep", new Vector3(310f, keep - 1f, 360f), new Vector3(326f, keep + 20f, 376f));
         }
 
-        /// <summary>The saved desert scene given the covered places' reflections, touching nothing else (no captured room probe is lost).</summary>
+        /// <summary>
+        /// The saved desert scene given the covered places' reflections and the masonry's matte, touching nothing else (no captured room
+        /// probe is lost, no light baked).
+        /// </summary>
         public static void BatchCoveredReflections()
         {
             var scene = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
             var root = Object.FindAnyObjectByType<IndoorReflections>(FindObjectsInactive.Include);
             if (root == null) { Debug.LogError("[FPSKitBatch] FAILED: no IndoorReflections in the desert scene"); FPSKitBatch.Exit(1); return; }
             AddCoveredPlaces(root.transform, RoomCube());
+            int matted = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/FPSKit_Generated/Town/Materials" }))
+            {
+                var m = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+                if (m == null || !m.name.StartsWith("Town_") || !m.HasProperty("_Smoothness")) continue;
+                if (!Mathf.Approximately(m.GetFloat("_Smoothness"), 0.35f) || FPSKitSceneBuilder.KeepsSheen(m.name)) continue;
+                m.SetFloat("_Smoothness", FPSKitSceneBuilder.MasonrySmoothness);
+                EditorUtility.SetDirty(m);
+                matted++;
+            }
+            AssetDatabase.SaveAssets();
+            // The scene's cars carry the engine they were built with.
+            foreach (var car in Object.FindObjectsByType<DrivableCar>(FindObjectsInactive.Include, FindObjectsSortMode.None)) car.motorTorque = 620f;
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, DesertScene);
-            Debug.Log("[FPSKitBatch] covered places' reflections placed");
+            Debug.Log($"[FPSKitBatch] covered places' reflections placed; {matted} masonry materials matted");
             FPSKitBatch.Exit(0);
         }
+
+        const float CoveredReflection = 0.15f;
 
         const string RoomCubePath = "Assets/FPSKit_Generated/Town/IndoorRoom.cubemap";
 

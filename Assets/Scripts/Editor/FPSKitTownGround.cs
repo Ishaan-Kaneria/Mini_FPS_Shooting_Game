@@ -859,9 +859,21 @@ namespace FPSKit.EditorTools
         /// </summary>
         // Smoothness scales the scan's own (from its roughness map). Low by default: plaster, stone, earth and asphalt in a dry
         // climate are matte, and with the sky reflecting (the HDRI cubemap) anything higher looks wet.
+        /// <summary>Masonry, plaster and paint on a wall are rough: at 0.35 their normal maps caught the sky in the shade and read as wet (his note, 2026-11-04).</summary>
+        internal const float MasonrySmoothness = 0.15f;
+
+        /// <summary>What may keep the old 0.35: polished floors, painted metal and lacquered wood.</summary>
+        internal static bool KeepsSheen(string name)
+        {
+            foreach (var k in new[] { "MosqueFloor", "Terrazzo", "Parquet", "Shutter", "DoorMetal", "Gate", "Iron", "Tank", "TechnicalPaint", "Cabinet", "Frame", "Canopy" })
+                if (name.Contains(k)) return true;
+            return false;
+        }
+
         private static Material TownMat(string name, string tex, Color tint, float tileMetres, float smoothness = 0.35f,
                                         float albedoCap = AlbedoCap, float normalStrength = 1f, float flatSmoothness = -1f)
         {
+            if (Mathf.Approximately(smoothness, 0.35f) && !KeepsSheen(name)) smoothness = MasonrySmoothness;
             string key = $"{name}|{tex}|{tileMetres}";
             if (_townMats.TryGetValue(key, out var cached) && cached != null) return cached;
             var (diff, nor, mask) = PolyTexture(tex);

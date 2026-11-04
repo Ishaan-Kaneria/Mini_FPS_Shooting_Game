@@ -128,6 +128,10 @@ Campaign order lives only in `FPSKitCampaign.ZoneOrder`; difficulty keys off tha
   `heavyRange`, or a blast) on a limb already crippled, with Blood on, never a boss (`EnemyBrutality`);
   pieces are capped (`SeveredPiece`). A melee blow's reaction starts on its contact frame: never slow
   `Time.timeScale` for hit-stop (VerifyCombat measures it). Stage 3 check: `FPSKitStage3Test.Batch`.
+- Neck wound (`EnemyNeckWound`, added by `EnemyGore`): a light round through the neck is held short of a kill in `Hitbox.Receive`; he drops the rifle, both hands
+  on the throat (`EnemyBody.ClutchHand`, axes from his shoulders, never the root), `EnemyAI.ThroatOpen` stops the fight and the flight, the artery pumps in beats
+  (`BloodFX.Jet`) and the bleeding kills him as damage flagged `DamageInfo.bleed`, credited to the shooter. Never a boss; heavy rounds, blasts and a second round still finish him.
+  A big splash is many fine drops (`BloodLibrary.splash`), not big ones. Check: `FPSKitNeckWoundTest.Batch` (`UNITY_GRAPHICS=1`; frames in Build/NeckWound).
 - Bullet impacts: `FPSImpactManager.HandleImpact(RaycastHit)` from every gun (Weapon, EnemyAI, TechnicalTruck); surface = struck face's
   material on a multi-material mesh, else the collider's `Surface_*` physics material, else the tag. Pooled only (one marks mesh, three
   particle systems, three lights): never instantiate per shot. Physics materials keep default friction. Check: `FPSKitBatch.VerifyImpacts`.

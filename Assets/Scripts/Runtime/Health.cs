@@ -98,6 +98,9 @@ public struct DamageInfo
     /// killing (EnemyWounds.CoreCapFor). Off for everything else, so a hit made anywhere
     /// with no hitbox is whole.
     /// </summary>
+    /// <summary>A wound bleeding on (EnemyNeckWound), not a new blow: no spray, no flinch, no cry.</summary>
+    public bool bleed;
+
     public bool coreCapped;
 
     /// <summary>The most this hit may take off shield and health together, when <see cref="coreCapped"/>.</summary>
@@ -115,6 +118,7 @@ public struct DamageInfo
         this.fromMelee = false;
         this.heavy = false;
         this.part = BodyPart.Torso;
+        this.bleed = false;
         this.coreCapped = false;
         this.coreCap = 0f;
     }

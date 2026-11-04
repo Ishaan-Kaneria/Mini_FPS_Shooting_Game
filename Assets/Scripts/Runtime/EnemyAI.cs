@@ -178,6 +178,8 @@ public class EnemyAI : MonoBehaviour
     /// of the movement code for one missing line.
     /// </summary>
     [System.NonSerialized] public bool forcedFlight;
+    /// <summary>Set by EnemyNeckWound while he bleeds out.</summary>
+    [System.NonSerialized] public bool ThroatOpen;
 
     [Tooltip("Damage inside the window below that sends it looking for cover.")]
     [Min(1f)] public float suppressionDamage = 45f;
@@ -574,6 +576,14 @@ public class EnemyAI : MonoBehaviour
 
         UpdateTelegraph();
         DecaySuppression();
+
+        // His throat is open: nothing but holding it (EnemyNeckWound). Not the fight, and not the flight of a body low on health.
+        if (ThroatOpen)
+        {
+            Stop();
+            UpdateAnimator();
+            return;
+        }
 
         if (Time.time < _staggerUntil)
         {

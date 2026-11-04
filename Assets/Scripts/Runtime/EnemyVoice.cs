@@ -161,7 +161,7 @@ public class EnemyVoice : MonoBehaviour
     void OnDamaged(Health health, DamageInfo info)
     {
         // The killing blow is the death cry's; both at once reads as two enemies.
-        if (health.Current <= 0f || info.amount <= 0f) return;
+        if (health.Current <= 0f || info.amount <= 0f || info.bleed) return;
 
         _alerted = true;
 

@@ -55,5 +55,8 @@ public class BloodLibrary : ScriptableObject
     public Vector3Int decalBudget = new Vector3Int(64, 128, 200);
 
     [Tooltip("Droplets per hit at full severity, before the quality tier scales it.")]
-    [Min(1)] public int dropsPerHit = 26;
+    [Min(1)] public int dropsPerHit = 80;
+
+    [Tooltip("How big every spray, mist and splat is. His brief 2026-11-04: very huge. 1 is what they were.")]
+    [Range(0.5f, 3f)] public float splash = 1.8f;
 }

@@ -113,7 +113,7 @@ public class FacialDamageHandler : MonoBehaviour
 
     void OnDamaged(Health health, DamageInfo info)
     {
-        if (!Ready || info.amount <= 0f || (info.part != BodyPart.Head && info.part != BodyPart.Neck)) return;
+        if (!Ready || info.amount <= 0f || info.bleed || (info.part != BodyPart.Head && info.part != BodyPart.Neck)) return;
         float share = info.amount / Mathf.Max(1f, health.maxHealth + health.maxShield);
         float force = share * (info.fromMelee ? bluntScale : info.heavy ? heavyRoundScale : roundScale);
         if (info.part == BodyPart.Neck) force *= 0.4f;

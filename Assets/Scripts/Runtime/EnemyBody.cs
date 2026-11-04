@@ -378,6 +378,7 @@ public class EnemyBody : MonoBehaviour
 
     void OnDamaged(Health health, DamageInfo info)
     {
+        if (info.bleed) return;
         if (_health != null && !_health.IsDead)
         {
             _hitFrame = Time.frameCount;
@@ -1684,6 +1685,7 @@ public class EnemyBody : MonoBehaviour
     {
         _needSidearm = false;
         if (!Rigged || pistol == null || _wounds == null || _pistolHand != 0) return;
+        if (_ai != null && _ai.ThroatOpen) return;     // both hands are on his throat
         bool rightGone = _wounds.AtLeast(BodyPart.RightArm, EnemyWounds.LimbState.Crippled);
         bool leftGone = _wounds.AtLeast(BodyPart.LeftArm, EnemyWounds.LimbState.Crippled);
         if (_wounds.Disarmed || (rightGone && leftGone)) return;
@@ -2268,7 +2270,7 @@ public class EnemyBody : MonoBehaviour
     // Pain: where it was hit decides what the body does about it
     // ======================================================================
 
-    enum Pain { None, Leg, Arm, OffArm, Gut, Chest, Head }
+    enum Pain { None, Leg, Arm, OffArm, Gut, Chest, Head, Neck }
     Pain _pain;
     BodyPart _painPart;
     float _painStart, _painLength = 1f, _painStrength;
@@ -2368,6 +2370,7 @@ public class EnemyBody : MonoBehaviour
     public string PainDoing => _pain switch
     {
         Pain.Leg => Time.time - _painStart > 0.55f ? "firing from one knee" : "leg buckled",
+        Pain.Neck => "clutching its throat",
         Pain.Arm => "clutching its arm",
         Pain.OffArm => "arm hanging",
         Pain.Gut => "doubled over",
@@ -2421,7 +2424,56 @@ public class EnemyBody : MonoBehaviour
         _painStrength = strength;
     }
 
-    static int Rank(Pain p) => p switch { Pain.Leg => 5, Pain.Gut => 4, Pain.Head => 3, Pain.Arm => 2, Pain.OffArm => 2, Pain.Chest => 1, _ => 0 };
+    static int Rank(Pain p) => p switch { Pain.Neck => 6, Pain.Leg => 5, Pain.Gut => 4, Pain.Head => 3, Pain.Arm => 2, Pain.OffArm => 2, Pain.Chest => 1, _ => 0 };
+
+    float _neckSinkAt;
+
+    /// <summary>His throat is open: for <paramref name="seconds"/> he does nothing else (the mind waits on InPain), sinking to his knees
+    /// after <paramref name="sinkAfter"/>. Outranks every other pain.</summary>
+    public void ClutchNeck(float seconds, float sinkAfter)
+    {
+        _pain = Pain.Neck;
+        _painPart = BodyPart.Neck;
+        _painStart = Time.time;
+        _painLength = seconds;
+        _painStrength = 1f;
+        _neckSinkAt = sinkAfter;
+        // Both hands go to the wound, so the rifle goes: held across his chest it hid the whole thing.
+        DropGun(transform.forward * 1.2f + Vector3.up * 0.6f);
+    }
+
+    /// <summary>The left hand pressed over the wound, after everything else has posed the body (EnemyNeckWound's LateUpdate): the wrist
+    /// beside the throat, the fingers across it, the back of the hand outward.</summary>
+    public void ClutchHand(Vector3 wound, float weight)
+    {
+        if (_lUpper == null || _lLower == null || _lHand == null || weight <= 0.001f || IsDown) return;
+        if (_ragdoll != null && _ragdoll.IsRagdolled) return;
+        float k = transform.lossyScale.y;
+        // From his shoulders, not his feet: the chest can be turned well off the way the root faces.
+        Vector3 side = _rUpper != null ? Vector3.ProjectOnPlane(_rUpper.position - _lUpper.position, Vector3.up).normalized : transform.right;   // his right
+        Vector3 forward = Vector3.Cross(side, Vector3.up).normalized;
+        // A wound at the nape: the hand still goes to the throat's side he can reach.
+        if (_neck != null && _head != null)
+        {
+            Vector3 middle = Vector3.Lerp(_neck.position, _head.position, 0.4f);
+            if (Vector3.Dot(wound - middle, forward) < 0f) wound = middle + (forward - side * 0.5f).normalized * 0.06f * k;
+        }
+        Vector3 wrist = wound + (-side * 0.085f - Vector3.up * 0.035f + forward * 0.035f) * k;
+        Vector3 fingers = (wound + side * 0.05f * k + Vector3.up * 0.015f * k - wrist).normalized;
+        Vector3 back = (forward - side * 0.25f).normalized;
+        Quaternion rest = _lHand.rotation;
+        SolveWeighted(_lUpper, _lLower, _lHand, wrist, _lUpper.position + (-side * 0.5f - Vector3.up * 0.6f - forward * 0.1f) * k, weight);
+        if (_lFrame.valid) _lHand.rotation = Quaternion.Slerp(rest, _lFrame.World(fingers, back), weight);
+        // The right hand over the left, a little lower, pressing it in.
+        if (_rUpper != null && _rLower != null && _rHand != null)
+        {
+            Vector3 over = wound + (side * 0.08f - Vector3.up * 0.06f + forward * 0.06f) * k;
+            Vector3 toLeft = (wound - side * 0.04f * k - over).normalized;
+            Quaternion restR = _rHand.rotation;
+            SolveWeighted(_rUpper, _rLower, _rHand, over, _rUpper.position + (side * 0.5f - Vector3.up * 0.6f - forward * 0.1f) * k, weight);
+            if (_rFrame.valid) _rHand.rotation = Quaternion.Slerp(restR, _rFrame.World(toLeft, (forward + side * 0.25f).normalized), weight);
+        }
+    }
 
     /// <summary>In fast, held, out slower: a wound grabs at once and lets go reluctantly.</summary>
     float PainWeight()
@@ -2493,6 +2545,28 @@ public class EnemyBody : MonoBehaviour
                 _bodyDrop = 0.08f * w;
                 _gunDip = w * 0.7f;
                 break;
+            case Pain.Neck:
+            {
+                // Hunched over the throat, chin down on the hand, the rifle hanging; the legs go as the blood does.
+                float sink = Smooth(Mathf.Clamp01((t - _neckSinkAt) / 1.4f));
+                if (sink > 0.001f)
+                {
+                    BlendKneel(w * sink, false, 0.3f, 16f);
+                    _bodyDrop = 0.3f * w * sink;
+                }
+                float sway = Mathf.Sin(t * 2.3f);
+                // About his shoulders' own line, not his feet's: with the chest turned off the root's way these bent him sideways.
+                Vector3 across = _rUpper != null && _lUpper != null ? Vector3.ProjectOnPlane(_rUpper.position - _lUpper.position, Vector3.up).normalized : transform.right;
+                Vector3 ahead = Vector3.Cross(across, Vector3.up).normalized;
+                Turn(_spine, across, (7f + 8f * sink) * w);
+                Turn(_chest, across, 7f * w);
+                Turn(_neck, across, 8f * w);
+                Turn(_head, across, 8f * w - 14f * w * shock);
+                Turn(_spine, ahead, 3f * w * sway);
+                _gunDip = w;
+                _leftOff = w;
+                break;
+            }
             case Pain.Chest:
                 Turn(_chest, transform.right, -10f * w * shock);
                 _gunDip = w * 0.35f;

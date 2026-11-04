@@ -63,6 +63,7 @@ public class EnemyGore : MonoBehaviour
 
     void Awake()
     {
+        if (GetComponent<EnemyNeckWound>() == null) gameObject.AddComponent<EnemyNeckWound>();
         _health = GetComponent<Health>();
         _ai = GetComponent<EnemyAI>();
         _wounds = GetComponent<EnemyWounds>();
@@ -134,7 +135,7 @@ public class EnemyGore : MonoBehaviour
 
     void OnDamaged(Health health, DamageInfo info)
     {
-        if (info.amount <= 0f || library == null) return;
+        if (info.amount <= 0f || library == null || info.bleed) return;
 
         // Measured against a third of the pool: three hits that each take a third are
         // three hits worth the full spray.
@@ -179,7 +180,7 @@ public class EnemyGore : MonoBehaviour
         // The death blow: the big spray, at the wound, along the blow.
         var blow = health.LastDamage;
         // Not for a beating: a body killed by fists or boots does not burst.
-        if (!blow.fromMelee)
+        if (!blow.fromMelee && !blow.bleed)
             BloodFX.Burst(library, blow.point.sqrMagnitude > 0.01f ? blow.point : transform.position + Vector3.up * 1.2f,
                           blow.direction, blow.fromBlast ? 1.4f : 1f);
         StartCoroutine(PoolWhenSettled());

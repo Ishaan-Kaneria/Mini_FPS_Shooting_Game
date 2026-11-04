@@ -69,6 +69,7 @@ public static class BloodFX
         s_quads = null;
         s_whole = null;
         s_surfaceMask = 0;
+        JetDrops = 0;
     }
 
     /// <summary>The player's Blood setting. Off, a hit throws up a dull puff instead.</summary>
@@ -142,31 +143,33 @@ public static class BloodFX
         }
 
         // The cloud at the wound, blown back out of it toward the shooter.
-        Mist(point, normal * 1.1f + direction * 0.4f, 0.2f + 0.35f * severity,
-             library.mistColor, 2 + Mathf.RoundToInt(3 * severity));
+        Mist(point, normal * 1.1f + direction * 0.4f, (0.2f + 0.35f * severity) * library.splash,
+             library.mistColor, 3 + Mathf.RoundToInt(5 * severity));
 
         // Droplets out of the far side, along the round. Most of what the eye reads as
         // "that went through him".
         int drops = Mathf.Max(6, Mathf.RoundToInt(library.dropsPerHit * (0.6f + 1.4f * severity) * DropScale));
         Spray(point, direction, 2.2f + 4.5f * severity, drops, library.dropColor);
+        // The heavy gouts in it, slower and falling sooner: what makes it read as liquid and not as dust.
+        Spray(point, direction, 1.4f + 2.2f * severity, Mathf.Max(2, drops / 5), library.dropColor, 2.4f);
 
         // A few back toward the shooter, slower.
         Spray(point, normal, 1.2f + 1.5f * severity, Mathf.Max(1, drops / 4), library.dropColor);
 
         // The wall behind. Chance and size both grow with the hit, so a pistol round
         // leaves a fleck and a heavy hit leaves the thing everyone remembers.
-        if (Random.value < 0.35f + 0.6f * severity &&
+        if (Random.value < 0.55f + 0.45f * severity &&
             Physics.Raycast(point + direction * 0.3f, direction, out RaycastHit wall,
-                            1.5f + 2.5f * severity, SurfaceMask, QueryTriggerInteraction.Ignore))
+                            2.5f + 3.5f * severity, SurfaceMask, QueryTriggerInteraction.Ignore))
         {
-            Splat(wall.point, wall.normal, Random.Range(0.3f, 0.55f) + 0.7f * severity, direction);
+            Splat(wall.point, wall.normal, (Random.Range(0.3f, 0.55f) + 0.7f * severity) * library.splash, direction);
         }
 
         // And the floor under the wound: a heavy hit throws several, out along the round.
-        int floorDrops = 1 + Mathf.RoundToInt(3f * severity);
+        int floorDrops = 2 + Mathf.RoundToInt(5f * severity);
         for (int i = 0; i < floorDrops; i++)
-            Drip(point + direction * Random.Range(0f, 1.2f * severity) + Random.insideUnitSphere * 0.4f,
-                 Random.Range(0.16f, 0.3f) + 0.3f * severity);
+            Drip(point + direction * Random.Range(0f, 2f * severity) + Random.insideUnitSphere * 0.5f,
+                 (Random.Range(0.16f, 0.3f) + 0.3f * severity) * library.splash);
     }
 
     /// <summary>
@@ -181,14 +184,52 @@ public static class BloodFX
 
         Hit(library, point, -direction, direction, 1f);
         Hit(library, point + Random.insideUnitSphere * 0.15f, Vector3.up, (direction + Vector3.up * 0.5f).normalized, strength);
-        Mist(point, Vector3.up * 0.6f + direction * 0.8f, 0.6f * strength, library.mistColor, 6);
+        Mist(point, Vector3.up * 0.6f + direction * 0.8f, 0.6f * strength * library.splash, library.mistColor, 10);
 
-        int spots = 3 + Mathf.RoundToInt(4f * strength);
+        int spots = 6 + Mathf.RoundToInt(8f * strength);
         for (int i = 0; i < spots; i++)
         {
-            Vector2 r = Random.insideUnitCircle * 1.6f * strength;
-            Drip(point + direction * Random.Range(0.2f, 1.8f) * strength + new Vector3(r.x, 0f, r.y), Random.Range(0.2f, 0.45f));
+            Vector2 r = Random.insideUnitCircle * 2.4f * strength;
+            Drip(point + direction * Random.Range(0.2f, 2.8f) * strength + new Vector3(r.x, 0f, r.y), Random.Range(0.2f, 0.45f) * library.splash);
         }
+    }
+
+    /// <summary>Drops an opened artery has thrown, for the checks only.</summary>
+    public static int JetDrops { get; private set; }
+
+    /// <summary>
+    /// An artery: one frame's worth of a narrow, fast stream out of a wound, thrown by each heartbeat
+    /// (<see cref="EnemyNeckWound"/>). <paramref name="pressure"/> is 0 to 1: a full heart to a failing one, less under a hand.
+    /// </summary>
+    public static void Jet(Vector3 at, Vector3 direction, float pressure, float dt)
+    {
+        if (!Enabled || !Ensure(s_library) || s_spray == null) return;
+        int count = Mathf.CeilToInt(520f * dt * DropScale * Mathf.Clamp01(pressure + 0.2f));
+        var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false };
+        for (int i = 0; i < count; i++)
+        {
+            emit.position = at + Random.insideUnitSphere * 0.012f;
+            emit.velocity = (direction + Random.insideUnitSphere * 0.11f).normalized * (2.2f + 3.6f * pressure) * Random.Range(0.8f, 1.15f);
+            emit.startSize = Random.Range(0.005f, 0.017f) * Mathf.Sqrt(s_library.splash);
+            emit.startLifetime = Random.Range(0.5f, 0.95f);
+            emit.startColor = s_library.dropColor;
+            s_spray.Emit(emit, 1);
+            JetDrops++;
+        }
+        // The fine red cloud a pressurised jet throws off round it.
+        if (s_mist != null && Random.value < dt * 10f)
+            Mist(at + direction * 0.06f, direction * 0.7f * pressure, 0.09f * s_library.splash, s_library.mistColor, 1);
+    }
+
+    /// <summary>Where one heartbeat's stream comes down: on a wall in its way, else the floor ahead of the body.</summary>
+    public static void JetLanding(Vector3 at, Vector3 direction, float pressure)
+    {
+        if (!Enabled || !Ensure(s_library)) return;
+        float reach = 0.5f + 1.5f * pressure;
+        if (Physics.Raycast(at, direction, out RaycastHit wall, reach, SurfaceMask, QueryTriggerInteraction.Ignore))
+            Splat(wall.point, wall.normal, Random.Range(0.18f, 0.34f) * s_library.splash, direction);
+        else
+            Drip(at + Vector3.ProjectOnPlane(direction, Vector3.up) * reach * Random.Range(0.6f, 1f), Random.Range(0.14f, 0.3f) * s_library.splash);
     }
 
     /// <summary>A drop or two falling from a wounded body onto the floor under it.</summary>
@@ -231,6 +272,7 @@ public static class BloodFX
         if (!Physics.Raycast(at + Vector3.up * 0.5f, Vector3.down, out RaycastHit floor, 3f,
                              SurfaceMask, QueryTriggerInteraction.Ignore)) return;
 
+        size *= Mathf.Sqrt(library.splash);
         var decal = Place(floor.point, floor.normal, size, Vector3.zero,
                           library.poolMaterial != null ? library.poolMaterial : library.splatMaterial,
                           library.poolMaterial != null ? Whole() : Atlas(), pool: true);
@@ -255,7 +297,7 @@ public static class BloodFX
     // Pieces
     // ======================================================================
 
-    static void Spray(Vector3 at, Vector3 direction, float speed, int count, Color color)
+    static void Spray(Vector3 at, Vector3 direction, float speed, int count, Color color, float heavy = 1f)
     {
         if (s_spray == null) return;
 
@@ -269,7 +311,8 @@ public static class BloodFX
             emit.position = at + Random.insideUnitSphere * 0.04f;
             emit.velocity = v;
             // Big enough to read as blood at fighting range: a few were drops, most were dust.
-            emit.startSize = Random.Range(0.03f, 0.09f);
+            // Fine: a big splash is many drops, not big ones (at 16 cm each they drew as flat chips of paint).
+            emit.startSize = Random.Range(0.006f, 0.024f) * Mathf.Sqrt(s_library.splash) * heavy;
             emit.startLifetime = Random.Range(0.45f, 0.95f);
             emit.startColor = color;
 
@@ -421,7 +464,19 @@ public static class BloodFX
         s_root = root.transform;
 
         if (library.sprayPrefab != null)
+        {
             s_spray = Object.Instantiate(library.sprayPrefab, s_root);
+            // Room for bigger sprays, and each drop drawn long along its flight: a liquid, not grit.
+            var main = s_spray.main;
+            main.maxParticles = Mathf.Max(main.maxParticles, QualityTiers.Current == GameSettings.Quality.Low ? 900 : 2400);
+            if (s_spray.TryGetComponent<ParticleSystemRenderer>(out var drawn))
+            {
+                drawn.renderMode = ParticleSystemRenderMode.Stretch;
+                // Drawn a little long along the flight: much more and they were needles scratched on the air.
+                drawn.velocityScale = 0.022f;
+                drawn.lengthScale = 1.1f;
+            }
+        }
 
         if (library.mistPrefab != null)
             s_mist = Object.Instantiate(library.mistPrefab, s_root);

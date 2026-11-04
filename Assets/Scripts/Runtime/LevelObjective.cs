@@ -76,6 +76,14 @@ public class LevelObjective : MonoBehaviour
     Transform _quarryBeacon;
     float _nextQuarryScan;
 
+    // ---- the target --------------------------------------------------------------
+    EnemyAI _target;
+    Health _targetHealth;
+    Transform _targetBeacon;
+    bool _targetPlaced, _targetDown;
+    float _nextTargetTry;
+    string _targetName = "", _targetPlace = "";
+
     // ---- the ground --------------------------------------------------------------
     Transform _site;
     Vector3 _sitePoint;
@@ -146,6 +154,7 @@ public class LevelObjective : MonoBehaviour
 
         DestroyIfAny(ref _site);
         DestroyIfAny(ref _quarryBeacon);
+        DestroyIfAny(ref _targetBeacon);
 
         foreach (var charge in _charges) DestroyIfAny(ref charge.Beacon);
         _charges.Clear();
@@ -188,6 +197,10 @@ public class LevelObjective : MonoBehaviour
             case LevelSet.Objective.Recon:
                 BeginRecon();
                 break;
+
+            case LevelSet.Objective.Target:
+                BeginTarget();
+                break;
         }
     }
 
@@ -202,7 +215,74 @@ public class LevelObjective : MonoBehaviour
             case LevelSet.Objective.Extraction: TickExtraction(); break;
             case LevelSet.Objective.Disposal: TickDisposal(); break;
             case LevelSet.Objective.Recon: TickRecon(); break;
+            case LevelSet.Objective.Target: TickTarget(); break;
         }
+    }
+
+    // ==================================================================
+    // The target
+    //
+    // A named man at a named place, with his guards round him (LevelSet.Level.targetName, targetPlace,
+    // targetGuards). They come out of the roster still to come, so the level's total does not change; they hold the
+    // place until they see the player or are hit. He is marked on the map and over his head, and the HUD says who, where
+    // and how far. Killing him is the objective's weight; the clock still ends the level.
+    // ==================================================================
+    void BeginTarget()
+    {
+        Satisfied = false;
+        _targetName = string.IsNullOrWhiteSpace(_level.targetName) ? "THE TARGET" : _level.targetName.Trim().ToUpperInvariant();
+        _targetPlace = _level.targetPlace ?? "";
+        HudLine = $"TARGET: {_targetName}" + (string.IsNullOrEmpty(_targetPlace) ? "" : $" AT {PlaceTitle(_targetPlace)}");
+    }
+
+    void TickTarget()
+    {
+        if (_targetDown) return;
+        if (!_targetPlaced)
+        {
+            if (Time.time < _nextTargetTry) return;
+            _nextTargetTry = Time.time + 1f;
+            if (!_manager.TryPlacePoint(_targetPlace, out var at))
+            {
+                if (!_manager.TryAnySpawnPoint(out at)) return;
+                _targetPlace = "";
+            }
+            var group = _manager.Station(at, 1 + Mathf.Max(0, _level.targetGuards), 9f, firstIsElite: true);
+            if (group.Count == 0) return;
+            _target = group[0].GetComponent<EnemyAI>();
+            _targetHealth = group[0].GetComponent<Health>();
+            if (_targetHealth != null) _targetHealth.SetMaxHealth(_targetHealth.maxHealth * 1.5f);
+            _targetBeacon = Beacon("Target", group[0].transform.position + Vector3.up * 2.6f, UITheme.Hazard, 0.7f, 3.2f, marker: true, pip: true);
+            _targetPlaced = true;
+        }
+
+        if (_target == null || _targetHealth == null || _targetHealth.IsDead)
+        {
+            // Taken back by the leash (he fell somewhere unreachable): say so rather than leave a marker on nothing.
+            if (!_targetDown) { DestroyIfAny(ref _targetBeacon); HudLine = $"TARGET: {_targetName} IS GONE"; Satisfied = true; _targetDown = true; }
+            return;
+        }
+
+        if (_targetBeacon != null) _targetBeacon.position = _target.transform.position + Vector3.up * 2.6f;
+        if (_manager.player != null)
+        {
+            int metres = Mathf.RoundToInt(Vector3.Distance(_manager.player.position, _target.transform.position) / 10f) * 10;
+            string where = string.IsNullOrEmpty(_targetPlace) ? "" : $" AT {PlaceTitle(_targetPlace)}";
+            HudLine = $"TARGET: {_targetName}{where} - {metres} M";
+        }
+    }
+
+    /// <summary>"GasStation" -> "THE GAS STATION".</summary>
+    static string PlaceTitle(string place)
+    {
+        var sb = new System.Text.StringBuilder("THE ");
+        for (int i = 0; i < place.Length; i++)
+        {
+            char c = place[i];
+            if (i > 0 && char.IsUpper(c) && !char.IsUpper(place[i - 1])) sb.Append(' ');
+            sb.Append(char.ToUpperInvariant(c));
+        }
+        return sb.ToString();
     }
 
     // ==================================================================
@@ -322,6 +402,15 @@ public class LevelObjective : MonoBehaviour
     /// </summary>
     public void NoteKilled(GameObject body)
     {
+        if (Kind == LevelSet.Objective.Target && body != null && _target != null && _target.gameObject == body && !_targetDown)
+        {
+            _targetDown = true;
+            EarnedWeight += Weight;
+            Satisfied = true;
+            DestroyIfAny(ref _targetBeacon);
+            HudLine = $"TARGET: {_targetName} IS DOWN";
+            return;
+        }
         if (Kind != LevelSet.Objective.Hunt || body == null) return;
         if (_quarry == null || _quarry.gameObject != body) return;
 

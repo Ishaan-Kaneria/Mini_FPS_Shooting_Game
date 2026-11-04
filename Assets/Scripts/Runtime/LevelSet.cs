@@ -67,7 +67,14 @@ public class LevelSet : ScriptableObject
         /// Reach a chain of marked points across the arena, one after another. The long
         /// levels' reason to cross the map rather than hold one corner of it.
         /// </summary>
-        Recon = 7
+        Recon = 7,
+
+        /// <summary>
+        /// A named man, with his guards, at a named place in the arena (targetName, targetPlace): find him and kill
+        /// him. He and the guards come out of the roster, so the level's total is the same; they hold their ground until
+        /// they see the player or are hit. Appended: objectives are saved as their number.
+        /// </summary>
+        Target = 8
     }
 
     [Serializable]
@@ -132,6 +139,15 @@ public class LevelSet : ScriptableObject
                  "long level has several; the weight is shared between them.")]
         [Min(1)] public int objectiveStages = 1;
 
+        [Header("Target (objective Target)")]
+        [Tooltip("Who the target is, on the HUD and the brief (\"The Quartermaster\"). Empty: \"the target\".")]
+        public string targetName;
+        [Tooltip("Where he is: the name of one of the arena's spawn zones (LevelManager.spawnZones, e.g. \"GasStation\"). " +
+                 "Empty or unknown: a place the level's spawner would use.")]
+        public string targetPlace;
+        [Tooltip("Guards stationed round him, taken from the roster.")]
+        [Min(0)] public int targetGuards = 4;
+
         [Header("Boss")]
         [Tooltip("Adds a boss on top of the count above. It arrives with the level rather " +
                  "than at the end, so the fight is the crowd and the boss together.")]
@@ -149,6 +165,10 @@ public class LevelSet : ScriptableObject
                  "and a banner reading \"WARDEN\" where the story says Tove is standing " +
                  "is the seam showing.")]
         public string bossName;
+
+        [Tooltip("Where the boss is waiting: the name of one of the arena's spawn zones. He holds it (with a marker on the " +
+                 "map) until he sees the player or is hurt. Empty: he arrives like the rest.")]
+        public string bossPlace;
 
         [Tooltip("What the boss is worth against one ordinary enemy when the stars are " +
                  "counted. At 5 it is a fifth of a twenty-enemy level on its own, which " +
@@ -229,6 +249,7 @@ public class LevelSet : ScriptableObject
             Objective.Extraction => objectiveWeight,
             Objective.Disposal => objectiveWeight,
             Objective.Recon => objectiveWeight,
+            Objective.Target => objectiveWeight,
             _ => 0f
         };
     }

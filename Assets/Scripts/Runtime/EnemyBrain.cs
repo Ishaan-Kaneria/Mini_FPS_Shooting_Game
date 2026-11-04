@@ -180,8 +180,10 @@ public class EnemyBrain : MonoBehaviour
 
         if (_ai != null && _ai.target != null) _playerMotor = _ai.target.GetComponent<PlayerMotor>();
 
-        // A boss knows the player is here: it was sent for them.
-        if (_ai != null && _ai.archetype != null && _ai.archetype.role == EnemyArchetype.Role.Boss && _ai.target != null)
+        // A boss knows the player is here: it was sent for them. Not one holding a place of its own (LevelManager sets
+        // relentless off for a boss at bossSpawnPoint or a level's bossPlace): that one waits there, on watch, until it
+        // sees or hears the player like anyone else.
+        if (_ai != null && _ai.archetype != null && _ai.archetype.role == EnemyArchetype.Role.Boss && _ai.target != null && _ai.relentless)
             Learn(_ai.target.position, Awareness.Alert);
     }
 

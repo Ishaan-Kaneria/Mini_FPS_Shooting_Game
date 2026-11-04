@@ -85,6 +85,17 @@ namespace FPSKit.EditorTools
         {
             ("Snowbound Station", 1) => "The Foreman",
             ("Snowbound Station", 2) => "The Shotfirer",
+            // The desert's ten, each waiting at his own place of the town (FPSKitLevels.DesertBossPlaces, same order).
+            ("Desert Outpost", 1) => "The Quartermaster",
+            ("Desert Outpost", 2) => "The Customs Man",
+            ("Desert Outpost", 3) => "The Mechanic",
+            ("Desert Outpost", 4) => "The Scrap King",
+            ("Desert Outpost", 5) => "The Watchman",
+            ("Desert Outpost", 6) => "The Courier",
+            ("Desert Outpost", 7) => "The Fixer",
+            ("Desert Outpost", 8) => "The Well Keeper",
+            ("Desert Outpost", 9) => "The Steward",
+            ("Desert Outpost", 10) => "The Gatekeeper",
             _ => ""
         };
 

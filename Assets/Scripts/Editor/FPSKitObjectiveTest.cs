@@ -47,7 +47,8 @@ namespace FPSKit.EditorTools
             LevelSet.Objective.Blackout,
             LevelSet.Objective.Extraction,
             LevelSet.Objective.Disposal,
-            LevelSet.Objective.Recon
+            LevelSet.Objective.Recon,
+            LevelSet.Objective.Target
         };
 
         static int _at;
@@ -319,6 +320,7 @@ namespace FPSKit.EditorTools
                 case LevelSet.Objective.Hold:
                 case LevelSet.Objective.Extraction:
                 case LevelSet.Objective.Recon:
+                case LevelSet.Objective.Target:
                     if (beacons < 1)
                         Errors.Add($"{kind}: nothing was placed in the world, so the level marks " +
                                    "ground that does not exist");

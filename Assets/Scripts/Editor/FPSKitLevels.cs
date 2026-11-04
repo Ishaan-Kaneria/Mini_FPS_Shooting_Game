@@ -202,6 +202,7 @@ namespace FPSKit.EditorTools
             set.stakes = FPSKitCampaign.StakesFor(themeName);
             int count = LevelsFor(themeName);
             set.levels = new List<LevelSet.Level>(count);
+            DesertTargetCount = 0;     // the desert's target levels take their men in order, the same every build
 
             var bosses = BossRoster();
 
@@ -326,8 +327,64 @@ namespace FPSKit.EditorTools
                     oneStarScore = 0.5f
                 };
 
+                PlaceDesertLevel(themeName, level, number, boss, last, enemies);
                 set.levels.Add(level);
             }
+        }
+
+        /// <summary>
+        /// The desert town's levels put their people somewhere (2026-11-04: "locate and kill certain enemies at certain
+        /// locations"). Each boss waits at a named place of the town with a marker on the map (LevelSet.Level.bossPlace),
+        /// and the Recon levels become target hunts: a named man and his guards at a named place (Objective.Target). The
+        /// places are the town's spawn zones (FPSKitTown.BuildTownSpawnPoints). Never the mosque: nobody is hunted there.
+        /// </summary>
+        static void PlaceDesertLevel(string themeName, LevelSet.Level level, int number, bool boss, bool last, int enemies)
+        {
+            if (themeName != "Desert Outpost") return;
+            if (boss && !last)
+            {
+                int ordinal = Mathf.Clamp(number / 3, 1, DesertBossPlaces.Length) - 1;
+                level.bossPlace = DesertBossPlaces[ordinal];
+                level.brief = $"{level.brief} He is at {Spaced(level.bossPlace)}: the map marks the place.";
+                return;
+            }
+            if (level.objective != LevelSet.Objective.Recon) return;
+            int k = DesertTargetCount++ % DesertTargets.Length;
+            var (who, where) = DesertTargets[k];
+            level.objective = LevelSet.Objective.Target;
+            level.objectiveStages = 1;
+            level.targetName = who;
+            level.targetPlace = where;
+            level.targetGuards = Mathf.Clamp(3 + enemies / 25, 3, 8);
+            level.displayName = who.ToUpperInvariant();
+            level.brief = $"{enemies} hostiles. {who} is at {Spaced(where)} with {level.targetGuards} guards: find him and kill him. The map marks him.";
+        }
+
+        static int DesertTargetCount;
+
+        /// <summary>Where the desert's ten lieutenants wait, in ladder order (spawn-zone names).</summary>
+        static readonly string[] DesertBossPlaces =
+        {
+            "GasStation", "Checkpoint", "Garage", "Junkyard", "WaterTower", "BusStop", "Souk", "Oasis", "Palace", "Citadel"
+        };
+
+        /// <summary>The marked men of the target levels, and where each is found.</summary>
+        static readonly (string who, string where)[] DesertTargets =
+        {
+            ("The Paymaster", "ClockSquare"),
+            ("The Smuggler", "Farms"),
+            ("The Radio Man", "OldTownWest"),
+        };
+
+        static string Spaced(string place)
+        {
+            var sb = new System.Text.StringBuilder("the ");
+            for (int i = 0; i < place.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(place[i]) && !char.IsUpper(place[i - 1])) sb.Append(' ');
+                sb.Append(char.ToLowerInvariant(place[i]));
+            }
+            return sb.ToString();
         }
 
         /// <summary>

@@ -612,6 +612,8 @@ public class LevelManager : MonoBehaviour
 
         ActiveBoss = null;
         ActiveBossName = "";
+        BossPlaced = false;
+        if (_bossBeacon != null) { Destroy(_bossBeacon.gameObject); _bossBeacon = null; }
 
         ResolveLevel();
 
@@ -903,6 +905,7 @@ public class LevelManager : MonoBehaviour
 
         ActiveBoss = null;
         ActiveBossName = "";
+        if (_bossBeacon != null) { Destroy(_bossBeacon.gameObject); _bossBeacon = null; }
 
         director?.ReportLevelFinished(result);
         LevelFinished?.Invoke(result);
@@ -1077,10 +1080,17 @@ public class LevelManager : MonoBehaviour
             // A boss with a place of its own holds it. Every other enemy is relentless and heads for the player
             // from the moment it spawns; a boss that did the same would walk out of its arena and the arena would
             // be empty. It wakes when it sees the player or is hurt, and that is also when its bar appears.
-            if (bossSpawnPoint != null)
+            if (bossSpawnPoint != null || BossPlaced)
             {
                 var bossAi = boss.GetComponent<EnemyAI>();
                 if (bossAi != null) bossAi.relentless = false;
+            }
+            // Waiting at a named place: marked on the map and in the world, so the player can go and find him.
+            if (BossPlaced)
+            {
+                if (_bossBeacon != null) Destroy(_bossBeacon.gameObject);
+                _bossBeacon = LevelObjective.BuildBeacon("BossPlace", boss.transform.position, UITheme.Alert, 3f, 8f, marker: true, pip: true);
+                if (ActiveBoss != null) ActiveBoss.Died += _ => { if (_bossBeacon != null) Destroy(_bossBeacon.gameObject); _bossBeacon = null; };
             }
 
             // The level's own name wins: the campaign fights two boss chassis as eight
@@ -1139,7 +1149,22 @@ public class LevelManager : MonoBehaviour
                 ? bossHit.position
                 : bossSpawnPoint.position;
         }
+        else if (boss && !string.IsNullOrWhiteSpace(Level.bossPlace) && TryPlacePoint(Level.bossPlace, out var placed))
+        {
+            // The level says where the boss waits (LevelSet.Level.bossPlace): one of the arena's named places.
+            position = placed;
+            BossPlaced = true;
+        }
         else if (!TryGetSpawnPosition(out position)) return null;
+
+        return SpawnTypeAt(type, position, boss);
+    }
+
+    /// <summary>Puts an enemy of <paramref name="type"/> down at <paramref name="position"/> and tracks it like any other.</summary>
+    GameObject SpawnTypeAt(EnemyType type, Vector3 position, bool boss)
+    {
+        var prefab = type.prefab != null ? type.prefab : baseEnemyPrefab;
+        if (prefab == null) return null;
 
         var enemy = Instantiate(prefab, position, FacePlayerFrom(position));
         Configure(enemy, type, boss);
@@ -1176,6 +1201,90 @@ public class LevelManager : MonoBehaviour
     /// pool so one can never wander into the regular mix, and nothing else can stand in
     /// for a boss.
     /// </summary>
+    // ======================================================================
+    // Named places (the arena's spawn zones): where a target or a boss is stationed
+    // ======================================================================
+
+    /// <summary>Whether this level's boss was put down at its named place (LevelSet.Level.bossPlace).</summary>
+    public bool BossPlaced { get; private set; }
+    Transform _bossBeacon;
+
+    /// <summary>The arena's place of that name (a spawn zone, case and spaces ignored), or null.</summary>
+    public SpawnZone FindPlace(string name)
+    {
+        if (spawnZones == null || string.IsNullOrWhiteSpace(name)) return null;
+        string want = name.Replace(" ", "").ToLowerInvariant();
+        foreach (var zone in spawnZones)
+            if (zone != null && !string.IsNullOrEmpty(zone.name) && zone.name.Replace(" ", "").ToLowerInvariant() == want) return zone;
+        return null;
+    }
+
+    /// <summary>A point of the named place on the navmesh with a route to the player; false if the place is unknown or none is reachable.</summary>
+    public bool TryPlacePoint(string name, out Vector3 at)
+    {
+        at = Vector3.zero;
+        var zone = FindPlace(name);
+        if (zone == null || zone.points == null || zone.points.Length == 0) return false;
+        int start = UnityEngine.Random.Range(0, zone.points.Length);
+        for (int k = 0; k < zone.points.Length; k++)
+        {
+            var p = zone.points[(start + k) % zone.points.Length];
+            if (p == null || !NavMesh.SamplePosition(p.position, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas)) continue;
+            if (player != null && !CanReachPlayerFrom(hit.position)) continue;
+            at = hit.position;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Any point the spawner would use (for a level whose arena has no named places).</summary>
+    public bool TryAnySpawnPoint(out Vector3 at) => TryGetSpawnPosition(out at);
+
+    /// <summary>
+    /// Stands up to <paramref name="count"/> enemies round <paramref name="centre"/>, holding it (not relentless: they
+    /// wake when they see the player or are hit). They are taken out of the roster still to come, so the level's total
+    /// is unchanged; the first is an elite when the roster has one. Returns those placed, the first first.
+    /// </summary>
+    public List<GameObject> Station(Vector3 centre, int count, float spread, bool firstIsElite)
+    {
+        var made = new List<GameObject>();
+        int n = Mathf.Min(count, _pendingSpawns);
+        for (int i = 0; i < n; i++)
+        {
+            var type = i == 0 && firstIsElite ? (PickElite() ?? PickEnemyType(false)) : PickEnemyType(false);
+            if (type == null) break;
+            Vector3? at = null;
+            for (int tries = 0; tries < 12 && at == null; tries++)
+            {
+                var ring = UnityEngine.Random.insideUnitCircle * (i == 0 ? spread * 0.3f : spread);
+                var p = centre + new Vector3(ring.x, 0f, ring.y);
+                if (NavMesh.SamplePosition(p, out NavMeshHit hit, 3f, NavMesh.AllAreas) && (player == null || CanReachPlayerFrom(hit.position)))
+                    at = hit.position;
+            }
+            if (at == null) continue;
+            var enemy = SpawnTypeAt(type, at.Value, boss: false);
+            if (enemy == null) continue;
+            var ai = enemy.GetComponent<EnemyAI>();
+            if (ai != null) ai.relentless = false;
+            made.Add(enemy);
+            _pendingSpawns--;
+        }
+        return made;
+    }
+
+    EnemyType PickElite()
+    {
+        int step = Mathf.Max(1, Level.rosterStep);
+        EnemyType pick = null;
+        int seen = 0;
+        foreach (var type in enemyTypes)
+        {
+            if (!IsUsable(type, step, false) || type.archetype == null || type.archetype.role != EnemyArchetype.Role.Elite) continue;
+            if (UnityEngine.Random.Range(0, ++seen) == 0) pick = type;
+        }
+        return pick;
+    }
+
     EnemyType PickEnemyType(bool boss)
     {
         int step = Mathf.Max(1, Level.rosterStep);

@@ -130,6 +130,7 @@ public class CivilianLife : MonoBehaviour
             int shop = _town.ShopNear(_town.houses[_house].door, shopReach);
             if (shop >= 0 && Reachable(_town.shops[shop].entrance))
             {
+                ReleaseSpot();       // the seat at home is free while they are out (and Arrive must not take them back to it)
                 _shop = shop;
                 _errand = Errand.ToShop;
                 _browsesLeft = Random.Range(1, 4);

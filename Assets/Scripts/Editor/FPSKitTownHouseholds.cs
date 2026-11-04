@@ -76,7 +76,7 @@ namespace FPSKit.EditorTools
                         Vector3 at = (look != null ? look.position : room.position) - Vector3.up * 0.3f;
                         centres.Add(at);
                         string kind = room.name.Substring(5).Split(' ')[0];
-                        float yaw = Hash01(at) * 360f;
+                        float yaw = LifeHash(at) * 360f;
                         void Stand(LifeActivity a, Vector3 offset) => spots.Add(new TownHouseholds.Spot { pos = at + offset, approach = at + offset, yaw = yaw, kind = a });
                         switch (kind)
                         {
@@ -92,7 +92,7 @@ namespace FPSKit.EditorTools
                     if (count == 0 || centres.Count == 0) continue;
                     var centre = centres.Aggregate(Vector3.zero, (a, b) => a + b) / centres.Count;
                     // One to four people, more in a bigger house, from the house's place (no random draws).
-                    int residents = Mathf.Clamp(1 + Mathf.FloorToInt(Hash01(door.position) * Mathf.Min(4, centres.Count + 1)), 1, 4);
+                    int residents = Mathf.Clamp(1 + Mathf.FloorToInt(LifeHash(door.position) * Mathf.Min(4, centres.Count + 1)), 1, 4);
                     houses.Add(new TownHouseholds.House { door = door.position, centre = centre, firstSpot = first, spotCount = count, residents = residents });
                 }
 
@@ -124,7 +124,7 @@ namespace FPSKit.EditorTools
                       $"{spots.Count} spots ({seated} on furniture)");
         }
 
-        static float Hash01(Vector3 p)
+        static float LifeHash(Vector3 p)
         {
             unchecked
             {

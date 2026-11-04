@@ -182,7 +182,7 @@ namespace FPSKit.EditorTools
         public static void BatchBodyPoses()
         {
             _batch = new Queue<(string, string)>(new[] { (Arenas[0].path, Arg("-fpskitTag", "body")) });
-            _onlyPoses = "stand,down,walk,sprint,kick";
+            _onlyPoses = "stand,down,walk,sprint,kick,bloodpool";
             EditorApplication.update += NextArena;
         }
 
@@ -394,6 +394,20 @@ namespace FPSKit.EditorTools
                 case "hand_run": MobileInput.Move = new Vector2(0f, 1f); return _frame >= Frames(1.6f) && Shoot(closeUp: true);
                 case "hand_fire": MobileInput.SetFireButton(_frame >= Frames(1f)); return _frame >= Frames(1f) + 2 && Shoot(closeUp: true);
                 case "hand_aim": MobileInput.Aim = true; return _frame >= Frames(1.0f) && Shoot(closeUp: true);
+                // A pool on the open street at the view's size, for judging its colour in the sun.
+                case "bloodpool":
+                {
+                    if (_frame == 1 && AssetDatabase.FindAssets("t:BloodLibrary") is { Length: > 0 } found)
+                    {
+                        var library = AssetDatabase.LoadAssetAtPath<BloodLibrary>(AssetDatabase.GUIDToAssetPath(found[0]));
+                        var eye = _motor.cameraHolder;
+                        Vector3 ahead = eye.position + _motor.transform.forward * 3.5f;
+                        if (Physics.Raycast(ahead, Vector3.down, out var street, 5f, ~LayerMask.GetMask("Player", "FirstPerson", "Enemy"), QueryTriggerInteraction.Ignore))
+                            BloodFX.Pool(library, street.point, 1.3f, 0.5f);
+                    }
+                    Pitch(25f);
+                    return _frame >= Frames(2.5f) && Shoot();
+                }
                 case "down": Pitch(80f); return _frame >= Frames(1.2f) && Shoot();
                 // Impacts (FPSImpactManager): turned to the shop beside the desert's start -- its shutter (metal: dents,
                 // sparks, a flash), or the stone over it -- a burst; shot while firing, or a second after (marks, dust).
@@ -988,6 +1002,16 @@ namespace FPSKit.EditorTools
                     if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_PROBES") == "0")
                         foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
                             if (r.gameObject.isStatic) r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+                    // FPSKIT_TOUR_ONLY=souk: just the covered market, looking down its length as a player does.
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_ONLY") == "souk")
+                    {
+                        _tourRooms.Clear();
+                        if (Physics.Raycast(new Vector3(-90f, 6f, 20f), Vector3.down, out var soukFloor, 20f, ~LayerMask.GetMask("Player", "FirstPerson", "Enemy"), QueryTriggerInteraction.Ignore))
+                            _tourRooms.Add((soukFloor.point, soukFloor.point + new Vector3(-20f, 1.5f, -1.5f), "souk"));
+                        else Report += "tour: no floor in the souk\n";
+                        Phase(5);
+                        return false;
+                    }
                     Report += $"tour: {_tourRooms.Count} rooms picked\n";
                     Phase(1);
                     return false;

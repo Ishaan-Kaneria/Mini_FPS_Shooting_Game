@@ -96,6 +96,46 @@ namespace FPSKit.EditorTools
             PlaceIndoorReflections(arena != null ? arena.transform : null);
         }
 
+        /// <summary>
+        /// The covered market's own room reflection. Roofed but not a house or a shop, it had none: its stone, and the player's gun and
+        /// gloves in it, mirrored the open sky, and the eye adapting under the roof brightened that into wet walls and chrome
+        /// (his screenshot, 2026-11-04). Its box is the souk's street and shop rows, past the walls, from under the floor to over the vault.
+        /// </summary>
+        static void AddCoveredPlaces(Transform root, Cubemap cube)
+        {
+            const string Souk = "CoveredProbe_Souk";
+            var old = root.Find(Souk);
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            var box = new Bounds();
+            box.SetMinMax(new Vector3(-232f - RoomPad, -3f, 12f - RoomPad), new Vector3(-34f + RoomPad, 14f, 28f + RoomPad));
+            var go = new GameObject(Souk);
+            go.transform.SetParent(root, false);
+            go.transform.position = box.center;
+            var probe = go.AddComponent<ReflectionProbe>();
+            probe.mode = ReflectionProbeMode.Custom;
+            probe.customBakedTexture = cube;
+            probe.size = box.size;
+            probe.center = Vector3.zero;
+            probe.boxProjection = false;
+            probe.blendDistance = RoomBlend;
+            probe.importance = 2;
+            probe.intensity = ShopLitReflection;
+            probe.enabled = false;   // IndoorReflections switches it on near the eye
+        }
+
+        /// <summary>The saved desert scene given the covered places' reflections, touching nothing else (no captured room probe is lost).</summary>
+        public static void BatchCoveredReflections()
+        {
+            var scene = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
+            var root = Object.FindAnyObjectByType<IndoorReflections>(FindObjectsInactive.Include);
+            if (root == null) { Debug.LogError("[FPSKitBatch] FAILED: no IndoorReflections in the desert scene"); FPSKitBatch.Exit(1); return; }
+            AddCoveredPlaces(root.transform, RoomCube());
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, DesertScene);
+            Debug.Log("[FPSKitBatch] covered places' reflections placed");
+            FPSKitBatch.Exit(0);
+        }
+
         const string RoomCubePath = "Assets/FPSKit_Generated/Town/IndoorRoom.cubemap";
 
         /// <summary>
@@ -183,6 +223,7 @@ namespace FPSKit.EditorTools
                 Probe("ShopProbe_" + shop.GetSiblingIndex(), box, isDark ? ShopDarkReflection : ShopLitReflection);
                 if (isDark) dark++; else lit++;
             }
+            AddCoveredPlaces(root.transform, cube);
             root.AddComponent<IndoorReflections>();
             Debug.Log($"[FPSKit] indoor reflections: {houses} house probes, {lit + dark} shop probes ({dark} dark)");
             PlaceRoomContents(arena, boxes);

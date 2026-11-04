@@ -14,7 +14,7 @@ Shader "FPSKit/BloodSurface"
     Properties
     {
         _BaseMap ("Shape (A) and shade (RGB)", 2D) = "white" {}
-        _BaseColor ("Colour (linear) and opacity", Color) = (0.17, 0.004, 0.007, 0.97)
+        _BaseColor ("Colour (linear) and opacity", Color) = (0.28, 0.006, 0.008, 0.97)
         _Smoothness ("Smoothness where thick", Range(0, 1)) = 0.86
         _EdgeSmoothness ("Smoothness at the thin edge", Range(0, 1)) = 0.55
         _Reflectance ("Reflectance at normal incidence", Range(0, 0.08)) = 0.02
@@ -206,7 +206,8 @@ Shader "FPSKit/BloodSurface"
                 half NoV = saturate(dot(N, V));
                 half fresnel = _Reflectance + (1.0h - _Reflectance) * pow(1.0h - NoV, 5.0h);
                 fresnel *= lerp(0.3h, 1.0h, s.smoothness);     // a rough, drying rim reflects less at grazing
-                color += env * norm * fresnel;
+                // The film's reflection takes the sky's brightness, not its colour: blue added to a dark red drew a purple pool (his screenshot, 2026-11-04).
+                color += Luminance(env) * half3(1.0h, 0.5h, 0.45h) * norm * fresnel;
 
                 color = MixFog(color, inputData.fogCoord);
                 return half4(color, alpha);

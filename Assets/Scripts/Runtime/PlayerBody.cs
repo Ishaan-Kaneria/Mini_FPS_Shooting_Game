@@ -178,7 +178,7 @@ public class PlayerBody : MonoBehaviour
 
     /// <summary>
     /// Each garment two ways, by which bone a vertex mostly follows: the hips and legs drawn, the
-    /// rest (chest, arms, head) into the shadows only. A triangle on the seam is drawn if any of it
+    /// rest (chest, arms, head) into the shadows only. A triangle on the seam goes with the shadow unless all of it
     /// is leg. The shadow copy hangs off this object, not the skeleton (a child added to the
     /// skeleton in play would make the Animator rebind).
     /// </summary>
@@ -209,11 +209,21 @@ public class PlayerBody : MonoBehaviour
             var bones = smr.bones;
             var weights = mesh.boneWeights;
             if (weights.Length != mesh.vertexCount) continue;
+            // A straight cut at the waist, measured up the spine in the bind pose: by bones alone, a vertex under the arm counted as belly and
+            // stretched a long spike of cloth across the view (his screenshot, 2026-11-04).
+            var binds = mesh.bindposes;
+            int hipsAt = System.Array.IndexOf(bones, hips);
+            int chestAt = System.Array.IndexOf(bones, _anim.GetBoneTransform(HumanBodyBones.Chest));
+            bool canCut = hipsAt >= 0 && chestAt >= 0 && hipsAt < binds.Length && chestAt < binds.Length;
+            Vector3 hipsBind = canCut ? (Vector3)binds[hipsAt].inverse.GetColumn(3) : Vector3.zero;
+            Vector3 spineBind = canCut ? (Vector3)binds[chestAt].inverse.GetColumn(3) - hipsBind : Vector3.up;
+            var verts = canCut ? mesh.vertices : null;
             var leg = new bool[weights.Length];
             for (int v = 0; v < weights.Length; v++)
             {
                 int bi = weights[v].boneIndex0;
-                leg[v] = bi >= 0 && bi < bones.Length && bones[bi] != null && legs.Contains(bones[bi]);
+                leg[v] = bi >= 0 && bi < bones.Length && bones[bi] != null && legs.Contains(bones[bi])
+                         && (!canCut || Vector3.Dot(verts[v] - hipsBind, spineBind) < WaistCut * spineBind.sqrMagnitude);
             }
 
             Mesh Subset(string suffix, bool keepLegs)
@@ -226,8 +236,8 @@ public class PlayerBody : MonoBehaviour
                     var kept = new List<int>(tris.Length);
                     for (int i = 0; i + 2 < tris.Length; i += 3)
                     {
-                        bool any = leg[tris[i]] || leg[tris[i + 1]] || leg[tris[i + 2]];
-                        if (any == keepLegs) { kept.Add(tris[i]); kept.Add(tris[i + 1]); kept.Add(tris[i + 2]); }
+                        bool all = leg[tris[i]] && leg[tris[i + 1]] && leg[tris[i + 2]];
+                        if (all == keepLegs) { kept.Add(tris[i]); kept.Add(tris[i + 1]); kept.Add(tris[i + 2]); }
                     }
                     m.SetTriangles(kept, sub);
                 }
@@ -245,10 +255,36 @@ public class PlayerBody : MonoBehaviour
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             r.updateWhenOffscreen = true;
 
+            // Two-sided: looking down, the waist where the body is cut shows cloth, not the floor through a hollow.
             smr.sharedMesh = Subset("_Legs", keepLegs: true);
+            smr.sharedMaterials = TwoSided(smr.sharedMaterials);
             smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         }
     }
+
+    /// <summary>How far up from the hips to the chest the drawn body stops: the waist.</summary>
+    const float WaistCut = 0.5f;
+
+    /// <summary>Copies of the materials drawn on both faces (URP Lit's Render Face: Both), made once per material.</summary>
+    Material[] TwoSided(Material[] mats)
+    {
+        var result = new Material[mats.Length];
+        for (int i = 0; i < mats.Length; i++)
+        {
+            if (mats[i] == null || !mats[i].HasProperty("_Cull")) { result[i] = mats[i]; continue; }
+            if (!TwoSidedCache.TryGetValue(mats[i], out var copy))
+            {
+                copy = new Material(mats[i]) { name = mats[i].name + " (two-sided)" };
+                copy.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+                TwoSidedCache[mats[i]] = copy;
+            }
+            result[i] = copy;
+        }
+        return result;
+    }
+
+    Dictionary<Material, Material> _twoSided;
+    Dictionary<Material, Material> TwoSidedCache => _twoSided ??= new Dictionary<Material, Material>();
 
     /// <summary>The gun's meshes, drawn into the shadows only, carried in the body's right hand.</summary>
     void BuildShadowGun(WeaponData data)

@@ -1342,10 +1342,11 @@ public class EnemyBody : MonoBehaviour
     void LateUpdate()
     {
         if (_hips == null) return;
-        if (_down == Down.Flying || (_ragdoll != null && _ragdoll.IsRagdolled)) { TrackReaction(); return; }
+        if (_down == Down.Flying || (_ragdoll != null && _ragdoll.IsRagdolled)) { HoldPistol(); TrackReaction(); return; }
 
         bool alive = _health == null || !_health.IsDead;
-        if (!alive) return;
+        // The pistol stays on the falling body: it is a child of the root, and left alone it hung in the air (his screenshot, 2026-11-04).
+        if (!alive) { HoldPistol(); return; }
 
         if (_alignPending && _down == Down.GettingUp && _clipRise) AlignRise();
 

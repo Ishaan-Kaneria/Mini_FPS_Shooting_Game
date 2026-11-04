@@ -541,6 +541,7 @@ namespace FPSKit.EditorTools
             // behind by the previous arena in a six-arena batch is used by the next one.
             _playerStart = null;
             _fuelPumps.Clear();      // FPSKitTownExplosives: the gas station's pumps, written by BuildGasStation
+            ClearLifeSpots();        // FPSKitTownHouseholds: activity spots written while houses are furnished
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 

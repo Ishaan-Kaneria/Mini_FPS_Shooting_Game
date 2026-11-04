@@ -29,6 +29,9 @@ changes"). Each item gives what the code does now, the cause, and the fix. Writt
 
 ## 2. No people
 
+**Update 2026-11-04:** households (residents living in the houses, shopping, shopkeepers) are now in code; the full
+examination and the design are in `Docs/DESERT_PEOPLE.md`. What follows is the street walkers' side.
+
 * **What the code does:** `CivilianDirector` keeps up to `townCivilians` (60) on High, 60 % (36) on Medium, 35 % (21)
   on Low and phones, spread over a town of about 250,000 m². They are put down 30-150 m from the player (never closer),
   never within 25 m of an enemy, and later ones only out of view (`CivilianDirector.cs`). At the first shot every one

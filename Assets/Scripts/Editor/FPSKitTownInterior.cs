@@ -204,6 +204,7 @@ namespace FPSKit.EditorTools
             if (_roomMarks == null) { _roomMarks = new GameObject("HouseRooms").transform; _roomMarks.SetParent(_volumes.parent, false); }
             var house = new GameObject(old ? "OldHouse" : "House").transform;
             house.SetParent(_roomMarks, false);
+            _lifeHouse = house;      // FPSKitTownHouseholds: the spots recorded while this house is furnished are its own
             foreach (var o in b.openings)
                 if (o.side == b.door && o.floor == 0 && o.h.w - o.h.z > 2f)
                 {
@@ -767,6 +768,12 @@ namespace FPSKit.EditorTools
             {
                 var (at, wall) = s1.Value;
                 PlaceTown(props, Prop("sofa_02"), f.P(at.x, at.y, r.y), f.Yaw(Inward(wall)));
+                {
+                    Vector3 inw = f.A * Inward(wall).x + f.D * Inward(wall).y, seat = f.P(at.x, at.y, r.y) + inw * 0.12f;
+                    Vector3 alongS = Vector3.Cross(Vector3.up, inw);
+                    foreach (float s in new[] { -0.45f, 0.45f })
+                        LifeSpot(LifeActivity.SitSofa, seat + alongS * s, inw, seat + alongS * s + inw * 0.75f);
+                }
                 if (own.NextDouble() < 0.6) PlaceTown(props, Prop("throw_pillows_01"), f.P(at.x, at.y, r.y + 0.42f) + (f.A * Inward(wall).x + f.D * Inward(wall).y) * 0.05f, f.Yaw(Inward(wall)), 0.3f, navBlock: false);
                 // The table and rug in front of it.
                 var into = Inward(wall);
@@ -814,6 +821,9 @@ namespace FPSKit.EditorTools
                     m.Box(_mattressMat, c - Iw(into) * 0.75f + Iw(side) * s + Vector3.up * 0.62f, new Vector3(0.62f, 0.12f, 0.36f), rot);   // pillows
                 Rug(m, f, r, at + into * 0.4f + side * 1.25f, wall < 2 ? new Vector2(0.9f, 1.6f) : new Vector2(1.6f, 0.9f), own);
                 BedsideTables(m, f, r, at, wall, own);
+                // On the bed, lying (head to the headboard), and sitting on its edge.
+                LifeSpot(LifeActivity.Sleep, c + Vector3.up * 0.56f + Iw(into) * 0.1f, Iw(into), c + Iw(side) * 1.15f);
+                LifeSpot(LifeActivity.SitBed, c + Iw(side) * 0.72f + Iw(into) * 0.2f + Vector3.up * 0.02f, Iw(side), c + Iw(side) * 1.25f + Iw(into) * 0.2f);
             }
             if (!PropAgainstWall(props, f, r, own, "vintage_cabinet_01", 2.05f, 0.7f, true))
                 PropAgainstWall(props, f, r, own, "painted_wooden_cabinet", 1.2f, 0.64f, false);
@@ -850,6 +860,9 @@ namespace FPSKit.EditorTools
                 Vector3 hob = c + Iw(along) * (len * 0.3f) + Vector3.up * 0.905f;
                 foreach (var (x, z) in new[] { (-0.15f, -0.12f), (0.15f, -0.12f), (-0.15f, 0.12f), (0.15f, 0.12f) })
                     m.Disc(_tankBlack, hob + Iw(along) * x + Iw(into) * z, 0.09f, 10, Vector3.up);
+                // Standing at the burners and at the sink, facing the counter.
+                LifeSpot(LifeActivity.Cook, new Vector3(hob.x, f.P(at.x, at.y, r.y).y, hob.z) + Iw(into) * 0.62f, -Iw(into));
+                LifeSpot(LifeActivity.Wash, new Vector3(sink.x, f.P(at.x, at.y, r.y).y, sink.z) + Iw(into) * 0.62f, -Iw(into));
                 // Tiles behind it, wall cupboards over it (not over the sink's window).
                 Vector3 wallFoot = c - Iw(into) * 0.299f;
                 m.Quad(_wallTile, wallFoot - Iw(along) * (len * 0.5f) + Vector3.up * 0.9f, wallFoot + Iw(along) * (len * 0.5f) + Vector3.up * 0.9f,
@@ -873,7 +886,11 @@ namespace FPSKit.EditorTools
                 r.placed.Add(round);
                 PlaceTown(props, Prop("painted_wooden_table"), f.P(tc.x, tc.y, r.y), f.Yaw(Vector2.up), 0.76f);
                 foreach (var (dx, dy, face) in new[] { (-0.35f, -0.75f, Vector2.up), (0.35f, -0.75f, Vector2.up), (-0.35f, 0.75f, Vector2.down), (0.35f, 0.75f, Vector2.down) })
+                {
                     PlaceTown(props, Prop("painted_wooden_chair_01"), f.P(tc.x + dx, tc.y + dy, r.y), f.Yaw(face) + Rand(own, -8f, 8f));
+                    Vector3 toTable = f.A * face.x + f.D * face.y, chair = f.P(tc.x + dx, tc.y + dy, r.y);
+                    LifeSpot(dx < 0f ? LifeActivity.Eat : LifeActivity.SitChair, chair, toTable, chair - toTable * 0.55f);
+                }
             }
             else PropAgainstWall(props, f, r, own, "outdoor_table_chair_set_01", 0.85f, 1.85f, false);
         }
@@ -918,6 +935,11 @@ namespace FPSKit.EditorTools
                 var rot = Quaternion.LookRotation(Iw(Inward(w)));
                 Vector3 c = f.P(at.x, at.y, r.y);
                 m.Box(cloth, c + Vector3.up * 0.09f, new Vector3(L, 0.18f, 0.72f), rot);                                        // floor mattress
+                foreach (float k in new[] { -0.3f, 0.3f })
+                {
+                    Vector3 inw = Iw(Inward(w)), alongM = Vector3.Cross(Vector3.up, inw), seat = c + Vector3.up * 0.18f + inw * 0.05f + alongM * (k * L);
+                    LifeSpot(LifeActivity.SitFloor, seat, inw, new Vector3(seat.x, c.y, seat.z) + inw * 0.8f);
+                }
                 m.Box(_cloth[own.Next(_cloth.Length)], c - Iw(Inward(w)) * 0.28f + Vector3.up * 0.42f, new Vector3(L, 0.48f, 0.16f), rot);   // back cushion
             }
             Rug(m, f, r, r.r.center, new Vector2(Mathf.Min(3.2f, r.r.width - 1.8f), Mathf.Min(2.4f, r.r.height - 1.8f)), own);
@@ -939,6 +961,7 @@ namespace FPSKit.EditorTools
                 Vector3 Iw(Vector2 v) => f.A * v.x + f.D * v.y;
                 Vector3 c = f.P(at.x, at.y, r.y);
                 m.Box(_paintMud, c + Vector3.up * 0.4f, new Vector3(2.2f, 0.8f, 0.6f), Quaternion.LookRotation(Iw(Inward(wall))));
+                LifeSpot(LifeActivity.Cook, c + Iw(Inward(wall)) * 0.65f, -Iw(Inward(wall)));
                 string[] pots = { "pot_enamel_01", "jug_01", "brass_pot_01", "wooden_bowl_01", "wicker_basket_01" };
                 for (int i = 0; i < 3; i++)
                     PlaceTown(props, Prop(pots[own.Next(pots.Length)]), c + Iw(new Vector2(-Inward(wall).y, Inward(wall).x)) * Rand(own, -0.9f, 0.9f) + Vector3.up * 0.8f, Rand(own, 0f, 360f), navBlock: false);

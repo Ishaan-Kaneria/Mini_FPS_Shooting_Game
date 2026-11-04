@@ -106,8 +106,13 @@ namespace FPSKit.EditorTools
                         m.Box(wood, c + Iw(ax) * (sa * (L * 0.5f - 0.1f)) + Iw(bx) * (sb * (Wd * 0.5f - 0.1f)) + Vector3.up * 0.36f, new Vector3(0.06f, 0.72f, 0.06f), rot);
                 foreach (float sb in new[] { -1f, 1f })
                     for (int k = 0; k < perSide; k++)
-                        PlaceTown(props, Prop("painted_wooden_chair_01"), c + Iw(ax) * ((k - (perSide - 1) * 0.5f) * 0.62f) + Iw(bx) * (sb * (Wd * 0.5f + 0.3f)),
-                                  f.Yaw(bx * -sb) + Rand(own, -6f, 6f));
+                    {
+                        Vector3 chair = c + Iw(ax) * ((k - (perSide - 1) * 0.5f) * 0.62f) + Iw(bx) * (sb * (Wd * 0.5f + 0.3f));
+                        PlaceTown(props, Prop("painted_wooden_chair_01"), chair, f.Yaw(bx * -sb) + Rand(own, -6f, 6f));
+                        // Eating at it, or sitting (FPSKitTownHouseholds): facing the table, stood up to from behind the chair.
+                        Vector3 toTable = Iw(bx * -sb);
+                        LifeSpot(k % 2 == 0 ? LifeActivity.Eat : LifeActivity.SitChair, chair, toTable, chair - toTable * 0.55f);
+                    }
                 PlaceTown(props, Prop("wooden_bowl_01"), c + Vector3.up * 0.76f, Rand(own, 0f, 360f), navBlock: false);
                 string[] fruit = { "food_pomegranate_01", "food_apple_01", "food_lime_01" };
                 PlaceTown(props, Prop(fruit[own.Next(fruit.Length)]), c + Vector3.up * 0.8f + Iw(ax) * 0.03f, Rand(own, 0f, 360f), navBlock: false);

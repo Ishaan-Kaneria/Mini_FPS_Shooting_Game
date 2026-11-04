@@ -51,6 +51,8 @@ namespace FPSKit.EditorTools
             civ.prefabs = CivilianPrefabs();
             civ.spots = CivilianSpots().ToArray();
             civ.doors = _townDoors.ToArray();
+            // The households: residents at home in the enterable houses, shopkeepers in the lit shops (FPSKitTownHouseholds).
+            BuildHouseholds(life.transform, civ.prefabs);
 
             var traffic = life.AddComponent<TrafficDirector>();
             traffic.maxCars = _theme.townTrafficCars;
@@ -857,6 +859,8 @@ namespace FPSKit.EditorTools
             if (walk != null) tree.AddChild(walk, 1.4f);
             if (run != null) tree.AddChild(run, 4.8f);
             sm.defaultState = loco;
+            int lifeStates = AddLifeStates(ctrl, loco);     // sitting, cooking, sleeping... where Life/ clips exist
+            if (lifeStates == 0) Debug.LogWarning("[FPSKit] civilians: no everyday clips in Assets/Animations/Mixamo/Life/ (Docs/DESERT_PEOPLE.md); townspeople stand in their idle at every spot");
             string[] deaths = { "Deaths/Death_Back", "Deaths/Death_Front", "Deaths/Death_Right" };
             for (int i = 0; i < deaths.Length; i++)
             {

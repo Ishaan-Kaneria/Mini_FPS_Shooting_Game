@@ -111,14 +111,14 @@ namespace FPSKit.EditorTools
 
         /// <summary>Cycles: walks, runs, crawls, idles, strafes. "Move_" is the 8-way rifle set.</summary>
         static bool Loops(string name) =>
-            Has(name, "Idle", "Move_", "Limp_", "Crawl_", "Pistol_Walk", "Pistol_Run", "Pistol_Strafe", "Cover_Sneak");
+            Has(name, "Idle", "Move_", "Limp_", "Crawl_", "Pistol_Walk", "Pistol_Run", "Pistol_Strafe", "Cover_Sneak", "Life_");
 
         /// <summary>Clips whose root turns on purpose.</summary>
         static bool Turns(string name) => Has(name, "Turn");
 
         /// <summary>Clips that stand on the spot: their root drift is noise, not travel.</summary>
         static bool InPlace(string name) =>
-            Has(name, "Idle", "Hit_", "Reload_", "Throw_", "Signal_", "Death_", "Melee_", "Punch_", "Kick_");
+            Has(name, "Idle", "Hit_", "Reload_", "Throw_", "Signal_", "Death_", "Melee_", "Punch_", "Kick_", "Life_");
 
         /// <summary>One-sided clips that need the other side too.</summary>
         static bool Mirrored(string name) => Has(name, "Limp_", "Injured_HoldLeg", "Pistol_", "Rifle_Idle_Low", "Punch_", "Kick_");

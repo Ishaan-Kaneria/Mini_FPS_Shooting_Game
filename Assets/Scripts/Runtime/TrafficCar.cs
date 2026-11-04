@@ -20,11 +20,22 @@ public class TrafficCar : MonoBehaviour
     [Tooltip("Half the car's length and width in metres, measured from its body by the builder: how far ahead it looks and how wide.")]
     public float halfLength = 2.3f, halfWidth = 0.95f;
 
+    [Tooltip("Where the driver sits, in the car's space (written by the builder: the left front seat).")]
+    public Vector3 seatLocal = new Vector3(-0.38f, 0.08f, 0.05f);
+
+    [Tooltip("Seconds a driver takes to start braking for a person who steps out in front (a range, per driver). Other cars " +
+             "are braked for at once: they are seen coming. Real drivers take 0.7-1.5 s; at speed that is how people get hit.")]
+    public Vector2 reactionTime = new Vector2(0.7f, 1.2f);
+
     internal TrafficDirector director;
     internal int route, index;
 
-    float _speed, _waitUntil, _panicUntil, _stopClearedAt = -1f;
+    float _speed, _waitUntil, _panicUntil, _stopClearedAt = -1f, _personSince = -1f, _reaction;
     int _heard, _clearedStop = -1;
+    VehicleDriver _driver;
+    bool _driverDead;
+    VehicleStrike _strike;
+    System.Action<NoiseSystem.Noise, float> _onNoise;
     Transform[] _wheels;
     float _wheelRadius = 0.33f;
 
@@ -33,6 +44,16 @@ public class TrafficCar : MonoBehaviour
     void Start()
     {
         _heard = NoiseSystem.Latest;
+        _reaction = Random.Range(reactionTime.x, reactionTime.y);
+        // Somebody at the wheel (VehicleDriver): one of the town's people, seated, and shot through the glass like anyone.
+        var people = director != null ? director.driverPrefabs : null;
+        if (people != null && people.Length > 0)
+        {
+            _driver = VehicleDriver.Seat(transform, people[Random.Range(0, people.Length)], seatLocal);
+            if (_driver != null) _driver.Died += OnDriverDied;
+        }
+        _strike = GetComponent<VehicleStrike>();
+        if (_strike != null) _strike.Struck += OnStruck;
         var list = new System.Collections.Generic.List<Transform>();
         foreach (var t in GetComponentsInChildren<Transform>())
         {
@@ -54,10 +75,15 @@ public class TrafficCar : MonoBehaviour
         if (index >= r.points.Length - 1) { director.Finished(this); return; }
 
         // Danger: stop with the hazards on.
-        _heard = NoiseSystem.Listen(transform.position, 1f, _heard, (n, d) =>
+        _onNoise ??= OnNoise;
+        _heard = NoiseSystem.Listen(transform.position, 1f, _heard, _onNoise);
+
+        // Nobody driving: it rolls on, slowing, until it stops (or meets something).
+        if (_driverDead)
         {
-            if (n.kind == NoiseKind.Gunfire || n.kind == NoiseKind.Blast) _panicUntil = Time.time + 18f;
-        });
+            _speed = Mathf.MoveTowards(_speed, 0f, 1.6f * Time.deltaTime);
+            if (_speed <= 0.01f) return;
+        }
 
         Vector3 target = r.points[index + 1];
         Vector3 to = target - transform.position;
@@ -71,7 +97,7 @@ public class TrafficCar : MonoBehaviour
             if (turn > 20f && to.magnitude < 14f) limit = Mathf.Min(limit, Mathf.Lerp(8f, 4f, turn / 90f));
         }
 
-        float want = limit;
+        float want = _driverDead ? _speed : limit;
         if (Time.time < _panicUntil) want = 0f;
         if (Time.time < _waitUntil) want = 0f;
 
@@ -105,14 +131,23 @@ public class TrafficCar : MonoBehaviour
 
         // Whatever is in front.
         float look = halfLength + gap + _speed * 1.2f;
+        bool person = false;
         if (Physics.SphereCast(transform.position + Vector3.up * 0.8f + transform.forward * (halfLength - 0.6f), halfWidth * 0.8f, transform.forward,
                                out var hit, look, director.obstacleMask, QueryTriggerInteraction.Ignore))
         {
             if (hit.collider.attachedRigidbody == null || hit.collider.attachedRigidbody.gameObject != gameObject)
-                want = Mathf.Min(want, Mathf.Max(0f, (hit.distance - gap) * 0.8f));
+            {
+                // A person stepping out is braked for only once the driver has reacted; a car ahead, at once.
+                int layer = hit.collider.gameObject.layer;
+                person = layer == LayerMask.NameToLayer("Civilian") || layer == LayerMask.NameToLayer("Enemy") || layer == LayerMask.NameToLayer("Player");
+                if (person && _personSince < 0f) _personSince = Time.time;
+                if (!person || Time.time - _personSince >= _reaction)
+                    want = Mathf.Min(want, Mathf.Max(0f, (hit.distance - gap) * 0.8f));
+            }
         }
+        if (!person) _personSince = -1f;
 
-        _speed = Mathf.MoveTowards(_speed, want, (want < _speed ? brake : accel) * Time.deltaTime);
+        if (!_driverDead) _speed = Mathf.MoveTowards(_speed, want, (want < _speed ? brake : accel) * Time.deltaTime);
 
         // Move along the route, turning towards the next point.
         float step = _speed * Time.deltaTime;
@@ -158,4 +193,23 @@ public class TrafficCar : MonoBehaviour
 
     /// <summary>Stand still for a few seconds (the director uses it to let a car wait its turn).</summary>
     public void Wait(float seconds) => _waitUntil = Mathf.Max(_waitUntil, Time.time + seconds);
+
+    /// <summary>Whether its driver has been killed (it rolls to a stop and stays; the director leaves it).</summary>
+    public bool Abandoned => _driverDead;
+
+    void OnNoise(NoiseSystem.Noise n, float d)
+    {
+        if (n.kind == NoiseKind.Gunfire || n.kind == NoiseKind.Blast) _panicUntil = Time.time + 18f;
+    }
+
+    void OnDriverDied(VehicleDriver d) => _driverDead = true;
+
+    // Hit someone: a hard stop, then the shock of it.
+    void OnStruck(VehicleStrike s, float speed) => _panicUntil = Time.time + 25f;
+
+    void OnDestroy()
+    {
+        if (_driver != null) _driver.Died -= OnDriverDied;
+        if (_strike != null) _strike.Struck -= OnStruck;
+    }
 }

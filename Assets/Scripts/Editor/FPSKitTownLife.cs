@@ -60,6 +60,7 @@ namespace FPSKit.EditorTools
             traffic.signals = signals;
             traffic.carPrefabs = SedanNames.Select(n => TrafficPrefab(n)).Where(p => p != null).ToArray();
             traffic.obstacleMask = LayerMask.GetMask("Vehicle", "Player", "Civilian", "Enemy");
+            traffic.driverPrefabs = civ.prefabs;
 
             Debug.Log($"[FPSKit] town life: {civ.prefabs.Length} civilian kinds, {civ.spots.Length} spots, {civ.doors.Length} doors; " +
                       $"{_routes.Count} traffic routes ({_routes.Sum(r => r.points.Length)} points), {signals.Length} signalled junctions, " +
@@ -303,20 +304,31 @@ namespace FPSKit.EditorTools
             body.transform.localPosition = new Vector3(-b.center.x, -b.min.y, -b.center.z);
             b = WorldBounds(body);
             foreach (var c in root.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+            // The body to the waistline and the roof, with the windows open between them (Docs/DESERT_VEHICLES.md): a round
+            // through the windscreen or a side window reaches the driver (VehicleDriver). The obstacle keeps the whole car.
+            float belt = b.size.y * 0.56f;
             var box = root.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, b.size.y * 0.5f, 0f);
-            box.size = new Vector3(b.size.x * 0.95f, b.size.y * 0.9f, b.size.z * 0.97f);
+            box.center = new Vector3(0f, belt * 0.5f, 0f);
+            box.size = new Vector3(b.size.x * 0.95f, belt, b.size.z * 0.97f);
             box.sharedMaterial = FPSKitImpactAssets.Surface("Metal");      // sparks, not dust (FPSImpactManager)
+            var roof = root.AddComponent<BoxCollider>();
+            roof.center = new Vector3(0f, b.size.y * 0.94f, -b.size.z * 0.04f);
+            roof.size = new Vector3(b.size.x * 0.8f, b.size.y * 0.1f, b.size.z * 0.42f);
+            roof.sharedMaterial = box.sharedMaterial;
             var rb = root.AddComponent<Rigidbody>();
             rb.isKinematic = true;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             var obs = root.AddComponent<NavMeshObstacle>();
             obs.shape = NavMeshObstacleShape.Box;
-            obs.center = box.center; obs.size = box.size;
+            obs.center = new Vector3(0f, b.size.y * 0.5f, 0f); obs.size = new Vector3(b.size.x * 0.95f, b.size.y * 0.9f, b.size.z * 0.97f);
             obs.carving = false;
             var car = root.AddComponent<TrafficCar>();
             car.halfLength = b.size.z * 0.5f;
             car.halfWidth = b.size.x * 0.5f;
+            // The driver's seat: left front, a hand's width above the floor pan (the sitting pose carries the hips up to the seat).
+            car.seatLocal = new Vector3(-b.size.x * 0.2f, b.size.y * 0.06f, b.size.z * 0.02f);
+            var strike = root.AddComponent<VehicleStrike>();
+            strike.halfLength = car.halfLength; strike.halfWidth = car.halfWidth;
             SetLayerRecursive(root, LayerMask.NameToLayer("Vehicle") >= 0 ? LayerMask.NameToLayer("Vehicle") : 0);
             SetTagRecursive(root, "Metal");
             DynamicLighting(root);
@@ -370,6 +382,8 @@ namespace FPSKit.EditorTools
             box.size = new Vector3(b.size.x * 0.95f, b.size.y * 0.7f, b.size.z * 0.97f);
             var rb = holder.AddComponent<Rigidbody>();
             var car = holder.AddComponent<DrivableCar>();
+            var strike = holder.AddComponent<VehicleStrike>();          // runs people over (VehicleStrike), credited to the player while he drives
+            strike.halfLength = b.size.z * 0.5f; strike.halfWidth = b.size.x * 0.5f;
 
             // Wheels: the pack's named wheel roots, front-left, front-right, rear-left, rear-right.
             string[] names = { "FrontLeft", "FrontRight", "RearLeft", "RearRight" };

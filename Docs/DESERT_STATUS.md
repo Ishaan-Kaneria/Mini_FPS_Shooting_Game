@@ -112,9 +112,11 @@ station, lorries, burnt-out wrecks.
 | Explosives | Drums, cans, cylinders, propane tanks, pumps; fire; chains | Gas station rebuilt in Blender; real drums and cans; scorch marks and wrecks |
 | Grenades | Enemy drops; frags lent to a player with none | Enemies throwing grenades |
 | People | Households (residents, shopping, shopkeepers, cowering); clip download and sort tools | Women, children, older people; props in hand; families; doors; reactions to the player; sound; time of day; pooling |
-| Missions | Named bosses at named places; target levels; markers; the brain fix | Compass; intel; roof posts; a target who flees by car |
+| Missions | Named bosses at named places, a man's size, with an elite security detail; target levels; markers; the brain fix | Mafia look for the bosses (outfits, dark glasses, weapons); compass; intel; roof posts; a target who flees by car |
+| Map | | Street names, house and shop numbers, a readable minimap, a full map (`DESERT_TOWN_FIXES.md` section 7) |
+| Unreal areas | | 24 listed (`DESERT_TOWN_FIXES.md` section 8) |
 | Combat bugs | | Neck shot at low health; fire rate at low fps; blasts through walls; civilian blame; reported damage; negative score; double payout |
-| Vehicles | | Section 3; driving fixes B1-B12 |
+| Vehicles | A driver in every traffic car, shot through the open windows (`VehicleDriver`); cars run people over (`VehicleStrike`), drivers react to people after a human delay | `DESERT_VEHICLES.md`: other models, the technical rebuilt, weight in movement, lights, sound, damage; driving fixes B1-B12 |
 | Town | | Roof access for every building type; shops filled; realism steps (bevels, the shared shader, materials) |
 
 ## 5. Order for the laptop
@@ -139,3 +141,21 @@ Tools/unity-batch.sh FPSKitBatch.VerifyTown
 Read the build log for `[FPSKit] explosives:`, `[FPSKit] households:` and the civilians' clip warning. In play, watch for
 a target never appearing (the HUD keeps "TARGET: ... AT ..." with no distance): that means no point of its place has a
 route to the player.
+
+## 7. His bug list (from the play-tests), in one place
+
+| # | Bug | Where it is written up | Status |
+|---|---|---|---|
+| 1 | No riders in moving cars | `DESERT_VEHICLES.md` V1 | Traffic: in code |
+| 2 | Cars all look the same | V2 | Plan |
+| 3 | The armed pickup is boxes and cylinders | V3 | Plan |
+| 4 | Cars glide with no weight, float or sink | V4 | Plan |
+| 5 | Cars never hit anybody; a round never reaches a driver | V5, V6 | In code |
+| 6 | Bosses are giants and not special | `DESERT_VEHICLES.md` section 5 | Size and security in code; the look is a plan |
+| 7 | No numbers on houses and shops; the map is pale and hard to read | `DESERT_TOWN_FIXES.md` section 7 | Plan |
+| 8 | Areas that look generated | `DESERT_TOWN_FIXES.md` section 8 (U1-U24) | Plan |
+| 9 | No way up to the roofs | `DESERT_TOWN_FIXES.md` section 1 | Plan |
+| 10 | No people; shops too open and empty | `DESERT_PEOPLE.md`, `DESERT_TOWN_FIXES.md` 2-3 | Households in code; shops a plan |
+| 11 | No explosives, no grenades | `DESERT_EXPLOSIVES.md` | In code |
+| 12 | Lighting inside and outside houses | `DESERT_LIGHTING.md` | Part in code, part plan |
+| 13 | Windows must be real glass | `DESERT_GLASS.md` | Plan |

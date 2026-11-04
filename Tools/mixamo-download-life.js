@@ -49,6 +49,7 @@
     ['Life_Window', 'leaning', 2, []],
     ['Life_Eat', 'eating', 2, []],
     ['Life_SitBed', 'sitting sad', 1, []],
+    ['Life_Drive', 'driving', 1, ['Driving']],
   ];
 
   // ---- plumbing ----

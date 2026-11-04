@@ -752,9 +752,9 @@ public class LevelManager : MonoBehaviour
 
     IEnumerator SpawnLevel()
     {
-        if (HasBoss) SpawnBoss();
-
+        // The roster first: a boss at his place takes his bodyguards out of it (Station).
         _pendingSpawns = Level.enemyCount;
+        if (HasBoss) SpawnBoss();
         _replacements = 0;
 
         // A spawn can legitimately fail -- a cornered player, a NavMesh with no room
@@ -1077,6 +1077,9 @@ public class LevelManager : MonoBehaviour
 
             ActiveBoss = boss.GetComponent<Health>();
 
+            // A man's size, if the level says so (the generic boss chassis are giants).
+            if (Level.bossScale > 0f) boss.transform.localScale = Vector3.one * Level.bossScale;
+
             // A boss with a place of its own holds it. Every other enemy is relentless and heads for the player
             // from the moment it spawns; a boss that did the same would walk out of its arena and the arena would
             // be empty. It wakes when it sees the player or is hurt, and that is also when its bar appears.
@@ -1091,6 +1094,8 @@ public class LevelManager : MonoBehaviour
                 if (_bossBeacon != null) Destroy(_bossBeacon.gameObject);
                 _bossBeacon = LevelObjective.BuildBeacon("BossPlace", boss.transform.position, UITheme.Alert, 3f, 8f, marker: true, pip: true);
                 if (ActiveBoss != null) ActiveBoss.Died += _ => { if (_bossBeacon != null) Destroy(_bossBeacon.gameObject); _bossBeacon = null; };
+                // His security: elites in a ring round him, on watch (they hold, as he does).
+                if (Level.bossGuards > 0) Station(boss.transform.position, Level.bossGuards, 11f, firstIsElite: true, allElite: true);
             }
 
             // The level's own name wins: the campaign fights two boss chassis as eight
@@ -1245,13 +1250,13 @@ public class LevelManager : MonoBehaviour
     /// wake when they see the player or are hit). They are taken out of the roster still to come, so the level's total
     /// is unchanged; the first is an elite when the roster has one. Returns those placed, the first first.
     /// </summary>
-    public List<GameObject> Station(Vector3 centre, int count, float spread, bool firstIsElite)
+    public List<GameObject> Station(Vector3 centre, int count, float spread, bool firstIsElite, bool allElite = false)
     {
         var made = new List<GameObject>();
         int n = Mathf.Min(count, _pendingSpawns);
         for (int i = 0; i < n; i++)
         {
-            var type = i == 0 && firstIsElite ? (PickElite() ?? PickEnemyType(false)) : PickEnemyType(false);
+            var type = (i == 0 && firstIsElite) || allElite ? (PickElite() ?? PickEnemyType(false)) : PickEnemyType(false);
             if (type == null) break;
             Vector3? at = null;
             for (int tries = 0; tries < 12 && at == null; tries++)

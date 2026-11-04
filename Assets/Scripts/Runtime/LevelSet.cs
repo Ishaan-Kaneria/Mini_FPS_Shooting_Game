@@ -170,6 +170,14 @@ public class LevelSet : ScriptableObject
                  "map) until he sees the player or is hurt. Empty: he arrives like the rest.")]
         public string bossPlace;
 
+        [Tooltip("Bodyguards stood round a boss at his place, elites where the roster has them, taken from the roster (the " +
+                 "level's total is unchanged). 0: none.")]
+        [Min(0)] public int bossGuards;
+
+        [Tooltip("The boss's size, as a scale on a person's (1 = a man's height). 0 keeps the archetype's own (the generic " +
+                 "chassis are 1.9-2.2: giants). A lieutenant who is dangerous for who he is, not for his size, is 1.0-1.08.")]
+        [Min(0f)] public float bossScale;
+
         [Tooltip("What the boss is worth against one ordinary enemy when the stars are " +
                  "counted. At 5 it is a fifth of a twenty-enemy level on its own, which " +
                  "is the point: the boss is the level, and leaving it alive costs a star " +

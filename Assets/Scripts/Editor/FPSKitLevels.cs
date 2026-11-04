@@ -345,7 +345,12 @@ namespace FPSKit.EditorTools
             {
                 int ordinal = Mathf.Clamp(number / 3, 1, DesertBossPlaces.Length) - 1;
                 level.bossPlace = DesertBossPlaces[ordinal];
-                level.brief = $"{level.brief} He is at {Spaced(level.bossPlace)}: the map marks the place.";
+                // A lieutenant is a man, not a giant (the generic chassis are 1.9-2.2), and never alone: an elite detail
+                // round him, growing up the ladder (his look, a black shirt and dark glasses, needs its own outfit model:
+                // Docs/DESERT_VEHICLES.md "The bosses").
+                level.bossScale = 1.06f;
+                level.bossGuards = Mathf.Clamp(5 + ordinal, 5, Mathf.Max(5, enemies / 3));
+                level.brief = $"{level.brief} He is at {Spaced(level.bossPlace)} with {level.bossGuards} bodyguards: the map marks the place.";
                 return;
             }
             if (level.objective != LevelSet.Objective.Recon) return;

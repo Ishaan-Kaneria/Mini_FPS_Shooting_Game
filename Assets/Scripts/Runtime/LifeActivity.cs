@@ -24,6 +24,7 @@ public enum LifeActivity
     Window = 15,      // looking out
     Eat = 16,         // at a table, eating
     SitBed = 17,      // on the edge of a bed
+    Drive = 18,       // at the wheel of a vehicle (VehicleDriver)
 }
 
 public static class LifeActivities

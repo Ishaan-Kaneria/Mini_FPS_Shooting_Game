@@ -102,9 +102,72 @@ colours (95), too-dark pack materials (64). Steps 1-3 of `Docs/DESERT_REVIEW.md`
 * Life in and on them: washing lines, water tanks and dishes on roofs, plants on balconies, open windows with curtains
   moving, people at windows (section 2).
 
+## 7. House and shop numbers, and a map you can read
+
+**Now:** no building has a number or an address. Streets have only builder names (`East130N`, `SouthStreet`,
+`AvenueSouth`: `FPSKitTownPlan.cs:132-151`). The minimap (`Minimap`) is a 62 m disc of walls drawn in a pale grey-blue
+(`wallColor` 0.62/0.66/0.74, `coverColor` 0.38/0.42/0.49): no roads, no building kinds, no names, no numbers, and there
+is no full map at all. Finding "the courier at the bus stop" means knowing the town already.
+
+**Plan:**
+1. **Street names.** Every road gets a real name in Arabic and English (a name table in `FPSKitTownPlan`: e.g. the avenue
+   "Shari' al-Jumhuriya / Republic Avenue", the boulevard "Corniche Road", the streets after people, trees and trades);
+   the builder name stays as the id. Name plates at every junction corner, from `Tools/town/make_signs.py` (real Arabic,
+   as the shop signs already are).
+2. **Numbers.** Each building gets a number on its street: odd on the left and even on the right going away from the
+   clock square, as towns number them; a shop is "No. 14, Republic Avenue", a house "No. 7, Pomegranate Street". A
+   blue enamel plate beside each door with the number in Arabic-Indic and Western digits (a digit atlas made by
+   `make_signs.py`, quads in the facade's detail mesh, so no new objects). The builder writes the town's **address
+   book**: number, street, kind (house, shop and its trade, landmark), door position and footprint (a `TownAddresses`
+   component, data only, beside `TownHouseholds`).
+3. **A map that is not pale.** The minimap redrawn with a real palette: the ground a warm dark sand, roads in asphalt grey
+   with their kerbs, pavements lighter, buildings filled by kind (houses ochre, shops amber, landmarks white, ruins
+   broken outline), yards and compounds in a low tone, the player's view cone, north up or rotating (a setting), and
+   building numbers drawn when zoomed in.
+4. **A full map** (the M key, Back on a pad, a map button on touch): the whole town, district names, street names, every
+   landmark with an icon, house and shop numbers when zoomed, the target and the boss places marked, your position and
+   heading, drag and pinch to pan and zoom. Built in C# with `UIKit` like the rest of the UI (CLAUDE.md "UI").
+5. **Objectives say the address:** "TARGET: THE COURIER, BUS STOP, No. 3 STATION ROAD - 150 M", and the full map opens on
+   him.
+6. **Check:** every enterable house and shop has a unique address; every address's door is on the navmesh; the map's
+   numbers match the plates.
+
+## 8. What looks generated or unreal (his list, and the audit's)
+
+From the realism audit (`Docs/REALISM_AUDIT_DesertOutpost.csv`, 100 objects rated FAKE) and from reading the
+builders. Each line: what it is, why it reads as generated, the fix (details in `DESERT_REVIEW.md` sections 8 and 13).
+
+| # | What | Why it reads as generated | Fix |
+|---|---|---|---|
+| U1 | **Every edge in the town** (222 objects, ~65 % of the view) | Not one bevel: knife-sharp corners on walls, sills, steps, kerbs, frames (`Town_TrimStone_Plain` 136 km of hard edge, 0 % bevelled) | Chamfers in `TownMesh`; shader edge-rounding far off |
+| U2 | **The street grid** | Every road straight and parallel to x or z (`FPSKitTownPlan`: "every road is parallel to x or to z"), one roundabout; no bend, no lane, no alley that wanders | Old town lanes that curve and narrow; a bend in the streets that follow the ground; cul-de-sacs |
+| U3 | **Tiling** (66 objects) | The same stone repeating 57 times across a face (`Town_StoneWarm`, the most seen surface) | The shared anti-tiling shader with macro variation and grime |
+| U4 | **Flat colours** (95 objects) | Single-colour materials with no texture or normal map: shutter boxes, shop insides, ceilings, curtains, road paint, galvanised steel, wrought iron | Real CC0 texture sets |
+| U5 | **Windows** | Opaque dark mirrors with nothing behind them | Real glass (`DESERT_GLASS.md`) |
+| U6 | **Shop insides** | Evenly lit, nearly empty boxes (`Town_ShopInsideLit`, `Town_ShopInterior` FAKE) | Section 3 |
+| U7 | **Furniture made of boxes** | Beds, kitchen counters, cabinets (`Town_CabinetWhite` 100 % plain boxes), majlis mattresses (97 %), wardrobes | Real models (Poly Haven has many), or Blender kitbashes |
+| U8 | **The technical** | Boxes and Unity cylinders | `DESERT_VEHICLES.md` V3 |
+| U9 | **The same car everywhere** | One sedan model for all traffic, nobody in it | `DESERT_VEHICLES.md` V1, V2 |
+| U10 | **The same four men** | Four male models, the only people in the town | `DESERT_PEOPLE.md` section 3 |
+| U11 | **Too clean** | No litter, no stains on the pavements, no oil under parked cars, no sand drifted against walls, no water streaks under sills, no faded paint; `Town_WeatherDark` strips are a uniform band | Decals and the grime shader (realism step 5) |
+| U12 | **The same building heights and boxes** | Masses are rectangles with flat roofs, stacked floors of one height | Setbacks, roof structures (stair heads, water tanks, rebar of unfinished floors), different storey heights, balconies |
+| U13 | **Parapets and roofs** | Every roof flat and empty, a parapet of one height | Clutter on roofs (tanks, dishes, washing), broken parapets, roof access (section 1) |
+| U14 | **The sky** | A clear, soft 4K sky (11 px/degree), a 43-degree sun | `DESERT_LIGHTING.md` part 2 |
+| U15 | **Distant mountains and the apron** | One material each, no detail at the town's edge | Layered ridges, haze by height |
+| U16 | **Shutters** | Flat boxes (`Town_ShutterBox` FAKE, 72 km of sharp edge) | Corrugated profile, dents, graffiti, rust at the foot |
+| U17 | **Lamps and signals** | Box lamp heads, signal bodies 44 % plain boxes | Real models |
+| U18 | **Placeholders that show** | The grenade pickup (a capsule), the health and shield pickups (a sphere, a cube), objective beacons (a glowing column) | Real pickups (a grenade, a med kit); beacons only on the HUD and map, or a smoke flare |
+| U19 | **A blank white sign on a post** (the 200 m street view) | A sign with nothing on it | Give it a sign from the atlas |
+| U20 | **The white fallback material** | 98 building pieces drawn in pure white (`Buildings: Universal Render Pipeline/Lit`) | Review E1 |
+| U21 | **Interiors all lit the same** | Reflections from one painted cubemap | `DESERT_LIGHTING.md` part 1 |
+| U22 | **Nobody reacts to anything but gunfire** | People, cars and animals ignore the player otherwise | `DESERT_PEOPLE.md` section 3 |
+| U23 | **No animals** | No dogs, cats, goats, birds in a desert town | A few dogs and cats in the old town, pigeons on roofs, goats at the farms |
+| U24 | **No sound of a town** | No traffic hum, voices, call to prayer, radios, generators | An ambience by district, sounds on things (generators, aircon units, TVs) |
+
 ## Order
 
 1. Roof access (section 1): a bug, and it changes how every level plays.
+1a. Numbers, street names and the map (section 7): they make every mission findable.
 2. People who stay (section 2.1) and spawning nearer (2.2).
 3. Shops filled and closed up (section 3).
 4. Cars' driving fixes (review B1-B8), then the rest with the driving feature.

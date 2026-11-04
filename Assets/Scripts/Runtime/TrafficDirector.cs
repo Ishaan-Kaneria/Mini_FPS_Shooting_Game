@@ -32,6 +32,8 @@ public class TrafficDirector : MonoBehaviour
     [Header("Content (written by the builder)")]
     public Route[] routes;
     public GameObject[] carPrefabs;
+    [Tooltip("The people who drive them (VehicleDriver): the civilian prefabs.")]
+    public GameObject[] driverPrefabs;
     public TownSignals[] signals;
 
     readonly List<TrafficCar> _cars = new List<TrafficCar>();
@@ -63,7 +65,8 @@ public class TrafficDirector : MonoBehaviour
         {
             var c = _cars[i];
             if (c == null) { _cars.RemoveAt(i); continue; }
-            if (Vector3.Distance(c.transform.position, _player.position) > recycleDistance && !InView(c.transform.position, 600f))
+            float far = c.Abandoned ? recycleDistance * 0.5f : recycleDistance;   // a car whose driver was shot stays where it stopped while near
+            if (Vector3.Distance(c.transform.position, _player.position) > far && !InView(c.transform.position, 600f))
             {
                 Destroy(c.gameObject);
                 _cars.RemoveAt(i);

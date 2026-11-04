@@ -146,6 +146,7 @@ public class DrivableCar : MonoBehaviour
 
         _rb.isKinematic = false;
         Driving = this;
+        if (TryGetComponent<VehicleStrike>(out var strike)) strike.Driver = p;      // who runs a man down is the man driving
         Offered = null;
         Changed?.Invoke();
     }
@@ -154,6 +155,7 @@ public class DrivableCar : MonoBehaviour
     {
         if (Driving != this) return;
         Driving = null;
+        if (TryGetComponent<VehicleStrike>(out var strike)) strike.Driver = null;
         SetTorque(0f, brakeTorque * 2f, 0f);
         if (_player != null)
         {

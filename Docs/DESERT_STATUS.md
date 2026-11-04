@@ -1,6 +1,7 @@
 # Desert Outpost: status, verification, and what is left
 
-2026-11-04. **The one file to read first.** It says what has been checked and how, what is in code and what is only a
+2026-11-04. **The one file to read first.** The master bug list (every bug, with the performance and size items) is
+`DESERT_BUGS_AND_PERFORMANCE.md`. It says what has been checked and how, what is in code and what is only a
 plan, how the desert now plays as missions, and what the vehicles need to look real. The detail lives in the other
 documents: `DESERT_REVIEW.md` (every bug, every object), `DESERT_LIGHTING.md`, `DESERT_GLASS.md`,
 `DESERT_EXPLOSIVES.md`, `DESERT_TOWN_FIXES.md`, `DESERT_PEOPLE.md`.

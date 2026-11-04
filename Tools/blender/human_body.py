@@ -33,14 +33,241 @@ addon_utils.enable("bl_ext.blender_org.mpfb", default_set=False)
 from bl_ext.blender_org.mpfb.services.humanservice import HumanService
 from bl_ext.blender_org.mpfb.services.targetservice import TargetService
 
+# ------------------------------------------------------------------
+# The soldier's uniform, fitted from the Survivalist pack's skinned garments.
+# Each garment vertex is carried by its own bone weights from that skeleton's joints to the new
+# one's, then pushed out of the body wherever it still sinks in, and takes the new skeleton's weights by
+# name. The body under the cloth is cut away: it would only poke through and cost triangles.
+# ------------------------------------------------------------------
+UE_TO_MIXAMO = {"root": "Hips", "pelvis": "Hips", "spine_01": "Spine", "spine_02": "Spine1", "spine_03": "Spine2", "neck_01": "Neck", "head": "Head"}
+for side, s in (("l", "Left"), ("r", "Right")):
+    UE_TO_MIXAMO.update({f"clavicle_{side}": f"{s}Shoulder", f"upperarm_{side}": f"{s}Arm", f"upperarm_twist_01_{side}": f"{s}Arm",
+                         f"lowerarm_{side}": f"{s}ForeArm", f"lowerarm_twist_01_{side}": f"{s}ForeArm", f"hand_{side}": f"{s}Hand",
+                         f"thigh_{side}": f"{s}UpLeg", f"thigh_twist_01_{side}": f"{s}UpLeg", f"calf_{side}": f"{s}Leg", f"calf_twist_01_{side}": f"{s}Leg",
+                         f"foot_{side}": f"{s}Foot", f"ball_{side}": f"{s}ToeBase"})
+    for finger, f in (("index", "Index"), ("middle", "Middle"), ("ring", "Ring"), ("pinky", "Pinky"), ("thumb", "Thumb")):
+        for i in (1, 2, 3):
+            UE_TO_MIXAMO[f"{finger}_0{i}_{side}"] = f"{s}Hand{f}{i}"
+# The cloth under the gear is MPFB's own, fitted and weighted to this body: the pack's shirt and trousers, made for another body, tore and let skin through.
+WEAR = ("SK_Military_Vest1", "SK_Military_Cap1", "SK_Military_Backpack1")
+NATIVE = (("clothes", "male_worksuit01", "Outfit_Worksuit", "Clothes"), ("clothes", "shoes03", "Outfit_Boots", "Clothes"),
+          ("hair", "short02", "Human_Hair", "Hair"), ("eyebrows", "eyebrow001", "Human_Brows", "Eyebrows"))
+# Each old bone's line runs to this child, and the new skeleton's to its counterpart. Bone tails in the FBX mean nothing here.
+NEXT = {"pelvis": "spine_01", "spine_01": "spine_02", "spine_02": "spine_03", "spine_03": "neck_01", "neck_01": "head"}
+for side in ("l", "r"):
+    NEXT.update({f"clavicle_{side}": f"upperarm_{side}", f"upperarm_{side}": f"lowerarm_{side}", f"lowerarm_{side}": f"hand_{side}", f"hand_{side}": f"middle_01_{side}",
+                 f"thigh_{side}": f"calf_{side}", f"calf_{side}": f"foot_{side}", f"foot_{side}": f"ball_{side}"})
+    for finger in ("index", "middle", "ring", "pinky", "thumb"):
+        NEXT[f"{finger}_01_{side}"] = f"{finger}_02_{side}"
+        NEXT[f"{finger}_02_{side}"] = f"{finger}_03_{side}"
+
+
+def new_bone(rig, name):
+    return rig.data.bones.get("mixamorig:" + name)
+
+
+def fit_matrix(old_head, old_tail, new_head, new_tail):
+    """Old joint onto new: moved, turned the shortest way and scaled along the bone's length."""
+    from mathutils import Matrix
+    a, b = (old_tail - old_head), (new_tail - new_head)
+    scale = max(0.75, min(1.3, b.length / max(a.length, 1e-5)))
+    rot = a.normalized().rotation_difference(b.normalized()).to_matrix().to_4x4()
+    return Matrix.Translation(new_head) @ rot @ Matrix.Scale(scale, 4) @ Matrix.Translation(-old_head)
+
+
+def skin(body, name="middleage_caucasian_male"):
+    """The face and hands: the CC0 skin image on a plain material, which FBX and Unity can both read."""
+    from bl_ext.blender_org.mpfb.services.locationservice import LocationService
+    import glob
+    folder = os.path.join(LocationService.get_user_data("skins"), name)
+    found = glob.glob(os.path.join(folder, "*diffuse*.png"))
+    mat = bpy.data.materials.new("Human_Skin")
+    mat.use_nodes = True
+    mat.diffuse_color = (0.78, 0.58, 0.46, 1)
+    if found:
+        node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+        node.image = bpy.data.images.load(found[0])
+        mat.node_tree.links.new(node.outputs["Color"], mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
+        mat.node_tree.nodes.active = node
+        print("[human] skin", os.path.basename(found[0]))
+    body.data.materials.clear()
+    body.data.materials.append(mat)
+    for p in body.data.polygons:
+        p.material_index = 0
+
+
+def dress(body, rig, path, cloth_objects=(), clearance=0.015):
+    import bmesh
+    from mathutils import Matrix
+    from mathutils.bvhtree import BVHTree
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=path, automatic_bone_orientation=False)
+    imported = [o for o in bpy.data.objects if o not in before]
+    source = next(o for o in imported if o.type == "ARMATURE")
+
+    # Each old bone's move, read in world space. A bone with no counterpart moves as its mapped parent does.
+    mats = {}
+    for b in source.data.bones:
+        mapped = UE_TO_MIXAMO.get(b.name)
+        nb = new_bone(rig, mapped) if mapped else None
+        if nb is None:
+            continue
+        mw, nw = source.matrix_world, rig.matrix_world
+        # Twist bones move with their parent. A bone at a chain's end (the head) keeps its turn and takes the body's overall scale.
+        anchor = b.parent if "twist" in b.name and b.parent else b
+        next_name = NEXT.get(anchor.name)
+        if next_name is None or next_name not in source.data.bones:
+            overall = TARGET_HEIGHT / 1.884
+            mats[b.name] = Matrix.Translation(nw @ nb.head_local) @ Matrix.Scale(overall, 4) @ Matrix.Translation(-(mw @ anchor.head_local))
+            continue
+        new_next = new_bone(rig, UE_TO_MIXAMO[next_name])
+        mats[b.name] = fit_matrix(mw @ anchor.head_local, mw @ source.data.bones[next_name].head_local, nw @ nb.head_local, nw @ new_next.head_local)
+
+    # The body as it now stands, to push cloth out of and to cut under it.
+    dg = bpy.context.evaluated_depsgraph_get()
+    body_eval = body.evaluated_get(dg)
+    bm = bmesh.new()
+    for o in (body,) + tuple(cloth_objects):
+        tmp_mesh = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)
+        tmp_mesh.transform(o.matrix_world)
+        bm.from_mesh(tmp_mesh)
+        bpy.data.meshes.remove(tmp_mesh)
+    bm.normal_update()
+    body_bvh = BVHTree.FromBMesh(bm)
+
+    worn = []
+    for name in WEAR:
+        g = next((o for o in imported if o.type == "MESH" and o.name.split(".")[0] == name), None)
+        if g is None:
+            print("[human] no garment", name)
+            continue
+        gw = g.matrix_world.copy()
+        names = {vg.index: vg.name for vg in g.vertex_groups}
+        out = []
+        weights = []
+        for v in g.data.vertices:
+            p = gw @ v.co
+            total, moved, keep = 0.0, Vector((0, 0, 0)), {}
+            for e in v.groups:
+                bn = names.get(e.group)
+                if e.weight <= 0 or bn not in mats:
+                    continue
+                total += e.weight
+                moved += (mats[bn] @ p) * e.weight
+                mapped = "mixamorig:" + UE_TO_MIXAMO[bn]
+                keep[mapped] = keep.get(mapped, 0.0) + e.weight
+            out.append(moved / total if total > 0 else p)
+            weights.append(keep)
+        # Out of the skin, as a smooth shift of the whole area: moved vertex by vertex it tore. Gear stands 1.5 cm clear of the
+        # cloth under it (what it is pushed from is the body and everything native on it).
+        import numpy as np
+        shift = np.zeros((len(out), 3))
+        for i, p in enumerate(out):
+            loc, nrm, _, dist = body_bvh.find_nearest(p)
+            if loc is None:
+                continue
+            if (p - loc).dot(nrm) < 0 or dist < clearance:
+                shift[i] = np.array(loc + nrm * clearance - p)
+        pushed = int((np.abs(shift).sum(axis=1) > 0).sum())
+        neighbours = [[] for _ in out]
+        for e in g.data.edges:
+            a, b2 = e.vertices
+            neighbours[a].append(b2)
+            neighbours[b2].append(a)
+        for _ in range(6):
+            mean = np.array([shift[n].mean(axis=0) if n else shift[i] for i, n in enumerate(neighbours)])
+            # Never less than each vertex's own need, so smoothing cannot sink one back in.
+            keep = (shift * shift).sum(axis=1) >= (mean * mean).sum(axis=1)
+            shift = np.where(keep[:, None], shift, mean)
+        out = [p + Vector(d) for p, d in zip(out, shift)]
+        # World coordinates, on the new armature, by the new bones' names.
+        for v, p in zip(g.data.vertices, out):
+            v.co = p
+        g.parent = None
+        g.matrix_world = Matrix.Identity(4)
+        for vg in list(g.vertex_groups):
+            g.vertex_groups.remove(vg)
+        for i, keep in enumerate(weights):
+            for bone, w in keep.items():
+                vg = g.vertex_groups.get(bone) or g.vertex_groups.new(name=bone)
+                vg.add([i], w, "REPLACE")
+        for m in list(g.modifiers):
+            g.modifiers.remove(m)
+        g.modifiers.new("Armature", "ARMATURE").object = rig
+        for m in g.data.materials:
+            if m is not None:
+                m.diffuse_color = (0.30, 0.33, 0.20, 1) if "Vest" in name or "Backpack" in name else (0.42, 0.36, 0.22, 1) if "Pants" in name else (0.18, 0.14, 0.1, 1) if "Boots" in name else (0.36, 0.34, 0.22, 1)
+        g.parent = rig
+        g.matrix_parent_inverse = rig.matrix_world.inverted()
+        worn.append(g)
+        print(f"[human] worn {name}: {len(out)} vertices, {pushed} pushed out of the skin; z {min(x.z for x in out):.3f} to {max(x.z for x in out):.3f}")
+
+    # What is left of the pack comes out.
+    for o in imported:
+        if o not in worn:
+            bpy.data.objects.remove(o, do_unlink=True)
+
+    # The body under the cloth goes: a face whose outward line meets a garment within 5 cm cannot be seen.
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    cloth = bmesh.new()
+    for g in list(worn) + list(cloth_objects):
+        m = g.evaluated_get(dg).to_mesh()
+        offset = len(cloth.verts)
+        tmp = bmesh.new()
+        tmp.from_mesh(m)
+        tmp.transform(g.matrix_world)
+        tmp2 = bpy.data.meshes.new("t")
+        tmp.to_mesh(tmp2)
+        cloth.from_mesh(tmp2)
+        bpy.data.meshes.remove(tmp2)
+        tmp.free()
+        g.evaluated_get(dg).to_mesh_clear()
+    cloth_bvh = BVHTree.FromBMesh(cloth)
+    mesh = body.data
+    wm = body.matrix_world
+    keep_groups = {vg.index for vg in body.vertex_groups if vg.name == "mixamorig:Head" or "Hand" in vg.name}
+    bm2 = bmesh.new()
+    bm2.from_mesh(mesh)
+    bm2.faces.ensure_lookup_table()
+    gone = []
+    for f in bm2.faces:
+        c = wm @ f.calc_center_median()
+        n = (wm.to_3x3() @ f.normal).normalized()
+        # What shows stays whatever is near it: the head, under the cap's brim too, and the hands.
+        if any(i in keep_groups for v in f.verts for i in (g2.group for g2 in mesh.vertices[v.index].groups if g2.weight > 0.3)):
+            continue
+        if cloth_bvh.ray_cast(c + n * 0.002, n, 0.14)[0] is not None:
+            gone.append(f)
+    bmesh.ops.delete(bm2, geom=gone, context="FACES")
+    bm2.to_mesh(mesh)
+    bm2.free()
+    print(f"[human] body under the cloth cut: {len(gone)} faces gone, {len(mesh.polygons)} left")
+    skin(body)
+    for o in cloth_objects:
+        for m in o.data.materials:
+            if m is not None:
+                m.diffuse_color = (0.3, 0.3, 0.3, 1)
+    return worn
+
+
 macro = TargetService.get_default_macro_info_dict()
-macro.update({"gender": 1.0, "age": 0.5, "muscle": 0.62, "weight": 0.52, "proportions": 0.6, "height": 0.5})
+macro.update({"gender": 1.0, "age": float(opt("--age", "0.65")), "muscle": float(opt("--muscle", "0.92")), "weight": float(opt("--weight", "0.68")),
+              "proportions": float(opt("--proportions", "0.85")), "height": 0.5})
 
-body = HumanService.create_human(mask_helpers=True, detailed_helpers=False, extra_vertex_groups=True, feet_on_ground=True, scale=0.1, macro_detail_dict=macro)
+# Feet on the ground is done here, not by MPFB: its option lifts the mesh and leaves the skeleton 0.85 m under it, so every
+# joint would pivot in the wrong place. Its macro shape keys are baked and its helper mask applied first, so the FBX is plain.
+body = HumanService.create_human(mask_helpers=True, detailed_helpers=False, extra_vertex_groups=True, feet_on_ground=False, scale=0.1, macro_detail_dict=macro)
 rig = HumanService.add_builtin_rig(body, RIG, import_weights=True)
-bpy.context.view_layer.update()
-
+eyes = None
+try:
+    from bl_ext.blender_org.mpfb.services.locationservice import LocationService
+    eyes = HumanService.add_mhclo_asset(os.path.join(LocationService.get_user_data("eyes"), "low-poly", "low-poly.mhclo"), body, asset_type="Eyes", subdiv_levels=0)
+    print("[human] eyes", eyes.name if eyes else None)
+except Exception as e:
+    print("[human] no eyes:", e)
 def world_extent(obj):
+    bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
     mesh = obj.evaluated_get(dg).to_mesh()
     zs = [(obj.matrix_world @ v.co).z for v in mesh.vertices]
@@ -48,26 +275,153 @@ def world_extent(obj):
     obj.evaluated_get(dg).to_mesh_clear()
     return min(zs), max(zs), tris
 
+
+# Measured now: fitting clothes takes the body under them away, feet included.
 low, high, tris = world_extent(body)
 height = high - low
-print(f"[human] generated: height {height:.3f} m (feet {low:.3f}), triangles shown {tris}, bones {len(rig.data.bones)}")
-print("[human] bones:", ", ".join(b.name for b in rig.data.bones)[:900])
 
-# Exactly the wanted height, with the scale applied so Unity sees a body in metres at scale 1.
+native = []
+if opt("--uniform", ""):
+    for kind, folder, label, asset_type in NATIVE:
+        try:
+            o = HumanService.add_mhclo_asset(os.path.join(LocationService.get_user_data(kind), folder, folder + ".mhclo"), body, asset_type=asset_type, subdiv_levels=0)
+            o.name = label
+            native.append(o)
+            print("[human] native", label, len(o.data.vertices), "vertices")
+        except Exception as e:
+            print("[human] no", folder, e)
+bpy.context.view_layer.update()
+
+
+def bake(obj):
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    if obj.data.shape_keys is not None:
+        bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+    for mod in list(obj.modifiers):
+        if mod.type == "MASK":
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+bake(body)
+if eyes is not None:
+    bake(eyes)
+for o in native:
+    bake(o)
+
+
+print(f"[human] generated: height {height:.3f} m (feet {low:.3f}), bones {len(rig.data.bones)}")
+print("[human] bones:", ", ".join(b.name for b in rig.data.bones)[:400])
+
+# Exactly the wanted height, feet at zero, everything applied so Unity sees metres at scale 1.
 k = TARGET_HEIGHT / height
-rig.scale = rig.scale * k
+rig.scale = Vector((k, k, k))
+rig.location = Vector((0, 0, -low * k))
 bpy.context.view_layer.update()
 bpy.ops.object.select_all(action="DESELECT")
-rig.select_set(True)
+for o in (rig, body) + ((eyes,) if eyes is not None else ()) + tuple(native):
+    o.select_set(True)
 bpy.context.view_layer.objects.active = rig
-bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
 low, high, tris = world_extent(body)
-print(f"[human] scaled: height {high - low:.3f} m, armature scale {tuple(round(x, 3) for x in rig.scale)}")
+hips = rig.matrix_world @ rig.data.bones["mixamorig:Hips"].head_local
+print(f"[human] placed: feet {low:.3f}, crown {high:.3f}, hips joint {hips.z:.3f}, foot joint {(rig.matrix_world @ rig.data.bones['mixamorig:LeftFoot'].head_local).z:.3f}, rig scale {rig.scale.x:.3f}, body scale {body.scale.x:.3f}")
+
+UNIFORM = opt("--uniform", "")
+garments = []
+if UNIFORM:
+    garments = dress(body, rig, UNIFORM, native) + native
+    bpy.context.view_layer.update()
+
+
+def into_t_pose(rig, meshes):
+    """Arms straight out: Unity's Humanoid retargeting reads the rest pose as its T-pose. The meshes are bent by their own weights and the pose made the rest."""
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    for side, x in (("Left", 1.0), ("Right", -1.0)):
+        for bone, child in ((f"{side}Arm", f"{side}ForeArm"), (f"{side}ForeArm", f"{side}Hand"), (f"{side}Hand", f"{side}HandMiddle1")):
+            pb = rig.pose.bones["mixamorig:" + bone]
+            cb = rig.pose.bones["mixamorig:" + child]
+            bpy.context.view_layer.update()
+            d = (cb.head - pb.head).normalized()
+            turn = d.rotation_difference(Vector((x, 0, 0))).to_matrix().to_4x4()
+            from mathutils import Matrix
+            pb.matrix = Matrix.Translation(pb.head) @ turn @ Matrix.Translation(-pb.head) @ pb.matrix
+            bpy.context.view_layer.update()
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for m in meshes:
+        bpy.ops.object.select_all(action="DESELECT")
+        m.select_set(True)
+        bpy.context.view_layer.objects.active = m
+        for mod in list(m.modifiers):
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.armature_apply(selected=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for m in meshes:
+        m.modifiers.new("Armature", "ARMATURE").object = rig
+
+
+def split_head(body):
+    """The head as its own mesh: EnemyBrutality and the face damage find it by its name."""
+    import bmesh
+    head_index = body.vertex_groups["mixamorig:Head"].index
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.duplicate()
+    head = bpy.context.view_layer.objects.active
+    head.name = "Human_Head"
+    body.name = "Human_Body"
+    def keep(obj, want_head):
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        layer = bm.verts.layers.deform.verify()
+        gone = []
+        for f in bm.faces:
+            is_head = all(v[layer].get(head_index, 0.0) > 0.5 for v in f.verts)
+            if is_head != want_head:
+                gone.append(f)
+        bmesh.ops.delete(bm, geom=gone, context="FACES")
+        bm.to_mesh(obj.data)
+        bm.free()
+    keep(head, True)
+    keep(body, False)
+    return head
+
+
+head_mesh = None
+if UNIFORM:
+    meshes = [body] + garments + ([eyes] if eyes is not None else [])
+    into_t_pose(rig, meshes)
+    head_mesh = split_head(body)
+    garments.append(head_mesh)
+    if eyes is not None:
+        eyes.name = "Human_Eyes"
+        mat = bpy.data.materials.new("Human_Eyes")
+        eyes.data.materials.clear()
+        eyes.data.materials.append(mat)
+    NAMES = {"Outfit_Worksuit": ("Human_Worksuit", (0.40, 0.38, 0.24, 1)), "Outfit_Boots": ("Human_Boots", (0.18, 0.13, 0.09, 1)),
+             "Human_Hair": ("Human_Hair", (0.08, 0.06, 0.05, 1)), "Human_Brows": ("Human_Brows", (0.08, 0.06, 0.05, 1))}
+    for o in native:
+        name, colour = NAMES[o.name]
+        mat = bpy.data.materials.new(name)
+        mat.diffuse_color = colour
+        o.data.materials.clear()
+        o.data.materials.append(mat)
+    bpy.context.view_layer.update()
+    print("[human] t-pose done; left hand joint", [round(x, 3) for x in rig.matrix_world @ rig.data.bones["mixamorig:LeftHand"].head_local], "objects", [o.name for o in [rig, body] + garments])
 
 # Two looks at it.
 bpy.context.scene.render.engine = "BLENDER_WORKBENCH"
 bpy.context.scene.display.shading.light = "STUDIO"
-bpy.context.scene.display.shading.color_type = "SINGLE"
+bpy.context.scene.display.shading.color_type = "MATERIAL" if UNIFORM else "SINGLE"
 bpy.context.scene.display.shading.single_color = (0.75, 0.62, 0.52)
 bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y = 500, 900
 cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
@@ -90,6 +444,10 @@ bpy.data.objects.remove(cam, do_unlink=True)
 bpy.ops.object.select_all(action="DESELECT")
 body.select_set(True)
 rig.select_set(True)
+for g in garments:
+    g.select_set(True)
+if eyes is not None:
+    eyes.select_set(True)
 bpy.context.view_layer.objects.active = rig
 bpy.ops.export_scene.fbx(
     filepath=os.path.join(out, f"{NAME}.fbx"), use_selection=True, object_types={"ARMATURE", "MESH"},

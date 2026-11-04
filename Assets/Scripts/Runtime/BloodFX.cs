@@ -54,6 +54,7 @@ public static class BloodFX
     static Mesh[] s_quads;
     static Mesh s_whole;
     static int s_surfaceMask;
+    static Material s_streamMaterial;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStaticState()
@@ -69,6 +70,7 @@ public static class BloodFX
         s_quads = null;
         s_whole = null;
         s_surfaceMask = 0;
+        s_streamMaterial = null;
         JetDrops = 0;
     }
 
@@ -143,15 +145,15 @@ public static class BloodFX
         }
 
         // The cloud at the wound, blown back out of it toward the shooter.
-        Mist(point, normal * 1.1f + direction * 0.4f, (0.2f + 0.35f * severity) * library.splash,
-             library.mistColor, 3 + Mathf.RoundToInt(5 * severity));
+        Mist(point, normal * 1.1f + direction * 0.4f, (0.16f + 0.26f * severity) * library.splash,
+             library.mistColor, 1 + Mathf.RoundToInt(2 * severity));
 
         // Droplets out of the far side, along the round. Most of what the eye reads as
         // "that went through him".
         int drops = Mathf.Max(6, Mathf.RoundToInt(library.dropsPerHit * (0.6f + 1.4f * severity) * DropScale));
         Spray(point, direction, 2.2f + 4.5f * severity, drops, library.dropColor);
         // The heavy gouts in it, slower and falling sooner: what makes it read as liquid and not as dust.
-        Spray(point, direction, 1.4f + 2.2f * severity, Mathf.Max(2, drops / 5), library.dropColor, 2.4f);
+        Spray(point, direction, 1.4f + 2.2f * severity, Mathf.Max(2, drops / 4), library.dropColor, 2.2f);
 
         // A few back toward the shooter, slower.
         Spray(point, normal, 1.2f + 1.5f * severity, Mathf.Max(1, drops / 4), library.dropColor);
@@ -194,31 +196,32 @@ public static class BloodFX
         }
     }
 
-    /// <summary>Drops an opened artery has thrown, for the checks only.</summary>
+    /// <summary>Points of artery stream thrown, for the checks only.</summary>
     public static int JetDrops { get; private set; }
 
-    /// <summary>
-    /// An artery: one frame's worth of a narrow, fast stream out of a wound, thrown by each heartbeat
-    /// (<see cref="EnemyNeckWound"/>). <paramref name="pressure"/> is 0 to 1: a full heart to a failing one, less under a hand.
-    /// </summary>
-    public static void Jet(Vector3 at, Vector3 direction, float pressure, float dt)
+    /// <summary>An open artery's stream, or null with the Blood setting off. Its owner feeds it with <see cref="Stream"/> and destroys it.</summary>
+    public static BloodStream NewStream()
     {
-        if (!Enabled || !Ensure(s_library) || s_spray == null) return;
-        int count = Mathf.CeilToInt(520f * dt * DropScale * Mathf.Clamp01(pressure + 0.2f));
-        var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false };
-        for (int i = 0; i < count; i++)
+        if (!Enabled || !Ensure(s_library) || s_library.sprayPrefab == null) return null;
+        if (s_streamMaterial == null)
         {
-            emit.position = at + Random.insideUnitSphere * 0.012f;
-            emit.velocity = (direction + Random.insideUnitSphere * 0.11f).normalized * (2.2f + 3.6f * pressure) * Random.Range(0.8f, 1.15f);
-            emit.startSize = Random.Range(0.005f, 0.017f) * Mathf.Sqrt(s_library.splash);
-            emit.startLifetime = Random.Range(0.5f, 0.95f);
-            emit.startColor = s_library.dropColor;
-            s_spray.Emit(emit, 1);
-            JetDrops++;
+            // The spray's own lit shader, untextured, in the blood's colour: with the droplet texture on a line it came out thin and white.
+            var drawn = s_library.sprayPrefab.GetComponent<ParticleSystemRenderer>();
+            s_streamMaterial = new Material(drawn.sharedMaterial) { name = "BloodStream", hideFlags = HideFlags.DontSave };
+            if (s_streamMaterial.HasProperty("_BaseMap")) s_streamMaterial.SetTexture("_BaseMap", null);
+            if (s_streamMaterial.HasProperty("_BaseColor")) s_streamMaterial.SetColor("_BaseColor", Color.white);
         }
-        // The fine red cloud a pressurised jet throws off round it.
-        if (s_mist != null && Random.value < dt * 10f)
-            Mist(at + direction * 0.06f, direction * 0.7f * pressure, 0.09f * s_library.splash, s_library.mistColor, 1);
+        return BloodStream.Create(s_root, s_streamMaterial, s_library.dropColor);
+    }
+
+    /// <summary>One frame of an artery. <paramref name="pressure"/> is 0 to 1: it throws further and swells on each heartbeat. A little spatter breaks off it.</summary>
+    public static void Stream(BloodStream stream, Vector3 at, Vector3 direction, float pressure, float dt)
+    {
+        if (stream == null || !Enabled) return;
+        stream.Feed(at, direction * (1.1f + 3.0f * pressure), (0.009f + 0.016f * pressure) * Mathf.Sqrt(s_library.splash));
+        JetDrops++;
+        if (s_spray != null && Random.value < dt * 40f * pressure)
+            Spray(at + direction * 0.06f, direction, 1.6f + 2.5f * pressure, 1, s_library.dropColor);
     }
 
     /// <summary>Where one heartbeat's stream comes down: on a wall in its way, else the floor ahead of the body.</summary>
@@ -305,7 +308,8 @@ public static class BloodFX
 
         for (int i = 0; i < count; i++)
         {
-            Vector3 v = (direction + Random.insideUnitSphere * 0.45f).normalized * speed * Random.Range(0.4f, 1.1f);
+            // A tight sheaf, not a burst in all directions: liquid thrown one way holds together.
+            Vector3 v = (direction + Random.insideUnitSphere * 0.2f).normalized * speed * Random.Range(0.45f, 1.1f);
             v += Vector3.up * Random.Range(0f, 1.2f);
 
             emit.position = at + Random.insideUnitSphere * 0.04f;
@@ -466,15 +470,23 @@ public static class BloodFX
         if (library.sprayPrefab != null)
         {
             s_spray = Object.Instantiate(library.sprayPrefab, s_root);
-            // Room for bigger sprays, and each drop drawn long along its flight: a liquid, not grit.
+            // Room for bigger sprays. Each drop draws a liquid tail, tapering to nothing behind it (not on Low).
             var main = s_spray.main;
             main.maxParticles = Mathf.Max(main.maxParticles, QualityTiers.Current == GameSettings.Quality.Low ? 900 : 2400);
-            if (s_spray.TryGetComponent<ParticleSystemRenderer>(out var drawn))
+            if (QualityTiers.Current != GameSettings.Quality.Low && s_spray.TryGetComponent<ParticleSystemRenderer>(out var drawn))
             {
-                drawn.renderMode = ParticleSystemRenderMode.Stretch;
-                // Drawn a little long along the flight: much more and they were needles scratched on the air.
-                drawn.velocityScale = 0.022f;
-                drawn.lengthScale = 1.1f;
+                var trails = s_spray.trails;
+                trails.enabled = true;
+                trails.mode = ParticleSystemTrailMode.PerParticle;
+                trails.ratio = 0.8f;
+                trails.lifetime = new ParticleSystem.MinMaxCurve(0.035f, 0.085f);
+                trails.minVertexDistance = 0.012f;
+                trails.worldSpace = true;
+                trails.dieWithParticles = false;
+                trails.sizeAffectsWidth = true;
+                trails.inheritParticleColor = true;
+                trails.widthOverTrail = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+                drawn.trailMaterial = drawn.sharedMaterial;
             }
         }
 

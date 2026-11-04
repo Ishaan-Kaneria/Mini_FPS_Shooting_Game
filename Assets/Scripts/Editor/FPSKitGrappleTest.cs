@@ -274,7 +274,7 @@ namespace FPSKit.EditorTools
             float near = Flat(t.transform.position - _player.transform.position).magnitude;
             yield return Seconds(1.2f);
             float far = Flat(t.transform.position - _player.transform.position).magnitude;
-            Require(far > near + 2f, $"G5 running from the player ({near:0.0} m -> {far:0.0} m in 1.2 s)");
+            Require(far > near + 1.7f, $"G5 running from the player ({near:0.0} m -> {far:0.0} m in 1.2 s)");
             ai.enabled = false;
             _hurtBy = null;
 

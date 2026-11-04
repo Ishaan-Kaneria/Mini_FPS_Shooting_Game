@@ -462,6 +462,9 @@ namespace FPSKit.EditorTools
         /// <summary>The first-person arms and body alone (FP_Arms, FP_Body); no gun is remade.</summary>
         public static void BuildPlayerBody() => Run(FPSKitViewModels.BuildArmsAndBody);
 
+        /// <summary>The player's own body (FPSKit > Player > Build Body): legs, trunk, kick and shadow.</summary>
+        public static void BuildPlayerTrunk() => Run(FPSKitPlayerBody.Build);
+
         /// <summary>
         /// Plays the loop the player sees: dashboard, into an arena, quit, back to the
         /// dashboard with the run recorded.

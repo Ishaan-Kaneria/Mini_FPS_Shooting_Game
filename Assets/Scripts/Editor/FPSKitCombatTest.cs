@@ -134,6 +134,8 @@ namespace FPSKit.EditorTools
                 _poolAtEngage = _poolAfterRanged = _poolBeforeClose = _poolAtEnd = -1f;
                 _closeAttacks = 0;
                 _sawRangedShot = false;
+                FightingEyes.Clear();
+                _playerEye = -1f;
                 _punchThrown = _punchKilled = _gunLowered = _fistShown = _punchMissed = false;
                 _punchRole = _punchMissHit = "";
                 _punchTarget = null;
@@ -160,8 +162,56 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>
+        /// The player's eye against an ordinary enemy's in a fight, measured in play. His stance dips 16 cm below the rest pose, so the
+        /// rest pose's numbers said "level" while the player looked down on the top of his head (his report, 2026-11-04, three times).
+        /// </summary>
+        static readonly System.Collections.Generic.List<float> FightingEyes = new System.Collections.Generic.List<float>();
+        static int _eyeSampleFrame;
+        const float EnemyEyeOverHeadJoint = 0.04f;
+        static float _playerEye = -1f;
+
+        static void SampleEyes()
+        {
+            if (!Application.isPlaying || Time.frameCount - _eyeSampleFrame < 45) return;
+            _eyeSampleFrame = Time.frameCount;
+            var player = GameObject.FindGameObjectWithTag("Player");
+            var motor = player != null ? player.GetComponent<PlayerMotor>() : null;
+            if (motor == null || motor.cameraHolder == null) return;
+            _playerEye = motor.cameraHolder.position.y - player.transform.position.y;
+            foreach (var ai in Enemies())
+            {
+                if (ai.archetype == null || ai.archetype.name != "Grunt") continue;
+                if (ai.CurrentState != EnemyAI.State.Chase && ai.CurrentState != EnemyAI.State.Attack) continue;
+                var animator = ai.GetComponentInChildren<Animator>();
+                var head = animator != null && animator.isHuman ? animator.GetBoneTransform(HumanBodyBones.Head) : null;
+                if (head != null) FightingEyes.Add(head.position.y + EnemyEyeOverHeadJoint - ai.transform.position.y);
+            }
+        }
+
+        /// <summary>What is wrong with the sizes, or null. A man-sized enemy is never under 1 (they read as teenagers), a boss aside.</summary>
+        static string SizeProblems()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var guid in AssetDatabase.FindAssets("t:EnemyArchetype"))
+            {
+                var a = AssetDatabase.LoadAssetAtPath<EnemyArchetype>(AssetDatabase.GUIDToAssetPath(guid));
+                if (a != null && a.scaleMultiplier < 0.999f) sb.Append($"\n  - {a.name} is {a.scaleMultiplier:0.00} of a man's size: reads as a teenager");
+            }
+            if (FightingEyes.Count < 5) sb.Append($"\n  - only {FightingEyes.Count} samples of a fighting Grunt's eye");
+            else
+            {
+                FightingEyes.Sort();
+                float eye = FightingEyes[FightingEyes.Count / 2];
+                Notes.Append($"\n  eyes over the feet: player {_playerEye:0.00}, a fighting Grunt {eye:0.00} ({FightingEyes.Count} samples)");
+                if (_playerEye > eye + 0.05f) sb.Append($"\n  - the player's eye ({_playerEye:0.00}) looks down on a fighting Grunt's ({eye:0.00})");
+            }
+            return sb.Length > 0 ? sb.ToString() : null;
+        }
+
         static void Tick()
         {
+            SampleEyes();
             try
             {
                 if (EditorApplication.timeSinceStartup - _startedAt > HardTimeout)
@@ -377,8 +427,7 @@ namespace FPSKit.EditorTools
                             return;
                         }
 
-                        Face(player, nearest.transform.position);
-                        Physics.SyncTransforms();
+                        HoldAtArmsLength(player, nearest.transform);
 
                         var target = nearest.GetComponent<Health>();
                         _punchPoolBefore = target.Current + target.Shield;
@@ -413,6 +462,7 @@ namespace FPSKit.EditorTools
                         var melee = player != null ? player.GetComponent<MeleeStrike>() : null;
                         if (melee != null && (melee.FistsUp > 0.3f || (melee.weapon != null && melee.weapon.HandsRotation.magnitude > 5f)))
                             _fistShown = true;
+                        if (_punchTarget != null && !_punchTarget.IsDead) HoldAtArmsLength(player, _punchTarget.transform);
 
                         // Past the jab's recovery, still inside the window for the cross.
                         // The second press of the fight: the gun goes on the back and a fist lands.
@@ -429,8 +479,6 @@ namespace FPSKit.EditorTools
 
                         if (melee != null && _punchTarget != null && !_punchTarget.IsDead)
                         {
-                            // Still facing it, as a player keeps the enemy in the crosshair after the butt.
-                            if (player != null) { Face(player, _punchTarget.transform.position); Physics.SyncTransforms(); }
                             var hit = melee.TryPunch();
                             Notes.Append($"\n  punch thrown at {(hit != null ? hit.name : "nothing")}");
                             if (hit == null)
@@ -460,6 +508,7 @@ namespace FPSKit.EditorTools
                         var ms = MeleeSettings.Active;
                         if (melee != null && Time.time < Mathf.Max(melee.ReadyAt, _punchAt + ms.crossSeconds) + 0.05f)
                         {
+                            if (_punchTarget != null && !_punchTarget.IsDead) HoldAtArmsLength(player, _punchTarget.transform);
                             if (Waiting()) return;
                             Notes.Append("\n  punch: game time never passed the cooldown");
                         }
@@ -712,6 +761,53 @@ namespace FPSKit.EditorTools
             return nearest;
         }
 
+        /// <summary>
+        /// On the ground, facing him, just outside grab reach, for the butt-then-punch pair: nearer, the butt folds him, his head comes
+        /// within MeleeSettings.grabRange, and the next press is rightly the grab (the 2026-11-04 failures: five runs in six), which
+        /// VerifyGrapple measures and which never finishes a man. He keeps walking in, so this is asked again until the punch has landed.
+        /// </summary>
+        /// <summary>A blow folds him about half a metre forward at the head: this far off, the next press is still a punch, not the grab.</summary>
+        const float ClearOfGrab = 1.8f;
+
+        static void HoldAtArmsLength(GameObject player, Transform target) => StandBy(player, target, ClearOfGrab);
+
+        /// <summary>
+        /// Stands the player this far from the target, on his level and facing him, on the side they are already on unless something
+        /// solid is between. A blow rightly does not land through a wall, and a teleport can cross one (a hangar wall, 2026-11-04: the
+        /// butt was blocked, one run in eight), so the check walks round him to the nearest side that is clear.
+        /// </summary>
+        static void StandBy(GameObject player, Transform target, float metres)
+        {
+            Vector3 away = Vector3.ProjectOnPlane(player.transform.position - target.position, Vector3.up);
+            away = away.sqrMagnitude > 0.01f ? away.normalized : target.forward;
+            for (int i = 0; i < 12; i++)
+            {
+                // 0, +30, -30, +60, -60 ... degrees from where the player already is.
+                int step = (i + 1) / 2 * (i % 2 == 1 ? 1 : -1);
+                Vector3 side = Quaternion.AngleAxis(step * 30f, Vector3.up) * away;
+                if (!ClearSide(target.position, side, metres)) continue;
+                away = side;
+                break;
+            }
+            var controller = player.GetComponent<CharacterController>();
+            if (controller != null) controller.enabled = false;
+            player.transform.position = target.position + away * metres + Vector3.up * 0.05f;
+            if (controller != null) controller.enabled = true;
+            Face(player, target.position);
+            Physics.SyncTransforms();
+        }
+
+        static bool ClearSide(Vector3 at, Vector3 side, float metres)
+        {
+            int solid = ~LayerMask.GetMask("Enemy", "Player");
+            foreach (float height in new[] { 0.4f, 1f, 1.7f })
+            {
+                Vector3 from = at + Vector3.up * height;
+                if (Physics.Linecast(from, from + side * (metres + 0.4f), solid, QueryTriggerInteraction.Ignore)) return false;
+            }
+            return true;
+        }
+
         static void Face(GameObject player, Vector3 at)
         {
             Vector3 to = Vector3.ProjectOnPlane(at - player.transform.position, Vector3.up);
@@ -865,6 +961,8 @@ namespace FPSKit.EditorTools
                     problems.Append($"\n  - a punch thrown from eight metres hit {_punchMissHit}");
             }
 
+            problems.Append(SizeProblems());
+
             if (problems.Length > 0)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: level one does not fight:{problems}\n{Notes}");
@@ -928,16 +1026,9 @@ namespace FPSKit.EditorTools
 
                     var health = _rxTarget.GetComponent<Health>();
                     health.ResetHealth();
-                    Vector3 away = Vector3.ProjectOnPlane(player.transform.position - _rxTarget.transform.position, Vector3.up);
-                    away = away.sqrMagnitude > 0.01f ? away.normalized : _rxTarget.transform.forward;
-                    var controller = player.GetComponent<CharacterController>();
-                    if (controller != null) controller.enabled = false;
                     // 1.6 m, just outside grab reach: at 1.3 m the butt folded him, his head came into the crosshair within
                     // MeleeSettings.grabRange, and the next press was rightly the grab, not the jab this measures.
-                    player.transform.position = _rxTarget.transform.position + away * 1.6f + Vector3.up * 0.05f;
-                    if (controller != null) controller.enabled = true;
-                    Face(player, _rxTarget.transform.position);
-                    Physics.SyncTransforms();
+                    StandBy(player, _rxTarget.transform, ClearOfGrab);
 
                     _rxHitBefore = _rxBody.LastHitFrame;
                     var hit = strike == MeleeStrike.Strike.Kick ? melee.TryKick() : melee.TryPunch();
@@ -973,18 +1064,11 @@ namespace FPSKit.EditorTools
                     // during the wind-up read as "no reaction" when the strike had simply missed. This times the reaction.
                     if (!landed && _rxTarget != null && melee.Current != MeleeStrike.Strike.None)
                     {
-                        Vector3 back = Vector3.ProjectOnPlane(player.transform.position - _rxTarget.transform.position, Vector3.up);
-                        back = back.sqrMagnitude > 0.01f ? back.normalized : _rxTarget.transform.forward;
-                        var cc = player.GetComponent<CharacterController>();
-                        if (cc != null) cc.enabled = false;
-                        player.transform.position = _rxTarget.transform.position + back * 1.3f + Vector3.up * 0.05f;
-                        if (cc != null) cc.enabled = true;
-                        Face(player, _rxTarget.transform.position);
-                        Physics.SyncTransforms();
+                        StandBy(player, _rxTarget.transform, 1.3f);
                     }
                     if (_rxFrame > 120)
                     {
-                        Notes.Append($"\n  reaction to {strike}: no blow landed, or no answer within 2 s");
+                        Notes.Append($"\n  reaction to {strike}: no blow landed, or no answer within 2 s (hit frame {_rxBody?.LastHitFrame} before {_rxHitBefore}, latency {_rxBody?.ReactionLatencyFrames}, state {_rxTarget?.CurrentState}, down {_rxBody?.IsDown})");
                         Errors.Add($"a {strike} at arm's length never got a visible reaction");
                         _rxStep++;
                         _rxStage = 0;

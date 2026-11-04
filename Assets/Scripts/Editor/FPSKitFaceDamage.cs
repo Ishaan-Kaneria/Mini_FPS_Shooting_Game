@@ -24,10 +24,10 @@ namespace FPSKit.EditorTools
     /// </summary>
     public static class FPSKitFaceDamage
     {
-        const string SourceFbx = "Assets/Survivalist/Basemesh/SK_Military_Survivalist.fbx";
-        const string ShapesFbx = "Assets/Models/Enemy/SK_Military_Head1_FaceDamage.fbx";
+        const string SourceFbx = "Assets/Characters/HumanSoldier/Human_Soldier.fbx";
+        const string ShapesFbx = "Assets/Models/Enemy/Human_Head_FaceDamage.fbx";
         const string OutFolder = "Assets/FPSKit_Generated/Resources/FaceDamage";
-        const string OutPath = OutFolder + "/SK_Military_Head1.asset";
+        const string OutPath = OutFolder + "/Human_Head.asset";
 
         public static string Bake()
         {

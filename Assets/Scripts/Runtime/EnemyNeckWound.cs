@@ -21,7 +21,7 @@ public class EnemyNeckWound : MonoBehaviour
     [Tooltip("Share of each heartbeat the artery is throwing blood.")]
     [Range(0.1f, 0.9f)] public float pulseShare = 0.4f;
     [Tooltip("How much of the stream his hand holds back once it is there.")]
-    [Range(0f, 1f)] public float handStops = 0.5f;
+    [Range(0f, 1f)] public float handStops = 0.3f;
     [Tooltip("Seconds the wound goes on pumping after he is dead, weakening.")]
     [Range(0f, 8f)] public float afterDeath = 2.5f;
     [Tooltip("Share of the bleeding at which his knees go.")]
@@ -39,6 +39,12 @@ public class EnemyNeckWound : MonoBehaviour
     bool _open;
     float _openedAt, _diedAt, _hand, _rate, _phase, _nextTick, _nextDrip, _nextGroan;
     int _lastBeat;
+    BloodStream _stream;
+    float _spurtSide = 1f, _pressure;
+    Vector3 _way;
+
+    /// <summary>The stream now, for the checks.</summary>
+    public BloodStream Stream => _stream;
 
     /// <summary>The wound is open and he is still alive: what the checks and the debug line read.</summary>
     public bool Bleeding => _open && _health != null && !_health.IsDead;
@@ -68,6 +74,13 @@ public class EnemyNeckWound : MonoBehaviour
     void OnDisable()
     {
         if (_health != null) _health.Damaged -= OnDamaged;
+        EndStream();
+    }
+
+    void EndStream()
+    {
+        if (_stream != null) Destroy(_stream.gameObject);
+        _stream = null;
     }
 
     void OnDamaged(Health health, DamageInfo info)
@@ -102,6 +115,10 @@ public class EnemyNeckWound : MonoBehaviour
         _nextGroan = Time.time + 0.6f;
         _phase = 0f;
         _lastBeat = -1;
+        EndStream();
+        _spurtSide = Random.value < 0.5f ? -1f : 1f;
+        _way = Vector3.zero;
+        _pressure = 0f;
         _diedAt = -1f;
         if (_ai != null) _ai.ThroatOpen = true;
         if (_body != null) _body.ClutchNeck(seconds + 2f, seconds * sinkAtShare);
@@ -112,7 +129,7 @@ public class EnemyNeckWound : MonoBehaviour
         if (!_open || _health == null) return;
         bool dead = _health.IsDead;
         if (dead && _diedAt < 0f) _diedAt = Time.time;
-        if (dead && Time.time - _diedAt > afterDeath) { _open = false; return; }
+        if (dead && Time.time - _diedAt > afterDeath) { _open = false; EndStream(); return; }
 
         if (!dead && Time.time >= _nextTick)
         {
@@ -145,13 +162,17 @@ public class EnemyNeckWound : MonoBehaviour
         int beat = Mathf.FloorToInt(_phase);
         float within = _phase - beat;
         float pressure = heart * (1f - handStops * _hand);
-        Vector3 at = WoundPoint, way = (WorldOut + Vector3.up * 0.35f).normalized;
-        if (within < pulseShare)
-        {
-            // Each beat rises hard and tails off.
-            float shape = 1f - within / pulseShare;
-            BloodFX.Jet(at, way, pressure * Mathf.Lerp(0.45f, 1f, shape), Time.deltaTime);
-        }
+        // Made here, not at the hit: on the level's first wound the blood's library arrives with the same hit, after this hears of it.
+        if (_stream == null) _stream = BloodFX.NewStream();
+        // It arcs off to one side of him: thrown straight along the round it came at the shooter end on, a dot.
+        Vector3 at = WoundPoint, way = (WorldOut + Vector3.Cross(Vector3.up, WorldOut) * (_spurtSide * 0.8f) + Vector3.up * 0.35f).normalized;
+        // One stream that never breaks: each beat rises hard and tails off, and between beats it only sags and thins.
+        float shape = within < pulseShare ? 1f - within / pulseShare : 0f;
+        // Eased: the bone's small shake and the beat's sharp edge, taken straight, drew the stream as a staircase.
+        float ease = 1f - Mathf.Exp(-Time.deltaTime * 7f);
+        _way = _way.sqrMagnitude > 0.5f ? Vector3.Slerp(_way, way, ease).normalized : way;
+        _pressure = Mathf.Lerp(_pressure, pressure * Mathf.Lerp(0.62f, 1f, shape), 1f - Mathf.Exp(-Time.deltaTime * 12f));
+        BloodFX.Stream(_stream, at, _way, _pressure, Time.deltaTime);
         if (beat != _lastBeat)
         {
             _lastBeat = beat;

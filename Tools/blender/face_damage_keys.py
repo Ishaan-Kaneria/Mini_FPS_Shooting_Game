@@ -22,10 +22,10 @@ import bpy
 from mathutils import Vector
 
 PROJECT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SOURCE = os.path.join(PROJECT, "Assets/Survivalist/Basemesh/SK_Military_Survivalist.fbx")
-OUT = os.path.join(PROJECT, "Assets/Models/Enemy/SK_Military_Head1_FaceDamage.fbx")
+SOURCE = os.path.join(PROJECT, "Assets/Characters/HumanSoldier/Human_Soldier.fbx")
+OUT = os.path.join(PROJECT, "Assets/Models/Enemy/Human_Head_FaceDamage.fbx")
 PREVIEWS = os.environ.get("FACE_PREVIEWS", "")
-HEAD = "SK_Military_Head1"
+HEAD = "Human_Head"
 
 F, U, LEFT = Vector((0, -1, 0)), Vector((0, 0, 1)), Vector((1, 0, 0))
 
@@ -59,15 +59,14 @@ def build(head):
     mw = head.matrix_world
     lin = mw.to_3x3()
     inv = lin.inverted()
-    eye_mat = [i for i, m in enumerate(me.materials) if m and "Eye" in m.name][0]
+    # The eyeballs are their own mesh on the generated man: the skin has none of them to hold still, only their places to measure from.
     eyes = set()
-    for p in me.polygons:
-        if p.material_index == eye_mat:
-            eyes.update(p.vertices)
+    eye_mesh = next(o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("Human_Eyes"))
     W = [mw @ v.co for v in me.vertices]
     N = [(lin @ v.normal).normalized() for v in me.vertices]
-    eyeL = [W[i] for i in eyes if W[i].x > 0]
-    eyeR = [W[i] for i in eyes if W[i].x < 0]
+    balls = [eye_mesh.matrix_world @ v.co for v in eye_mesh.data.vertices]
+    eyeL = [p for p in balls if p.x > 0]
+    eyeR = [p for p in balls if p.x < 0]
     cL = sum(eyeL, Vector()) / len(eyeL)
     cR = sum(eyeR, Vector()) / len(eyeR)
     centre = sum(W, Vector()) / len(W)

@@ -60,6 +60,10 @@ public class EyeCamera : MonoBehaviour
         _breathPhase = Random.value;
     }
 
+    MeleeStrike _melee;
+    Vector3 _blowOffset, _blowOffsetVel;
+    Vector2 _blowTurn, _blowTurnVel;
+
     void OnEnable()
     {
         if (_motor != null) _motor.Landed += OnLanded;
@@ -143,6 +147,28 @@ public class EyeCamera : MonoBehaviour
         float breathPitch = -breath * Mathf.Lerp(s.restPitch, s.blownPitch, blown);
         float breathLift = breath * Mathf.Lerp(s.restLift, s.blownLift, blown);
 
+        // ---- a blow's weight ---------------------------------------------------------------
+        // His note, 2026-11-04: the camera sucks in a kick or a punch; it used to hold dead still, a floating eye over a leg. The head
+        // goes with the body: leaning back from a kick, into a punch, on springs. The aim is untouched (this is the eye, under the holder).
+        if (_melee == null) _melee = GetComponentInChildren<MeleeStrike>();
+        Vector3 blowOffsetWant = Vector3.zero;
+        Vector2 blowTurnWant = Vector2.zero;
+        if (_melee != null && _melee.Current != MeleeStrike.Strike.None)
+        {
+            float k = _melee.StrikeProgress;
+            float bell = Mathf.Sin(Mathf.Clamp01(k) * Mathf.PI);
+            if (_melee.Current == MeleeStrike.Strike.Kick)
+            {
+                blowOffsetWant = new Vector3(-0.01f, -0.02f, -0.035f) * bell;
+                blowTurnWant = new Vector2(-1.4f, 1.1f) * bell;
+            }
+            else
+            {
+                blowOffsetWant = new Vector3(0f, -0.008f, 0.03f) * bell;
+                blowTurnWant = new Vector2(0.7f, -0.9f) * bell;
+            }
+        }
+
         // ---- springs, in fixed slices ----------------------------------------------------
         const float Slice = 1f / 240f;
         float left = dt;
@@ -154,11 +180,14 @@ public class EyeCamera : MonoBehaviour
             Spring2(ref _tilt, ref _tiltVel, tiltWant, s.settle, s.damping, h);
             Spring1(ref _land, ref _landVel, 0f, s.settle * 0.8f, s.damping, h);
             Spring1(ref _landNod, ref _landNodVel, 0f, s.settle * 0.8f, s.damping, h);
+            Spring(ref _blowOffset, ref _blowOffsetVel, blowOffsetWant, s.settle * 1.3f, s.damping, h);
+            Spring2(ref _blowTurn, ref _blowTurnVel, blowTurnWant, s.settle * 1.3f, s.damping, h);
         }
         _land = Mathf.Clamp(_land, -0.15f, 0.05f);
 
-        Vector3 offset = stepOffset + _lag * keep + Vector3.up * (_land * comfort + breathLift);
+        Vector3 offset = stepOffset + _lag * keep + Vector3.up * (_land * comfort + breathLift) + _blowOffset * s.blowMotion * comfort;
         Vector3 turn = new Vector3(stepTurn.x + _tilt.x * keep + _landNod * comfort + breathPitch, 0f, stepTurn.y + _tilt.y * keep);
+        turn += new Vector3(_blowTurn.x, 0f, _blowTurn.y) * s.blowMotion * comfort;
         Offset = offset;
         Turn = turn;
         _eye.localPosition = offset;

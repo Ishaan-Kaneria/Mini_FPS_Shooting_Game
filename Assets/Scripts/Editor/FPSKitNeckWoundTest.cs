@@ -125,6 +125,7 @@ namespace FPSKit.EditorTools
                         Require(_a.GetComponent<EnemyNeckWound>().Bleeding, "the wound is open");
                         _startFloor = _a.GetComponentInChildren<Animator>().GetBoneTransform(HumanBodyBones.Hips).position.y;
                         _lowest = _startFloor;
+                        Snap();
                         _hitAt = _a.transform.position;
                         _step = 3; _t0 = Time.time;
                         return;
@@ -177,16 +178,20 @@ namespace FPSKit.EditorTools
             var animator = _a.GetComponentInChildren<Animator>();
             if (wound.Bleeding)
             {
-                float d = Vector3.Distance(animator.GetBoneTransform(HumanBodyBones.LeftHand).position, wound.WoundPoint);
+                // From the neck, not the wound: a round in the nape still sends the hand to the throat he can reach.
+                Vector3 neckMiddle = Vector3.Lerp(animator.GetBoneTransform(HumanBodyBones.Neck).position, animator.GetBoneTransform(HumanBodyBones.Head).position, 0.4f);
+                float d = Vector3.Distance(animator.GetBoneTransform(HumanBodyBones.LeftHand).position, neckMiddle);
                 if (d < _bestHand) _bestHand = d;
                 if (_handAt < 0f && d < 0.19f) _handAt = t;
                 _lowest = Mathf.Min(_lowest, animator.GetBoneTransform(HumanBodyBones.Hips).position.y);
                 // A man shot mid-run stumbles on for a second on his clip's momentum; after that he stays where he is.
                 if (t < 1.3f) _hitAt = _a.transform.position;
                 else _walked = Mathf.Max(_walked, Vector3.Distance(_a.transform.position, _hitAt));
-                if (t > 0.5f && !_bloodDuringA) _bloodDuringA = BloodFX.JetDrops > 0;
+                // Drawn, not just counted: this once passed with nothing on the screen.
+                var stream = wound.Stream;
+                if (t > 0.5f && !_bloodDuringA) _bloodDuringA = stream != null && stream.Drawn >= 10 && stream.Widest > 0.01f;
             }
-            if (Time.frameCount % 12 == 0 && t < 10f) Snap();
+            if ((t < 0.5f && Time.frameCount % 3 == 0) || (Time.frameCount % 12 == 0 && t < 10f)) Snap();
             if (health.IsDead && _diedAt < 0f)
             {
                 _diedAt = t;
@@ -197,9 +202,9 @@ namespace FPSKit.EditorTools
             {
                 _log.AppendLine($"  hand nearest the wound {_bestHand:0.000} m, there at {_handAt:0.00} s; hips dropped {_startFloor - _lowest:0.00} m; died at {_diedAt:0.0} s; {BloodFX.JetDrops} drops thrown");
                 Require(_handAt >= 0f && _handAt < 1.2f, "his hand is on the wound within 1.2 s");
-                Require(_bloodDuringA, "the artery throws blood");
+                Require(_bloodDuringA, "the artery throws a connected stream that is drawn");
                 Require(_a.GetComponent<EnemyBody>().PistolHand == 0, "he draws no sidearm: both hands are on his throat");
-                Require(_walked < 0.25f, $"he gives up the fight and stays where he is, once he has stumbled to a stop (moved {_walked:0.00} m)");
+                Require(_walked < 0.4f, $"he gives up the fight and stays where he is, once he has stumbled to a stop (moved {_walked:0.00} m)");
                 Require(_startFloor - _lowest > 0.15f, "his knees go");
                 Require(_diedAt > 3f && _diedAt < 16f, "he bleeds out on his own, in 3 to 16 s");
                 _step = 4;

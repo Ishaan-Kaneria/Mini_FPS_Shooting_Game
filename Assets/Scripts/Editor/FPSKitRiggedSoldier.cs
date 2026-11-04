@@ -33,15 +33,16 @@ namespace FPSKit.EditorTools
     {
         const string PrefabPath = "Assets/FPSKit_Generated/Enemy.prefab";
         const string Folder = "Assets/FPSKit_Generated/Soldier/Rig";
-        const string Source = "Assets/Survivalist/Prefab/Survivalist (1).prefab";
-        const string ModelFile = "Assets/Survivalist/Basemesh/SK_Military_Survivalist.fbx";
+        const string Source = "Assets/Characters/HumanSoldier/Human_Soldier.fbx";
+        const string ModelFile = Source;
+        const string HumanArt = "Assets/Characters/HumanSoldier";
         const string PackMaterials = "Assets/Survivalist/Materials URP";
         const string Clips = "Assets/Survivalist/StarterAssets/ThirdPersonController/Character/Animations";
         const string GunPrefab = "Assets/FPSKit_Generated/ViewModels/VM_AK74.prefab";
         public const string ProfilePath = "Assets/FPSKit_Generated/Soldier/BodyDamage.asset";
 
-        /// <summary>How much bigger than the pack's 1.8 m man the enemy is: his pick, enemies 10% bigger.</summary>
-        const float Scale = 1.1f;
+        /// <summary>The generated man is 1.80 m as he is. His pick (2026-11-04): a standard enemy as tall as he is, no more the 2.07 m it measured.</summary>
+        const float Scale = 1f;
 
         /// <summary>
         /// The garments, what they are called on the enemy, and which pack skin each of the
@@ -50,11 +51,13 @@ namespace FPSKit.EditorTools
         /// </summary>
         static readonly (string mesh, string name, string[] skins)[] Wardrobe =
         {
-            ("SK_Military_Head1", "Outfit_Head", null),
-            ("SK_Military_Male_Arms1", "Outfit_Hands", null),
-            ("SK_Military_Shirt3", "Outfit_Shirt", new[] { "Shirt3_Skin2", "Shirt3_Skin3", "Shirt3_Skin1" }),
-            ("SK_Military_Pants2", "Outfit_Pants", new[] { "Pants2_Skin2", "Pants2_Skin3", "Pants2_Skin2" }),
-            ("SK_Military_Boots3", "Outfit_Boots", new[] { "Boots3_Skin1", "Boots3_Skin2", "Boots3_Skin3" }),
+            ("Human_Head", "Outfit_Head", null),
+            ("Human_Eyes", "Outfit_HeadEyes", null),
+            ("Human_Hair", "Outfit_HeadHair", null),
+            ("Human_Brows", "Outfit_HeadBrows", null),
+            ("Human_Body", "Outfit_Hands", null),
+            ("Outfit_Worksuit", "Outfit_Shirt", new[] { "Human_Worksuit_Olive", "Human_Worksuit_Tan", "Human_Worksuit_Grey" }),
+            ("Outfit_Boots", "Outfit_Boots", null),
             ("SK_Military_Vest1", "Outfit_Vest", new[] { "Vest1_Skin2", "Vest1_Skin3", "Vest1_Skin1" }),
             ("SK_Military_Cap1", "Kit_Human_Cap", new[] { "Cap1_Skin2", "Cap1_Skin3", "Cap1_Skin1" }),
             ("SK_Military_Backpack1", "Kit_Elite_Backpack", new[] { "Backpack1_Skin2", "Backpack1_Skin3", "Backpack1_Skin1" }),
@@ -69,9 +72,13 @@ namespace FPSKit.EditorTools
             // Read/Write on for the body's meshes: cutting a severed limb out of them reads
             // their bone weights at runtime (EnemyBrutality), which a build only allows on a
             // readable mesh. The one change made to the pack's import settings.
-            if (AssetImporter.GetAtPath(ModelFile) is ModelImporter importer && !importer.isReadable)
+            if (AssetImporter.GetAtPath(ModelFile) is ModelImporter importer && (!importer.isReadable || importer.animationType != ModelImporterAnimationType.Human))
             {
                 importer.isReadable = true;
+                importer.animationType = ModelImporterAnimationType.Human;
+                importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                importer.importAnimation = false;
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
                 importer.SaveAndReimport();
             }
 
@@ -118,7 +125,7 @@ namespace FPSKit.EditorTools
                 if (oldAgent != null) EditorUtility.CopySerialized(oldAgent, agent);
                 agent.stoppingDistance = 0.8f;       // the fixed brake; see CLAUDE.md
                 agent.radius = 0.4f;
-                agent.height = 2f;
+                agent.height = 1.85f;
 
                 var eyes = new GameObject("Eyes").transform;
                 eyes.SetParent(root.transform, false);
@@ -224,8 +231,19 @@ namespace FPSKit.EditorTools
         // Clothes
         // ==================================================================
 
+        static string HumanSkin(string mesh) => mesh switch
+        {
+            "Human_Head" or "Human_Body" => "Human_Skin",
+            "Human_Eyes" => "Human_Eyes",
+            "Human_Hair" => "Human_Hair",
+            "Human_Brows" => "Human_Brows",
+            "Outfit_Boots" => "Human_Boots",
+            _ => null,
+        };
+
         static EnemyBody.Garment[] Dress(GameObject model)
         {
+            var animator = model.GetComponent<Animator>();
             // The first-person arms belong to the player's view model, not to anyone seen.
             var fps = model.transform.Find("FPS_HANDS");
             if (fps != null) Object.DestroyImmediate(fps.gameObject);
@@ -242,10 +260,21 @@ namespace FPSKit.EditorTools
                 smr.updateWhenOffscreen = false;
                 smr.quality = SkinQuality.Bone2;
 
+                // The model comes in with no materials (its importer makes none): each piece is given its own here.
                 var mats = smr.sharedMaterials;
+                if (mats == null || mats.Length == 0) mats = new Material[1];
                 for (int i = 0; i < mats.Length; i++) mats[i] = Lit(mats[i] != null ? mats[i].name : null);
                 if (entry.skins != null) mats[0] = Lit(entry.skins[0]);
+                else if (HumanSkin(entry.mesh) is string own) mats[0] = Lit(own);
                 smr.sharedMaterials = mats;
+
+                // Bounds that travel with the body and hold any pose of it: from the model's root they stayed at standing height,
+                // and a cap on a kneeling man was culled off the top of the view.
+                if (animator != null && animator.GetBoneTransform(HumanBodyBones.Hips) is Transform hips)
+                {
+                    smr.rootBone = hips;
+                    smr.localBounds = new Bounds(Vector3.zero, Vector3.one * 2.6f);
+                }
 
                 if (entry.skins == null) continue;
                 var skins = new Material[entry.skins.Length];
@@ -261,6 +290,36 @@ namespace FPSKit.EditorTools
         /// colour so the archetype's tint multiplies the cloth, and emission enabled (black)
         /// so the wind-up flash can light it through a property block.
         /// </summary>
+        /// <summary>The generated man's own materials, from his art folder. The work suit has an image for each outfit (tinted from the grey of the original, its white T-shirt darkened); brows and hair have holes.</summary>
+        static Material HumanMaterial(Material mat, string name)
+        {
+            var diffuse = AssetDatabase.LoadAssetAtPath<Texture2D>($"{HumanArt}/{name}_diffuse.png");
+            var normal = AssetDatabase.LoadAssetAtPath<Texture2D>($"{HumanArt}/{(name.StartsWith("Human_Worksuit") ? "Human_Worksuit" : name)}_normal.png");
+            mat.SetTexture("_BaseMap", diffuse);
+            if (normal != null)
+            {
+                if (AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(normal)) is TextureImporter ti && ti.textureType != TextureImporterType.NormalMap)
+                {
+                    ti.textureType = TextureImporterType.NormalMap;
+                    ti.SaveAndReimport();
+                }
+                mat.SetTexture("_BumpMap", normal);
+                mat.EnableKeyword("_NORMALMAP");
+            }
+            // White: EnemyArchetype washes each body's clothes through a property block, which replaces a material's own tint.
+            // So the outfit's colour is in its image (Human_Worksuit_Olive and the rest).
+            mat.SetColor("_BaseColor", name == "Human_Boots" ? new Color(2.4f, 2.1f, 1.8f) : Color.white);
+            mat.SetFloat("_Smoothness", name == "Human_Eyes" ? 0.75f : name == "Human_Skin" ? 0.3f : 0.15f);
+            mat.SetFloat("_Metallic", 0f);
+            bool holes = name == "Human_Brows" || name == "Human_Hair";
+            mat.SetFloat("_AlphaClip", holes ? 1f : 0f);
+            mat.SetFloat("_Cutoff", 0.4f);
+            if (holes) { mat.EnableKeyword("_ALPHATEST_ON"); mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest; mat.SetFloat("_Cull", 0f); }
+            mat.EnableKeyword("_EMISSION");
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
         internal static Material Lit(string packName)
         {
             if (string.IsNullOrEmpty(packName)) return null;
@@ -272,6 +331,8 @@ namespace FPSKit.EditorTools
                 mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                 AssetDatabase.CreateAsset(mat, path);
             }
+
+            if (packName.StartsWith("Human_")) return HumanMaterial(mat, packName);
 
             var pack = AssetDatabase.LoadAssetAtPath<Material>($"{PackMaterials}/URP_{packName}.mat");
             if (pack != null)
@@ -844,7 +905,7 @@ namespace FPSKit.EditorTools
             (HumanBodyBones.Hips, BodyPart.LowerTorso, 0.15f, 11f),
             (HumanBodyBones.Chest, BodyPart.LowerTorso, 0.14f, 8f),
             (HumanBodyBones.UpperChest, BodyPart.Torso, 0.16f, 10f),
-            (HumanBodyBones.Neck, BodyPart.Neck, 0.06f, 1.5f),
+            (HumanBodyBones.Neck, BodyPart.Neck, 0.08f, 1.5f),
             (HumanBodyBones.Head, BodyPart.Head, 0.11f, 4.5f),
             (HumanBodyBones.LeftUpperArm, BodyPart.LeftArm, 0.06f, 2.5f),
             (HumanBodyBones.RightUpperArm, BodyPart.RightArm, 0.06f, 2.5f),

@@ -826,7 +826,9 @@ public partial class MeleeStrike : MonoBehaviour
     bool Reaches(Health target, float reach)
     {
         EnsureMasks();
-        Vector3 eye = fpsCamera.transform.position;
+        // From the head's rest under the motor, not the eye: the eye leans with the blow (EyeCamera), and a lean back must not cost reach.
+        Transform rest = fpsCamera.transform.parent != null ? fpsCamera.transform.parent : fpsCamera.transform;
+        Vector3 eye = rest.position;
         Vector3 to = ClosestPoint(target, eye, out _) - eye;
         float distance = to.magnitude;
         if (distance > reach) return false;

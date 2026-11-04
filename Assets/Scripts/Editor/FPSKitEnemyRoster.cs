@@ -234,7 +234,7 @@ namespace FPSKit.EditorTools
                     a.woundResistance = 0.0f;
                     a.bodyColor = new Color(0.85f, 0.45f, 0.10f);
                     a.headColor = new Color(1f, 0.65f, 0.25f);
-                    a.scaleMultiplier = 0.85f;
+                    a.scaleMultiplier = 1f;   // a grown man: under 1 read as a teenager on the 1.80 m body (his note, 2026-11-04)
                     a.unlockWave = 2;
                     a.baseWeight = 1.5f;
                     a.weightGrowthPerWave = 0.3f;
@@ -370,14 +370,14 @@ namespace FPSKit.EditorTools
                 // Late-game pressure: small, quick, constantly circling. Meant to
                 // be the reason you cannot hold one corner forever.
                 case "Screamer":
-                    a.description = "Small, quick and always circling. Flanks relentlessly.";
+                    a.description = "Quick and always circling. Flanks relentlessly.";
                     a.role = EnemyArchetype.Role.Standard;
                     a.voice = EnemyVoice.Kind.Human;
                     a.woundResistance = 0.0f;
                     a.bodyColor = new Color(0.62f, 0.15f, 0.45f);
                     a.headColor = new Color(0.90f, 0.35f, 0.65f);
                     a.glowColor = new Color(0.8f, 0.1f, 0.5f);
-                    a.scaleMultiplier = 0.72f;
+                    a.scaleMultiplier = 1f;
                     a.unlockWave = 9;
                     a.baseWeight = 0.8f;
                     a.weightGrowthPerWave = 0.32f;
@@ -498,7 +498,7 @@ namespace FPSKit.EditorTools
                     a.bodyColor = new Color(0.46f, 0.34f, 0.16f);
                     a.headColor = new Color(0.72f, 0.58f, 0.30f);
                     a.glowColor = new Color(1.4f, 1.0f, 0.3f);
-                    a.scaleMultiplier = 0.95f;
+                    a.scaleMultiplier = 1f;
                     a.unlockWave = 3;
                     a.baseWeight = 0.9f;
                     a.weightGrowthPerWave = 0.18f;
@@ -575,7 +575,7 @@ namespace FPSKit.EditorTools
                     a.bodyColor = new Color(0.12f, 0.14f, 0.13f);
                     a.headColor = new Color(0.30f, 0.38f, 0.32f);
                     a.glowColor = new Color(0.4f, 1.8f, 0.7f);
-                    a.scaleMultiplier = 0.9f;
+                    a.scaleMultiplier = 1f;
                     a.unlockWave = 4;
                     a.baseWeight = 0.9f;
                     a.weightGrowthPerWave = 0.2f;

@@ -23,5 +23,5 @@ MonoBehaviour:
   bloodlessColor: {r: 0.32, g: 0.3, b: 0.28, a: 0.55}
   stainColor: {r: 0.2, g: 0.02, b: 0.02, a: 1}
   decalBudget: {x: 64, y: 128, z: 200}
-  dropsPerHit: 80
+  dropsPerHit: 30
   splash: 1.8

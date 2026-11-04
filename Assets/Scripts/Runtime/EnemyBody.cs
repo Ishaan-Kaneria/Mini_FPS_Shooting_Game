@@ -1122,12 +1122,20 @@ public class EnemyBody : MonoBehaviour
     /// <summary>Whether this fall ends with firing from the ground: the chance (scaled by aggression), the rifle still on the body, a ranged mind, and the player inside the cone ahead of the head.</summary>
     bool WantsGroundFire(BodyDamageProfile prof)
     {
-        if (prof == null || prof.groundFireChance <= 0f || _ai == null || !_ai.ranged || _ai.target == null || HandToHand) return false;
-        if (!Rigged || _rifle == null || !_rifle.OnBody) return false;
-        if (animator == null || _injuredLayer < 0 || !animator.HasState(_injuredLayer, Animator.StringToHash("ProneFire"))) return false;
+        if (prof == null || prof.groundFireChance <= 0f || _ai == null || !_ai.ranged || _ai.target == null || HandToHand)
+        {
+            if (_ai != null) _ai.GroundFireRefusal = "no chance, no gun skill, no target or hand to hand";
+            return false;
+        }
+        if (!Rigged || _rifle == null || !_rifle.OnBody) { _ai.GroundFireRefusal = "the rifle is not on the body"; return false; }
+        if (animator == null || _injuredLayer < 0 || !animator.HasState(_injuredLayer, Animator.StringToHash("ProneFire"))) { _ai.GroundFireRefusal = "no ProneFire state"; return false; }
         Vector3 ahead = Flat(_snapHead - _snapHipsPos);
         Vector3 toPlayer = Flat(_ai.target.position - _snapHipsPos);
-        if (ahead.sqrMagnitude < 1e-4f || Vector3.Angle(ahead, toPlayer) > prof.groundFireCone) return false;
+        if (ahead.sqrMagnitude < 1e-4f || Vector3.Angle(ahead, toPlayer) > prof.groundFireCone)
+        {
+            _ai.GroundFireRefusal = $"the player is {Vector3.Angle(ahead, toPlayer):0} degrees off where it lay";
+            return false;
+        }
         float chance = prof.groundFireChance * Mathf.Lerp(0.6f, 1.4f, _ai.Aggression);
         return Random.value < chance && _rifle.TakeInHand();
     }
@@ -1334,10 +1342,11 @@ public class EnemyBody : MonoBehaviour
     void LateUpdate()
     {
         if (_hips == null) return;
-        if (_down == Down.Flying || (_ragdoll != null && _ragdoll.IsRagdolled)) { TrackReaction(); return; }
+        if (_down == Down.Flying || (_ragdoll != null && _ragdoll.IsRagdolled)) { HoldPistol(); TrackReaction(); return; }
 
         bool alive = _health == null || !_health.IsDead;
-        if (!alive) return;
+        // The pistol stays on the falling body: it is a child of the root, and left alone it hung in the air (his screenshot, 2026-11-04).
+        if (!alive) { HoldPistol(); return; }
 
         if (_alignPending && _down == Down.GettingUp && _clipRise) AlignRise();
 

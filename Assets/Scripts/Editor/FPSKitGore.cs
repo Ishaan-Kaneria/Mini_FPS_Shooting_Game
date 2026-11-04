@@ -49,7 +49,7 @@ namespace FPSKit.EditorTools
             // Fresh blood is nearly black-red, wet and smooth (BloodSurface: the room's light, reflections brought to it).
             // Under URP Lit the sheen was the sky's at outdoor strength: lilac at 0.6 smoothness outdoors, and cream-white
             // indoors once the eye opened up for the room (2026-10-31). Values: smoothness where thick, at the thin edge.
-            library.splatMaterial = BloodSurface("Blood_Splat", splat, new Color(0.17f, 0.004f, 0.007f, 0.97f), 0.84f, 0.5f);
+            library.splatMaterial = BloodSurface("Blood_Splat", splat, new Color(0.28f, 0.006f, 0.008f, 0.97f), 0.84f, 0.5f);
             library.poolMaterial = BloodSurface("Blood_Pool", pool, new Color(0.14f, 0.003f, 0.006f, 0.98f), 0.9f, 0.6f);
             library.woundMaterial = BloodSurface("Blood_Wound", wound, new Color(0.24f, 0.008f, 0.01f, 1f), 0.72f, 0.45f);
             // A bruise is skin, not blood: dark purple-red, mostly matte, its edge fading out uneven.

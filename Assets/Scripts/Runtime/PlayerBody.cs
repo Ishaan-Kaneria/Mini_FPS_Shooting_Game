@@ -394,7 +394,24 @@ public class PlayerBody : MonoBehaviour
         _placed = true;
         // Forward under the eye through a kick, so more of the leg is in view (kickReach).
         _body.position = transform.position + _offset + flat * (S.kickReach * Smooth(_kickW));
+
+        // Never into a wall (2026-11-04: "my legs pass through walls"): the body is drawn ahead of the capsule (under
+        // the set-back eye, further through a kick), so in front of a wall its knees and the kicking foot went into it.
+        // Cast at knee height to where the legs reach; whatever is in the way pushes the drawn body back by the overlap.
+        float ahead = Vector3.Dot(_body.position - transform.position, flat) + LegReach + KickLegReach * Smooth(_kickW);
+        if (ahead > 0.01f && Physics.SphereCast(transform.position + Vector3.up * 0.55f, 0.14f, flat, out var wall, ahead,
+                                                WallMask, QueryTriggerInteraction.Ignore))
+            _body.position -= flat * (ahead - wall.distance);
     }
+
+    /// <summary>How far ahead of the body's root its knees and toes reach when walking, metres.</summary>
+    const float LegReach = 0.32f;
+    /// <summary>How much further the kicking foot reaches at full extension, metres.</summary>
+    const float KickLegReach = 0.55f;
+
+    int _wallMask = -1;
+    int WallMask => _wallMask != -1 ? _wallMask
+        : (_wallMask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Civilian", "Ignore Raycast", "UI", "PlayerBounds"));
 
     void PlaceShadowGun()
     {

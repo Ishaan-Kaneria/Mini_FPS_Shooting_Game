@@ -130,6 +130,9 @@ public partial class MeleeStrike : MonoBehaviour
             if (_strike == Strike.None || _strikeLength <= 0f) return -1f;
             if (Time.time < _holdUntil) return _heldAt;   // held on the blow (StartHitStop)
             float k = (Time.time - _strikeStart) / _strikeLength;
+            // Stopped by a wall (BlockedAt): out to the contact, then back the way it came, faster. The arms and the
+            // legs both follow this, so neither goes into the wall.
+            if (_blockK > 0f && k > _blockK) k = _blockK - (k - _blockK) * 1.6f;
             return k >= 0f && k < 1f ? k : -1f;
         }
     }
@@ -486,6 +489,7 @@ public partial class MeleeStrike : MonoBehaviour
         _pendingTarget = target;
         _pendingStrike = strike;
         _pendingRange = range;
+        _blockK = target == null ? BlockedAt(strike, range) : -1f;
 
         AttackStarted?.Invoke(this, strike, target);
         return target;
@@ -556,7 +560,7 @@ public partial class MeleeStrike : MonoBehaviour
 
         // A hair over what is left when the share would finish it, so the
         // shield-then-health split cannot leave it standing on a rounding error.
-        float amount = Mathf.Max(1f, full * share * (_tired ? 0.7f : 1f));
+        float amount = Mathf.Max(1f, full * share * (_tired ? 0.7f : 1f) * Limbs.StrikeMultiplier(LimbOf(strike)));
         if (amount >= pool) amount = pool + 1f;
 
         // Where the blow lands decides where the body answers it: the head snaps back from
@@ -570,6 +574,9 @@ public partial class MeleeStrike : MonoBehaviour
 
         info.amount = target.ApplyDamage(info);
         if (info.amount <= 0f) return false;
+        // A fist takes a little back from a jaw or a skull (half a wall's share: a fight is many blows); a stock or a boot
+        // hardly anything (PlayerLimbs).
+        Limbs.Impact(LimbOf(strike), PlayerLimbs.Hardness(ImpactSurface.Flesh) * 0.5f, Padding(strike), point);
 
         if (weapon != null) weapon.ReportHit(info);
 
@@ -844,7 +851,7 @@ public partial class MeleeStrike : MonoBehaviour
             Feel(strike, target.IsDead);
             Landed?.Invoke(this, strike, target);
         }
-        else if (HitWorld(strike)) { if (_motor != null) _motor.AddShake(Settings.kickShake); }   // the thing struck makes its own sound
+        else if (HitWorld(strike)) { if (_motor != null) _motor.AddShake(Settings.kickShake); }   // the thing struck makes its own sound (and hurts: Limbs)
         else Missed?.Invoke(this, strike);
     }
 
@@ -860,11 +867,60 @@ public partial class MeleeStrike : MonoBehaviour
         Vector3 dir = kick ? Quaternion.AngleAxis(12f, cam.right) * cam.forward : cam.forward;
         if (!Physics.Raycast(cam.position, dir, out var hit, _pendingRange + Settings.impactTolerance, _blockMask, QueryTriggerInteraction.Ignore))
             return false;
-        return WorldHit.Send(hit.collider, new WorldHitInfo
+        WorldHit.Send(hit.collider, new WorldHitInfo
         {
             kind = kick ? WorldHitKind.Kick : WorldHitKind.Punch, point = hit.point, normal = hit.normal, direction = dir,
             impulse = kick ? WorldHit.KickImpulse : WorldHit.PunchImpulse, source = gameObject,
         });
+        // A wall does not give: the limb that met it takes the blow back (PlayerLimbs).
+        Limbs.Impact(LimbOf(strike), PlayerLimbs.Hardness(FPSImpactManager.SurfaceOf(hit)), Padding(strike), hit.point);
+        return true;
+    }
+
+    // ---- what the blow costs the body that threw it (PlayerLimbs) -----------------------------------------------------
+
+    PlayerLimbs _limbs;
+    PlayerLimbs Limbs
+    {
+        get
+        {
+            if (_limbs == null && !TryGetComponent(out _limbs)) _limbs = gameObject.AddComponent<PlayerLimbs>();
+            return _limbs;
+        }
+    }
+
+    /// <summary>The share of the strike, 0 to 1, at which it meets a wall in front, or -1 when nothing is in reach.</summary>
+    float _blockK = -1f;
+
+    float BlockedAt(Strike strike, float range)
+    {
+        if (fpsCamera == null) return -1f;
+        EnsureMasks();
+        var cam = fpsCamera.transform;
+        bool kick = strike == Strike.Kick;
+        Vector3 dir = kick ? Quaternion.AngleAxis(12f, cam.right) * cam.forward : cam.forward;
+        float reach = range + Settings.impactTolerance;
+        if (!Physics.Raycast(cam.position, dir, out var hit, reach, _blockMask, QueryTriggerInteraction.Ignore)) return -1f;
+        // Nearer the wall, the sooner it meets it; never before the strike has left the guard.
+        float full = ImpactAt(strike);
+        return full * Mathf.Lerp(0.6f, 1f, Mathf.Clamp01(hit.distance / Mathf.Max(0.1f, reach)));
+    }
+
+    /// <summary>Which limb throws it: the jab is the left hand, the rest of the punches the right, the kick the right foot.</summary>
+    static PlayerLimbs.Limb LimbOf(Strike strike) => strike switch
+    {
+        Strike.Jab => PlayerLimbs.Limb.LeftHand,
+        Strike.Kick => PlayerLimbs.Limb.RightFoot,
+        _ => PlayerLimbs.Limb.RightHand,
+    };
+
+    /// <summary>How much of a blow reaches the limb: a bare fist all of it, a boot under half, the rifle's stock little.</summary>
+    float Padding(Strike strike)
+    {
+        if (strike == Strike.Kick) return 0.45f;
+        bool fist = _fists || (strike == Strike.Takedown && TakedownWithFists) || strike == Strike.Jab || strike == Strike.Cross ||
+                    strike == Strike.FacePunch || strike == Strike.Overhand || strike == Strike.BodyBlow;
+        return fist && strike != Strike.Butt ? 1f : 0.12f;
     }
 
     /// <summary>
@@ -877,7 +933,8 @@ public partial class MeleeStrike : MonoBehaviour
         float k = StrikeProgress;
         bool swinging = k >= 0f;
 
-        if (_pending && (!swinging && Time.time >= _strikeStart || k >= ImpactAt(_pendingStrike))) Resolve();
+        float raw = _strikeLength > 0f ? (Time.time - _strikeStart) / _strikeLength : 1f;
+        if (_pending && (!swinging && Time.time >= _strikeStart || raw >= (_blockK > 0f ? _blockK : ImpactAt(_pendingStrike)))) Resolve();
 
         if (weapon == null) return;
 

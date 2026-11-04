@@ -92,6 +92,12 @@ public class PlayerMotor : MonoBehaviour
     /// </summary>
     [System.NonSerialized] public float ConditionMultiplier = 1f;
 
+    /// <summary>A hurt foot's limp (<see cref="PlayerLimbs"/>): swollen 0.92, broken 0.75.</summary>
+    [System.NonSerialized] public float InjuryMultiplier = 1f;
+
+    /// <summary>No sprinting on a broken foot (<see cref="PlayerLimbs"/>).</summary>
+    [System.NonSerialized] public bool SprintBlocked;
+
     /// <summary>The speeds actually in use (MovementSettings), not the ones the scene was built with.</summary>
     public float JogSpeedNow => MovementSettings.Active.jogSpeed;
     public float SprintSpeedNow => MovementSettings.Active.sprintSpeed;
@@ -843,7 +849,7 @@ public class PlayerMotor : MonoBehaviour
         if (input.sqrMagnitude > 1f) input.Normalize();
 
         var move = MovementSettings.Active;
-        bool wantsSprint = EvaluateSprint(input) && IsGrounded && !IsCrouching;
+        bool wantsSprint = EvaluateSprint(input) && IsGrounded && !IsCrouching && !SprintBlocked;
 
         // Blown: the sprint is gone until enough breath is back to be worth having.
         if (Stamina01 <= 0.001f) _blown = true;
@@ -884,7 +890,7 @@ public class PlayerMotor : MonoBehaviour
         }
         if (_weapon != null && _weapon.IsAiming) targetSpeed *= move.aiming;
 
-        targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier) * Mathf.Max(0.05f, ConditionMultiplier);
+        targetSpeed *= Mathf.Max(0.05f, SpeedMultiplier) * Mathf.Max(0.05f, ConditionMultiplier) * Mathf.Max(0.05f, InjuryMultiplier);
         targetSpeed *= WadingZone.SpeedFactorAt(transform.position, true, IsSprinting);   // floodwater slows the player
         Vector3 wish = (transform.right * input.x + transform.forward * input.y) * targetSpeed;
 

@@ -144,13 +144,16 @@ public class Weapon : MonoBehaviour
     /// <summary>Temporary reload multiplier from a consumable. Below 1 is faster.</summary>
     [System.NonSerialized] public float BoostReloadTimeMultiplier = 1f;
 
+    /// <summary>A hurt hand's slower reload (<see cref="PlayerLimbs"/>): swollen 1.25, broken 1.6 (one-handed).</summary>
+    [System.NonSerialized] public float InjuryReloadMultiplier = 1f;
+
     /// <summary>The magazine the gun actually holds right now.</summary>
     public int MagazineSize => data == null ? 0 : Mathf.Max(1, data.magazineSize + MagazineBonus);
 
     /// <summary>The reload the gun actually takes right now, in seconds.</summary>
     public float ReloadTime => data == null
         ? 0f
-        : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier * Mathf.Max(0.05f, BoostReloadTimeMultiplier)
+        : Mathf.Max(0.15f, data.reloadTime * ReloadTimeMultiplier * Mathf.Max(0.05f, BoostReloadTimeMultiplier) * Mathf.Max(1f, InjuryReloadMultiplier)
                            * MovementSettings.Active.reloadTimeScale);
 
     /// <summary>
@@ -901,6 +904,14 @@ public class Weapon : MonoBehaviour
         Vector3 poseOffset = new Vector3(-0.07f, -0.05f, -0.04f) * sprint + new Vector3(0.02f, -0.28f, -0.08f) * down;
         Vector3 poseTurn = new Vector3(14f, -32f, 12f) * sprint + new Vector3(35f, -12f, 8f) * down;
 
+        // Up against a wall the rifle is drawn back and its muzzle lifted, as a soldier does, instead of going into the
+        // wall (the arms camera draws over the world, so a muzzle in a wall read as through it). Rounds still leave
+        // from the eye.
+        UpdateWallTuck();
+        float tuck = UITheme.EaseOut(_wallTuck);
+        poseOffset += new Vector3(0.01f, -0.025f, -_wallTuckDepth) * tuck;
+        poseTurn += new Vector3(-28f, 10f, 4f) * tuck;
+
         transform.localPosition = basePosition + Vector3.back * _kickback + HandsOffset + reloadOffset + poseOffset;
         var turned = Quaternion.Euler(reloadTurn + HandsRotation + poseTurn);
         transform.localRotation = _hipRotation * turned;
@@ -946,6 +957,35 @@ public class Weapon : MonoBehaviour
     /// A landed blow's pulse: the view narrows by <paramref name="degrees"/> in a frame and opens again over 0.16 s, scaled
     /// by the Camera Shake setting like the shake. The camera does not move; only the field of view pulses.
     /// </summary>
+    float _wallTuck, _wallTuckDepth, _nextWallCheck;
+    int _wallMask = -1;
+
+    /// <summary>How far the gun is drawn back from a wall in front, 0 to 1.</summary>
+    public float WallTuck => _wallTuck;
+
+    void UpdateWallTuck()
+    {
+        if (fpsCamera == null) return;
+        if (Time.time >= _nextWallCheck)
+        {
+            _nextWallCheck = Time.time + 0.05f;
+            if (_wallMask == -1)
+                _wallMask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Civilian", "Ignore Raycast", "UI", "PlayerBounds");
+            var cam = fpsCamera.transform;
+            const float barrel = 0.85f;      // eye to muzzle, about, at the shoulder
+            float want = 0f;
+            if (Physics.SphereCast(cam.position, 0.06f, cam.forward, out var hit, barrel, _wallMask, QueryTriggerInteraction.Ignore))
+            {
+                want = Mathf.Clamp01((barrel - hit.distance) / 0.55f);
+                _wallTuckDepth = Mathf.Clamp(barrel - hit.distance, 0f, 0.35f);
+            }
+            _wallTuckTarget = want;
+        }
+        _wallTuck = Mathf.MoveTowards(_wallTuck, _wallTuckTarget, Time.deltaTime * 6f);
+    }
+
+    float _wallTuckTarget;
+
     public void FovPulse(float degrees)
     {
         _fovPulseAt = Time.time;

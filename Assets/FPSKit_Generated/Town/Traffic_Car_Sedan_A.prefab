@@ -10,9 +10,11 @@ GameObject:
   m_Component:
   - component: {fileID: 3621822731082746851}
   - component: {fileID: 8775247414500362468}
+  - component: {fileID: 4784882924402180789}
   - component: {fileID: 1547650833698381092}
   - component: {fileID: 352481126612715879}
   - component: {fileID: 5916538454202853370}
+  - component: {fileID: 2840431269695157305}
   m_Layer: 15
   m_Name: Traffic_Car_Sedan_A
   m_TagString: Metal
@@ -55,8 +57,29 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2.0145798, y: 1.3255749, z: 4.9532685}
-  m_Center: {x: 0, y: 0.7364305, z: 0}
+  m_Size: {x: 2.0145798, y: 0.8248022, z: 4.9532685}
+  m_Center: {x: 0, y: 0.4124011, z: 0}
+--- !u!65 &4784882924402180789
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7536637036786145499}
+  m_Material: {fileID: 13400000, guid: 7558c430c79d0e0a2b9300284b8f8017, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.6964883, y: 0.1472861, z: 2.144714}
+  m_Center: {x: 0, y: 1.3844894, z: -0.2042585}
 --- !u!54 &1547650833698381092
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -117,6 +140,24 @@ MonoBehaviour:
   gap: 3
   halfLength: 2.5532312
   halfWidth: 1.0603051
+  seatLocal: {x: -0.42412207, y: 0.088371664, z: 0.10212925}
+  reactionTime: {x: 0.7, y: 1.2}
+--- !u!114 &2840431269695157305
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7536637036786145499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 363c2a66c9064c7693316f5f0a253276, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VehicleStrike
+  halfWidth: 1.0603051
+  halfLength: 2.5532312
+  minSpeed: 2.5
+  damageAt10: 220
 --- !u!1001 &9037326529949749230
 PrefabInstance:
   m_ObjectHideFlags: 0

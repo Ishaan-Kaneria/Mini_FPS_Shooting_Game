@@ -54,6 +54,7 @@ public static class LifeActivities
     /// <summary>How often a person at home picks it, against the others the house has.</summary>
     public static float HomeWeight(LifeActivity a) => a switch
     {
+        LifeActivity.Pray => 0f,          // no clip yet (TownHouseholds.FreeSpot)
         LifeActivity.SitSofa => 3f,
         LifeActivity.SitFloor => 3f,
         LifeActivity.SitChair => 1.5f,
@@ -62,7 +63,6 @@ public static class LifeActivities
         LifeActivity.Wash => 1f,
         LifeActivity.SitBed => 0.8f,
         LifeActivity.Sleep => 0.5f,
-        LifeActivity.Pray => 0.8f,
         LifeActivity.Phone => 1f,
         LifeActivity.Clean => 0.8f,
         LifeActivity.Talk => 1f,

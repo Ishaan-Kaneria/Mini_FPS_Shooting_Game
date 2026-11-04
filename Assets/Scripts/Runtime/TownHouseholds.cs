@@ -126,17 +126,28 @@ public class TownHouseholds : MonoBehaviour
             if (l.house >= 0) residents++; else keepers++;
         }
 
-        // Who arrives: the nearest houses first, at home, out of the player's sight.
-        for (int h = 0; h < houses.Length && residents < _maxResidents; h++)
+        // Who arrives: the nearest houses first (in list order, far houses took the whole budget), at home, out of the player's sight.
+        var near = Nearby;
+        near.Clear();
+        for (int h = 0; h < houses.Length; h++) if ((houses[h].centre - me).sqrMagnitude <= r2) near.Add(h);
+        near.Sort((a, b) => (houses[a].centre - me).sqrMagnitude.CompareTo((houses[b].centre - me).sqrMagnitude));
+        foreach (int h in near)
         {
+            if (residents >= _maxResidents) break;
             var house = houses[h];
-            if ((house.centre - me).sqrMagnitude > r2) continue;
             int want = house.residents - _lost[h] - _spawned[h];
             for (int k = 0; k < want && residents < _maxResidents; k++)
             {
-                int spot = FreeSpot(house.firstSpot, house.spotCount, null);
-                if (spot < 0) break;
-                if (!Spawn(spots[spot].approach, out var life)) break;
+                // Several tries: nearly half the spots (a seat, a bed) have no navmesh within reach, and one of those is no reason to leave the house empty.
+                int spot = -1;
+                CivilianLife life = null;
+                for (int t = 0; t < 8 && life == null; t++)
+                {
+                    spot = FreeSpot(house.firstSpot, house.spotCount, null);
+                    if (spot < 0) break;
+                    Spawn(spots[spot].approach, out life);
+                }
+                if (life == null) break;
                 LiveList.Add(new Live(life, h, -1));
                 _spawned[h]++;
                 residents++;
@@ -148,7 +159,7 @@ public class TownHouseholds : MonoBehaviour
             if (_keeperOf[s] >= 0 || (shops[s].entrance - me).sqrMagnitude > r2) continue;
             int spot = FreeSpot(shops[s].firstSpot, shops[s].spotCount, LifeActivity.Keeper);
             if (spot < 0) { _keeperOf[s] = -2; continue; }      // a shop with no counter: nobody minds it
-            if (!Spawn(spots[spot].approach, out var life)) break;
+            if (!Spawn(spots[spot].approach, out var life)) continue;
             LiveList.Add(new Live(life, -1, s));
             _keeperOf[s] = LiveList.Count - 1;
             keepers++;
@@ -170,7 +181,8 @@ public class TownHouseholds : MonoBehaviour
     bool Spawn(Vector3 at, out CivilianLife life)
     {
         life = null;
-        if (InView(at) && (at - _player.position).sqrMagnitude < 30f * 30f) return false;   // never appear in front of him
+        // Never appear in front of him. Behind a wall is not in front of him: without this, walking up to a house looking at it kept it empty.
+        if (InView(at) && (at - _player.position).sqrMagnitude < 30f * 30f && !BehindSomething(at)) return false;
         if (!NavMesh.SamplePosition(at, out var hit, 1.2f, NavMesh.AllAreas)) return false;
         var go = Instantiate(prefabs[Random.Range(0, prefabs.Length)], hit.position, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f), transform);
         if (go.GetComponent<Civilian>() == null) { Destroy(go); return false; }
@@ -178,6 +190,17 @@ public class TownHouseholds : MonoBehaviour
         if (life == null) life = go.AddComponent<CivilianLife>();
         return true;
     }
+
+    bool BehindSomething(Vector3 p)
+    {
+        if (_cam == null) return false;
+        if (_solid == 0) _solid = ~LayerMask.GetMask("Player", "FirstPerson", "Civilian", "Enemy", "Ignore Raycast", "UI");
+        return Physics.Linecast(_cam.transform.position, p + Vector3.up * 1.2f, _solid, QueryTriggerInteraction.Ignore);
+    }
+
+    int _solid;
+    List<int> _nearby;
+    List<int> Nearby => _nearby ??= new List<int>();
 
     bool InView(Vector3 p)
     {
@@ -197,6 +220,7 @@ public class TownHouseholds : MonoBehaviour
             if (i < 0 || i >= spots.Length || _taken[i]) continue;
             if (kind.HasValue && spots[i].kind != kind.Value) continue;
             if (!kind.HasValue && spots[i].kind == LifeActivity.Keeper) continue;
+            if (spots[i].kind == LifeActivity.Pray) continue;   // no clip: Mixamo's is not salah, and without one the body stands in a walking frame
             return i;
         }
         return -1;

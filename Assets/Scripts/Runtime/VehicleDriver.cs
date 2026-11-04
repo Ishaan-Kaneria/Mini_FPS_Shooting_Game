@@ -71,6 +71,42 @@ public class VehicleDriver : MonoBehaviour
         if (Health != null) Health.Died -= OnDied;
     }
 
+    bool _fitted;
+    int _fitFrames;
+
+    /// <summary>
+    /// Once the seated pose has reached the bones: the body lowered to sit under this car's roof, and its capsule laid from hips to head.
+    /// The sitting clip holds the hips over a metre up and the builder's seat is a guess, so the head came out through the roof and rounds
+    /// through the windows passed under nothing (R11, R12). Measured here, it fits whatever car he is in.
+    /// </summary>
+    void LateUpdate()
+    {
+        if (_fitted || _animator == null || !_animator.isHuman || ++_fitFrames < 3) return;
+        _fitted = true;
+        var head = _animator.GetBoneTransform(HumanBodyBones.Head);
+        var hips = _animator.GetBoneTransform(HumanBodyBones.Hips);
+        if (head == null || hips == null || transform.parent == null) return;
+        float roof = float.MinValue;
+        foreach (var r in transform.parent.GetComponentsInChildren<MeshRenderer>())
+            if (!r.transform.IsChildOf(transform)) roof = Mathf.Max(roof, r.bounds.max.y);
+        if (roof > float.MinValue)
+        {
+            float over = head.position.y + HeadTop + RoofGap - roof;
+            if (over > 0f) transform.position += Vector3.down * over;
+        }
+        var cap = GetComponent<CapsuleCollider>();
+        if (cap != null)
+        {
+            Vector3 low = transform.InverseTransformPoint(hips.position), high = transform.InverseTransformPoint(head.position);
+            cap.direction = 1;
+            cap.radius = 0.24f;
+            cap.center = new Vector3(low.x, (low.y + high.y + HeadTop) * 0.5f, (low.z + high.z) * 0.5f);
+            cap.height = high.y + HeadTop - low.y + 0.3f;
+        }
+    }
+
+    const float HeadTop = 0.16f, RoofGap = 0.06f;
+
     void Pose()
     {
         if (_animator == null) return;

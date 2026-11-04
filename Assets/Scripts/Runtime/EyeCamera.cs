@@ -92,6 +92,8 @@ public class EyeCamera : MonoBehaviour
 
     void LateUpdate()
     {
+        // The chase camera has the view (DrivableCar): the camera is off its parent, so a local position written here is the world's origin.
+        if (DrivableCar.Driving != null) return;
         if (_motor == null || _motor.cameraHolder == null) return;
         if (_eye == null)
         {

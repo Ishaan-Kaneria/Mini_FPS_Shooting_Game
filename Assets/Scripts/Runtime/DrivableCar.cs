@@ -21,13 +21,19 @@ public class DrivableCar : MonoBehaviour
 
     [Header("Drive")]
     [Tooltip("Engine torque at each driven wheel, newton-metres.")]
-    public float motorTorque = 900f;
+    public float motorTorque = 620f;
     [Tooltip("Brake torque at each wheel.")]
     public float brakeTorque = 2600f;
     [Tooltip("Steering lock at a crawl, degrees; it narrows with speed.")]
     public float maxSteer = 32f;
-    [Tooltip("Top speed in metres per second (about 100 km/h).")]
+    [Tooltip("Top speed in metres per second (about 100 km/h). The engine's pull falls away towards it.")]
     public float topSpeed = 28f;
+    [Tooltip("Top speed in reverse, metres per second.")]
+    public float reverseSpeed = 6f;
+    [Tooltip("Degrees a second the wheels turn towards the lock asked for, and back to centre when let go. A key is all or nothing: straight onto full lock, the car lurched.")]
+    public float steerRate = 110f, steerReturn = 190f;
+    [Tooltip("Share of the brake felt with the pedals up: the engine holding it back.")]
+    [Range(0f, 0.3f)] public float engineBrake = 0.05f;
     [Tooltip("Pull towards level when the car rolls, and a push down with speed, so it does not tip on a dune.")]
     public float antiRoll = 6000f, downforce = 60f;
 
@@ -36,6 +42,10 @@ public class DrivableCar : MonoBehaviour
     public Vector3 exitOffset = new Vector3(-1.9f, 0f, 0.3f);
     [Tooltip("The chase camera: behind and above the car, looking at a point ahead of it.")]
     public Vector3 cameraOffset = new Vector3(0f, 2.6f, -6.8f);
+    [Tooltip("Height of the point the chase camera turns about, metres over the car.")]
+    public float cameraPivot = 1.4f;
+    [Tooltip("Seconds the heading of the chase camera takes to follow the car's.")]
+    public float cameraTurnTime = 0.25f;
     [Tooltip("Metres from the car within which it can be got into.")]
     public float reach = 3.2f;
 
@@ -63,8 +73,16 @@ public class DrivableCar : MonoBehaviour
     Quaternion _cameraLocalRot;
     CharacterController _cc;
     PlayerMotor _motor;
-    Renderer[] _hidden;
     float _nextLook;
+    float _steer, _camYaw, _camYawVel, _camDistance;
+    int _cameraMask;
+    Camera _viewCamera;
+    Camera[] _stacked;
+    int[] _stackedMasks;
+    WheelCollider[] _wheels;
+    WheelCollider[] Wheels => _wheels ??= new[] { frontLeft, frontRight, rearLeft, rearRight };
+    PlayerMotor _keysFrom;
+    Quaternion[] _wheelRest;
 
     void Awake()
     {
@@ -73,10 +91,13 @@ public class DrivableCar : MonoBehaviour
         _rb.centerOfMass = new Vector3(0f, 0.35f, 0.1f);
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
         _rb.isKinematic = true;          // parked until someone drives it: it cannot be shoved about or roll away
+        _rb.maxAngularVelocity = 6f;
+        // Finer wheel physics at a crawl: at the default the car shivers when stopped.
+        if (frontLeft != null) frontLeft.ConfigureVehicleSubsteps(5f, 12, 15);
     }
 
     void OnEnable() => _all.Add(this);
-    void OnDisable() { _all.Remove(this); if (Driving == this) GetOut(); }
+    void OnDisable() { _all.Remove(this); if (Driving == this) GetOut(force: true); }
 
     void Update()
     {
@@ -98,12 +119,13 @@ public class DrivableCar : MonoBehaviour
         else if (Offered == this && PlayerMotor.InputEnabled) GetIn();
     }
 
-    static bool InteractPressed()
+    bool InteractPressed()
     {
-        // One press does one thing: with a gun to pick up in reach (disarmed), the press is the pickup's.
+        // Not behind a menu, and one press does one thing: with a gun to pick up in reach (disarmed), the press is the pickup's.
+        if (Time.timeScale == 0f || OverlayPanel.AnyOpenThisFrame) return false;
         if (MobileInput.PickUpReady && Driving == null) return false;
-        var motor = Object.FindAnyObjectByType<PlayerMotor>();
-        var keys = motor != null ? motor.controls : null;
+        if (_keysFrom == null) _keysFrom = Object.FindAnyObjectByType<PlayerMotor>();
+        var keys = _keysFrom != null ? _keysFrom.controls : null;
         bool press = (keys != null && ControlSettings.Pressed(keys.interact)) | GameInput.PadPressed(GameAction.Interact);
         press |= MobileInput.ConsumeInteract();
         return press;
@@ -139,10 +161,28 @@ public class DrivableCar : MonoBehaviour
 
         PlayerMotor.InputEnabled = false;
         if (_cc != null) _cc.enabled = false;
-        // The player's body and gun are not drawn while the car is.
-        _hidden = p.GetComponentsInChildren<Renderer>();
-        foreach (var r in _hidden) r.enabled = false;
+        // The player's body and gun are not drawn while the car is: left out of the cameras, touching no renderer (turning them all off and
+        // on again also turned on what had been off). The arms camera stays on with nothing to draw: post-processing runs on it.
+        _viewCamera = cam;
+        _cameraMask = cam.cullingMask;
+        cam.cullingMask &= ~LayerMask.GetMask("Player", "FirstPerson");
+        _stacked = System.Array.FindAll(cam.GetComponentsInChildren<Camera>(true), c => c != cam);
+        _stackedMasks = new int[_stacked.Length];
+        for (int i = 0; i < _stacked.Length; i++) { _stackedMasks[i] = _stacked[i].cullingMask; _stacked[i].cullingMask = 0; }
         _camera.SetParent(null, true);
+        // What each wheel's mesh is to its collider's pose, so laying it on the pose keeps the way it was modelled: written straight over, a
+        // wheel modelled the other way round showed its blank inner face (a white disc for a hub).
+        if (_wheelRest == null) _wheelRest = new Quaternion[4];
+        for (int i = 0; i < 4; i++)
+        {
+            _wheelRest[i] = Quaternion.identity;
+            if (Wheels[i] == null || wheelVisuals == null || i >= wheelVisuals.Length || wheelVisuals[i] == null) continue;
+            Wheels[i].GetWorldPose(out _, out var pose);
+            _wheelRest[i] = Quaternion.Inverse(pose) * wheelVisuals[i].rotation;
+        }
+        _camYaw = transform.eulerAngles.y;
+        _camYawVel = 0f;
+        _camDistance = cameraOffset.magnitude;
 
         _rb.isKinematic = false;
         Driving = this;
@@ -151,22 +191,51 @@ public class DrivableCar : MonoBehaviour
         Changed?.Invoke();
     }
 
-    void GetOut()
+    /// <summary>Where the player can stand beside the car, in order of preference; false if the car is hemmed in on every side.</summary>
+    bool ExitPoint(out Vector3 at)
+    {
+        at = transform.position;
+        float radius = _cc != null ? _cc.radius : 0.4f, height = _cc != null ? _cc.height : 1.7f;
+        int ground = ~LayerMask.GetMask("Player", "PlayerBounds", "FirstPerson", "Vehicle", "Civilian", "Enemy");
+        int solid = ~LayerMask.GetMask("Player", "PlayerBounds", "FirstPerson", "Ignore Raycast", "UI");
+        float side = Mathf.Abs(exitOffset.x), along = 3.2f;
+        var tries = new[]
+        {
+            exitOffset, new Vector3(side, 0f, exitOffset.z), new Vector3(0f, 0f, -along), new Vector3(0f, 0f, along),
+            new Vector3(-side - 1f, 0f, exitOffset.z), new Vector3(side + 1f, 0f, exitOffset.z),
+        };
+        foreach (var offset in tries)
+        {
+            Vector3 p = transform.TransformPoint(offset);
+            if (!Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out var hit, 8f, ground, QueryTriggerInteraction.Ignore)) continue;
+            Vector3 feet = hit.point + Vector3.up * 0.05f;
+            Vector3 low = feet + Vector3.up * (radius + 0.02f), high = feet + Vector3.up * Mathf.Max(radius + 0.02f, height - radius);
+            if (Physics.CheckCapsule(low, high, radius, solid, QueryTriggerInteraction.Ignore)) continue;
+            at = feet;
+            return true;
+        }
+        return false;
+    }
+
+    void GetOut(bool force = false)
     {
         if (Driving != this) return;
+        Vector3 at = transform.TransformPoint(exitOffset);
+        // Hemmed in on every side: stay in the car (the press does nothing) rather than land in a wall or on the roof.
+        if (!ExitPoint(out var found)) { if (!force) return; }
+        else at = found;
         Driving = null;
         if (TryGetComponent<VehicleStrike>(out var strike)) strike.Driver = null;
         SetTorque(0f, brakeTorque * 2f, 0f);
         if (_player != null)
         {
-            var at = transform.TransformPoint(exitOffset);
-            if (Physics.Raycast(at + Vector3.up * 3f, Vector3.down, out var hit, 8f, ~LayerMask.GetMask("Player", "PlayerBounds"), QueryTriggerInteraction.Ignore))
-                at = hit.point + Vector3.up * 0.05f;
             _player.position = at;
             _player.rotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
             if (_cc != null) _cc.enabled = true;
-            if (_hidden != null) foreach (var r in _hidden) if (r != null) r.enabled = true;
         }
+        if (_viewCamera != null) _viewCamera.cullingMask = _cameraMask;
+        if (_stacked != null)
+            for (int i = 0; i < _stacked.Length; i++) if (_stacked[i] != null) _stacked[i].cullingMask = _stackedMasks[i];
         if (_camera != null)
         {
             _camera.SetParent(_cameraParent, false);
@@ -191,11 +260,22 @@ public class DrivableCar : MonoBehaviour
         float throttle = 0f, brake = 0f;
         if (move.y > 0.05f) { if (speed < -0.5f) brake = move.y; else throttle = move.y; }
         else if (move.y < -0.05f) { if (speed > 0.5f) brake = -move.y; else throttle = move.y * 0.6f; }
-        if (Mathf.Abs(speed) > topSpeed) throttle = 0f;
 
-        float steer = move.x * Mathf.Lerp(maxSteer, maxSteer * 0.3f, Mathf.Clamp01(Mathf.Abs(speed) / topSpeed));
-        frontLeft.steerAngle = frontRight.steerAngle = steer;
-        SetTorque(throttle * motorTorque, brake * brakeTorque, handbrake ? brakeTorque * 1.5f : 0f);
+        // The engine's pull falls away towards the top speed instead of cutting out there; reverse has its own, lower one.
+        float limit = speed < -0.5f || throttle < 0f ? reverseSpeed : topSpeed;
+        float pull = Mathf.Sqrt(Mathf.Clamp01(1f - Mathf.Abs(speed) / Mathf.Max(0.1f, limit)));
+        float idle = 0f;
+        if (Mathf.Abs(move.y) <= 0.05f)
+            idle = Mathf.Abs(speed) < 1f ? 1f : engineBrake;   // the engine holds it back; under walking pace, it is held still
+
+        float lockAngle = Mathf.Lerp(maxSteer, maxSteer * 0.3f, Mathf.Clamp01(Mathf.Abs(speed) / topSpeed));
+        float wanted = move.x * lockAngle;
+        _steer = Mathf.MoveTowards(_steer, wanted, (Mathf.Abs(move.x) < 0.05f ? steerReturn : steerRate) * Time.fixedDeltaTime);
+        frontLeft.steerAngle = frontRight.steerAngle = _steer;
+        SetTorque(throttle * pull * motorTorque, Mathf.Max(brake, idle) * brakeTorque, handbrake ? brakeTorque * 1.5f : 0f);
+
+        // Held still: wheel friction alone lets a stopped car creep (half a metre in two seconds).
+        if (idle >= 1f && Mathf.Abs(speed) < 0.3f) { _rb.linearVelocity = Vector3.zero; _rb.angularVelocity = Vector3.zero; }
 
         AntiRoll(frontLeft, frontRight);
         AntiRoll(rearLeft, rearRight);
@@ -231,20 +311,32 @@ public class DrivableCar : MonoBehaviour
 
     void LateUpdate()
     {
-        // Wheel meshes follow their colliders.
-        var cols = new[] { frontLeft, frontRight, rearLeft, rearRight };
-        for (int i = 0; i < 4; i++)
+        // Wheel meshes follow their colliders; a parked car's stay as they are.
+        if (!_rb.isKinematic)
         {
-            if (cols[i] == null || wheelVisuals == null || i >= wheelVisuals.Length || wheelVisuals[i] == null) continue;
-            cols[i].GetWorldPose(out var pos, out var rot);
-            wheelVisuals[i].SetPositionAndRotation(pos, rot);
+            var cols = Wheels;
+            for (int i = 0; i < 4; i++)
+            {
+                if (cols[i] == null || wheelVisuals == null || i >= wheelVisuals.Length || wheelVisuals[i] == null) continue;
+                cols[i].GetWorldPose(out var pos, out var rot);
+                wheelVisuals[i].SetPositionAndRotation(pos, _wheelRest != null ? rot * _wheelRest[i] : rot);
+            }
         }
         if (Driving != this || _camera == null) return;
-        // Chase camera: behind and above, smoothed, looking a little ahead of the car.
-        var want = transform.TransformPoint(cameraOffset);
-        _camera.position = Vector3.Lerp(_camera.position, want, 1f - Mathf.Exp(-6f * Time.deltaTime));
-        var look = transform.position + transform.forward * 4f + Vector3.up * 1.2f;
-        _camera.rotation = Quaternion.Slerp(_camera.rotation, Quaternion.LookRotation(look - _camera.position), 1f - Mathf.Exp(-8f * Time.deltaTime));
+
+        // Chase camera: fixed to the car's place, its heading easing after the car's, level whatever the car's roll and pitch.
+        _camYaw = Mathf.SmoothDampAngle(_camYaw, transform.eulerAngles.y, ref _camYawVel, cameraTurnTime);
+        Quaternion heading = Quaternion.Euler(0f, _camYaw, 0f);
+        Vector3 pivot = transform.position + Vector3.up * cameraPivot;
+        Vector3 away = heading * cameraOffset + Vector3.up * (-cameraPivot);
+        float full = away.magnitude;
+        // Never through a wall: in at once when something is in the way, out again slowly.
+        int solid = ~LayerMask.GetMask("Vehicle", "Player", "PlayerBounds", "FirstPerson", "Enemy", "Civilian", "Ignore Raycast", "UI");
+        float free = Physics.SphereCast(pivot, 0.25f, away / full, out var hit, full, solid, QueryTriggerInteraction.Ignore) ? Mathf.Max(0.5f, hit.distance - 0.2f) : full;
+        _camDistance = free < _camDistance ? free : Mathf.MoveTowards(_camDistance, free, full / 0.6f * Time.deltaTime);
+        _camera.position = pivot + away / full * _camDistance;
+        Vector3 look = pivot + heading * Vector3.forward * 5f;
+        _camera.rotation = Quaternion.LookRotation(look - _camera.position);
         if (_player != null) _player.position = transform.position + Vector3.up * 0.3f;
     }
 }

@@ -394,7 +394,7 @@ namespace FPSKit.EditorTools
                 case "hand_run": MobileInput.Move = new Vector2(0f, 1f); return _frame >= Frames(1.6f) && Shoot(closeUp: true);
                 case "hand_fire": MobileInput.SetFireButton(_frame >= Frames(1f)); return _frame >= Frames(1f) + 2 && Shoot(closeUp: true);
                 case "hand_aim": MobileInput.Aim = true; return _frame >= Frames(1.0f) && Shoot(closeUp: true);
-                case "down": Pitch(65f); return _frame >= Frames(1.2f) && Shoot();
+                case "down": Pitch(80f); return _frame >= Frames(1.2f) && Shoot();
                 // Impacts (FPSImpactManager): turned to the shop beside the desert's start -- its shutter (metal: dents,
                 // sparks, a flash), or the stone over it -- a burst; shot while firing, or a second after (marks, dust).
                 case "impacts":

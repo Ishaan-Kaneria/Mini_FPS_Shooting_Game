@@ -18,7 +18,7 @@ MonoBehaviour:
   bodyColor: {r: 0.85, g: 0.45, b: 0.1, a: 1}
   headColor: {r: 1, g: 0.65, b: 0.25, a: 1}
   glowColor: {r: 0, g: 0, b: 0, a: 1}
-  scaleMultiplier: 0.85
+  scaleMultiplier: 1
   unlockWave: 2
   baseWeight: 1.5
   weightGrowthPerWave: 0.3

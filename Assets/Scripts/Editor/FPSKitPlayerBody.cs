@@ -27,7 +27,7 @@ namespace FPSKit.EditorTools
         const string Source = "Assets/Characters/HumanSoldier/Human_Soldier.fbx";
 
         /// <summary>Metres from the floor to the player's eyes standing: PlayerBodySettings.playerHeight less PlayerMotor's 0.15 m to the top. Level with a standard enemy's (his pick, 2026-11-04).</summary>
-        const float EyeHeight = 1.62f;
+        const float EyeHeight = 1.48f;
 
         /// <summary>His outfit: the same garments as the enemies, in a mix none of them wears.</summary>
         static readonly (string mesh, string skin)[] Outfit =
@@ -273,6 +273,14 @@ namespace FPSKit.EditorTools
             // The kick takes the clip's whole lower body, its turn included (Root): the legs alone, laid on
             // hips still facing ahead, kicked off to the side.
             var legs = Mask("Legs", AvatarMaskBodyPart.Root, AvatarMaskBodyPart.Body, AvatarMaskBodyPart.LeftLeg, AvatarMaskBodyPart.RightLeg);
+            // Standing still, a plain stance from the waist down (PlayerBody's weight): the rifle idle's stance is turned side on with one foot
+            // behind, and looking down showed one leg (his note, 2026-11-04). The arms and the shadow's rifle stay on the base layer.
+            var plain = FPSKitRiggedSoldier.Mixamo("Idle/Idle_Breathing");
+            if (plain != null)
+            {
+                var standLegs = Layer(controller, "StandLegs", legs);
+                standLegs.defaultState = State(standLegs, "Stand", plain);
+            }
             var kick = Layer(controller, "Kick", legs);
             var clip = Find(KickFiles, HumanBodyBones.RightFoot);
             if (clip != null)

@@ -52,6 +52,8 @@ public class PlayerBody : MonoBehaviour
     float _lift, _turn, _kickW;
     bool _placed;
     int _kickLayer = -1;
+    int _standLayer = -1;
+    float _standW, _downW;
     string _kickState = "";
     string _baseState = "Idle";
 
@@ -169,6 +171,7 @@ public class PlayerBody : MonoBehaviour
         _lThigh = _anim.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
         _rThigh = _anim.GetBoneTransform(HumanBodyBones.RightUpperLeg);
         _kickLayer = _anim.GetLayerIndex("Kick");
+        _standLayer = _anim.GetLayerIndex("StandLegs");
 
         SplitMeshes();
     }
@@ -185,8 +188,8 @@ public class PlayerBody : MonoBehaviour
         foreach (var t in new[] { _lThigh, _rThigh }) if (t != null) foreach (var c in t.GetComponentsInChildren<Transform>(true)) legs.Add(c);
         var hips = _anim.GetBoneTransform(HumanBodyBones.Hips);
         if (hips != null) legs.Add(hips);
-        // The belly too (his brief, 2026-11-04: "my whole body is not visible"): this bone only, not what hangs from it. Any
-        // higher and the eye stood inside the vest, which draws as a black hollow; the arms are the view model's.
+        // The belly too (his brief, 2026-11-04: "my whole body is not visible"). No higher: the chest drew as a black hole seen from above, the
+        // shoulders filled half the screen, and the arms are the view model's. The body's lean (PlaceBody) brings the feet into view.
         if (_anim.GetBoneTransform(HumanBodyBones.Spine) is Transform belly) legs.Add(belly);
 
         foreach (var smr in _body.GetComponentsInChildren<SkinnedMeshRenderer>(true))
@@ -194,14 +197,13 @@ public class PlayerBody : MonoBehaviour
             if (!smr.enabled || !smr.gameObject.activeInHierarchy || smr.sharedMesh == null) continue;
             var mesh = smr.sharedMesh;
             smr.gameObject.layer = _playerLayer;
-            // Worn on the chest, in the shadow only: from the eye it is the inside of a vest.
+            smr.updateWhenOffscreen = true;
+            // In the shadow only: its inner panels face the eye, a black slab under the view.
             if (smr.name.Contains("Vest"))
             {
                 smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
-                smr.updateWhenOffscreen = true;
                 continue;
             }
-            smr.updateWhenOffscreen = true;
             if (!mesh.isReadable) { smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly; continue; }
 
             var bones = smr.bones;
@@ -243,33 +245,10 @@ public class PlayerBody : MonoBehaviour
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             r.updateWhenOffscreen = true;
 
-            // Two-sided: looking down, the waist where the body is cut shows cloth, not a hollow.
             smr.sharedMesh = Subset("_Legs", keepLegs: true);
-            smr.sharedMaterials = TwoSided(smr.sharedMaterials);
             smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         }
     }
-
-    /// <summary>Copies of the materials drawn on both faces (URP Lit's Render Face: Both), made once per material.</summary>
-    Material[] TwoSided(Material[] mats)
-    {
-        var result = new Material[mats.Length];
-        for (int i = 0; i < mats.Length; i++)
-        {
-            if (mats[i] == null || !mats[i].HasProperty("_Cull")) { result[i] = mats[i]; continue; }
-            if (!TwoSidedCache.TryGetValue(mats[i], out var copy))
-            {
-                copy = new Material(mats[i]) { name = mats[i].name + " (two-sided)" };
-                copy.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
-                TwoSidedCache[mats[i]] = copy;
-            }
-            result[i] = copy;
-        }
-        return result;
-    }
-
-    Dictionary<Material, Material> _twoSided;
-    Dictionary<Material, Material> TwoSidedCache => _twoSided ??= new Dictionary<Material, Material>();
 
     /// <summary>The gun's meshes, drawn into the shadows only, carried in the body's right hand.</summary>
     void BuildShadowGun(WeaponData data)
@@ -324,6 +303,13 @@ public class PlayerBody : MonoBehaviour
         {
             _anim.CrossFadeInFixedTime(want, 0.25f, 0);
             _baseState = want;
+        }
+
+        // Square on both feet when still, not the rifle's side-on stance (see FPSKitPlayerBody.Controller).
+        if (_standLayer >= 0)
+        {
+            _standW = Mathf.MoveTowards(_standW, speed < 0.2f && !_d.crouching ? 1f : 0f, dt * 4f);
+            _anim.SetLayerWeight(_standLayer, Smooth(_standW));
         }
 
         // The kick, its clip driven by the strike's own progress.
@@ -420,7 +406,10 @@ public class PlayerBody : MonoBehaviour
     void PlaceBody(float dt)
     {
         if (_head == null) return;
-        _body.rotation = transform.rotation * Quaternion.AngleAxis(-(S.kickLean + S.kickRise) * Smooth(_kickW), Vector3.right)
+        float lookingDown = Smooth(Mathf.InverseLerp(0.3f, 0.8f, Vector3.Dot(_cam.transform.forward, Vector3.down)));
+        // Eased, so a quick look down does not swing the legs through the view.
+        _downW = _placed ? Mathf.MoveTowards(_downW, lookingDown, dt * 3f) : lookingDown;
+        _body.rotation = transform.rotation * Quaternion.AngleAxis(-(S.kickLean + S.kickRise) * Smooth(_kickW) - S.lookDownLean * _downW, Vector3.right)
                                             * Quaternion.AngleAxis(-_turn, Vector3.up);
 
         Vector3 flat = Flat(_cam.transform.forward);
@@ -439,7 +428,7 @@ public class PlayerBody : MonoBehaviour
         _offset.y = _lift;
         _placed = true;
         // Forward under the eye through a kick, so more of the leg is in view (kickReach).
-        _body.position = transform.position + _offset + flat * (S.kickReach * Smooth(_kickW));
+        _body.position = transform.position + _offset + flat * (S.kickReach * Smooth(_kickW)) - transform.right * (S.lookDownAside * _downW);
     }
 
     void PlaceShadowGun()

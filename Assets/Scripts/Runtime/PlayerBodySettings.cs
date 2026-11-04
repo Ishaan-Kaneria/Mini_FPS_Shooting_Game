@@ -22,8 +22,8 @@ public class PlayerBodySettings : ScriptableObject
              "model's own legs are used instead.")]
     public GameObject bodyPrefab;
 
-    [Tooltip("The player's height, metres, top of the head (the capsule): the eyes are 0.15 under it. 1.77 sets them level with a standard enemy's.")]
-    [Range(1.4f, 2f)] public float playerHeight = 1.77f;
+    [Tooltip("The player's height, metres, top of the head (the capsule): the eyes are 0.15 under it. 1.63 sets them level with a standard enemy's.")]
+    [Range(1.4f, 2f)] public float playerHeight = 1.63f;
     [Tooltip("Metres the eyes sit ahead of the head bone's centre.")]
     [Range(0f, 0.2f)] public float eyeAhead = 0.09f;
     [Tooltip("Metres the eyes sit above the head bone.")]
@@ -37,13 +37,17 @@ public class PlayerBodySettings : ScriptableObject
     public Vector2 liftLimits = new Vector2(-0.15f, 0.1f);
     [Tooltip("Metres the body stands back from where the eyes are, looking straight down. The vest's front " +
              "is 15 cm ahead of the eye standing: back this far, the eye clears it and the forward boot is seen.")]
-    [Range(0f, 0.6f)] public float lookDownBack = 0.12f;
+    [Range(0f, 0.6f)] public float lookDownBack = 0.18f;
+    [Tooltip("Degrees the body leans back about the eye, looking down, its feet coming forward. Hanging straight under the eye, the chest hides the feet from every angle (a person leans over to see his own).")]
+    [Range(0f, 40f)] public float lookDownLean = 0f;
+    [Tooltip("Metres the body moves to the left, looking down: the arms and gun fill the right of the view.")]
+    [Range(0f, 0.4f)] public float lookDownAside = 0.18f;
     [Tooltip("Metres a second the forward sprint clip moves at, at the body's size (measured by the builder).")]
     [Min(0.5f)] public float sprintClipSpeed = 6.8f;
     [Tooltip("Share of the body's speed the legs' movement clips are asked for, at a walk (3 m/s), a jog (5.1) and a sprint " +
              "(7.6), blended between. The clips' feet do not move at their measured speeds (the planted foot slid forward " +
              "at a walk and back 18-20% at a jog and a sprint, FPSKitEyeCamTest); these put it back under the body.")]
-    public Vector3 legPace = new Vector3(1.17f, 1.12f, 0.894f);
+    public Vector3 legPace = new Vector3(1.17f, 1.08f, 0.894f);
 
     /// <summary>The legs' pace at a speed, metres a second: <see cref="legPace"/> blended between walk, jog and sprint.</summary>
     public float LegPaceAt(float speed) => speed <= 3f ? legPace.x

@@ -252,7 +252,8 @@ def dress(body, rig, path, cloth_objects=(), clearance=0.015):
 
 
 macro = TargetService.get_default_macro_info_dict()
-macro.update({"gender": 1.0, "age": 0.5, "muscle": 0.62, "weight": 0.52, "proportions": 0.6, "height": 0.5})
+macro.update({"gender": 1.0, "age": float(opt("--age", "0.65")), "muscle": float(opt("--muscle", "0.92")), "weight": float(opt("--weight", "0.68")),
+              "proportions": float(opt("--proportions", "0.85")), "height": 0.5})
 
 # Feet on the ground is done here, not by MPFB: its option lifts the mesh and leaves the skeleton 0.85 m under it, so every
 # joint would pivot in the wrong place. Its macro shape keys are baked and its helper mask applied first, so the FBX is plain.

@@ -134,6 +134,8 @@ namespace FPSKit.EditorTools
                 _poolAtEngage = _poolAfterRanged = _poolBeforeClose = _poolAtEnd = -1f;
                 _closeAttacks = 0;
                 _sawRangedShot = false;
+                FightingEyes.Clear();
+                _playerEye = -1f;
                 _punchThrown = _punchKilled = _gunLowered = _fistShown = _punchMissed = false;
                 _punchRole = _punchMissHit = "";
                 _punchTarget = null;
@@ -160,8 +162,56 @@ namespace FPSKit.EditorTools
             }
         }
 
+        /// <summary>
+        /// The player's eye against an ordinary enemy's in a fight, measured in play. His stance dips 16 cm below the rest pose, so the
+        /// rest pose's numbers said "level" while the player looked down on the top of his head (his report, 2026-11-04, three times).
+        /// </summary>
+        static readonly System.Collections.Generic.List<float> FightingEyes = new System.Collections.Generic.List<float>();
+        static int _eyeSampleFrame;
+        const float EnemyEyeOverHeadJoint = 0.04f;
+        static float _playerEye = -1f;
+
+        static void SampleEyes()
+        {
+            if (!Application.isPlaying || Time.frameCount - _eyeSampleFrame < 45) return;
+            _eyeSampleFrame = Time.frameCount;
+            var player = GameObject.FindGameObjectWithTag("Player");
+            var motor = player != null ? player.GetComponent<PlayerMotor>() : null;
+            if (motor == null || motor.cameraHolder == null) return;
+            _playerEye = motor.cameraHolder.position.y - player.transform.position.y;
+            foreach (var ai in Enemies())
+            {
+                if (ai.archetype == null || ai.archetype.name != "Grunt") continue;
+                if (ai.CurrentState != EnemyAI.State.Chase && ai.CurrentState != EnemyAI.State.Attack) continue;
+                var animator = ai.GetComponentInChildren<Animator>();
+                var head = animator != null && animator.isHuman ? animator.GetBoneTransform(HumanBodyBones.Head) : null;
+                if (head != null) FightingEyes.Add(head.position.y + EnemyEyeOverHeadJoint - ai.transform.position.y);
+            }
+        }
+
+        /// <summary>What is wrong with the sizes, or null. A man-sized enemy is never under 1 (they read as teenagers), a boss aside.</summary>
+        static string SizeProblems()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var guid in AssetDatabase.FindAssets("t:EnemyArchetype"))
+            {
+                var a = AssetDatabase.LoadAssetAtPath<EnemyArchetype>(AssetDatabase.GUIDToAssetPath(guid));
+                if (a != null && a.scaleMultiplier < 0.999f) sb.Append($"\n  - {a.name} is {a.scaleMultiplier:0.00} of a man's size: reads as a teenager");
+            }
+            if (FightingEyes.Count < 5) sb.Append($"\n  - only {FightingEyes.Count} samples of a fighting Grunt's eye");
+            else
+            {
+                FightingEyes.Sort();
+                float eye = FightingEyes[FightingEyes.Count / 2];
+                Notes.Append($"\n  eyes over the feet: player {_playerEye:0.00}, a fighting Grunt {eye:0.00} ({FightingEyes.Count} samples)");
+                if (_playerEye > eye + 0.05f) sb.Append($"\n  - the player's eye ({_playerEye:0.00}) looks down on a fighting Grunt's ({eye:0.00})");
+            }
+            return sb.Length > 0 ? sb.ToString() : null;
+        }
+
         static void Tick()
         {
+            SampleEyes();
             try
             {
                 if (EditorApplication.timeSinceStartup - _startedAt > HardTimeout)
@@ -716,7 +766,10 @@ namespace FPSKit.EditorTools
         /// within MeleeSettings.grabRange, and the next press is rightly the grab (the 2026-11-04 failures: five runs in six), which
         /// VerifyGrapple measures and which never finishes a man. He keeps walking in, so this is asked again until the punch has landed.
         /// </summary>
-        static void HoldAtArmsLength(GameObject player, Transform target) => StandBy(player, target, 1.6f);
+        /// <summary>A blow folds him about half a metre forward at the head: this far off, the next press is still a punch, not the grab.</summary>
+        const float ClearOfGrab = 1.8f;
+
+        static void HoldAtArmsLength(GameObject player, Transform target) => StandBy(player, target, ClearOfGrab);
 
         /// <summary>
         /// Stands the player this far from the target, on his level and facing him, on the side they are already on unless something
@@ -908,6 +961,8 @@ namespace FPSKit.EditorTools
                     problems.Append($"\n  - a punch thrown from eight metres hit {_punchMissHit}");
             }
 
+            problems.Append(SizeProblems());
+
             if (problems.Length > 0)
             {
                 Debug.LogError($"[FPSKitBatch] FAILED: level one does not fight:{problems}\n{Notes}");
@@ -973,7 +1028,7 @@ namespace FPSKit.EditorTools
                     health.ResetHealth();
                     // 1.6 m, just outside grab reach: at 1.3 m the butt folded him, his head came into the crosshair within
                     // MeleeSettings.grabRange, and the next press was rightly the grab, not the jab this measures.
-                    StandBy(player, _rxTarget.transform, 1.6f);
+                    StandBy(player, _rxTarget.transform, ClearOfGrab);
 
                     _rxHitBefore = _rxBody.LastHitFrame;
                     var hit = strike == MeleeStrike.Strike.Kick ? melee.TryKick() : melee.TryPunch();

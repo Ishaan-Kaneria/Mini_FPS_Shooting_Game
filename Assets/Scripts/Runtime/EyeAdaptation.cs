@@ -44,6 +44,9 @@ public class EyeAdaptation : MonoBehaviour
     [Tooltip("Share blocked at which it may open all the way (a room: roof overhead, walls round).")]
     [Range(0f, 1f)] public float openAt = 0.95f;
 
+    [Tooltip("Stops of the eye's opening that what the probes light keeps. Past it they stay at this brightness on the screen. Lower dims doors and small props against the walls; too low loses a soldier in a dark room.")]
+    [Range(0f, 8f)] public float probeStops = 1f;
+
     [Header("How fast")]
     [Tooltip("Seconds to adapt walking into the dark.")]
     [Range(0.05f, 5f)] public float adaptInSeconds = 1.4f;
@@ -68,6 +71,7 @@ public class EyeAdaptation : MonoBehaviour
     Volume _volume;
     VolumeProfile _profile;
     ColorAdjustments _adjust;
+    ProbeVolumesOptions _probes;
     float _base, _offset, _cap, _metered, _nextLook;
     int _mask, _nextRead;
     bool _reading;
@@ -115,6 +119,8 @@ public class EyeAdaptation : MonoBehaviour
             _profile.hideFlags = HideFlags.DontSave;
             _adjust = _profile.Add<ColorAdjustments>(false);
             _adjust.postExposure.overrideState = true;
+            _probes = _profile.Add<ProbeVolumesOptions>(false);
+            _probes.intensityMultiplier.overrideState = true;
             _volume.sharedProfile = _profile;
         }
         RenderPipelineManager.beginCameraRendering += AddMeterPass;
@@ -195,6 +201,9 @@ public class EyeAdaptation : MonoBehaviour
         float seconds = target > _offset ? adaptInSeconds : adaptOutSeconds;
         _offset = !float.IsNaN(_held) ? _held : Mathf.Lerp(_offset, target, 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, seconds)));
         _adjust.postExposure.value = _base + _offset;
+        // What the probes light (front doors, small props, people) is not brought up with the rooms' lightmaps past this: they
+        // hold more light than the lightmapped walls do, and with the eye wide open they glowed against them.
+        _probes.intensityMultiplier.value = Mathf.Pow(2f, -Mathf.Max(0f, _offset - probeStops));
         _volume.weight = 1f;
     }
 

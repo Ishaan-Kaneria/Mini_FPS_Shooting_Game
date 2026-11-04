@@ -85,7 +85,7 @@ public class FirstPersonShade : MonoBehaviour
         go.transform.SetParent(transform, false);
         _probeVolume = go.AddComponent<Volume>();
         _probeVolume.isGlobal = true;
-        _probeVolume.priority = 1000f;
+        _probeVolume.priority = 1001f;       // over the eye's own (EyeAdaptation)
         _probeProfile = ScriptableObject.CreateInstance<VolumeProfile>();
         _probeProfile.hideFlags = HideFlags.DontSave;
         _probeLight = _probeProfile.Add<ProbeVolumesOptions>(false);

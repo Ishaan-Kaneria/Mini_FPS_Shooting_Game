@@ -154,7 +154,8 @@ namespace FPSKit.EditorTools
             float m2 = 0f; int insides = 0, furniture = 0, furnitureLit = 0;
             foreach (var r in rooms.GetComponentsInChildren<MeshRenderer>(true))
             {
-                bool inside = !r.name.StartsWith("Detail_") && (r.name.StartsWith("Interior_") || r.name.StartsWith("ShopInside_") || r.name.StartsWith("ShopWindow_"));
+                // A house's fine work too (door frames, skirting): on the probes it glowed against the walls in a dark room.
+                bool inside = r.name.StartsWith("Detail_Interior_") || (!r.name.StartsWith("Detail_") && (r.name.StartsWith("Interior_") || r.name.StartsWith("ShopInside_") || r.name.StartsWith("ShopWindow_")));
                 if (inside)
                 {
                     m2 += FPSKitTownLightmaps.Lightmapped(r);

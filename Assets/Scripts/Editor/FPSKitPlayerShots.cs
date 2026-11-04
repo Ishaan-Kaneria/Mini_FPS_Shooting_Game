@@ -950,6 +950,10 @@ namespace FPSKit.EditorTools
                     _tourShot = 0;
                     _tourRooms = TourRooms();
                     PilotPlaces(_tourRooms);
+                    // FPSKIT_TOUR_SOLDIER=1: a soldier in the middle of every room, to judge whether he can be seen there.
+                    if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_SOLDIER") == "1")
+                        foreach (var (_, look, place) in _tourRooms)
+                            _tourSoldiers[place] = Physics.Raycast(look, Vector3.down, out var standOn, 4f, ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian"), QueryTriggerInteraction.Ignore) ? standOn.point : look;
                     // Diagnosis switches: FPSKIT_TOUR_BOUNCE=1 puts the old shadowless bounce light back on, FPSKIT_TOUR_SSAO=0
                     // switches screen-space occlusion off, FPSKIT_TOUR_PROBES=0 takes every static renderer off the probes.
                     if (System.Environment.GetEnvironmentVariable("FPSKIT_TOUR_BOUNCE") == "1")

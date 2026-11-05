@@ -389,8 +389,18 @@ public class GameDirector : MonoBehaviour
     {
         if (points == 0 || IsGameOver) return;
 
-        Score += points;
+        Score = Mathf.Max(0, Score + points);   // penalties (civilians) stop at nothing
         ScoreChanged?.Invoke(this);
+    }
+
+    bool _abandonRecorded;
+
+    /// <summary>A level left mid-fight counts once: leaving does not set IsGameOver, so two quits in a frame banked its coins twice.</summary>
+    void RecordAbandoned()
+    {
+        if (IsGameOver || GameSession.EditingHud || _abandonRecorded) return;
+        _abandonRecorded = true;
+        GameSession.RecordResult(AbandonedResult());
     }
 
     /// <summary>
@@ -496,7 +506,7 @@ public class GameDirector : MonoBehaviour
         // A level abandoned mid-fight still counts as an attempt. Reported here rather
         // than in ReportLevelFinished so the quit path is covered without
         // double-counting a scored one, which has already banked its result by now.
-        if (!IsGameOver && !GameSession.EditingHud) GameSession.RecordResult(AbandonedResult());
+        RecordAbandoned();
         GameSession.EndHudEditing();
 
         Time.timeScale = 1f;
@@ -595,7 +605,7 @@ public class GameDirector : MonoBehaviour
     /// </summary>
     public void RestartRun()
     {
-        if (!IsGameOver && !GameSession.EditingHud) GameSession.RecordResult(AbandonedResult());
+        RecordAbandoned();
         Restart();
     }
 

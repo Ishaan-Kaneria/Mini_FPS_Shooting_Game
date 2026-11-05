@@ -553,7 +553,7 @@ public class PlayerMotor : MonoBehaviour
         }
 
         // Recoil decays toward zero so the view settles between bursts.
-        float decay = Mathf.Clamp01(_recoilRecovery * Time.deltaTime);
+        float decay = 1f - Mathf.Exp(-_recoilRecovery * Time.deltaTime);   // the same settling at any frame rate
         _recoilPitch = Mathf.Lerp(_recoilPitch, 0f, decay);
         _recoilYaw = Mathf.Lerp(_recoilYaw, 0f, decay);
 

@@ -77,7 +77,12 @@ public class Hitbox : MonoBehaviour
         // credited to the same shooter), unless it was a heavy round, or armour is up, or he is a boss.
         if (owner != null && Part == BodyPart.Neck && !isHeadshot && !info.fromBlast && !info.fromMelee && !info.heavy && owner.Shield <= 0f
             && owner.TryGetComponent<EnemyNeckWound>(out var neck) && neck.CanOpen)
-            info.amount = Mathf.Min(info.amount, Mathf.Max(0f, owner.Current - Mathf.Max(1f, owner.maxHealth * 0.15f)));
+        {
+            // Held short of a kill only while he has more than that left: already below it (legs shot first), the cap came to nothing,
+            // ApplyDamage ignored a round of 0, and no light round to the neck could ever hurt him again.
+            float floor = Mathf.Max(1f, owner.maxHealth * 0.15f);
+            if (owner.Current > floor) info.amount = Mathf.Min(info.amount, owner.Current - floor);
+        }
 
         info.amount = owner != null ? owner.ApplyDamage(info) : 0f;
 

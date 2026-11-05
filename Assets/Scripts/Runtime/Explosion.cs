@@ -216,7 +216,7 @@ public class Explosion : MonoBehaviour
                 // return first: a target's head and its feet are a metre and a half apart,
                 // and a blast should not be worth more against a tall enemy.
                 float distance = Vector3.Distance(centre, health.transform.position);
-                float amount = spec.DamageAtDistance(distance);
+                float amount = spec.DamageAtDistance(distance) * Exposure(centre, health);
 
                 bool isSelf = selfRoot != null && health.gameObject == selfRoot;
                 if (isSelf) amount *= spec.selfDamageFraction;
@@ -244,4 +244,28 @@ public class Explosion : MonoBehaviour
 
         return count;
     }
+
+    /// <summary>What a blast keeps through a wall: a bomb against a house's outer wall no longer kills everyone inside it.</summary>
+    const float ThroughWall = 0.15f;
+
+    /// <summary>
+    /// 1 if the blast reaches the body or the head with no wall in the way, else <see cref="ThroughWall"/>. Both are tried so a kerb or
+    /// a crate does not shelter a man standing behind it. Another thing with a Health (a drum on the Environment layer) is not a wall.
+    /// </summary>
+    static float Exposure(Vector3 centre, Health health)
+    {
+        Vector3 from = centre + Vector3.up * 0.2f, foot = health.transform.position;
+        Vector3 body = foot + Vector3.up * 0.9f, head = foot + Vector3.up * 1.6f;
+        if (health.TryGetComponent<Collider>(out var own) && own.enabled)
+        {
+            var b = own.bounds;
+            body = b.center;
+            head = new Vector3(b.center.x, b.max.y - 0.1f, b.center.z);
+        }
+        int walls = LayerMask.GetMask("Environment");
+        return Clear(from, body, walls) || Clear(from, head, walls) ? 1f : ThroughWall;
+    }
+
+    static bool Clear(Vector3 from, Vector3 to, int walls) =>
+        !Physics.Linecast(from, to, out RaycastHit hit, walls, QueryTriggerInteraction.Ignore) || hit.collider.GetComponentInParent<Health>() != null;
 }

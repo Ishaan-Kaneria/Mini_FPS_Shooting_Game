@@ -540,6 +540,17 @@ public class Weapon : MonoBehaviour
         _nextFireTime = Time.time + SecondsBetweenShots;
     }
 
+    /// <summary>
+    /// When the next round may go. A held trigger only fires on a frame, so counting from now lost the wait to that frame on every shot:
+    /// a 900 round gun fired 708 at 30 fps. A shot this frame was due keeps the lost time; any later one (a fresh press) counts from now,
+    /// or tapping could beat the gun's rate.
+    /// </summary>
+    public static float NextShotTime(float now, float due, float interval, float frame)
+    {
+        float late = now - due;
+        return late >= 0f && late <= frame ? due + interval : now + interval;
+    }
+
     // ======================================================================
     void FireOnce()
     {
@@ -556,7 +567,7 @@ public class Weapon : MonoBehaviour
         }
 
         if (!data.infiniteAmmo) CurrentAmmo--;
-        _nextFireTime = Time.time + SecondsBetweenShots;
+        _nextFireTime = NextShotTime(Time.time, _nextFireTime, SecondsBetweenShots, Time.deltaTime);
         LastShotTime = Time.time;
 
         for (int i = 0; i < Mathf.Max(1, data.pelletsPerShot); i++)
@@ -881,7 +892,7 @@ public class Weapon : MonoBehaviour
             _motor.LookSensitivityMultiplier =
                 Mathf.Lerp(1f, _motor.adsSensitivityMultiplier, AimProgress);
 
-        _kickback = Mathf.Lerp(_kickback, 0f, Mathf.Clamp01(12f * Time.deltaTime));
+        _kickback = Mathf.Lerp(_kickback, 0f, 1f - Mathf.Exp(-12f * Time.deltaTime));
 
         Vector3 basePosition = Vector3.Lerp(_hipPosition, data.adsPosition, AimProgress);
         ReloadPose(out Vector3 reloadOffset, out Vector3 reloadTurn);

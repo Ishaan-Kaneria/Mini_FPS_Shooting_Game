@@ -148,7 +148,7 @@ public class Civilian : MonoBehaviour
             animator.SetInteger(DieVariantId, Random.Range(0, 3));
             animator.SetTrigger(DieId);
         }
-        CivilianCasualties.Report();
+        if (CivilianCasualties.ByPlayer(h.LastDamage.source)) CivilianCasualties.Report();   // an enemy's round, the truck's or a charge is not his to answer for
         director?.Died(this);
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 /// How many civilians died in the current level (the desert town's people, see <see cref="Civilian"/>).
 ///
 /// Reset when a level starts (LevelManager.RunLevel) and read when it ends (LevelManager.Finish): any civilian
-/// killed caps the level at two stars, three or more at one, and each costs <see cref="ScorePenalty"/> points.
+/// the player killed caps the level at two stars, three or more at one, and each costs <see cref="ScorePenalty"/> points.
 /// That is the user's rule for the town (2026-10-20: "hitting a civilian costs score or stars").
 /// </summary>
 public static class CivilianCasualties
@@ -31,6 +31,10 @@ public static class CivilianCasualties
         Count++;
         Changed?.Invoke(Count);
     }
+
+    /// <summary>Whether a death is the player's: his gun, bomb, blow, car, or a barrel he set off. Only those cost him (an enemy's stray round did, and capped his stars).</summary>
+    public static bool ByPlayer(GameObject source) =>
+        source != null && (source.CompareTag("Player") || source.GetComponentInParent<PlayerMotor>() != null);
 
     /// <summary>The star cap for this many civilian deaths: 3 for none, 2 for one or two, 1 for three or more.</summary>
     public static int StarCap(int count) => count <= 0 ? 3 : count < 3 ? 2 : 1;

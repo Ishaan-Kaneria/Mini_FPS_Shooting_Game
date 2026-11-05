@@ -121,9 +121,7 @@ public class VehicleDriver : MonoBehaviour
         // would be better: Docs/DESERT_VEHICLES.md.)
         if (_animator != null) _animator.speed = 0f;
         transform.localRotation = Quaternion.Euler(8f, 0f, -18f);
-        var src = h.LastDamage.source;
-        bool byPlayer = src != null && (src.CompareTag("Player") || src.GetComponentInParent<PlayerMotor>() != null);
-        if (byPlayer) CivilianCasualties.Report();
+        if (CivilianCasualties.ByPlayer(h.LastDamage.source)) CivilianCasualties.Report();
         Died?.Invoke(this);
     }
 }

@@ -75,8 +75,14 @@ public class CivilianDirector : MonoBehaviour
         }
         if (_live.Count < _budget) TrySpawn(false);
 
-        // Bodies are kept, but only so many: the oldest go once there are too many.
-        while (_dead.Count > 20) { if (_dead[0] != null) Destroy(_dead[0]); _dead.RemoveAt(0); }
+        // Bodies are kept, but only so many: the oldest out of view go once there are too many. One in view stays until he looks away.
+        for (int i = 0; i < _dead.Count && _dead.Count > 20;)
+        {
+            var body = _dead[i];
+            if (body != null && InView(body.transform.position + Vector3.up, 120f)) { i++; continue; }
+            if (body != null) Destroy(body);
+            _dead.RemoveAt(i);
+        }
     }
 
     bool InView(Vector3 p, float range)

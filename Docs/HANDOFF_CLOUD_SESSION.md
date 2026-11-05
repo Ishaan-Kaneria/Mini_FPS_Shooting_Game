@@ -25,6 +25,7 @@ Base: `261c706` (GitHub `main`). 9 commits, 54 files, about 3,000 lines of code.
 | F10 | **Drivers in traffic cars**, shot through open windows | `Runtime/VehicleDriver.cs`, `Runtime/TrafficCar.cs`, `Runtime/TrafficDirector.cs`, `FPSKitTownLife.TrafficPrefab` (collider split) | Rebuild; `Life_Drive` clip |
 | F11 | **Cars run people over**; drivers react to people after a human delay | `Runtime/VehicleStrike.cs`, `TrafficCar.cs`, `DrivableCar.cs`, `FPSKitTownLife.cs` | Rebuild |
 | F12 | **Player limbs**: wall punches and kicks hurt and injure (bruised, swollen, fractured); strikes stop at walls; legs and rifle kept out of walls | `Runtime/PlayerLimbs.cs`, `Runtime/MeleeStrike.cs`, `Runtime/PlayerBody.cs`, `Runtime/Weapon.cs`, `Runtime/PlayerMotor.cs` | Compile only |
+| F13 | **The town's edge stops cars too** (they drove off the map) | `Editor/FPSKitSceneBuilder.cs` (`EnsureProjectTagsAndLayers`) | `EnsureProjectTagsAndLayers` runs (the build does); check a driven car stops at the edge |
 | T1 | Tools | `Tools/desert_review_objects.py`, `Tools/mixamo-download-life.js`, `Tools/sort-life-clips.py`; `.gitignore` (`__pycache__`) | |
 
 ## 2. Known bugs and risks in that code (fix or confirm each)

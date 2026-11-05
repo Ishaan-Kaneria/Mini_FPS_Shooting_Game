@@ -420,7 +420,7 @@ public class SettingsPanel : OverlayPanel
                       () => GameSettings.VSync, v => GameSettings.VSync = v, t);
             AddSwitch(page, "Dynamic resolution", "A heavy moment costs a little sharpness, not frames. Medium and High only.",
                       () => GameSettings.DynamicResolution, v => { GameSettings.DynamicResolution = v; QualityTiers.ApplyScene(); }, t);
-            AddChoice(page, "Frame limit", "With VSync off. Higher is smoother on a fast display and runs the machine hotter; 30 and 45 are cooler and quieter.",
+            AddChoice(page, "Frame limit", "With VSync off. Higher is smoother on a fast display and runs the machine hotter.",
                       Array.ConvertAll(GameSettings.FrameLimits, f => f > 0 ? f + " fps" : "Unlimited"),
                       () => Mathf.Max(0, Array.IndexOf(GameSettings.FrameLimits, GameSettings.FrameLimit)),
                       i => GameSettings.FrameLimit = GameSettings.FrameLimits[i], t);

@@ -15,15 +15,15 @@ Measured numbers come from `Docs/DESIGN_NOTES.md` ("Part A on mains"); sizes fro
 ### Combat
 | ID | Bug | Status | Where |
 |---|---|---|---|
-| D1 | A neck shot does nothing to an enemy at or below 15 % health | Plan (code given) | `DESERT_REVIEW.md` D1 |
-| D2 | Automatic guns fire up to 25 % slower at 30 fps | Plan (code given) | D2 |
-| D3 | Blasts hurt people through walls | Plan | D3 |
-| D4 | Damage reported larger than what landed | Plan | D4 |
-| D5 | Score can go negative | Plan | D5 |
-| D6 | Quitting twice in a frame banks coins twice | Plan | D6 |
-| D7 | Recoil recovery depends on frame rate | Plan | D7 |
+| D1 | A neck shot does nothing to an enemy at or below 15 % health | Fixed, tested | `DESERT_REVIEW.md` D1 |
+| D2 | Automatic guns fire up to 25 % slower at 30 fps | Fixed, tested (player, truck; enemies' 1 s cooldowns left) | D2 |
+| D3 | Blasts hurt people through walls | Fixed, tested (15 % through a wall) | D3 |
+| D4 | Damage reported larger than what landed | Not a bug: `Health.ApplyDamage` reports a capped limb hit in full on purpose | D4 |
+| D5 | Score can go negative | Fixed | D5 |
+| D6 | Quitting twice in a frame banks coins twice | Fixed | D6 |
+| D7 | Recoil recovery depends on frame rate | Fixed | D7 |
 | D8 | No grenades before the Warehouse boss; no explosive props | Fixed | `DESERT_EXPLOSIVES.md` |
-| C1 | Civilians killed by enemies cost the player stars | Plan (code given); drivers: Fixed | `DESERT_REVIEW.md` C1 |
+| C1 | Civilians killed by enemies cost the player stars | Fixed, tested | `DESERT_REVIEW.md` C1 |
 
 ### Lighting
 | ID | Bug | Status | Where |
@@ -56,10 +56,10 @@ Measured numbers come from `Docs/DESIGN_NOTES.md` ("Part A on mains"); sizes fro
 | V10 | Parked intact sedans wear the burnt-wreck material | Plan | |
 | V11 / B1 | The drivable car's camera is pulled to the world origin | Plan (code given) | `DESERT_REVIEW.md` B1 |
 | B2-B8 | Chase camera through walls, snapping steering, no engine brake, flat torque, wheel jitter, renderers on exit, exit into walls | Plan | B2-B8 |
-| B9 | The drivable car stops dead on an enemy | Plan (run-over damage Fixed) | B9 |
-| B10 | In the car the player cannot be hit or seen | Plan | B10 |
+| B9 | The drivable car stops dead on an enemy | Fixed, tested at town speed; under 2.5 m/s it still stops at him | B9 |
+| B10 | In the car the player cannot be hit or seen | Fixed for rounds, tested (glass passes, body stops); blasts and melee still do not reach him | B10 |
 | B11-B12 | Interact conflicts; per-frame allocations | Plan | B11-B12 |
-| B13 | The technical drives through everything | Plan | B13 |
+| B13 | The technical drives through everything | Stops for people and vehicles (not play-tested); ground-following still Plan | B13 |
 | V12 | No dust behind or on cars | Plan | |
 
 ### People
@@ -69,7 +69,7 @@ Measured numbers come from `Docs/DESIGN_NOTES.md` ("Part A on mains"); sizes fro
 | P-1 | Only four models, all men | Plan | |
 | P-2 | No everyday animations (the clips are combat only) | Plan (download script written) | |
 | C2 | People and cars created and destroyed in play (hitches) | Plan | `DESERT_REVIEW.md` C2 |
-| C3 | Bodies over 20 vanish in view | Plan | C3 |
+| C3 | Bodies over 20 vanish in view | Fixed | C3 |
 
 ### Missions and bosses
 | ID | Bug | Status | Where |
@@ -125,14 +125,14 @@ Honest list of what the code written in this session does not do well yet.
 | ID | Bug | File |
 |---|---|---|
 | O1 | A dead driver "slumps" by freezing the sitting pose and tilting the body: no real dead-at-the-wheel pose | `VehicleDriver` |
-| O2 | A car whose driver is dead still follows its route round corners while it rolls to a stop, and is removed at its route's end even in view | `TrafficCar` |
-| O3 | Running over checks only the front and back bumpers, not the sides; the drivable car still stops dead on an enemy at low speed | `VehicleStrike` |
+| O2 | Fixed, tested: A car whose driver is dead still follows its route round corners while it rolls to a stop, and is removed at its route's end even in view | `TrafficCar` |
+| O3 | Sides Fixed; the drivable car still stops at an enemy under 2.5 m/s | `VehicleStrike` |
 | O4 | **New load:** a skinned driver in each of up to 15 traffic cars, plus up to 54 residents and shopkeepers on High; each body is 40-120k triangles with no lower LOD for people | `VehicleDriver`, `TownHouseholds` |
 | O5 | Residents of a house with a bolted front door never go out (errands need an open path) | `CivilianLife` |
 | O6 | Until the everyday clips are downloaded, every resident and driver stands or sits in the idle pose: they look like statues | `FPSKitTownHouseholds` |
 | O7 | Mixamo's "Praying" is not the Islamic prayer: it needs a captured clip or must be left out | `Tools/mixamo-download-life.js` |
-| O8 | A stationed target, his guards or a boss's detail can appear in view if the player is already at the place when the level starts (`Station` does not test visibility) | `LevelManager.Station` |
-| O9 | Residents are kept from appearing in view by a frustum test that ignores walls: a house looked at through a wall from under 30 m gets nobody until the player turns away | `TownHouseholds` |
+| O8 | Fixed (not play-tested): A stationed target, his guards or a boss's detail can appear in view if the player is already at the place when the level starts (`Station` does not test visibility) | `LevelManager.Station` |
+| O9 | Fixed (24f08f2): Residents are kept from appearing in view by a frustum test that ignores walls: a house looked at through a wall from under 30 m gets nobody until the player turns away | `TownHouseholds` |
 | O10 | The grenade pickup is a plain capsule; a burst leaves no scorch and no wreck | `FPSKitSceneBuilder`, `ExplosiveProp` |
 | O11 | The petrol drums' red is a material copy per source material (a few small assets) | `FPSKitTownExplosives` |
 | O12 | Medium's new Forward+ renderer: its frame cost is unmeasured | `FPSKitQualityTiers` |

@@ -65,7 +65,7 @@ namespace FPSKit.EditorTools
                     _melee = _motor.GetComponent<MeleeStrike>();
                     Time.captureDeltaTime = Step;
                     MobileInput.Active = true;
-                    _script = _carRun ? CarScript() : _level >= 0 ? LevelScript() : Script();
+                    _script = _worldRun ? WorldScript() : _carRun ? CarScript() : _level >= 0 ? LevelScript() : Script();
                     _deadline = Time.realtimeSinceStartup + 1100f;
                 }
                 if (Time.frameCount == _lastFrame) return;
@@ -82,7 +82,7 @@ namespace FPSKit.EditorTools
         static void Finish(int code)
         {
             EditorApplication.update -= Tick;
-            File.WriteAllText($"{Folder}/report{(_carRun ? "_car" : _level >= 0 ? "_level" + _level : "")}.txt", Log.ToString());
+            File.WriteAllText($"{Folder}/report{(_worldRun ? "_world" : _carRun ? "_car" : _level >= 0 ? "_level" + _level : "")}.txt", Log.ToString());
             Time.captureDeltaTime = 0f;
             MobileInput.Active = false;
             FPSKitPlayMode.RestoreStartScene();
@@ -357,6 +357,178 @@ namespace FPSKit.EditorTools
             Note("DONE");
         }
 
+        /// <summary>Holds W down from the game's Update and reads the player's input in FixedUpdate, where the car reads it.</summary>
+        class KeyHolder : MonoBehaviour
+        {
+            public UnityEngine.InputSystem.Keyboard keys;
+            public PlayerMotor motor;
+            public Vector2 read;
+            public Vector2 readUpdate; public bool held;
+            void Update()
+            {
+                readUpdate = motor.ReadMoveInput(); held = keys.wKey.isPressed;
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(keys, new UnityEngine.InputSystem.LowLevel.KeyboardState(UnityEngine.InputSystem.Key.W));
+            }
+            void FixedUpdate() => read = motor.ReadMoveInput();
+            void OnDestroy() => UnityEngine.InputSystem.InputSystem.QueueStateEvent(keys, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+        }
+
+        static bool _worldRun;
+
+        /// <summary>What his brief of 2026-11-05 asked for, in the real desert: glass breaking, a drum kicked, the horn, a driver running, a car's window, and how they look. Report and frames in Build/CloudCheck.</summary>
+        public static void BatchWorld()
+        {
+            _worldRun = true;
+            Batch();
+        }
+
+        static System.Collections.IEnumerator WorldScript()
+        {
+            Application.logMessageReceived += CountRed;
+            yield return 8f;
+            Note($"WORLD: player at {_motor.transform.position}");
+            var field = GlassField.Instance;
+            Note($"glass field: {(field != null ? field.panes.Length : 0)} panes, {(field != null ? field.chunks.Length : 0)} chunks");
+            Vector3 me = _motor.transform.position;
+            GlassField.Pane Nearest(GlassField.Kind kind)
+            {
+                GlassField.Pane best = default; float bestD = float.MaxValue;
+                foreach (var p in field.panes)
+                {
+                    if (p.kind != kind || p.corner.y > 4f) continue;
+                    float d = (p.corner - me).sqrMagnitude;
+                    if (d < bestD && UnityEngine.AI.NavMesh.SamplePosition(p.corner + (p.u + p.v) * 0.5f + p.normal * 3f, out _, 2.5f, UnityEngine.AI.NavMesh.AllAreas)) { bestD = d; best = p; }
+                }
+                return best;
+            }
+            foreach (var kind in new[] { GlassField.Kind.Display, GlassField.Kind.Window })
+            {
+                var pane = Nearest(kind);
+                Vector3 mid = pane.corner + (pane.u + pane.v) * 0.5f;
+                UnityEngine.AI.NavMesh.SamplePosition(mid + pane.normal * 3f, out var stand, 2.5f, UnityEngine.AI.NavMesh.AllAreas);
+                Place(stand.position, mid);
+                yield return 1f;
+                Shot($"glass_{kind}_0_whole");
+                Vector3 from = mid + pane.normal * 2f;
+                var chunkMesh = field.chunks[pane.chunk].sharedMesh;
+                var first = chunkMesh.vertices[pane.firstVertex];
+                int rounds = 0;
+                while (rounds < 4 && chunkMesh.vertices[pane.firstVertex + 1] != first)
+                {
+                    field.Ray(from, -pane.normal, 3f, GlassField.Blow.Round, _motor.gameObject);
+                    rounds++;
+                    yield return 0.2f;
+                    Shot($"glass_{kind}_{rounds}");
+                }
+                Note($"{kind} pane at {mid}: broke on round {rounds}");
+                yield return 1.2f;
+                Shot($"glass_{kind}_settled");
+            }
+
+            // A drum, kicked.
+            LooseProp drum = null; float near = float.MaxValue;
+            foreach (var l in Object.FindObjectsByType<LooseProp>(FindObjectsSortMode.None))
+            {
+                float d = (l.transform.position - me).sqrMagnitude;
+                if (l.GetComponent<ExplosiveProp>() == null && l.name.ToLowerInvariant().Contains("barrel") && d < near
+                    && UnityEngine.AI.NavMesh.SamplePosition(l.transform.position, out var open, 2f, UnityEngine.AI.NavMesh.AllAreas) && Physics.Raycast(open.position + Vector3.up * 1.5f, Vector3.up, 30f, LayerMask.GetMask("Environment")) == false) { near = d; drum = l; }
+            }
+            Note($"loose props in the town: {Object.FindObjectsByType<LooseProp>(FindObjectsSortMode.None).Length}");
+            if (drum != null)
+            {
+                Vector3 at = drum.transform.position;
+                UnityEngine.AI.NavMeshHit s2 = default;
+                foreach (var way in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
+                    if (UnityEngine.AI.NavMesh.SamplePosition(at + way * 2.2f, out s2, 0.6f, UnityEngine.AI.NavMesh.AllAreas)
+                        && !Physics.Linecast(s2.position + Vector3.up * 1.5f, at + Vector3.up * 0.6f, LayerMask.GetMask("Environment"), QueryTriggerInteraction.Ignore)) break;
+                Place(s2.position, at + Vector3.up * 0.5f);
+                yield return 0.5f;
+                Shot("drum_before");
+                var dir = (at - s2.position); dir.y = 0f;
+                WorldHit.Send(drum.GetComponentInChildren<Collider>(), new WorldHitInfo { kind = WorldHitKind.Kick, point = at + Vector3.up * 0.5f, direction = dir.normalized, impulse = WorldHit.KickImpulse, source = _motor.gameObject });
+                yield return 1.5f;
+                Shot("drum_after");
+                Note($"drum {drum.name} kicked: moved {(drum.transform.position - at).magnitude:0.00} m");
+            }
+            else Note("no inert drum found");
+
+            var person = Object.FindObjectsByType<Civilian>(FindObjectsSortMode.None).OrderBy(c => (c.transform.position - _motor.transform.position).sqrMagnitude).FirstOrDefault();
+            if (person != null)
+            {
+                Place(person.transform.position + person.transform.forward * 3.5f, person.transform.position + Vector3.up * 1.2f);
+                yield return 0.5f;
+                Shot("person_close");
+                var a = person.GetComponentInChildren<Animator>();
+                Note($"person: {person.name}, height {person.GetComponentsInChildren<SkinnedMeshRenderer>().Max(r => r.bounds.max.y) - person.transform.position.y:0.00} m, triangles {person.GetComponentsInChildren<SkinnedMeshRenderer>().Sum(r => r.sharedMesh.triangles.Length) / 3}, human {a != null && a.isHuman}");
+            }
+            // The horn: stood on the road in front of a moving car.
+            TrafficCar lead = null; float looked = 0f;
+            while (lead == null && looked < 30f)
+            {
+                lead = Object.FindObjectsByType<TrafficCar>(FindObjectsSortMode.None).OrderByDescending(c => c.Speed).FirstOrDefault(c => c.Speed > 4f && c.GetComponentInChildren<VehicleDriver>() != null);
+                if (lead == null) { looked += 1f; yield return 1f; }
+            }
+            if (lead == null) { Note("NO moving car with a driver"); Finish(1); yield break; }
+            Place(lead.transform.position + lead.transform.forward * 14f, lead.transform.position + Vector3.up);
+            bool honked = false; float hornFor = 0f;
+            for (float t = 0f; t < 8f && !honked; t += 0.1f)
+            {
+                var src = lead.GetComponent<AudioSource>();
+                honked = src != null && src.isPlaying;
+                hornFor = t;
+                yield return 0.1f;
+            }
+            Shot("car_horn");
+            Note($"horn at the player in the road: {honked} after {hornFor:0.0} s, car speed {lead.Speed:0.0}");
+
+            // A car's window, from the side.
+            var carGlass = lead.GetComponent<CarGlass>();
+            int shownBefore = lead.GetComponentsInChildren<MeshRenderer>().Count(r => r.enabled);
+            Vector3 side = lead.transform.TransformPoint(new Vector3(-6f, 1.05f, 0.1f));
+            CarGlass.Ray(side, lead.transform.right, 8f, GlassField.Blow.Round);
+            Note($"car window shot: {shownBefore} -> {lead.GetComponentsInChildren<MeshRenderer>().Count(r => r.enabled)} parts drawn, CarGlass {(carGlass != null ? "on" : "MISSING")}");
+            yield return 0.3f;
+            Shot("car_window");
+
+            // Gunfire: the driver gets out and runs.
+            int livingBefore = Object.FindObjectsByType<Civilian>(FindObjectsSortMode.None).Length;
+            NoiseSystem.Emit(_motor.transform.position, 90f, NoiseKind.Gunfire, _motor.gameObject);
+            bool left = false; float leftAt = 0f;
+            for (float t = 0f; t < 10f && !left; t += 0.1f)
+            {
+                left = lead.GetComponentInChildren<VehicleDriver>() == null;
+                leftAt = t;
+                if (!left) yield return 0.1f;
+            }
+            Note($"driver out of the car at gunfire: {left} after {leftAt:0.0} s; abandoned {lead.Abandoned}; civilians {livingBefore} -> {Object.FindObjectsByType<Civilian>(FindObjectsSortMode.None).Length}");
+            yield return 0.6f;
+            var runner = Object.FindObjectsByType<Civilian>(FindObjectsSortMode.None).OrderBy(c => (c.transform.position - lead.transform.position).sqrMagnitude).FirstOrDefault();
+            if (runner != null) Note($"nearest civilian to the car: {(runner.transform.position - lead.transform.position).magnitude:0.0} m, fleeing {runner.Fleeing}, {runner.GetComponentInChildren<Animator>()?.runtimeAnimatorController?.name}");
+            Shot("driver_running");
+            yield return 2f;
+            Shot("driver_running2");
+
+            // How they look: someone close to, a bedroom, the pumps.
+            var bed = Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None).Where(f => f.sharedMesh != null && f.sharedMesh.name.StartsWith("Bed_Double")).OrderBy(f => (f.transform.position - me).sqrMagnitude).FirstOrDefault();
+            Note($"beds from Blender found: {Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None).Count(f => f.sharedMesh != null && f.sharedMesh.name.StartsWith("Bed_Double"))}");
+            if (bed != null)
+            {
+                Place(bed.transform.position + bed.transform.parent.forward * 2f, bed.transform.position + Vector3.up * 0.5f);
+                yield return 1f;
+                Shot("bedroom");
+            }
+            var pump = Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None).FirstOrDefault(f => f.sharedMesh != null && f.sharedMesh.name.StartsWith("FuelPump"));
+            if (pump != null)
+            {
+                Place(pump.transform.position + new Vector3(3.5f, 0f, -3.5f), pump.transform.position + Vector3.up);
+                yield return 1f;
+                Shot("gas_station");
+            }
+            Application.logMessageReceived -= CountRed;
+            Note($"errors in the whole run: {_errors}");
+            Note("DONE");
+        }
+
         public static void BatchCar()
         {
             _carRun = true;
@@ -400,6 +572,37 @@ namespace FPSKit.EditorTools
             Shot("car_seated");
             float y0 = car.transform.position.y;
             Note($"  sitting 1 s: camera {(cam.transform.position - car.transform.position).magnitude:0.0} m from the car (origin bug: {(cam.transform.position.magnitude < 1f ? "YES" : "no")}), speed {rb.linearVelocity.magnitude:0.00}");
+            // The keyboard, as the player drives it: the keys are separate buttons on the Move action, and reading that as a Vector2 threw on every
+            // held key in FixedUpdate, so the car took no input and the console went red. The touch path above never went that way.
+            var keys = UnityEngine.InputSystem.Keyboard.current ?? UnityEngine.InputSystem.InputSystem.AddDevice<UnityEngine.InputSystem.Keyboard>();
+            MobileInput.Move = Vector2.zero;
+            MobileInput.Active = false;
+            yield return 2f;
+            int redBefore = _errors;
+            Application.logMessageReceived += CountRed;
+            float before = rb.linearVelocity.magnitude;
+            // A batch editor has no focus, and by default drops a device's input without it.
+            var inputSettings = UnityEngine.InputSystem.InputSystem.settings;
+            var wasBackground = inputSettings.backgroundBehavior; var wasEditor = inputSettings.editorInputBehaviorInPlayMode;
+            inputSettings.backgroundBehavior = UnityEngine.InputSystem.InputSettings.BackgroundBehavior.IgnoreFocus;
+            inputSettings.editorInputBehaviorInPlayMode = UnityEngine.InputSystem.InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            // NOTE: a batch editor never delivers these keys to the game (W reads False in Update, 2026-11-05), so this cannot prove the keyboard;
+            // it does prove that nothing throws on this path. Real keys: a play-test.
+            var holder = new GameObject("KeyHolder").AddComponent<KeyHolder>();
+            holder.keys = keys; holder.motor = _motor;
+            for (int held = 0; held < 4; held++)
+            {
+                yield return 1f;
+                Note($"    {held + 1} s: read in Update {holder.readUpdate} (W {holder.held}), in FixedUpdate {holder.read}, rear torque {car.rearLeft.motorTorque:0} brake {car.rearLeft.brakeTorque:0}, speed {rb.linearVelocity.magnitude:0.0} m/s, moved {(car.transform.position - spot).magnitude:0.0} m");
+            }
+            Object.Destroy(holder.gameObject);
+            inputSettings.backgroundBehavior = wasBackground; inputSettings.editorInputBehaviorInPlayMode = wasEditor;
+            Note($"  keyboard W for 4 s: {before:0.0} -> {rb.linearVelocity.magnitude:0.0} m/s, errors {_errors - redBefore}");
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(keys, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+            UnityEngine.InputSystem.InputSystem.Update();
+            Application.logMessageReceived -= CountRed;
+            MobileInput.Active = true;
+            yield return 1f;
             // Steering ramp, from a key's full left.
             MobileInput.Move = new Vector2(0f, 1f);
             float top = 0f;
@@ -410,23 +613,6 @@ namespace FPSKit.EditorTools
                 yield return Step;
             }
             Shot("car_moving");
-            // The keyboard, as the player drives it: the keys are separate buttons on the Move action, and reading that as a Vector2 threw on every
-            // held key in FixedUpdate, so the car took no input and the console went red. The touch path above never went that way.
-            var keys = UnityEngine.InputSystem.Keyboard.current ?? UnityEngine.InputSystem.InputSystem.AddDevice<UnityEngine.InputSystem.Keyboard>();
-            MobileInput.Move = Vector2.zero;
-            MobileInput.Active = false;
-            yield return 2f;
-            int redBefore = _errors;
-            Application.logMessageReceived += CountRed;
-            float before = rb.linearVelocity.magnitude;
-            UnityEngine.InputSystem.LowLevel.InputState.Change(keys.wKey, 1f);
-            UnityEngine.InputSystem.InputSystem.Update();
-            yield return 2f;
-            Note($"  keyboard W for 2 s: {before:0.0} -> {rb.linearVelocity.magnitude:0.0} m/s, errors {_errors - redBefore}");
-            UnityEngine.InputSystem.LowLevel.InputState.Change(keys.wKey, 0f);
-            UnityEngine.InputSystem.InputSystem.Update();
-            Application.logMessageReceived -= CountRed;
-            MobileInput.Active = true;
             yield return 0.05f;
             MobileInput.Move = new Vector2(-1f, 1f);
             float a0 = car.frontLeft.steerAngle; yield return Step; yield return Step;

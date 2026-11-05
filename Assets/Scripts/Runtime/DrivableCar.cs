@@ -73,6 +73,7 @@ public class DrivableCar : MonoBehaviour
     Quaternion _cameraLocalRot;
     CharacterController _cc;
     PlayerMotor _motor;
+    Vector2 _move;
     float _nextLook;
     float _steer, _camYaw, _camYawVel, _camDistance;
     int _cameraMask;
@@ -114,7 +115,7 @@ public class DrivableCar : MonoBehaviour
 
         if (Offered != this && Driving != this) return;
         // Held off while driving, whatever else turns it back on (closing the pause menu does): no shooting from the seat.
-        if (Driving == this) PlayerMotor.InputEnabled = false;
+        if (Driving == this) { PlayerMotor.InputEnabled = false; _move = ReadMove(); }
         if (!InteractPressed()) return;
         if (Driving == this) GetOut();
         else if (Offered == this && PlayerMotor.InputEnabled) GetIn();
@@ -287,7 +288,7 @@ public class DrivableCar : MonoBehaviour
             if (!_rb.isKinematic && _rb.linearVelocity.sqrMagnitude < 0.05f) _rb.isKinematic = true;
             return;
         }
-        Vector2 move = ReadMove();
+        Vector2 move = _move;      // read in Update, where the player's own movement reads it
         bool handbrake = GameInput.Held(GameAction.Jump);
         float speed = Vector3.Dot(_rb.linearVelocity, transform.forward);
 

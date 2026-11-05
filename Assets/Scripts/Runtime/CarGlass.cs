@@ -10,7 +10,23 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class CarGlass : MonoBehaviour
 {
-    class Part { public List<Renderer> renderers = new List<Renderer>(); public Bounds bounds; public bool windscreen, gone; public int hits; }
+    class Part
+    {
+        public List<Renderer> renderers = new List<Renderer>();
+        public bool windscreen, gone;
+        public int hits;
+
+        /// <summary>Where it is now: a car moves, so this cannot be kept from the start.</summary>
+        public Bounds Bounds
+        {
+            get
+            {
+                var b = renderers[0].bounds;
+                for (int i = 1; i < renderers.Count; i++) b.Encapsulate(renderers[i].bounds);
+                return b;
+            }
+        }
+    }
 
     readonly List<Part> _parts = new List<Part>();
     readonly List<(Renderer r, int slot)> _merged = new List<(Renderer, int)>();
@@ -58,12 +74,11 @@ public class CarGlass : MonoBehaviour
                 string name = PartName(r.name);
                 if (!byName.TryGetValue(name, out var part))
                 {
-                    part = new Part { bounds = r.bounds, windscreen = name.IndexOf("Front", System.StringComparison.Ordinal) >= 0 && name.IndexOf("Glass", System.StringComparison.Ordinal) >= 0 };
+                    part = new Part { windscreen = name.IndexOf("Front", System.StringComparison.Ordinal) >= 0 && name.IndexOf("Glass", System.StringComparison.Ordinal) >= 0 };
                     byName[name] = part;
                     _parts.Add(part);
                 }
                 part.renderers.Add(r);
-                part.bounds.Encapsulate(r.bounds);
             }
         }
         if (!any) return;
@@ -112,7 +127,7 @@ public class CarGlass : MonoBehaviour
         foreach (var p in _parts)
         {
             if (p.gone) continue;
-            float d = p.bounds.SqrDistance(at);
+            float d = p.Bounds.SqrDistance(at);
             if (d < bestD) { bestD = d; best = p; }
         }
         if (best == null || bestD > 0.5f) return;
@@ -130,8 +145,9 @@ public class CarGlass : MonoBehaviour
     {
         if (p.gone) return;
         p.gone = true;
+        var where = p.Bounds;
         foreach (var r in p.renderers) if (r != null) r.enabled = false;
-        Burst(p.bounds, dir);
+        Burst(where, dir);
     }
 
     void BreakMerged(Vector3 dir)

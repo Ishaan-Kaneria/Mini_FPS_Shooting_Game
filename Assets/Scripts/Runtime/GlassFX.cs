@@ -200,7 +200,7 @@ public static class GlassFX
             {
                 int s = vs.Count;
                 vs.Add(from + along * x); vs.Add(from + along * end); vs.Add(from + along * tip + inward * depth);
-                uvs.Add(new Vector2(x, 0f)); uvs.Add(new Vector2(end, 0f)); uvs.Add(new Vector2(tip, depth));
+                uvs.Add(new Vector2(0.5f, 0.6f)); uvs.Add(new Vector2(0.5f, 0.6f)); uvs.Add(new Vector2(0.5f, 0.6f));   // the clean middle of the pane: its edge is the thick dust
                 ts.Add(s); ts.Add(s + 1); ts.Add(s + 2); ts.Add(s); ts.Add(s + 2); ts.Add(s + 1);
             }
             x = end;

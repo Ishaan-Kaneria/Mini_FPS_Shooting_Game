@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5723326594168735212}
   - component: {fileID: 3209258956295343031}
+  - component: {fileID: 5313409746942437727}
   m_Layer: 0
   m_Name: Parked_Car_Sedan_A
   m_TagString: Untagged
@@ -58,6 +59,18 @@ LODGroup:
     - renderer: {fileID: 2293314687557680716}
   m_Enabled: 1
   m_GlobalIlluminationLOD: 0
+--- !u!114 &5313409746942437727
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4658366200068985926}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11d30194c9f93c65da4ab9d7d7a7f516, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CarGlass
 --- !u!1 &6289477136224247553
 GameObject:
   m_ObjectHideFlags: 0

@@ -702,7 +702,7 @@ namespace FPSKit.EditorTools
         /// <summary>Kilograms of what a kick can move, by prop; what is not here stays where it stands. See LooseProp.</summary>
         static readonly Dictionary<string, (float kg, LooseProp.Stuff stuff)> Loose = new Dictionary<string, (float, LooseProp.Stuff)>
         {
-            ["Barrel_01"] = (30f, LooseProp.Stuff.Metal), ["barrel_03"] = (30f, LooseProp.Stuff.Metal), ["barrel_stove"] = (25f, LooseProp.Stuff.Metal),
+            ["Barrel_01"] = (18f, LooseProp.Stuff.Metal), ["barrel_03"] = (18f, LooseProp.Stuff.Metal), ["barrel_stove"] = (25f, LooseProp.Stuff.Metal),
             ["plastic_jerrycan"] = (6f, LooseProp.Stuff.Plastic), ["small_lpg_tank"] = (15f, LooseProp.Stuff.Metal), ["propane_tank"] = (25f, LooseProp.Stuff.Metal),
             ["cardboard_box_01"] = (4f, LooseProp.Stuff.Wood), ["old_tyre"] = (12f, LooseProp.Stuff.Plastic), ["rusted_wheel_rim_01"] = (10f, LooseProp.Stuff.Metal),
             ["plastic_crate_01"] = (3f, LooseProp.Stuff.Plastic), ["plastic_crate_02"] = (3f, LooseProp.Stuff.Plastic), ["plastic_crate_03"] = (3f, LooseProp.Stuff.Plastic),

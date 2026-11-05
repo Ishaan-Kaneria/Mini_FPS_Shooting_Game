@@ -142,6 +142,8 @@ MonoBehaviour:
   halfWidth: 1.1255099
   seatLocal: {x: -0.45020396, y: 0.08835684, z: 0.10295578}
   reactionTime: {x: 0.7, y: 1.2}
+  fleeFrom: 70
+  hornEvery: 1.5
 --- !u!114 &5184598206674603577
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -158,6 +160,7 @@ MonoBehaviour:
   halfLength: 2.5738945
   minSpeed: 2.5
   damageAt10: 220
+  sideShare: 0.35
 --- !u!1001 &4675006422557059934
 PrefabInstance:
   m_ObjectHideFlags: 0

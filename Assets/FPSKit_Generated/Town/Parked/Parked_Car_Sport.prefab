@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6281583111182852271}
   - component: {fileID: 2077112564616223448}
+  - component: {fileID: 7407398594058416475}
   m_Layer: 0
   m_Name: Parked_Car_Sport
   m_TagString: Untagged
@@ -53,6 +54,18 @@ LODGroup:
     - renderer: {fileID: 5150871338381820445}
   m_Enabled: 1
   m_GlobalIlluminationLOD: 0
+--- !u!114 &7407398594058416475
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6334136488430332742}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11d30194c9f93c65da4ab9d7d7a7f516, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CarGlass
 --- !u!1 &7942646610759321266
 GameObject:
   m_ObjectHideFlags: 0

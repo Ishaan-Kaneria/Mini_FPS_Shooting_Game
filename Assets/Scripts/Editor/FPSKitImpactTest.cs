@@ -68,7 +68,12 @@ namespace FPSKit.EditorTools
             Expect("shop shutter (in the wall's mesh)", shutter, ImpactSurface.Metal);
             if (shutter != null && (shutter.Value.collider.sharedMaterial == null || !shutter.Value.collider.sharedMaterial.name.EndsWith("Concrete")))
                 problems.Add("the shutter's chunk is not concrete by its physics material: the face check is not what was tested");
-            Expect("shop glass", FaceHit(n => n.Contains("shopglass")), ImpactSurface.Glass);
+            // Glass has no collider: GlassField knows it as data, and a shot asks along its line (FPSKitCloudCheck.BatchWorld breaks some).
+            var glass = UnityEngine.Object.FindAnyObjectByType<GlassField>(FindObjectsInactive.Include);
+            int display = glass != null && glass.panes != null ? System.Array.FindAll(glass.panes, p => p.kind == GlassField.Kind.Display).Length : 0;
+            if (display == 0) problems.Add("no shop glass in the town's GlassField");
+            else if (glass.chunks[0].sharedMesh == null || !glass.chunks[0].sharedMesh.isReadable) problems.Add("the glass meshes are not readable: a broken pane could not be taken out");
+            else notes.AppendLine($"  glass: {glass.panes.Length} panes, {display} of them shop glass");
 
             RaycastHit? DownOnto(Collider c)
             {

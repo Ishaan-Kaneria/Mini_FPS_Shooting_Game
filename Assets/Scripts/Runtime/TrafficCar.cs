@@ -71,19 +71,13 @@ public class TrafficCar : MonoBehaviour
     void Update()
     {
         if (director == null) return;
+        if (_driverDead) { Coast(); return; }
         var r = director.routes[route];
         if (index >= r.points.Length - 1) { director.Finished(this); return; }
 
         // Danger: stop with the hazards on.
         _onNoise ??= OnNoise;
         _heard = NoiseSystem.Listen(transform.position, 1f, _heard, _onNoise);
-
-        // Nobody driving: it rolls on, slowing, until it stops (or meets something).
-        if (_driverDead)
-        {
-            _speed = Mathf.MoveTowards(_speed, 0f, 1.6f * Time.deltaTime);
-            if (_speed <= 0.01f) return;
-        }
 
         Vector3 target = r.points[index + 1];
         Vector3 to = target - transform.position;
@@ -97,7 +91,7 @@ public class TrafficCar : MonoBehaviour
             if (turn > 20f && to.magnitude < 14f) limit = Mathf.Min(limit, Mathf.Lerp(8f, 4f, turn / 90f));
         }
 
-        float want = _driverDead ? _speed : limit;
+        float want = limit;
         if (Time.time < _panicUntil) want = 0f;
         if (Time.time < _waitUntil) want = 0f;
 
@@ -147,7 +141,7 @@ public class TrafficCar : MonoBehaviour
         }
         if (!person) _personSince = -1f;
 
-        if (!_driverDead) _speed = Mathf.MoveTowards(_speed, want, (want < _speed ? brake : accel) * Time.deltaTime);
+        _speed = Mathf.MoveTowards(_speed, want, (want < _speed ? brake : accel) * Time.deltaTime);
 
         // Move along the route, turning towards the next point.
         float step = _speed * Time.deltaTime;
@@ -166,11 +160,35 @@ public class TrafficCar : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(flat.normalized, Vector3.up), Mathf.Clamp01(Time.deltaTime * 6f));
         }
 
-        if (_wheels != null)
-        {
-            float spin = _speed * Time.deltaTime / _wheelRadius * Mathf.Rad2Deg;
-            foreach (var w in _wheels) w.Rotate(spin, 0f, 0f, Space.Self);
-        }
+        SpinWheels();
+    }
+
+    /// <summary>
+    /// Nobody driving: it rolls straight on, slowing, until it stops or meets a wall or a car (a person it runs down, VehicleStrike). No
+    /// route: a dead man does not take corners, and it is not removed at a route's end in front of the player.
+    /// </summary>
+    void Coast()
+    {
+        _speed = Mathf.MoveTowards(_speed, 0f, 1.6f * Time.deltaTime);
+        if (_speed <= 0.01f) { _speed = 0f; return; }
+        int environment = LayerMask.GetMask("Environment");
+        int solid = (director.obstacleMask | environment) & ~LayerMask.GetMask("Civilian", "Enemy", "Player");
+        float step = _speed * Time.deltaTime;
+        if (Physics.SphereCast(transform.position + Vector3.up + transform.forward * (halfLength - 0.6f), halfWidth * 0.8f, transform.forward,
+                               out var hit, 0.6f + step, solid, QueryTriggerInteraction.Ignore)
+            && !hit.collider.transform.IsChildOf(transform)) { _speed = 0f; return; }
+        Vector3 p = transform.position + transform.forward * step;
+        if (Physics.Raycast(p + Vector3.up * 2f, Vector3.down, out var ground, 4f, environment, QueryTriggerInteraction.Ignore))
+            p.y = Mathf.MoveTowards(p.y, ground.point.y, Time.deltaTime);
+        transform.position = p;
+        SpinWheels();
+    }
+
+    void SpinWheels()
+    {
+        if (_wheels == null) return;
+        float spin = _speed * Time.deltaTime / _wheelRadius * Mathf.Rad2Deg;
+        foreach (var w in _wheels) w.Rotate(spin, 0f, 0f, Space.Self);
     }
 
     int NextStop(TrafficDirector.Route r, out float dist)

@@ -191,6 +191,39 @@ public class DrivableCar : MonoBehaviour
         Changed?.Invoke();
     }
 
+    /// <summary>The car's height, from its box (the builder makes the box 90 % of it, top to the roof).</summary>
+    float CarHeight
+    {
+        get
+        {
+            var box = GetComponent<BoxCollider>();
+            return box != null ? (box.center.y + box.size.y * 0.5f) / 0.9f : 1.3f;
+        }
+    }
+
+    /// <summary>Where to shoot at this target if he is driving: the cabin. His own position plus a chest height went over the roof.</summary>
+    public static bool SeatOf(Transform target, out Vector3 seat)
+    {
+        seat = default;
+        if (Driving == null || target == null || Driving._player == null || target.root != Driving._player.root) return false;
+        seat = Driving.transform.TransformPoint(new Vector3(0f, Driving.CarHeight * 0.72f, 0f));
+        return true;
+    }
+
+    /// <summary>
+    /// A round that struck the car he is driving (Docs/DESERT_VEHICLES.md: the body stops rounds, windows do not). Through the band of
+    /// glass it reaches him and this returns true; the body and the roof stop it, and the caller marks the metal.
+    /// </summary>
+    public static bool TakeRound(RaycastHit hit, DamageInfo info)
+    {
+        if (Driving == null || Driving._player == null || hit.collider.GetComponentInParent<DrivableCar>() != Driving) return false;
+        float y = Driving.transform.InverseTransformPoint(hit.point).y, height = Driving.CarHeight;
+        if (y < height * 0.56f || y > height * 0.86f) return false;
+        if (!Driving._player.TryGetComponent<Health>(out var health)) return false;
+        health.ApplyDamage(info);
+        return true;
+    }
+
     /// <summary>Where the player can stand beside the car, in order of preference; false if the car is hemmed in on every side.</summary>
     bool ExitPoint(out Vector3 at)
     {

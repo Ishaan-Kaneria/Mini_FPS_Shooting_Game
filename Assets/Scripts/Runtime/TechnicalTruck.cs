@@ -41,6 +41,8 @@ public class TechnicalTruck : MonoBehaviour
     public AudioSource audioSource;
     public AudioClip shot;
     public LineRenderer tracer;
+    [Tooltip("Metres ahead it stops for a person or another vehicle. It moves itself and pushes nothing: it drove through traffic and over the player.")]
+    [Min(0f)] public float stopLook = 6f;
 
     int _point;
     float _setOff = -1f, _nextShot, _burstEnds, _pauseEnds, _tracerOff;
@@ -50,6 +52,7 @@ public class TechnicalTruck : MonoBehaviour
     Transform _player;
     LevelManager _levels;
     int _sightMask;
+    RaycastHit[] _ahead;
 
     void Start()
     {
@@ -109,7 +112,7 @@ public class TechnicalTruck : MonoBehaviour
 
     void Drive()
     {
-        if (_point >= route.Length - 1) return;
+        if (_point >= route.Length - 1 || SomethingAhead()) return;
         var target = route[_point + 1];
         var to = target - transform.position;
         float step = speed * Time.deltaTime;
@@ -119,11 +122,22 @@ public class TechnicalTruck : MonoBehaviour
         transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(flat.normalized), Time.deltaTime * 4f);
     }
 
+    bool SomethingAhead()
+    {
+        _ahead ??= new RaycastHit[8];
+        int n = Physics.SphereCastNonAlloc(transform.position + Vector3.up, 1f, transform.forward, _ahead, stopLook,
+                                           LayerMask.GetMask("Player", "Civilian", "Enemy", "Vehicle"), QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+            if (!_ahead[i].collider.transform.IsChildOf(transform)) return true;
+        return false;
+    }
+
     void Shoot()
     {
         if (gunner == null || gunner.IsDead || gunYaw == null || muzzle == null) return;
         if (_player == null) { var p = GameObject.FindWithTag("Player"); if (p != null) _player = p.transform; if (_player == null) return; }
-        Vector3 aim = _player.position + Vector3.up * 1.3f;
+        bool inCar = DrivableCar.SeatOf(_player, out var seat);
+        Vector3 aim = inCar ? seat : _player.position + Vector3.up * 1.3f;
         Vector3 dir = aim - muzzle.position;
         if (dir.magnitude > range) return;
         // Traverse the gun towards him, on its pivot.
@@ -131,13 +145,14 @@ public class TechnicalTruck : MonoBehaviour
         gunYaw.rotation = Quaternion.RotateTowards(gunYaw.rotation, Quaternion.LookRotation(flat.normalized), 90f * Time.deltaTime);
         if (Vector3.Angle(gunYaw.forward, flat) > 8f) return;
         // Line of sight: nothing solid between the muzzle and him.
-        if (Physics.Raycast(muzzle.position, dir.normalized, dir.magnitude - 0.5f, _sightMask, QueryTriggerInteraction.Ignore)) return;
+        int sight = inCar ? _sightMask & ~LayerMask.GetMask("Vehicle") : _sightMask;       // his own car is no cover from sight
+        if (Physics.Raycast(muzzle.position, dir.normalized, dir.magnitude - 0.5f, sight, QueryTriggerInteraction.Ignore)) return;
 
         if (Time.time < _pauseEnds) return;
         if (_burstEnds < Time.time) _burstEnds = Time.time + burst;
         if (Time.time > _burstEnds - 0.01f) { _pauseEnds = Time.time + pause; return; }
         if (Time.time < _nextShot) return;
-        _nextShot = Time.time + 1f / fireRate;
+        _nextShot = Weapon.NextShotTime(Time.time, _nextShot, 1f / fireRate, Time.deltaTime);
 
         var shotDir = Quaternion.Euler(Random.Range(-spread, spread), Random.Range(-spread, spread), 0f) * dir.normalized;
         Vector3 end = muzzle.position + shotDir * range;
@@ -145,7 +160,9 @@ public class TechnicalTruck : MonoBehaviour
         {
             end = hit.point;
             var h = hit.collider.GetComponentInParent<Health>();
-            if (h != null && h != gunner) h.ApplyDamage(new DamageInfo(damage, hit.point, hit.normal, shotDir, gameObject));
+            var round = new DamageInfo(damage, hit.point, hit.normal, shotDir, gameObject);
+            if (DrivableCar.TakeRound(hit, round)) { }
+            else if (h != null && h != gunner) h.ApplyDamage(round);
             else if (h == null && !hit.collider.transform.IsChildOf(transform)) FPSImpactManager.Instance.HandleImpact(hit);
         }
         if (audioSource != null && shot != null) audioSource.PlayOneShot(shot, 0.9f);

@@ -1176,7 +1176,7 @@ public class EnemyAI : MonoBehaviour
         if (target == null) return;
 
         Vector3 origin = from ?? eyes.position;
-        Vector3 aimAt = HasAimPoint ? AimPoint : target.position + Vector3.up * 1.2f;
+        Vector3 aimAt = DrivableCar.SeatOf(target, out var seat) ? seat : HasAimPoint ? AimPoint : target.position + Vector3.up * 1.2f;
         Vector3 direction = (aimAt - origin).normalized;
 
         // A hurt arm shakes the aim. Wider, never tighter: a wound only ever helps you.
@@ -1206,7 +1206,7 @@ public class EnemyAI : MonoBehaviour
 
         var hitbox = hit.collider.GetComponent<Hitbox>();
         if (hitbox != null) hitbox.Receive(info);
-        else
+        else if (!DrivableCar.TakeRound(hit, info))
         {
             var health = hit.collider.GetComponentInParent<Health>();
             if (health != null && health != _health) health.ApplyDamage(info);

@@ -247,7 +247,8 @@ namespace FPSKit.EditorTools
             // ---- glass: the rectangle, then the arch as a fan ----
             double pick = rng.NextDouble();
             Material glass = pick < 0.12 ? _glassCurtain : pick < 0.2 ? _glassBlinds : b.glass;
-            shell.Quad(glass, G(0, 0), G(W, 0), G(W, H), G(0, H), nrm);
+            if (!b.enterable || glass != b.glass) shell.Quad(glass, G(0, 0), G(W, 0), G(W, H), G(0, H), nrm);
+            AddPane(G(0, 0), G(W, 0), G(W, H), G(0, H), nrm, GlassField.Kind.Window);
             if (rise > 0f)
             {
                 const int N = 8;

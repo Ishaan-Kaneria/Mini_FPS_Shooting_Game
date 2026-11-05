@@ -10,12 +10,14 @@ GameObject:
   m_Component:
   - component: {fileID: 1625290024257073577}
   - component: {fileID: 8419412737254653369}
+  - component: {fileID: 5460484658562898579}
+  - component: {fileID: 5483128321464114721}
   m_Layer: 0
   m_Name: painted_wooden_table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 22
+  m_StaticEditorFlags: 0
   m_IsActive: 1
 --- !u!4 &1625290024257073577
 Transform:
@@ -53,6 +55,47 @@ LODGroup:
     - renderer: {fileID: 906693942131785043}
   m_Enabled: 1
   m_GlobalIlluminationLOD: 0
+--- !u!54 &5460484658562898579
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145367117684566803}
+  serializedVersion: 5
+  m_Mass: 20
+  m_LinearDamping: 0.05
+  m_AngularDamping: 0.4
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &5483128321464114721
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145367117684566803}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5248afab8ac573cfdb768dfd771a5c5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LooseProp
+  stuff: 1
+  heardFrom: 1.2
 --- !u!1001 &1969389118058258903
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -142,7 +185,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -2918421855958740712, guid: c3db0d5b008a660279d4686c8edd92c3, type: 3}
 --- !u!4 &2080123762637571644 stripped

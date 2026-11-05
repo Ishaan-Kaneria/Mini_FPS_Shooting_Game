@@ -1197,6 +1197,7 @@ public class EnemyAI : MonoBehaviour
         bool struck = Physics.Raycast(origin, direction, out RaycastHit hit, detectionRadius,
                                       rangedHitMask, QueryTriggerInteraction.Ignore);
 
+        GlassBreak.Ray(origin, direction, struck ? hit.distance : detectionRadius, GlassField.Blow.Round, gameObject);
         SpawnTracer(struck ? hit.point : origin + direction * detectionRadius);
 
         if (!struck) return;

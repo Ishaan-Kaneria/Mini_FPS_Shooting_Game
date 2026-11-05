@@ -540,6 +540,7 @@ namespace FPSKit.EditorTools
             // the same shape as ResetTerrain above, and for the same reason: a static left
             // behind by the previous arena in a six-arena batch is used by the next one.
             _playerStart = null;
+            ClearGlass();
             _fuelPumps.Clear();      // FPSKitTownExplosives: the gas station's pumps, written by BuildGasStation
             ClearLifeSpots();        // FPSKitTownHouseholds: activity spots written while houses are furnished
 

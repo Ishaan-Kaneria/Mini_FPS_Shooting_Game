@@ -11,12 +11,14 @@ GameObject:
   - component: {fileID: 4671147653318310684}
   - component: {fileID: 4530719986748092171}
   - component: {fileID: 8361547509634667141}
+  - component: {fileID: 5920857899352880071}
+  - component: {fileID: 3514247156469564756}
   m_Layer: 0
   m_Name: portable_generator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 22
+  m_StaticEditorFlags: 0
   m_IsActive: 1
 --- !u!4 &4671147653318310684
 Transform:
@@ -78,6 +80,47 @@ LODGroup:
     - renderer: {fileID: 9219097534749463840}
   m_Enabled: 1
   m_GlobalIlluminationLOD: 0
+--- !u!54 &5920857899352880071
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5447262792545444262}
+  serializedVersion: 5
+  m_Mass: 45
+  m_LinearDamping: 0.05
+  m_AngularDamping: 0.4
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &3514247156469564756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5447262792545444262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5248afab8ac573cfdb768dfd771a5c5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LooseProp
+  stuff: 0
+  heardFrom: 1.2
 --- !u!1001 &5141414742469025015
 PrefabInstance:
   m_ObjectHideFlags: 0

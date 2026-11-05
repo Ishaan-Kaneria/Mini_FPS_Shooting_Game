@@ -11,12 +11,14 @@ GameObject:
   - component: {fileID: 4286599203958894651}
   - component: {fileID: 1441521029733792193}
   - component: {fileID: 8200065754546403702}
+  - component: {fileID: 2378211161535715115}
+  - component: {fileID: 5575955831401784303}
   m_Layer: 0
   m_Name: WoodenTable_01
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 22
+  m_StaticEditorFlags: 0
   m_IsActive: 1
 --- !u!4 &4286599203958894651
 Transform:
@@ -75,6 +77,47 @@ LODGroup:
     - renderer: {fileID: 4876352858548958748}
   m_Enabled: 1
   m_GlobalIlluminationLOD: 0
+--- !u!54 &2378211161535715115
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3474210380769749633}
+  serializedVersion: 5
+  m_Mass: 20
+  m_LinearDamping: 0.05
+  m_AngularDamping: 0.4
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &5575955831401784303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3474210380769749633}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5248afab8ac573cfdb768dfd771a5c5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LooseProp
+  stuff: 1
+  heardFrom: 1.2
 --- !u!1001 &6083761352062003864
 PrefabInstance:
   m_ObjectHideFlags: 0

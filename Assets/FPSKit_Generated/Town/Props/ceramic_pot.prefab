@@ -11,12 +11,14 @@ GameObject:
   - component: {fileID: 771257741699461793}
   - component: {fileID: 2846589738385916799}
   - component: {fileID: 3234509707639166714}
+  - component: {fileID: 139793080133079215}
+  - component: {fileID: 782759501699872679}
   m_Layer: 0
   m_Name: ceramic_pot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 22
+  m_StaticEditorFlags: 0
   m_IsActive: 1
 --- !u!4 &771257741699461793
 Transform:
@@ -75,6 +77,47 @@ LODGroup:
     - renderer: {fileID: 3471463018326251923}
   m_Enabled: 1
   m_GlobalIlluminationLOD: 0
+--- !u!54 &139793080133079215
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 144078324219799579}
+  serializedVersion: 5
+  m_Mass: 3
+  m_LinearDamping: 0.05
+  m_AngularDamping: 0.4
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &782759501699872679
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 144078324219799579}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5248afab8ac573cfdb768dfd771a5c5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LooseProp
+  stuff: 2
+  heardFrom: 1.2
 --- !u!1001 &2876824453375804695
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -156,7 +156,9 @@ public class TechnicalTruck : MonoBehaviour
 
         var shotDir = Quaternion.Euler(Random.Range(-spread, spread), Random.Range(-spread, spread), 0f) * dir.normalized;
         Vector3 end = muzzle.position + shotDir * range;
-        if (Physics.Raycast(muzzle.position, shotDir, out var hit, range, ~LayerMask.GetMask("PlayerBounds", "FirstPerson"), QueryTriggerInteraction.Ignore))
+        bool struck = Physics.Raycast(muzzle.position, shotDir, out var hit, range, ~LayerMask.GetMask("PlayerBounds", "FirstPerson"), QueryTriggerInteraction.Ignore);
+        GlassBreak.Ray(muzzle.position, shotDir, struck ? hit.distance : range, GlassField.Blow.Heavy, gameObject);
+        if (struck)
         {
             end = hit.point;
             var h = hit.collider.GetComponentInParent<Health>();

@@ -604,8 +604,11 @@ public class Weapon : MonoBehaviour
         Vector3 direction = ApplySpread(cam.forward, cam);
         Vector3 origin = cam.position;
 
-        if (Physics.Raycast(origin, direction, out RaycastHit hit, data.maxRange,
-                            hitMask, QueryTriggerInteraction.Ignore))
+        bool struck = Physics.Raycast(origin, direction, out RaycastHit hit, data.maxRange, hitMask, QueryTriggerInteraction.Ignore);
+        // Glass on the way breaks and the round goes on: no pane stops a shot (GlassField, CarGlass).
+        GlassBreak.Ray(origin, direction, struck ? hit.distance : data.maxRange,
+                       data.damageClass == WeaponData.DamageClass.Heavy ? GlassField.Blow.Heavy : GlassField.Blow.Round, gameObject);
+        if (struck)
         {
             float amount = DamageAtDistance(hit.distance);
             var info = new DamageInfo(amount, hit.point, hit.normal, direction, gameObject)

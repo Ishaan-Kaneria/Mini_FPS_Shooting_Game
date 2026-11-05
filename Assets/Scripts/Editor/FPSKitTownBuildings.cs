@@ -114,12 +114,11 @@ namespace FPSKit.EditorTools
             _stoneAshlar = TownMat("Ashlar", "white_sandstone_bricks", new Color(1.02f, 0.94f, 0.82f), 3f);
             ResolveFacadeMaterials();
 
-            // Glass reflects: as a plain dark dielectric a window read as a flat navy card, and metallic over a dark
-            // albedo only tints the reflection dark (a metal reflects in its albedo's colour). A grey base at 0.9
-            // metallic reflects a share of the sky and the street, as glass in front of a dark room does (at 0.3 grey
-            // it reflected the hazy horizon so brightly that windows read as frosted panels).
-            _glassDark = TownFlat("GlassDark", new Color(0.16f, 0.17f, 0.18f), 0.96f, 0.85f);
-            _glassBlue = TownFlat("GlassBlue", new Color(0.15f, 0.19f, 0.23f), 0.96f, 0.85f);
+            // The dark room behind a solid building's window, never a mirror: the reflection is the glass's own, a pane in front
+            // (FPSKitTownGlass). At 85 % metal these read as what his note of 2026-11-05 calls them: metal.
+            _townGlass = MakeGlassMaterials();
+            _glassDark = TownFlat("GlassDark", new Color(0.040f, 0.038f, 0.036f), 0.25f);
+            _glassBlue = TownFlat("GlassBlue", new Color(0.034f, 0.040f, 0.046f), 0.25f);
             // Seen through the glass: drawn curtains (dark cloth) and venetian blinds (slats, from the shutter texture at
             // a fifth of its size). As flat colours they read as blank panels in the window.
             _glassCurtain = TownFlat("GlassCurtain", new Color(0.30f, 0.24f, 0.19f), 0.7f, 0.2f);
@@ -825,11 +824,14 @@ namespace FPSKit.EditorTools
                 // Timber shutters, mostly closed; the odd one open on dark glass.
                 if (rng.NextDouble() < 0.7) { m.Quad(_woodShutter, g0, g1, h1, h0, nrm); return; }
                 m.Quad(_glassDark, g0, g1, h1, h0, nrm);
+                AddPane(g0, g1, h1, h0, nrm, GlassField.Kind.Window);
                 m.Box(_woodShutter, p0 - u * w * 0.25f + Vector3.up * hgt * 0.5f + nrm * 0.03f, new Vector3(w * 0.5f, hgt, 0.04f), Quaternion.LookRotation(nrm));
                 m.Box(_woodShutter, p1 + u * w * 0.25f + Vector3.up * hgt * 0.5f + nrm * 0.03f, new Vector3(w * 0.5f, hgt, 0.04f), Quaternion.LookRotation(nrm));
                 return;
             }
-            m.Quad(glass, g0, g1, h1, h0, nrm);
+            // An upper room behind it (an enterable house): nothing but the glass, so the room is seen. Else the dark room or the curtain.
+            if (!b.enterable || glass != b.glass) m.Quad(glass, g0, g1, h1, h0, nrm);
+            AddPane(g0, g1, h1, h0, nrm, GlassField.Kind.Window);
             // Frame: strips facing out just proud of the glass (a box per bar cost six times the triangles and the
             // sides are never seen), a mullion on wide windows, a transom on tall ones.
             const float fw = 0.055f;

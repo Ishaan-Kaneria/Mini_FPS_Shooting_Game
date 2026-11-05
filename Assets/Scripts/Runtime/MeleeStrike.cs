@@ -867,6 +867,7 @@ public partial class MeleeStrike : MonoBehaviour
         bool kick = strike == Strike.Kick;
         var cam = fpsCamera.transform;
         Vector3 dir = kick ? Quaternion.AngleAxis(12f, cam.right) * cam.forward : cam.forward;
+        GlassBreak.Ray(cam.position, dir, _pendingRange + Settings.impactTolerance, kick ? GlassField.Blow.Heavy : GlassField.Blow.Round, gameObject);
         if (!Physics.Raycast(cam.position, dir, out var hit, _pendingRange + Settings.impactTolerance, _blockMask, QueryTriggerInteraction.Ignore))
             return false;
         WorldHit.Send(hit.collider, new WorldHitInfo
@@ -875,7 +876,9 @@ public partial class MeleeStrike : MonoBehaviour
             impulse = kick ? WorldHit.KickImpulse : WorldHit.PunchImpulse, source = gameObject,
         });
         // A wall does not give: the limb that met it takes the blow back (PlayerLimbs).
-        Limbs.Impact(LimbOf(strike), PlayerLimbs.Hardness(FPSImpactManager.SurfaceOf(hit)), Padding(strike), hit.point);
+        // Something that gives (a bin, a drum, a chair) takes the blow away with it: a third of the strain.
+        float gives = hit.collider.GetComponentInParent<LooseProp>() != null ? 0.33f : 1f;
+        Limbs.Impact(LimbOf(strike), PlayerLimbs.Hardness(FPSImpactManager.SurfaceOf(hit)) * gives, Padding(strike), hit.point);
         return true;
     }
 

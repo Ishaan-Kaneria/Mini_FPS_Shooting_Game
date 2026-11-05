@@ -325,12 +325,12 @@ namespace FPSKit.EditorTools
             foreach (var sp in spans)
             {
                 Prism(m, riserMat, S((sp.x + sp.y) * 0.5f, riser * 0.5f, 0.03f), u, up, nrm, sp.y - sp.x, riser, 0.15f);
-                m.Quad(_shopGlass, S(sp.x, riser), S(sp.y, riser), S(sp.y, transom), S(sp.x, transom), nrm);
+                AddPane(S(sp.x, riser), S(sp.y, riser), S(sp.y, transom), S(sp.x, transom), nrm, GlassField.Kind.Display);
             }
-            m.Quad(_shopGlass, S(0f, transom), S(W, transom), S(W, hs), S(0f, hs), nrm);
+            AddPane(S(0f, transom), S(W, transom), S(W, hs), S(0f, hs), nrm, GlassField.Kind.Window);
             if (doorW > 0f)
             {
-                m.Quad(_shopGlass, S(d0 + 0.05f, 0.32f), S(d1 - 0.05f, 0.32f), S(d1 - 0.05f, doorH - 0.05f), S(d0 + 0.05f, doorH - 0.05f), nrm);
+                AddPane(S(d0 + 0.05f, 0.32f), S(d1 - 0.05f, 0.32f), S(d1 - 0.05f, doorH - 0.05f), S(d0 + 0.05f, doorH - 0.05f), nrm, GlassField.Kind.Tempered);
                 Prism(m, frame, S((d0 + d1) * 0.5f, 0.16f, 0.02f), u, up, nrm, doorW - 0.1f, 0.32f, 0.04f);   // the kick panel
             }
 

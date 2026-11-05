@@ -196,6 +196,7 @@ public class Explosion : MonoBehaviour
 
         // Heard across the map: everyone within a long way knows where the fight is.
         NoiseSystem.Emit(centre, Mathf.Max(60f, spec.radius * 12f), NoiseKind.Blast, attacker);
+        GlassBreak.Blast(centre, spec.radius, attacker);
 
         var hits = Physics.OverlapSphere(centre, spec.radius, mask, QueryTriggerInteraction.Ignore);
         if (hits.Length == 0) return 0;
@@ -237,6 +238,7 @@ public class Explosion : MonoBehaviour
                 }
             }
 
+            collider.GetComponentInParent<LooseProp>()?.Wake();
             var body = collider.attachedRigidbody;
             if (body != null && !body.isKinematic && pushed.Add(body))
                 body.AddExplosionForce(spec.explosionForce, centre, spec.radius, 0.7f, ForceMode.Impulse);

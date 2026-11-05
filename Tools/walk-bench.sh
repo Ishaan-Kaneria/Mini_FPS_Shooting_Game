@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The realism work's frame-time benchmark: the release build (FPSKitBatch.BuildSmoothPlayer: menu + Desert Outpost, Vulkan)
-# jogs WalkRoute for two minutes at each tier and leaves Build/Perf/walk/<tag>_<tier>.txt (WalkProbe), with the CPU
+# jogs WalkRoute for two minutes at each tier and leaves Build/Perf/walk/<tag>_<tier>.txt (WalkProbe; WALK_ARGS passes its switches: -fpskitcap N, -fpskitdr off|<floor>, -fpskitgpuocc), with the CPU
 # package temperature through the run appended.   usage: Tools/walk-bench.sh <tag> [Medium High]
 set -u
 cd "$(dirname "$0")/.."
@@ -31,7 +31,7 @@ for TIER in "${TIERS[@]}"; do
     until { [ "$(cpu_temp)" = "" ] || [ "$(cpu_temp)" -lt 70 ]; } && heat_cool; do sleep 10; done
     echo "walk-bench: $TAG $TIER (cpu $(cpu_temp) C, board $(heat_sen) C)"
     "$BIN" -screen-width 1920 -screen-height 1080 -screen-fullscreen 1 -force-vulkan -logFile "$PWD/Build/Perf/walk/${TAG}_${TIER}.log" \
-           -fpskitwalk "$PWD/$OUT" -fpskitquality "$TIER" -fpskitshots "$PWD/Build/Perf/walk/${TAG}_${TIER}_shots" "${EXTRA[@]}" &
+           -fpskitwalk "$PWD/$OUT" -fpskitquality "$TIER" -fpskitshots "$PWD/Build/Perf/walk/${TAG}_${TIER}_shots" "${EXTRA[@]}" ${WALK_ARGS:-} &
     PID=$!; MAX=0; SEN=0; HOT=0; HOTFOR=0
     for i in $(seq 1 300); do
       [ -f "$OUT" ] && break; kill -0 $PID 2>/dev/null || break

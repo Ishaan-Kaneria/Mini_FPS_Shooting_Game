@@ -418,7 +418,9 @@ public class SettingsPanel : OverlayPanel
             AddSwitch(page, "Fullscreen", null, () => Screen.fullScreen, v => Screen.fullScreen = v, t);
             AddSwitch(page, "VSync", "Waits for the display; off can tear and runs at the frame limit below.",
                       () => GameSettings.VSync, v => GameSettings.VSync = v, t);
-            AddChoice(page, "Frame limit", "With VSync off. Higher is smoother on a fast display and runs the machine hotter.",
+            AddSwitch(page, "Dynamic resolution", "A heavy moment costs a little sharpness, not frames. Medium and High only.",
+                      () => GameSettings.DynamicResolution, v => { GameSettings.DynamicResolution = v; QualityTiers.ApplyScene(); }, t);
+            AddChoice(page, "Frame limit", "With VSync off. Higher is smoother on a fast display and runs the machine hotter; 30 and 45 are cooler and quieter.",
                       Array.ConvertAll(GameSettings.FrameLimits, f => f > 0 ? f + " fps" : "Unlimited"),
                       () => Mathf.Max(0, Array.IndexOf(GameSettings.FrameLimits, GameSettings.FrameLimit)),
                       i => GameSettings.FrameLimit = GameSettings.FrameLimits[i], t);

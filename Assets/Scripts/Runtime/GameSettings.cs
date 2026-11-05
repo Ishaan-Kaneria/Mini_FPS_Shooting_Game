@@ -226,19 +226,28 @@ public static class GameSettings
     }
 
     /// <summary>The frame rates a desktop can be held to (0 is no limit).</summary>
-    public static readonly int[] FrameLimits = { 60, 90, 120, 144, 0 };
+    public static readonly int[] FrameLimits = { 30, 45, 60, 90, 120, 144, 0 };
 
     /// <summary>
-    /// A desktop's frame limit with VSync off: 60, 90, 120, 144 or 0 for none. Never below 60; with
-    /// VSync on the display paces the game and this is not used.
+    /// A desktop's frame limit with VSync off: one of <see cref="FrameLimits"/>, 0 for none, 60 until chosen (running flat out
+    /// took the laptop to its heat limit in 20 s). 30 and 45 run cooler and quieter. With VSync on the display paces the game
+    /// and this is not used.
     /// </summary>
     public static int FrameLimit
     {
-        get { int v = PlayerPrefs.GetInt(Prefix + "frameLimit", 0); return System.Array.IndexOf(FrameLimits, v) >= 0 ? v : 0; }
+        get { int v = PlayerPrefs.GetInt(Prefix + "frameLimit", 60); return System.Array.IndexOf(FrameLimits, v) >= 0 ? v : 60; }
         set => SetInt("frameLimit", System.Array.IndexOf(FrameLimits, value) >= 0 ? value : 0);
     }
 
     /// <summary>A little motion blur on fast turns and runs. Off by default: some players feel sick with it.</summary>
+    /// <summary>On a desktop's Medium and High: a heavy moment costs a little sharpness, not frames. Off until chosen: at 85 % on the laptop's
+    /// Arc the GPU's time did not fall (Build/Perf/walk/F1dr, 2026-11-05).</summary>
+    public static bool DynamicResolution
+    {
+        get => GetBool("dynamicResolution", false);
+        set => SetBool("dynamicResolution", value);
+    }
+
     public static bool MotionBlur
     {
         get => GetBool("motionBlur", false);

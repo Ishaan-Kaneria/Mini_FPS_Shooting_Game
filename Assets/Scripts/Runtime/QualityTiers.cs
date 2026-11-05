@@ -222,8 +222,20 @@ public static class QualityTiers
             cut.Apply(low ? 0.5f : 1f);
         }
 
-        if (Handheld && Camera.main != null && Camera.main.GetComponent<DynamicResolution>() == null)
-            Camera.main.gameObject.AddComponent<DynamicResolution>();
+        var main = Camera.main;
+        if (main == null) return;
+        var dynamic = main.GetComponent<DynamicResolution>();
+        bool wanted = Handheld || (!Web && !low && GameSettings.DynamicResolution);
+        if (wanted && dynamic == null) dynamic = main.gameObject.AddComponent<DynamicResolution>();
+        if (dynamic == null) return;
+        if (!Handheld)
+        {
+            // Never softer than 85 %: that is 72 % of the pixels, enough to bring Medium's 21 ms under a 60 fps frame.
+            dynamic.floor = 0.85f;
+            dynamic.batterySaverFloor = 0.7f;
+            dynamic.stepSeconds = 0.1f;
+        }
+        dynamic.enabled = wanted;
     }
 }
 

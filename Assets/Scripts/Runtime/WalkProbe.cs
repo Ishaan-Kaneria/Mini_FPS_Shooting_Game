@@ -150,6 +150,25 @@ public class WalkProbe : MonoBehaviour
             UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(Camera.main).renderPostProcessing = true;
             sb.AppendLine("post-processing on the world's camera as well (-fpskitpostboth)");
         }
+        // One build, several settings, so they compare without a rebuild each: -fpskitcap N, -fpskitdr off|<floor>, -fpskitgpuocc.
+        var cli = Environment.GetCommandLineArgs();
+        string Arg(string name) { int at = Array.IndexOf(cli, name); return at >= 0 && at + 1 < cli.Length ? cli[at + 1] : null; }
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = int.TryParse(Arg("-fpskitcap"), out int cap) ? cap : -1;
+        var dynamicRes = Camera.main != null ? Camera.main.GetComponent<DynamicResolution>() : null;
+        string drArg = Arg("-fpskitdr");
+        if (dynamicRes != null && drArg == "off") dynamicRes.enabled = false;
+        else if (dynamicRes != null && float.TryParse(drArg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float drFloor)) dynamicRes.floor = drFloor;
+        if (float.TryParse(Arg("-fpskitscale"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float renderScale)
+            && UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset scaled)
+        {
+            scaled.renderScale = renderScale;
+            sb.AppendLine($"render scale fixed at {renderScale:0.00} (-fpskitscale)");
+        }
+        if (Array.IndexOf(cli, "-fpskitgpuocc") >= 0 && UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp)
+            urp.gpuResidentDrawerEnableOcclusionCullingInCameras = true;
+        sb.AppendLine($"settings: cap {(cap > 0 ? cap.ToString() : "none")} | dynamic resolution {(dynamicRes != null && dynamicRes.enabled ? $"on, floor {dynamicRes.floor:0.00}" : "off")} | gpu occlusion {(UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset now && now.gpuResidentDrawerEnableOcclusionCullingInCameras ? "on" : "off")}");
+        float scaleSum = 0f, scaleMin = 1f; int scaleN = 0;
         MobileInput.Reset();
         MobileInput.Active = true;
         var dt = new List<float>(); var cpu = new List<float>(); var gpu = new List<float>();
@@ -191,6 +210,7 @@ public class WalkProbe : MonoBehaviour
             }
             yield return null;
             float ms = Time.unscaledDeltaTime * 1000f;
+            if (dynamicRes != null && dynamicRes.enabled) { scaleSum += dynamicRes.Scale; scaleMin = Mathf.Min(scaleMin, dynamicRes.Scale); scaleN++; }
             // The frame that wrote a screenshot is not a frame of play: left out of the timing.
             if (shotFrame) { shotFrame = false; continue; }
             if (_shots != null && nextShot < shotAt.Length && Time.realtimeSinceStartup - start >= shotAt[nextShot])
@@ -223,6 +243,7 @@ public class WalkProbe : MonoBehaviour
             float P(float p) => s[Mathf.Clamp((int)(p * (s.Length - 1)), 0, s.Length - 1)];
             float Low(float share) { int n = Mathf.Max(1, (int)(s.Length * share)); return 1000f / s.Skip(s.Length - n).Average(); }
             float Pc(List<float> v, float p) { if (v.Count == 0) return 0f; var o = v.OrderBy(x => x).ToArray(); return o[Mathf.Clamp((int)(p * (o.Length - 1)), 0, o.Length - 1)]; }
+            if (scaleN > 0) sb.AppendLine($"render scale averaged {scaleSum / scaleN:0.00}, lowest {scaleMin:0.00}");
             sb.AppendLine($"frames {dt.Count} over {dt.Sum() / 1000f:0.0} s, walked {walked:0} m ({stalls} stall(s) stepped past)");
             sb.AppendLine($"avg {1000f / dt.Average():0.0} fps | 1% low {Low(0.01f):0.0} fps | 0.1% low {Low(0.001f):0.0} fps | worst frame {s[s.Length - 1]:0.0} ms | " +
                           $"frames over 33 ms: {dt.Count(x => x > 33.3f)} | over 25 ms: {dt.Count(x => x > 25f)}");

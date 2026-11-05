@@ -48,6 +48,8 @@ namespace FPSKit.EditorTools
             EditorApplication.isPlaying = true;
         }
 
+        static int _errors;
+        static void CountRed(string message, string stack, LogType type) { if (type == LogType.Exception || type == LogType.Error) _errors++; }
         static void Note(string s) { Log.Append(s).Append('\n'); Debug.Log("[CloudCheck] " + s); }
 
         static void Tick()
@@ -408,6 +410,23 @@ namespace FPSKit.EditorTools
                 yield return Step;
             }
             Shot("car_moving");
+            // The keyboard, as the player drives it: the keys are separate buttons on the Move action, and reading that as a Vector2 threw on every
+            // held key in FixedUpdate, so the car took no input and the console went red. The touch path above never went that way.
+            var keys = UnityEngine.InputSystem.Keyboard.current ?? UnityEngine.InputSystem.InputSystem.AddDevice<UnityEngine.InputSystem.Keyboard>();
+            MobileInput.Move = Vector2.zero;
+            MobileInput.Active = false;
+            yield return 2f;
+            int redBefore = _errors;
+            Application.logMessageReceived += CountRed;
+            float before = rb.linearVelocity.magnitude;
+            UnityEngine.InputSystem.LowLevel.InputState.Change(keys.wKey, 1f);
+            UnityEngine.InputSystem.InputSystem.Update();
+            yield return 2f;
+            Note($"  keyboard W for 2 s: {before:0.0} -> {rb.linearVelocity.magnitude:0.0} m/s, errors {_errors - redBefore}");
+            UnityEngine.InputSystem.LowLevel.InputState.Change(keys.wKey, 0f);
+            UnityEngine.InputSystem.InputSystem.Update();
+            Application.logMessageReceived -= CountRed;
+            MobileInput.Active = true;
             yield return 0.05f;
             MobileInput.Move = new Vector2(-1f, 1f);
             float a0 = car.frontLeft.steerAngle; yield return Step; yield return Step;

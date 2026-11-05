@@ -38,6 +38,7 @@ namespace FPSKit.EditorTools
             _real = EditorApplication.timeSinceStartup;
             _step = 0;
             _struckAt = -1f;
+            _kickChecked = false; _kicked = null;
             EditorApplication.update += Tick;
         }
 
@@ -131,6 +132,53 @@ namespace FPSKit.EditorTools
             Require(CivilianCasualties.ByPlayer(_player), "a death by the player is his");
             Require(!CivilianCasualties.ByPlayer(enemy) && !CivilianCasualties.ByPlayer(null), "a death by an enemy or a charge is not");
             Object.Destroy(enemy);
+        }
+
+        static void CheckGlass()
+        {
+            Vector3 a = new Vector3(-10f, 1f, -30f), u = new Vector3(2f, 0f, 0f), v = new Vector3(0f, 1.5f, 0f);
+            var go = new GameObject("Glass_test");
+            var mesh = new Mesh();
+            mesh.SetVertices(new[] { a, a + u, a + u + v, a + v });
+            mesh.SetTriangles(new[] { 0, 2, 1, 0, 3, 2 }, 0);
+            var mf = go.AddComponent<MeshFilter>(); mf.sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = GlassFX.Pane;
+            var holder = new GameObject("GlassField");
+            holder.SetActive(false);
+            var field = holder.AddComponent<GlassField>();
+            field.chunks = new[] { mf };
+            field.panes = new[] { new GlassField.Pane { corner = a, u = u, v = v, normal = Vector3.back, kind = GlassField.Kind.Window, chunk = 0, firstVertex = 0 } };
+            holder.SetActive(true);
+            Require(GlassField.Instance == field, "the field is found");
+            Vector3 from = a + (u + v) * 0.5f + Vector3.back * 5f;
+            Require(field.Ray(from + Vector3.right * 30f, Vector3.forward, 20f, GlassField.Blow.Round, null) == 0, "a shot past a pane does nothing");
+            Require(field.Ray(from, Vector3.forward, 20f, GlassField.Blow.Round, null) == 1, "a round on the line strikes it");
+            Require(mesh.vertices[1] != mesh.vertices[0], "the first round only cracks ordinary glass");
+            field.Ray(from, Vector3.forward, 20f, GlassField.Blow.Round, null);
+            Require(mesh.vertices[1] == mesh.vertices[0], "the second breaks it: its quad is gone");
+            Require(field.Ray(from, Vector3.forward, 20f, GlassField.Blow.Heavy, null) == 0, "broken stays broken: the round passes");
+            var shard = GameObject.Find("Shards");
+            Require(shard != null, "shards fall");
+            Require(WorldSounds.GlassShatter(false) != null && WorldSounds.GlassCrack() != null && WorldSounds.Horn() != null, "its sounds are there");
+            Require(GlassFX.Pane != null && GlassFX.Pane.GetFloat("_Metallic") == 0f, "glass is no metal");
+        }
+
+        static Transform _kicked;
+        static Vector3 _kickedFrom;
+        static bool _kickChecked;
+
+        static void CheckLoose()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FPSKitTownAssets.PropFolder + "/Barrel_01.prefab");
+            if (prefab == null) { Require(false, "Barrel_01 prefab"); return; }
+            var drum = Object.Instantiate(prefab, new Vector3(10f, 0.02f, -32f), Quaternion.identity);
+            Require(drum.GetComponent<LooseProp>() != null, "a drum is loose");
+            Require(drum.GetComponent<Rigidbody>().isKinematic, "and costs nothing until it is struck");
+            Require(drum.GetComponentInChildren<MeshRenderer>() != null && drum.GetComponentInChildren<MeshRenderer>().sharedMaterial != null && drum.GetComponentInChildren<MeshRenderer>().sharedMaterial.name.StartsWith("Drum"), "it is the model from Blender");
+            _kicked = drum.transform; _kickedFrom = drum.transform.position;
+            var col = drum.GetComponentInChildren<Collider>();
+            WorldHit.Send(col, new WorldHitInfo { kind = WorldHitKind.Kick, point = drum.transform.position + Vector3.up * 0.5f + Vector3.back * 0.3f, direction = Vector3.forward, impulse = WorldHit.KickImpulse });
+            Require(!drum.GetComponent<Rigidbody>().isKinematic, "a kick frees it");
         }
 
         static void MakeCar()
@@ -233,6 +281,8 @@ namespace FPSKit.EditorTools
                         CheckFireRate();
                         CheckBlast();
                         CheckCredit();
+                        CheckGlass();
+                        CheckLoose();
                         MakeCar();
                         _step = 2; _t0 = Time.time;
                         return;
@@ -255,6 +305,11 @@ namespace FPSKit.EditorTools
                         _step = 3; _t0 = Time.time;
                         return;
                     case 3:
+                        if (_kicked != null && !_kickChecked && Time.time - _t0 > 1f)
+                        {
+                            _kickChecked = true;
+                            Require((_kicked.position - _kickedFrom).magnitude > 0.3f, $"a kicked drum moves ({(_kicked.position - _kickedFrom).magnitude:0.00} m in a second)");
+                        }
                         if (Time.time - _t0 < 6f) return;
                         Require(_traffic != null, "a car with a dead driver is not removed");
                         if (_traffic != null)
@@ -264,6 +319,7 @@ namespace FPSKit.EditorTools
                             Require(Mathf.Abs(p.x - _trafficFrom.x) < 0.01f, "it rolls straight, taking no corners");
                             Require(p.z > _trafficFrom.z + 5f && p.z + _traffic.halfLength < 14f, $"and stops at the wall in its way (front at {p.z + _traffic.halfLength:0.0}, wall at 14)");
                         }
+                        Require(!_kicked.GetComponent<Rigidbody>().IsSleeping() || _kicked.GetComponent<Rigidbody>().isKinematic, "and comes to rest without staying awake");
                         Finish();
                         return;
                 }

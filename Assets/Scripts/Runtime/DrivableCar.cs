@@ -92,6 +92,7 @@ public class DrivableCar : MonoBehaviour
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
         _rb.isKinematic = true;          // parked until someone drives it: it cannot be shoved about or roll away
         _rb.maxAngularVelocity = 6f;
+        if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         // Finer wheel physics at a crawl: at the default the car shivers when stopped.
         if (frontLeft != null) frontLeft.ConfigureVehicleSubsteps(5f, 12, 15);
     }

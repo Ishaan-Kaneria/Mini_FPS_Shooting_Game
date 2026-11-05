@@ -4387,8 +4387,12 @@ namespace FPSKit.EditorTools
             // PlayerBounds: the town's edge, a wall only the player's body meets (bullets, bombs and enemies pass).
             EnsureLayers("Civilian", "PlayerBounds", "Vehicle");
             int bounds = LayerMask.NameToLayer("PlayerBounds"), player = LayerMask.NameToLayer("Player");
+            // The edge stops the player's body and the cars he drives (2026-11-05: with only the player's layer, a car --
+            // whose driver's controller is off while driving -- drove straight off the map). Traffic and the technicals are
+            // moved along their routes, not by physics, so it does not touch them.
+            int vehicle = LayerMask.NameToLayer("Vehicle");
             if (bounds >= 0)
-                for (int i = 0; i < 32; i++) Physics.IgnoreLayerCollision(bounds, i, i != player);
+                for (int i = 0; i < 32; i++) Physics.IgnoreLayerCollision(bounds, i, i != player && i != vehicle);
         }
 
         private static void EnsureTags(params string[] tags)

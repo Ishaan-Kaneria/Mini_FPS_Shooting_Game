@@ -140,6 +140,54 @@ Honest list of what the code written in this session does not do well yet.
 
 ---
 
+## Part 1b: playing in the world (round 5, 2026-11-05)
+
+His example: "dustbins are not clickable". Analysed what the player can touch, push, search, break, shoot through, climb
+and hear. Each row: the bug, the cause in the code, the solution.
+
+### Touching the world
+| ID | Bug | Cause | Solution |
+|---|---|---|---|
+| W1 | **Props are frozen.** Bins, crates, chairs, buckets, tyres, cones, bottles, pots do not move when kicked, shot or blown up | None of the town's 114 prop prefabs has a `Rigidbody`, and only `Door` answers a blow (`IWorldHit`); `WorldHit` and `Explosion.Blast` push only loose rigidbodies | A `LooseProp` pass in `FPSKitTownAssets`: every prop under about 60 kg gets a sleeping `Rigidbody` with a mass by kind (a plastic chair 3 kg, a bin 8, a full crate 25, a drum 30), interpolation, a physics material by surface. At most about 60 awake at once (the rest wake when hit). Moved props stay off the navmesh bake (they already are) |
+| W2 | **Nothing can be searched or picked up**: bins, crates, cabinets, cars, shops hold nothing; no ammo box or med kit lies anywhere in the town (supplies only drop from enemies) | No searchable object, no world-placed pickup | A `Searchable` interactable: E (pad D-pad up, a touch button) with a short search (1-1.5 s; tap starts it and it finishes on its own, for his touchpad rule), loot by kind (bins little, crates ammo, bathroom cabinets and the pharmacy med kits, cars a pistol in a glovebox now and then), once per object. Ammo crates at enemy posts and the boss's place |
+| W3 | **The interact key reaches only cars and guns.** No door can be opened or shut with it (they only break after 3 kicks), no knocking, no counters, switches or taps | `Door` has no interact path; the interact press is read separately by `DrivableCar` and `GunPickup` | One `Interactable` component with a priority, a prompt (`InputPrompts`) and a reach, and one router that gives each press to one owner (also fixes review B11). Doors: unbolted ones open and shut with E, bolted ones still break to kicks, a knock with a hold |
+| W4 | Kicking a light bin will hurt like kicking a wall once props move | `PlayerLimbs` hardness is by surface only (a metal bin is metal) | In `MeleeStrike.HitWorld`: when what was struck moves (a loose rigidbody under 80 kg), a third of the strain; the bin flies instead |
+| W5 | **Nothing breaks** but doors and fuel: street lamps, windows, signs, plastic chairs, wooden crates, aircon units, water tanks, dishes | No breakable component | A `Breakable` component: health by kind, on break a swap to a broken mesh or pooled debris, a sound, lamps go dark (emissive off), a water tank leaks. Glass: `DESERT_GLASS.md` |
+| W6 | **Bullets never go through anything**: not a wooden door, a plaster partition, a car door, a cardboard box, a plastic chair | `Weapon.FireRay` and `EnemyAI` stop at the first collider | Penetration by material: each round carries power, each surface a resistance per cm (cardboard, plastic, wood, plaster, sheet metal, glass), a loop of casts that loses damage through each, at most 2-3 surfaces; never through concrete, stone or brick walls |
+| W7 | **Wrong collision shapes.** Small props are solid boxes of their full bounds (bullets stop in the air between a chair's or table's legs, you cannot shoot under a table, invisible corners on carts and bicycles); big dense props are convex hulls; palms carry their pack's full mesh collider (the fronds overhead probably stop bullets: check) | `FPSKitTownAssets` collider rules (box by bounds under 2.2 m, convex hull over 3,000 triangles) | Compound colliders by kind (a table's top and four legs, a chair's seat and back, a cart's bed and wheels), capsules on trunks, no collider on fronds and leaves; a coarse mesh collider on a "bullet only" layer for detailed props, simple shapes for movement |
+| W8 | **Cars drive off the edge of the map** | The edge (`PlayerBounds`) collided only with the player's layer; driving, his controller is off | **Fixed in code**: the edge now stops the `Vehicle` layer too (`FPSKitSceneBuilder.EnsureProjectTagsAndLayers`) |
+| W9 | An invisible wall at the town's edge, with open desert visible beyond | `BuildTownBounds`: four boxes on a sand ridge | A real edge: a fence with a gate and a guard post on the roads out, a dry river bed, berms, wrecks; a "leaving the area" warning that turns the player round before the wall |
+
+### Moving
+| ID | Bug | Cause | Solution |
+|---|---|---|---|
+| MV1 | **No vaulting, mantling or climbing**: a 1 m compound wall, a crate, a car's bonnet are obstacles that need a lucky jump; nothing climbable | Not in `PlayerMotor` (no such action) | Vault (an obstacle 0.4-1.3 m high with room beyond, on Jump while moving at it: the camera rolls over in 0.4 s), mantle up to 1.9 m ledges (onto a container, a low roof), ladders (with the roof access of `DESERT_TOWN_FIXES.md` 1) |
+| MV2 | **No leaning, no prone** | No actions for them | Lean (keys from `ControlSettings`, never typed into `.inputactions`; hold or tap-to-latch for his touchpad), prone (a hold of crouch); enemies' sight already scores a crouched player smaller |
+| MV3 | Swimming: the oasis is wading only | `WadingZone` only | Fine for a desert; keep deep water out of reach |
+
+### Sound
+| ID | Bug | Cause | Solution |
+|---|---|---|---|
+| S1 | **The town is silent between shots** | The Desert theme's `ambienceLoop` is empty | Ambience by district (the souk's voices, traffic, wind, dogs far off, the call to prayer at its times from the mosque), point sounds on things (generators, aircon units, a radio in a shop, a TV through a wall), reverb zones indoors |
+| S2 | **Footsteps sound the same on sand, asphalt, tiles, wood and metal** | Four clips in `PlayerMotor.footstepClips`, no surface check | A ray down at each step to `FPSImpactManager.SurfaceOf`, a clip set per surface (sand, gravel, asphalt, tile, wood, metal, carpet, water); the same for enemies' steps (they are how the player hears them coming) |
+| S3 | All sounds are synthetic placeholders; six guns share three firing sounds; no far shots or indoor tails | `Tools/generate-placeholder-audio.py` | Real recordings with a commercial licence (CC0 libraries, the Sonniss GDC bundles), logged in `LICENSES.md`: per gun a close shot, a distant shot and an indoor tail, chosen by distance and by whether the shooter is under a roof |
+| S4 | Nobody speaks: civilians are silent, enemies have pain and alert sounds only | No barks | Short barks in Arabic (warnings, callouts, a shopkeeper calling out), from voice actors or a licensed pack |
+
+### Fighting
+| ID | Bug | Cause | Solution |
+|---|---|---|---|
+| G1 | Hitscan bullets over the town's 300 m sightlines: no travel time, no drop | `Weapon.FireRay` is one instant ray | Past about 80 m, a projectile with drop and time of flight (the DMR and the LMG feel it); hitscan close in |
+| G2 | **Every fight is at street level**: no enemy on a roof, at a window or inside a building | Spawns are open ground only ("never a roof"); roofs cannot be reached | After roof access: posts on roofs and at windows for the stationed targets and boss guards, a building to clear room by room on target levels |
+| G3 | Enemies only ever arrive on foot | No vehicle drop-offs | A truck that brings a squad and drops them at the edge of the fight (with the technical's driving code) |
+
+### The world
+| ID | Bug | Cause | Solution |
+|---|---|---|---|
+| L1 | **Always the same light and weather**: a clear late-morning sky, no wind (palms and cloth never move), no dust | One sky, no `WindZone` | A `WindZone` and foliage/cloth wind in the shaders, dust devils, blowing sand at ground level, a dusk and a sandstorm variant of some levels (`DESERT_LIGHTING.md` part 2) |
+| L2 | No animals | | Dogs and cats in the old town, pigeons on roofs, goats at the farms (U23) |
+
+---
+
 ## Part 2: files that make it heavy
 
 **First, how size works in Unity.** A file nobody uses does **not** go into the built game: Unity builds only the scenes

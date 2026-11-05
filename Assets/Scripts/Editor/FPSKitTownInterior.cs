@@ -530,7 +530,8 @@ namespace FPSKit.EditorTools
                         Vector3 g0 = a0 + u * hole.x + Vector3.up * (y0 + hole.z) - nrm * (HouseWall - 0.21f);
                         Vector3 g1 = a0 + u * hole.y + Vector3.up * (y0 + hole.z) - nrm * (HouseWall - 0.21f);
                         float hh = hole.w - hole.z;
-                        m.Quad(old ? _woodShutter : _shopGlass, g0, g1, g1 + Vector3.up * hh, g0 + Vector3.up * hh, nrm);
+                        // Not old: the outer pane is two-sided and serves both ways (FPSKitTownGlass).
+                        if (old) m.Quad(_woodShutter, g0, g1, g1 + Vector3.up * hh, g0 + Vector3.up * hh, nrm);
                         Prism(det, old ? _woodBeam : _coping, (a0 + u * ((hole.x + hole.y) * 0.5f)) + Vector3.up * (y0 + hole.z - 0.02f) + nrm * 0.06f,
                               u, Vector3.up, nrm, hole.y - hole.x + 0.1f, 0.04f, 0.3f);
                     }
@@ -812,15 +813,16 @@ namespace FPSKit.EditorTools
                 Vector3 c = f.P(at.x, at.y, r.y);
                 var rot = Quaternion.LookRotation(Iw(into));
                 var wood = own.NextDouble() < 0.5 ? _frameWood : _doorWood;
-                m.Box(wood, c + Vector3.up * 0.18f, new Vector3(1.6f, 0.36f, 2.0f), rot);                                  // base
-                m.Box(_mattressMat, c + Vector3.up * 0.46f, new Vector3(1.52f, 0.2f, 1.92f), rot);                          // mattress
+                bool madeBed = Piece(props, wood == _frameWood ? "Bed_Double" : "Bed_Double_Blue", c, rot);
+                if (!madeBed) m.Box(wood, c + Vector3.up * 0.18f, new Vector3(1.6f, 0.36f, 2.0f), rot);                                  // base
+                if (!madeBed) m.Box(_mattressMat, c + Vector3.up * 0.46f, new Vector3(1.52f, 0.2f, 1.92f), rot);                          // mattress
                 var blanket = _cloth[own.Next(_cloth.Length)];
-                m.Box(blanket, c + Vector3.up * 0.57f + Iw(into) * 0.3f, new Vector3(1.58f, 0.04f, 1.3f), rot);              // blanket
-                m.Box(wood, c - Iw(into) * 1.0f + Vector3.up * 0.55f, new Vector3(1.66f, 1.1f, 0.06f), rot);                 // headboard
+                if (!madeBed) m.Box(blanket, c + Vector3.up * 0.57f + Iw(into) * 0.3f, new Vector3(1.58f, 0.04f, 1.3f), rot);              // blanket
+                if (!madeBed) m.Box(wood, c - Iw(into) * 1.0f + Vector3.up * 0.55f, new Vector3(1.66f, 1.1f, 0.06f), rot);                 // headboard
                 foreach (float s in new[] { -0.38f, 0.38f })
-                    m.Box(_mattressMat, c - Iw(into) * 0.75f + Iw(side) * s + Vector3.up * 0.62f, new Vector3(0.62f, 0.12f, 0.36f), rot);   // pillows
+                    if (!madeBed) m.Box(_mattressMat, c - Iw(into) * 0.75f + Iw(side) * s + Vector3.up * 0.62f, new Vector3(0.62f, 0.12f, 0.36f), rot);   // pillows
                 Rug(m, f, r, at + into * 0.4f + side * 1.25f, wall < 2 ? new Vector2(0.9f, 1.6f) : new Vector2(1.6f, 0.9f), own);
-                BedsideTables(m, f, r, at, wall, own);
+                BedsideTables(m, props, f, r, at, wall, own);
                 // On the bed, lying (head to the headboard), and sitting on its edge.
                 LifeSpot(LifeActivity.Sleep, c + Vector3.up * 0.56f + Iw(into) * 0.1f, Iw(into), c + Iw(side) * 1.15f);
                 LifeSpot(LifeActivity.SitBed, c + Iw(side) * 0.72f + Iw(into) * 0.2f + Vector3.up * 0.02f, Iw(side), c + Iw(side) * 1.25f + Iw(into) * 0.2f);
@@ -848,8 +850,17 @@ namespace FPSKit.EditorTools
                 Vector3 c = f.P(at.x, at.y, r.y) - Iw(along) * 0.375f;            // the counter's middle (the fridge takes 0.75 at one end)
                 var cab = own.NextDouble() < 0.6 ? _cabinetWhite : own.NextDouble() < 0.5 ? _cabinetGreen : _frameWood;
                 var top = own.NextDouble() < 0.5 ? _stallriser : _stallMarble;
-                m.Box(cab, c + Vector3.up * 0.43f + Iw(into) * 0.0f, new Vector3(len, 0.86f, 0.6f), rot);
-                m.Box(top, c + Vector3.up * 0.88f + Iw(into) * 0.02f, new Vector3(len + 0.02f, 0.04f, 0.64f), rot);
+                // Cupboards from Blender, a run of doors each a metre stretched to fill the length; worktop heights are the same, so sink and hob stay.
+                int units = Mathf.Max(1, Mathf.RoundToInt(len));
+                float unit = len / units;
+                bool madeUnits = false;
+                for (int u = 0; u < units; u++)
+                    madeUnits |= Piece(props, "KitchenBase", f.P(at.x, at.y, r.y) - Iw(along) * 0.375f + Iw(along) * (unit * (u + 0.5f) - len * 0.5f) - Iw(into) * 0.0f, rot, unit);
+                if (!madeUnits)
+                {
+                    m.Box(cab, c + Vector3.up * 0.43f + Iw(into) * 0.0f, new Vector3(len, 0.86f, 0.6f), rot);
+                    m.Box(top, c + Vector3.up * 0.88f + Iw(into) * 0.02f, new Vector3(len + 0.02f, 0.04f, 0.64f), rot);
+                }
                 // Cupboard doors: seams on the front.
                 for (float s = -len * 0.5f + 0.5f; s < len * 0.5f - 0.1f; s += 0.5f)
                     Bar(det, _frameDark, c + Iw(along) * s + Iw(into) * 0.301f + Vector3.up * 0.06f, c + Iw(along) * s + Iw(into) * 0.301f + Vector3.up * 0.82f, Iw(into), 0.01f, 0.005f);

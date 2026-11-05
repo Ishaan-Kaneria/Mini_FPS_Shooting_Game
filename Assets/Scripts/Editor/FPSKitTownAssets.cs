@@ -677,7 +677,74 @@ namespace FPSKit.EditorTools
             }
             UnlightLamps("Car");
             SwapDiscWheels();
+            CarWindowLook();
+            FPSKitWorldModels.Make();
+            MakeLooseProps();
             return made;
+        }
+
+        /// <summary>Car windows as glass, not black film: the pack's are 60 % black with a tinted reflection, read as a dark metal plate. A light tint, dielectric.</summary>
+        public static void CarWindowLook()
+        {
+            foreach (var name in new[] { "RMCar26_Windows", "RMCar26_Glass", "M_Windows", "M_Glass", "glass1" })
+            {
+                var m = AssetDatabase.LoadAssetAtPath<Material>($"{MatFolder}/Car/{name}.mat");
+                if (m == null) continue;
+                m.SetTexture("_MetallicGlossMap", null);
+                m.DisableKeyword("_METALLICSPECGLOSSMAP");
+                m.SetFloat("_Metallic", 0f);
+                m.SetFloat("_Smoothness", 0.94f);
+                m.SetColor("_BaseColor", new Color(0.08f, 0.1f, 0.1f, 0.34f));
+                EditorUtility.SetDirty(m);
+            }
+        }
+
+        /// <summary>Kilograms of what a kick can move, by prop; what is not here stays where it stands. See LooseProp.</summary>
+        static readonly Dictionary<string, (float kg, LooseProp.Stuff stuff)> Loose = new Dictionary<string, (float, LooseProp.Stuff)>
+        {
+            ["Barrel_01"] = (30f, LooseProp.Stuff.Metal), ["barrel_03"] = (30f, LooseProp.Stuff.Metal), ["barrel_stove"] = (25f, LooseProp.Stuff.Metal),
+            ["plastic_jerrycan"] = (6f, LooseProp.Stuff.Plastic), ["small_lpg_tank"] = (15f, LooseProp.Stuff.Metal), ["propane_tank"] = (25f, LooseProp.Stuff.Metal),
+            ["cardboard_box_01"] = (4f, LooseProp.Stuff.Wood), ["old_tyre"] = (12f, LooseProp.Stuff.Plastic), ["rusted_wheel_rim_01"] = (10f, LooseProp.Stuff.Metal),
+            ["plastic_crate_01"] = (3f, LooseProp.Stuff.Plastic), ["plastic_crate_02"] = (3f, LooseProp.Stuff.Plastic), ["plastic_crate_03"] = (3f, LooseProp.Stuff.Plastic),
+            ["wooden_crate_01"] = (20f, LooseProp.Stuff.Wood), ["wooden_crate_02"] = (20f, LooseProp.Stuff.Wood), ["wooden_military_crate"] = (25f, LooseProp.Stuff.Wood),
+            ["old_military_crate"] = (25f, LooseProp.Stuff.Wood), ["ammo_box"] = (8f, LooseProp.Stuff.Metal), ["trashbag"] = (3f, LooseProp.Stuff.Plastic),
+            ["plastic_bottle_gallon"] = (2f, LooseProp.Stuff.Plastic), ["cement_bag"] = (25f, LooseProp.Stuff.Plastic), ["WoodenChair_01"] = (5f, LooseProp.Stuff.Wood),
+            ["painted_wooden_chair_01"] = (5f, LooseProp.Stuff.Wood), ["plastic_monobloc_chair_01"] = (3f, LooseProp.Stuff.Plastic), ["folding_wooden_stool"] = (3f, LooseProp.Stuff.Wood),
+            ["wooden_stool_01"] = (3f, LooseProp.Stuff.Wood), ["wooden_stool_02"] = (3f, LooseProp.Stuff.Wood), ["wicker_basket_01"] = (2f, LooseProp.Stuff.Wood),
+            ["wicker_basket_02"] = (2f, LooseProp.Stuff.Wood), ["hand_truck"] = (12f, LooseProp.Stuff.Metal), ["jug_01"] = (1f, LooseProp.Stuff.Plastic),
+            ["ceramic_pot"] = (3f, LooseProp.Stuff.Plastic), ["pot_enamel_01"] = (1f, LooseProp.Stuff.Metal), ["portable_generator"] = (45f, LooseProp.Stuff.Metal),
+            ["portable_searchlight"] = (15f, LooseProp.Stuff.Metal), ["vintage_suitcase"] = (6f, LooseProp.Stuff.Wood), ["WoodenTable_01"] = (20f, LooseProp.Stuff.Wood),
+            ["painted_wooden_table"] = (20f, LooseProp.Stuff.Wood), ["wooden_picnic_table"] = (45f, LooseProp.Stuff.Wood), ["wooden_barrels_01"] = (40f, LooseProp.Stuff.Wood),
+            ["painted_wooden_bench"] = (18f, LooseProp.Stuff.Wood), ["plastic_jerrycan_steel"] = (5f, LooseProp.Stuff.Metal),
+        };
+
+        /// <summary>
+        /// Everything under about 60 kg can be moved: a rigidbody of its weight, kinematic until struck (LooseProp), colliders a body can have
+        /// (convex), never static batching (a batched mesh does not move). Idempotent; prefabs are kept between builds.
+        /// </summary>
+        public static int MakeLooseProps()
+        {
+            int done = 0;
+            foreach (var kv in Loose)
+            {
+                string path = $"{PropFolder}/{kv.Key}.prefab";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) continue;
+                var root = PrefabUtility.LoadPrefabContents(path);
+                if (!root.TryGetComponent<Rigidbody>(out var rb)) rb = root.AddComponent<Rigidbody>();
+                rb.mass = kv.Value.kg;
+                rb.linearDamping = 0.05f;
+                rb.angularDamping = 0.4f;
+                rb.isKinematic = true;
+                if (!root.TryGetComponent<LooseProp>(out var loose)) loose = root.AddComponent<LooseProp>();
+                loose.stuff = kv.Value.stuff;
+                foreach (var mc in root.GetComponentsInChildren<MeshCollider>(true)) mc.convex = true;
+                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                    GameObjectUtility.SetStaticEditorFlags(t.gameObject, 0);
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+                PrefabUtility.UnloadPrefabContents(root);
+                done++;
+            }
+            return done;
         }
 
         /// <summary>

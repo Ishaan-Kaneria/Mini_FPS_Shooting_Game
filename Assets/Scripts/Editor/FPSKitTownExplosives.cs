@@ -61,6 +61,15 @@ namespace FPSKit.EditorTools
                 go.tag = "Metal";
                 var box = go.AddComponent<BoxCollider>();
                 box.size = new Vector3(0.94f, 1.86f, 0.66f);
+                var model = FPSKitWorldModels.WorldPrefab("FuelPump");
+                if (model != null)
+                {
+                    var pump = Object.Instantiate(model, go.transform);
+                    pump.name = "Pump";
+                    pump.transform.localPosition = Vector3.down * 0.91f;
+                    pump.transform.localRotation = Quaternion.identity;
+                    foreach (var mc in pump.GetComponentsInChildren<MeshCollider>()) Object.DestroyImmediate(mc);
+                }
                 Arm(go, ExplosiveProp.Kind.FuelPump, frag, fire, smoke);
                 counts[ExplosiveProp.Kind.FuelPump] = counts.TryGetValue(ExplosiveProp.Kind.FuelPump, out var c) ? c + 1 : 1;
             }

@@ -48,13 +48,13 @@ namespace FPSKit.EditorTools
             switch (r.kind)
             {
                 case "living":
-                    for (int i = 0; i < Mathf.Max(1, extra); i++) Armchair(m, f, r, own);
+                    for (int i = 0; i < Mathf.Max(1, extra); i++) Armchair(m, props, f, r, own);
                     if (extra >= 2) Sideboard(m, det, props, f, r, own);
                     FloorVase(props, f, r, own);
                     if (extra >= 3) FloorVase(props, f, r, own);
                     break;
                 case "bedroom":
-                    if (area > 13f) Wardrobe(m, det, f, r, own);
+                    if (area > 13f) Wardrobe(m, det, props, f, r, own);
                     if (extra >= 2) Sideboard(m, det, props, f, r, own);           // a chest of drawers
                     if (own.NextDouble() < 0.5 || extra >= 2) FloorVase(props, f, r, own);
                     break;
@@ -149,7 +149,18 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>A wardrobe: a wooden box two metres high with its doors' seam and handles, kept clear of windows.</summary>
-        private static void Wardrobe(TownMesh m, TownMesh det, HouseFrame f, Room r, System.Random own)
+        /// <summary>A piece of furniture from Blender (FPSKitWorldModels), its feet at a point; false to fall back on the builder's own if it has not been made.</summary>
+        private static bool Piece(Transform props, string name, Vector3 feet, Quaternion rot, float stretchX = 1f)
+        {
+            var prefab = FPSKitWorldModels.WorldPrefab(name);
+            if (prefab == null || props == null) return false;
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, props);
+            go.transform.SetPositionAndRotation(feet, rot);
+            if (stretchX != 1f) go.transform.localScale = new Vector3(stretchX, 1f, 1f);
+            return true;
+        }
+
+        private static void Wardrobe(TownMesh m, TownMesh det, Transform props, HouseFrame f, Room r, System.Random own)
         {
             var spot = AgainstWall(r, own, 1.3f, 0.6f, true);
             if (spot == null) return;
@@ -159,6 +170,7 @@ namespace FPSKit.EditorTools
             var rot = Quaternion.LookRotation(Iw(into));
             Vector3 c = f.P(at.x, at.y, r.y);
             var wood = own.NextDouble() < 0.6 ? _doorWood : own.NextDouble() < 0.5 ? _frameWood : _cabinetWhite;
+            if (Piece(props, wood == _cabinetWhite ? "Wardrobe_White" : "Wardrobe", c, rot)) return;
             m.Box(wood, c + Vector3.up * 1.0f, new Vector3(1.3f, 2.0f, 0.58f), rot);
             m.Box(wood, c + Vector3.up * 2.03f, new Vector3(1.36f, 0.06f, 0.62f), rot);                       // cornice
             Vector3 face = c + Iw(into) * 0.291f;
@@ -169,7 +181,7 @@ namespace FPSKit.EditorTools
         }
 
         /// <summary>A bedside table each side of a bed's head, a lamp with a linen shade on each.</summary>
-        private static void BedsideTables(TownMesh m, HouseFrame f, Room r, Vector2 at, int wall, System.Random own)
+        private static void BedsideTables(TownMesh m, Transform props, HouseFrame f, Room r, Vector2 at, int wall, System.Random own)
         {
             Vector3 Iw(Vector2 v) => f.A * v.x + f.D * v.y;
             Vector2 into = Inward(wall), side = new Vector2(-into.y, into.x);
@@ -182,14 +194,14 @@ namespace FPSKit.EditorTools
                 if (!Free(r, foot)) continue;
                 r.placed.Add(foot);
                 Vector3 c = f.P(tc.x, tc.y, r.y);
-                m.Box(wood, c + Vector3.up * 0.27f, new Vector3(0.45f, 0.54f, 0.4f), rot);
+                if (!Piece(props, "BedsideTable", c, rot)) m.Box(wood, c + Vector3.up * 0.27f, new Vector3(0.45f, 0.54f, 0.4f), rot);
                 m.Cylinder(_frameDark, c + Vector3.up * 0.54f, 0.06f, 0.28f, 10, true, false);
                 m.Cylinder(_mattressMat, c + Vector3.up * 0.8f, 0.16f, 0.2f, 14, false, false, 0.11f);
             }
         }
 
         /// <summary>An upholstered armchair against a wall: seat, back and arms in one of the house's cloths.</summary>
-        private static void Armchair(TownMesh m, HouseFrame f, Room r, System.Random own)
+        private static void Armchair(TownMesh m, Transform props, HouseFrame f, Room r, System.Random own)
         {
             var spot = AgainstWall(r, own, 0.86f, 0.86f, false);
             if (spot == null) return;
@@ -199,6 +211,7 @@ namespace FPSKit.EditorTools
             var rot = Quaternion.LookRotation(Iw(into));
             Vector3 c = f.P(at.x, at.y, r.y);
             var cloth = _cloth[own.Next(_cloth.Length)];
+            if (Piece(props, own.NextDouble() < 0.5 ? "Armchair" : "Armchair_Green", c, rot)) return;
             m.Box(cloth, c + Vector3.up * 0.22f + Iw(into) * 0.04f, new Vector3(0.82f, 0.44f, 0.76f), rot);              // seat
             m.Box(cloth, c - Iw(into) * 0.33f + Vector3.up * 0.6f, new Vector3(0.82f, 0.72f, 0.18f), rot);                // back
             foreach (float s in new[] { -1f, 1f })

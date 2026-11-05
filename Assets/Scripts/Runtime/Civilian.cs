@@ -50,6 +50,7 @@ public class Civilian : MonoBehaviour
     static readonly int SpeedId = Animator.StringToHash("Speed");
     static readonly int DieId = Animator.StringToHash("Die");
     static readonly int DieVariantId = Animator.StringToHash("DieVariant");
+    static readonly int ActivityId = Animator.StringToHash("Activity");
 
     void Awake()
     {
@@ -113,6 +114,7 @@ public class Civilian : MonoBehaviour
     {
         if (Current == State.Dead || director == null || !_agent.isOnNavMesh) return;
         if (Current == State.Flee && Time.time < _until) return;
+        if (animator != null) animator.SetInteger(ActivityId, 0);
         var (target, door) = director.HideFrom(danger, transform.position);
         _toDoor = door;
         _agent.speed = runSpeed;
@@ -124,14 +126,19 @@ public class Civilian : MonoBehaviour
     void WalkTo(Vector3 to)
     {
         if (!_agent.isOnNavMesh) return;
+        if (animator != null) animator.SetInteger(ActivityId, 0);
         _agent.speed = walkSpeed;
         _agent.SetDestination(to);
         Current = State.Walk;
     }
 
+    /// <summary>What someone does while stood about: on the phone, talking, looking in at something. Only those a clip was made for.</summary>
+    static readonly LifeActivity[] StoodActivities = { LifeActivity.Phone, LifeActivity.Talk, LifeActivity.Talk, LifeActivity.Browse };
+
     void Stand()
     {
         if (_agent.isOnNavMesh) _agent.ResetPath();
+        if (animator != null && Random.value < 0.75f) animator.SetInteger(ActivityId, (int)StoodActivities[Random.Range(0, StoodActivities.Length)]);
         Current = State.Idle;
         _until = Time.time + Random.Range(idleTime.x, idleTime.y);
     }

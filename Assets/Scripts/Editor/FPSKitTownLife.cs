@@ -153,6 +153,7 @@ namespace FPSKit.EditorTools
             lg.SetLODs(lodList.ToArray());
             lg.RecalculateBounds();
             DynamicLighting(root);
+            root.AddComponent<CarGlass>();
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
             Object.DestroyImmediate(root);
             _parkedPrefabs[packName] = prefab; _parkedMade.Add(packName);
@@ -787,10 +788,13 @@ namespace FPSKit.EditorTools
         {
             var controller = CivilianController();
             var list = new List<GameObject>();
-            string[] idles = { "Idle/Idle_Breathing", "Idle/Idle_WeightShift", "Idle/Idle_LookAround", null };
-            for (int i = 1; i <= 4; i++)
+            string[] idles = { "Idle/Idle_Breathing", "Idle/Idle_WeightShift", "Idle/Idle_LookAround", null, "Idle/Idle_Breathing", "Idle/Idle_WeightShift" };
+            // The town's people from Blender (make_civilians.sh): ordinary builds, men and women, on the same skeleton as every clip.
+            var bodies = FPSKitWorldModels.MakeCivilianBodies();
+            int cast = bodies.Count > 0 ? bodies.Count : 4;
+            for (int i = 1; i <= cast; i++)
             {
-                var src = PackPrefab($"Civilian_Man_0{i}");
+                var src = bodies.Count > 0 ? bodies[i - 1] : PackPrefab($"Civilian_Man_0{i}");
                 if (src == null) continue;
                 string path = $"{FPSKitTownAssets.Out}/Civilian_0{i}.prefab";
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(src);
@@ -800,7 +804,7 @@ namespace FPSKit.EditorTools
                 if (anim == null) { Object.DestroyImmediate(go); continue; }
                 anim.applyRootMotion = false;
                 anim.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
-                var clipIdle = idles[i - 1] != null ? MixamoClip(idles[i - 1]) : null;
+                var clipIdle = idles[(i - 1) % idles.Length] != null ? MixamoClip(idles[(i - 1) % idles.Length]) : null;
                 if (clipIdle != null)
                 {
                     var ov = new AnimatorOverrideController(controller) { name = $"Civilian_0{i}" };
@@ -817,11 +821,11 @@ namespace FPSKit.EditorTools
                 else anim.runtimeAnimatorController = controller;
 
                 var agent = go.AddComponent<NavMeshAgent>();
-                agent.radius = 0.32f; agent.height = 1.8f; agent.speed = 1.3f; agent.acceleration = 8f; agent.angularSpeed = 420f;
+                agent.radius = 0.3f; agent.height = 1.72f; agent.speed = 1.3f; agent.acceleration = 8f; agent.angularSpeed = 420f;
                 agent.stoppingDistance = 0.6f; agent.obstacleAvoidanceType = ObstacleAvoidanceType.MedQualityObstacleAvoidance;
                 agent.avoidancePriority = 60;
                 var cap = go.AddComponent<CapsuleCollider>();
-                cap.radius = 0.3f; cap.height = 1.8f; cap.center = new Vector3(0f, 0.9f, 0f);
+                cap.radius = 0.28f; cap.height = 1.72f; cap.center = new Vector3(0f, 0.86f, 0f);
                 var hp = go.AddComponent<Health>();
                 hp.maxHealth = 100f;
                 hp.destroyOnDeath = false;

@@ -79,14 +79,21 @@ namespace FPSKit.EditorTools
                 for (int k = 0; k < 2; k++)
                 {
                     float pz = Mathf.Lerp(cz0 + 5f, cz1 - 5f, k);
-                    m.BoxMinMax(_stripeWhite, new Vector3(ix - 0.45f, y + 0.18f, pz - 0.3f), new Vector3(ix + 0.45f, y + 2.0f, pz + 0.3f));
-                    m.BoxMinMax(TownFlat("FuelGreen", new Color(0.0f, 0.42f, 0.27f), 0.4f), new Vector3(ix - 0.46f, y + 1.7f, pz - 0.31f), new Vector3(ix + 0.46f, y + 2.0f, pz + 0.31f));
-                    m.BoxMinMax(_glassDark, new Vector3(ix - 0.3f, y + 1.15f, pz - 0.31f), new Vector3(ix + 0.3f, y + 1.5f, pz + 0.31f));
-                    m.Box(_steel, new Vector3(ix + 0.5f, y + 1.0f, pz), new Vector3(0.06f, 1.2f, 0.06f), Quaternion.Euler(0, 0, 20f));
                     _fuelPumps.Add(new Vector3(ix, y, pz));
                 }
                 _townSolids.Add(Rect.MinMaxRect(ix - 0.8f, cz0 + 3f, ix + 0.8f, cz1 - 3f));
+                // Hoops of pipe at each end of the island, where a car comes in too wide (the pumps themselves: FPSKitTownExplosives).
+                PlaceTown(props, FPSKitWorldModels.WorldPrefab("CrashGuard"), new Vector3(ix, y + 0.18f, cz0 + 3.3f), 0f, navBlock: false);
+                PlaceTown(props, FPSKitWorldModels.WorldPrefab("CrashGuard"), new Vector3(ix, y + 0.18f, cz1 - 3.3f), 0f, navBlock: false);
+                // Light fittings in the canopy's soffit over the island.
+                for (int k = 0; k < 3; k++)
+                    PlaceTown(props, FPSKitWorldModels.WorldPrefab("CanopyLight"), new Vector3(ix, y + CH - 0.07f, Mathf.Lerp(cz0 + 4f, cz1 - 4f, k * 0.5f)), 0f, navBlock: false);
             }
+            // Bollards round the canopy's columns.
+            foreach (var pz in new[] { cz0 + 2f, cz1 - 2f })
+                foreach (var px in new[] { cx0 + 2f, (cx0 + cx1) * 0.5f, cx1 - 2f })
+                    foreach (var s in new[] { -0.55f, 0.55f })
+                        PlaceTown(props, FPSKitWorldModels.WorldPrefab("Bollard"), new Vector3(px + s, y, pz + (pz < (cz0 + cz1) * 0.5f ? -0.5f : 0.5f)), 0f, navBlock: false);
             // The shop behind the pumps.
             var shop = Rect.MinMaxRect(r.xMin + 40f, r.yMax - 14f, r.xMax - 2f, r.yMax - 2f);
             var b = NewMass(shop, rng, 1, false);

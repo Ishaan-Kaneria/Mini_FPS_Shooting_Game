@@ -252,7 +252,7 @@ def dress(body, rig, path, cloth_objects=(), clearance=0.015):
 
 
 macro = TargetService.get_default_macro_info_dict()
-macro.update({"gender": 1.0, "age": float(opt("--age", "0.65")), "muscle": float(opt("--muscle", "0.92")), "weight": float(opt("--weight", "0.68")),
+macro.update({"gender": float(opt("--gender", "1.0")), "age": float(opt("--age", "0.65")), "muscle": float(opt("--muscle", "0.92")), "weight": float(opt("--weight", "0.68")),
               "proportions": float(opt("--proportions", "0.85")), "height": 0.5})
 
 # Feet on the ground is done here, not by MPFB: its option lifts the mesh and leaves the skeleton 0.85 m under it, so every
@@ -280,8 +280,14 @@ def world_extent(obj):
 low, high, tris = world_extent(body)
 height = high - low
 
+# An ordinary person of the town, not a soldier: --civilian "clothes,shoes,hair" (MPFB's own CC0 assets, fitted and weighted to this
+# body). Each keeps its asset's name, so the game can give it the image that came with it (written beside the FBX).
+CIVIL = opt("--civilian", "")
+if CIVIL:
+    c, s, h = CIVIL.split(",")
+    NATIVE = (("clothes", c, "Civ_Clothes", "Clothes"), ("clothes", s, "Civ_Shoes", "Clothes"), ("hair", h, "Civ_Hair", "Hair"), ("eyebrows", "eyebrow001", "Civ_Brows", "Eyebrows"))
 native = []
-if opt("--uniform", ""):
+if opt("--uniform", "") or CIVIL:
     for kind, folder, label, asset_type in NATIVE:
         try:
             o = HumanService.add_mhclo_asset(os.path.join(LocationService.get_user_data(kind), folder, folder + ".mhclo"), body, asset_type=asset_type, subdiv_levels=0)
@@ -396,7 +402,43 @@ def split_head(body):
     return head
 
 
-head_mesh = None
+if CIVIL:
+    # The body under the clothes goes, as under a uniform: it would only show through when he walks.
+    bpy.context.view_layer.update()
+    from mathutils.bvhtree import BVHTree
+    import bmesh, shutil, glob
+    dg = bpy.context.evaluated_depsgraph_get()
+    cloth = bmesh.new()
+    for g in native[:2]:
+        m = g.evaluated_get(dg).to_mesh()
+        tmp = bmesh.new(); tmp.from_mesh(m); tmp.transform(g.matrix_world)
+        tm = bpy.data.meshes.new("t"); tmp.to_mesh(tm); cloth.from_mesh(tm); bpy.data.meshes.remove(tm); tmp.free()
+        g.evaluated_get(dg).to_mesh_clear()
+    cloth_bvh = BVHTree.FromBMesh(cloth)
+    bm2 = bmesh.new(); bm2.from_mesh(body.data); bm2.faces.ensure_lookup_table()
+    keep = {vg.index for vg in body.vertex_groups if vg.name == "mixamorig:Head" or vg.name == "mixamorig:Neck" or "Hand" in vg.name}
+    gone = []
+    wm = body.matrix_world
+    for f in bm2.faces:
+        c = wm @ f.calc_center_median(); n = (wm.to_3x3() @ f.normal).normalized()
+        if any(i in keep for v in f.verts for i in (g2.group for g2 in body.data.vertices[v.index].groups if g2.weight > 0.3)): continue
+        if cloth_bvh.ray_cast(c + n * 0.002, n, 0.09)[0] is not None: gone.append(f)
+    bmesh.ops.delete(bm2, geom=gone, context="FACES"); bm2.to_mesh(body.data); bm2.free()
+    skin(body, opt("--skin", "middleage_caucasian_male"))
+    for f in glob.glob(os.path.join(LocationService.get_user_data("skins"), opt("--skin", "middleage_caucasian_male"), "*diffuse*.png")): shutil.copy(f, os.path.join(out, f"{NAME}_Skin.png"))
+    mats = {"Civ_Clothes": ("clothes", CIVIL.split(",")[0]), "Civ_Shoes": ("clothes", CIVIL.split(",")[1]), "Civ_Hair": ("hair", CIVIL.split(",")[2])}
+    for o in native:
+        mat = bpy.data.materials.new(o.name); o.data.materials.clear(); o.data.materials.append(mat)
+        if o.name in mats:
+            kind, folder = mats[o.name]
+            for f in glob.glob(os.path.join(LocationService.get_user_data(kind), folder, "*diffuse*.png")): shutil.copy(f, os.path.join(out, f"{NAME}_{o.name}.png"))
+    into_t_pose(rig, [body] + native + ([eyes] if eyes is not None else []))
+    head_mesh = split_head(body)
+    garments = list(native) + [head_mesh]
+    if eyes is not None:
+        eyes.name = "Civ_Eyes"; em = bpy.data.materials.new("Civ_Eyes"); eyes.data.materials.clear(); eyes.data.materials.append(em)
+
+if not CIVIL: head_mesh = None
 if UNIFORM:
     meshes = [body] + garments + ([eyes] if eyes is not None else [])
     into_t_pose(rig, meshes)

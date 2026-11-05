@@ -1234,15 +1234,29 @@ public class LevelManager : MonoBehaviour
         var zone = FindPlace(name);
         if (zone == null || zone.points == null || zone.points.Length == 0) return false;
         int start = UnityEngine.Random.Range(0, zone.points.Length);
-        for (int k = 0; k < zone.points.Length; k++)
-        {
-            var p = zone.points[(start + k) % zone.points.Length];
-            if (p == null || !NavMesh.SamplePosition(p.position, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas)) continue;
-            if (player != null && !CanReachPlayerFrom(hit.position)) continue;
-            at = hit.position;
-            return true;
-        }
+        // Out of the player's sight if the place has such a point; failing that, anywhere there.
+        for (int pass = 0; pass < 2; pass++)
+            for (int k = 0; k < zone.points.Length; k++)
+            {
+                var p = zone.points[(start + k) % zone.points.Length];
+                if (p == null || !NavMesh.SamplePosition(p.position, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas)) continue;
+                if (player != null && !CanReachPlayerFrom(hit.position)) continue;
+                if (pass == 0 && PlayerSees(hit.position)) continue;
+                at = hit.position;
+                return true;
+            }
         return false;
+    }
+
+    /// <summary>Whether a man standing here is on screen with no wall between: nobody should appear in front of the player's eyes.</summary>
+    static bool PlayerSees(Vector3 feet)
+    {
+        var cam = Camera.main;
+        if (cam == null) return false;
+        Vector3 head = feet + Vector3.up * 1.5f;
+        Vector3 v = cam.WorldToViewportPoint(head);
+        if (v.z <= 0f || v.x < -0.1f || v.x > 1.1f || v.y < -0.1f || v.y > 1.1f) return false;
+        return !Physics.Linecast(cam.transform.position, head, LayerMask.GetMask("Environment"), QueryTriggerInteraction.Ignore);
     }
 
     /// <summary>Any point the spawner would use (for a level whose arena has no named places).</summary>
@@ -1266,7 +1280,8 @@ public class LevelManager : MonoBehaviour
             {
                 var ring = UnityEngine.Random.insideUnitCircle * (i == 0 ? spread * 0.3f : spread);
                 var p = centre + new Vector3(ring.x, 0f, ring.y);
-                if (NavMesh.SamplePosition(p, out NavMeshHit hit, 3f, NavMesh.AllAreas) && (player == null || CanReachPlayerFrom(hit.position)))
+                if (NavMesh.SamplePosition(p, out NavMeshHit hit, 3f, NavMesh.AllAreas) && (player == null || CanReachPlayerFrom(hit.position))
+                    && (tries >= 9 || !PlayerSees(hit.position)))                  // the last tries take any spot rather than lose a man
                     at = hit.position;
             }
             if (at == null) continue;

@@ -108,6 +108,10 @@ public class TrafficDirector : MonoBehaviour
         }
     }
 
+    CivilianDirector _civilians;
+    /// <summary>The town's people, whom a driver joins when he gets out and runs.</summary>
+    internal CivilianDirector Civilians => _civilians != null ? _civilians : _civilians = FindAnyObjectByType<CivilianDirector>();
+
     internal void Finished(TrafficCar car)
     {
         // Driven off the end of its route (often off the map on the highway): gone, and another arrives.

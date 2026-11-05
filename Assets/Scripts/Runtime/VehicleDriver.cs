@@ -18,6 +18,9 @@ public class VehicleDriver : MonoBehaviour
     public Health Health { get; private set; }
     public bool Dead => Health == null || Health.IsDead;
 
+    /// <summary>The person he was seated from: who gets out of the car and runs.</summary>
+    public GameObject Source { get; private set; }
+
     /// <summary>Raised once when he dies.</summary>
     public event System.Action<VehicleDriver> Died;
 
@@ -49,6 +52,7 @@ public class VehicleDriver : MonoBehaviour
         var cap = go.GetComponent<CapsuleCollider>();
         if (cap != null) { cap.radius = 0.24f; cap.height = 1.15f; cap.center = new Vector3(0f, 0.75f, 0.05f); }
         var driver = go.AddComponent<VehicleDriver>();
+        driver.Source = prefab;
         go.SetActive(true);
         return driver;
     }

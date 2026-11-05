@@ -26,6 +26,10 @@ public class TrafficCar : MonoBehaviour
     [Tooltip("Seconds a driver takes to start braking for a person who steps out in front (a range, per driver). Other cars " +
              "are braked for at once: they are seen coming. Real drivers take 0.7-1.5 s; at speed that is how people get hit.")]
     public Vector2 reactionTime = new Vector2(0.7f, 1.2f);
+    [Tooltip("Gunfire or a blast within this many metres and the driver stops, gets out and runs.")]
+    [Min(0f)] public float fleeFrom = 70f;
+    [Tooltip("Seconds between blasts of the horn at someone standing in the way.")]
+    [Min(0.3f)] public float hornEvery = 1.5f;
 
     internal TrafficDirector director;
     internal int route, index;
@@ -38,6 +42,9 @@ public class TrafficCar : MonoBehaviour
     System.Action<NoiseSystem.Noise, float> _onNoise;
     Transform[] _wheels;
     float _wheelRadius = 0.33f;
+    float _hornAt, _leaveAt = -1f;
+    Vector3 _danger;
+    AudioSource _horn;
 
     public float Speed => _speed;
 
@@ -52,6 +59,7 @@ public class TrafficCar : MonoBehaviour
             _driver = VehicleDriver.Seat(transform, people[Random.Range(0, people.Length)], seatLocal);
             if (_driver != null) _driver.Died += OnDriverDied;
         }
+        if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         _strike = GetComponent<VehicleStrike>();
         if (_strike != null) _strike.Struck += OnStruck;
         var list = new System.Collections.Generic.List<Transform>();
@@ -72,6 +80,7 @@ public class TrafficCar : MonoBehaviour
     {
         if (director == null) return;
         if (_driverDead) { Coast(); return; }
+        if (_leaveAt >= 0f && Time.time >= _leaveAt && _speed < 1f) LeaveCar();
         var r = director.routes[route];
         if (index >= r.points.Length - 1) { director.Finished(this); return; }
 
@@ -135,6 +144,7 @@ public class TrafficCar : MonoBehaviour
                 int layer = hit.collider.gameObject.layer;
                 person = layer == LayerMask.NameToLayer("Civilian") || layer == LayerMask.NameToLayer("Enemy") || layer == LayerMask.NameToLayer("Player");
                 if (person && _personSince < 0f) _personSince = Time.time;
+                if (layer == LayerMask.NameToLayer("Player") && Time.time - _personSince > 0.25f) Honk();
                 if (!person || Time.time - _personSince >= _reaction)
                     want = Mathf.Min(want, Mathf.Max(0f, (hit.distance - gap) * 0.8f));
             }
@@ -217,7 +227,50 @@ public class TrafficCar : MonoBehaviour
 
     void OnNoise(NoiseSystem.Noise n, float d)
     {
-        if (n.kind == NoiseKind.Gunfire || n.kind == NoiseKind.Blast) _panicUntil = Time.time + 18f;
+        if (n.kind != NoiseKind.Gunfire && n.kind != NoiseKind.Blast) return;
+        _panicUntil = Time.time + 18f;
+        if (_driver == null || _leaveAt >= 0f || Vector3.Distance(n.position, transform.position) > fleeFrom) return;
+        _danger = n.position;
+        _leaveAt = Time.time + Random.Range(0.5f, 2f);   // the time it takes to take in, then the door
+    }
+
+    /// <summary>The horn, at someone standing in front of the car. One blast, then another while he stays there.</summary>
+    void Honk()
+    {
+        if (Time.time < _hornAt) return;
+        _hornAt = Time.time + hornEvery * Random.Range(0.85f, 1.2f);
+        if (_horn == null)
+        {
+            _horn = gameObject.AddComponent<AudioSource>();
+            _horn.spatialBlend = 1f;
+            _horn.minDistance = 8f;
+            _horn.maxDistance = 90f;
+            _horn.rolloffMode = AudioRolloffMode.Linear;
+            _horn.playOnAwake = false;
+        }
+        var clip = WorldSounds.Horn();
+        if (clip != null) _horn.PlayOneShot(clip);
+    }
+
+    /// <summary>Out of the door side and running, as one of the town's people. Left in the road, the car stays where it stopped.</summary>
+    void LeaveCar()
+    {
+        _leaveAt = Time.time + 2f;       // nowhere to step out (a wall at the door): another try in a moment
+        if (_driver == null || _driver.Dead || director == null) return;
+        var people = director.Civilians;
+        if (people == null) return;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            Vector3 door = transform.TransformPoint(new Vector3(side * (halfWidth + 0.7f), 0f, seatLocal.z));
+            if (!UnityEngine.AI.NavMesh.SamplePosition(door, out var at, 1.6f, UnityEngine.AI.NavMesh.AllAreas)) continue;
+            if (!people.Adopt(_driver.Source, at.position, transform.rotation, _danger)) return;
+            _driver.Died -= OnDriverDied;
+            Destroy(_driver.gameObject);
+            _driver = null;
+            _driverDead = true;
+            _leaveAt = -1f;
+            return;
+        }
     }
 
     void OnDriverDied(VehicleDriver d) => _driverDead = true;

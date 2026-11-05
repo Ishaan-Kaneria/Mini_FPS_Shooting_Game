@@ -159,6 +159,25 @@ public class CivilianDirector : MonoBehaviour
         return (from + away * 20f, false);
     }
 
+    /// <summary>Someone who has stepped into the town from elsewhere (a driver out of his car), running from <paramref name="danger"/> at once.</summary>
+    public bool Adopt(GameObject prefab, Vector3 at, Quaternion facing, Vector3 danger)
+    {
+        if (prefab == null) return false;
+        var go = Instantiate(prefab, at, facing, transform);
+        var c = go.GetComponent<Civilian>();
+        if (c == null) { Destroy(go); return false; }
+        c.director = this;
+        _live.Add(c);
+        StartCoroutine(AlarmNextFrame(c, danger));
+        return true;
+    }
+
+    System.Collections.IEnumerator AlarmNextFrame(Civilian c, Vector3 danger)
+    {
+        yield return null;       // the agent takes a frame to find the navmesh
+        if (c != null) c.Alarm(danger);
+    }
+
     internal void Died(Civilian c)
     {
         _live.Remove(c);

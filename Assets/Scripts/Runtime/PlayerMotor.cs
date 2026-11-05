@@ -784,7 +784,7 @@ public class PlayerMotor : MonoBehaviour
     /// because Unity binds the arrow keys to those axes too -- and the arrows are
     /// needed for keyboard look.
     /// </summary>
-    Vector2 ReadMoveInput()
+    public Vector2 ReadMoveInput()
     {
         float x = 0f;
         float y = 0f;

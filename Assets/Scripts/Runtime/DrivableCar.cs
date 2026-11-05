@@ -335,11 +335,14 @@ public class DrivableCar : MonoBehaviour
         if (gr) _rb.AddForceAtPosition(r.transform.up * f, r.transform.position);
     }
 
-    static Vector2 ReadMove()
+    /// <summary>
+    /// The player's own movement input, keys, pad and touch alike. The Move action could not be read here: its keys are separate buttons
+    /// (GameInput.Bind), so reading it as a Vector2 threw on every held key, in FixedUpdate, and the car took no input at all.
+    /// </summary>
+    Vector2 ReadMove()
     {
-        if (MobileInput.Active) return MobileInput.Move;
-        var a = GameInput.ActionFor(GameAction.Move);
-        return a != null ? a.ReadValue<Vector2>() : Vector2.zero;
+        if (_motor != null) return _motor.ReadMoveInput();
+        return MobileInput.Active ? MobileInput.Move : GameInput.PadMove;
     }
 
     void LateUpdate()

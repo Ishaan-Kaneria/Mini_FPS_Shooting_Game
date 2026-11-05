@@ -676,7 +676,42 @@ namespace FPSKit.EditorTools
                 made++;
             }
             UnlightLamps("Car");
+            SwapDiscWheels();
             return made;
+        }
+
+        /// <summary>
+        /// The pack's Wheel_C has a closed face, half of it mapped to a white patch of the car atlas: in the sun, a blank white disc on the
+        /// rear axle of Car_Sedan_C. Those wheels get Wheel_B, level for level. Only the meshes change (same diameter, same transforms), so
+        /// the prefab's objects, its wheels' LOD groups and what saved scenes override on them all stay valid. Run on every build, because
+        /// pack prefabs are kept between builds. Traffic and drivable cars nest this prefab; a merged parked car takes only the root LOD
+        /// group, which has no wheel meshes.
+        /// </summary>
+        public static int SwapDiscWheels()
+        {
+            const string replacement = "Assets/RealisticMobileCars - Pro3DModels/RMCar26/Meshes/Wheel_B.FBX";
+            var meshes = AssetDatabase.LoadAllAssetsAtPath(replacement).OfType<Mesh>().ToArray();
+            int swapped = 0;
+            foreach (var kind in new[] { "Car_Sedan_A", "Car_Sedan_B", "Car_Sedan_C", "Car_Sedan_D" })
+            {
+                string path = $"{PackFolder}/{kind}.prefab";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) continue;
+                var root = PrefabUtility.LoadPrefabContents(path);
+                int here = 0;
+                foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (mf.sharedMesh == null || !mf.sharedMesh.name.Contains("Wheel_C")) continue;
+                    string wanted = mf.sharedMesh.name.Replace("Wheel_C", "Wheel_B");
+                    var mesh = System.Array.Find(meshes, m => m.name == wanted);
+                    if (mesh == null) { Debug.LogWarning($"[FPSKit] town: no {wanted} in {replacement}, {kind} keeps its disc wheel"); continue; }
+                    mf.sharedMesh = mesh;
+                    here++;
+                }
+                if (here > 0) PrefabUtility.SaveAsPrefabAsset(root, path);
+                PrefabUtility.UnloadPrefabContents(root);
+                swapped += here;
+            }
+            return swapped;
         }
 
         /// <summary>The town is in daylight: a vehicle's lamps (the car pack's emission) are not lit, parked or driving.</summary>

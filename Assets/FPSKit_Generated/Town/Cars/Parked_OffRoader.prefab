@@ -320,21 +320,21 @@ LODGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9203203051454974294}
   serializedVersion: 3
-  m_LocalReferencePoint: {x: 0, y: 0.96087724, z: -0.01000011}
-  m_Size: 4.7
+  m_LocalReferencePoint: {x: 0, y: 0.95587933, z: -0.009999752}
+  m_Size: 4.7799997
   m_FadeMode: 0
   m_AnimateCrossFading: 0
   m_LastLODIsBillboard: 0
   m_LODs:
-  - screenRelativeHeight: 0.2
+  - screenRelativeHeight: 0.11
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 6337951589426760976}
-  - screenRelativeHeight: 0.05
+  - screenRelativeHeight: 0.022
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 6290327806695746998}
-  - screenRelativeHeight: 0.012
+  - screenRelativeHeight: 0.007
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 2728040533859866856}
@@ -358,42 +358,42 @@ MonoBehaviour:
     filter: {fileID: 5435888917342591602}
     submesh: 2
     start: 0
-    count: 480
+    count: 576
     windscreen: 0
   - name: Glass_FR
     frame: {fileID: 4365094828378850743}
     filter: {fileID: 5435888917342591602}
     submesh: 2
-    start: 480
-    count: 480
+    start: 576
+    count: 576
     windscreen: 0
   - name: Glass_Front
     frame: {fileID: 4365094828378850743}
     filter: {fileID: 5435888917342591602}
     submesh: 2
-    start: 960
-    count: 1920
+    start: 1152
+    count: 3072
     windscreen: 1
   - name: Glass_Rear
     frame: {fileID: 4365094828378850743}
     filter: {fileID: 5435888917342591602}
     submesh: 2
-    start: 2880
-    count: 1152
+    start: 4224
+    count: 2688
     windscreen: 0
   - name: Glass_RL
     frame: {fileID: 4365094828378850743}
     filter: {fileID: 5435888917342591602}
     submesh: 2
-    start: 4032
-    count: 1344
+    start: 6912
+    count: 1152
     windscreen: 0
   - name: Glass_RR
     frame: {fileID: 4365094828378850743}
     filter: {fileID: 5435888917342591602}
     submesh: 2
-    start: 5376
-    count: 1344
+    start: 8064
+    count: 1152
     windscreen: 0
   farRenderers:
   - {fileID: 6290327806695746998}

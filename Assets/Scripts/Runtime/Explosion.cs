@@ -241,7 +241,11 @@ public class Explosion : MonoBehaviour
             collider.GetComponentInParent<LooseProp>()?.Wake();
             var body = collider.attachedRigidbody;
             if (body != null && !body.isKinematic && pushed.Add(body))
-                body.AddExplosionForce(spec.explosionForce, centre, spec.radius, 0.7f, ForceMode.Impulse);
+            {
+                // A car is a ton and a half: thrown about by the force meant for a crate, it went over on its roof.
+                if (body.TryGetComponent<DrivableCar>(out var car)) car.Blasted(centre, spec.radius);
+                else body.AddExplosionForce(spec.explosionForce, centre, spec.radius, 0.7f, ForceMode.Impulse);
+            }
         }
 
         return count;

@@ -127,6 +127,24 @@ namespace FPSKit.EditorTools
 
         static MethodInfo Private(System.Type t, string name) => t.GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic);
 
+        /// <summary>Cubes alive, not moving, and not on the ground: frozen in the air.</summary>
+        static int HangingCubes()
+        {
+            int stuck = 0;
+            var buffer = new ParticleSystem.Particle[1000];
+            foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+            {
+                if (ps.name != "Cubes") continue;
+                int n = ps.GetParticles(buffer);
+                for (int i = 0; i < n; i++)
+                {
+                    if (buffer[i].velocity.sqrMagnitude > 0.2f * 0.2f) continue;
+                    if (buffer[i].position.y > GlassFX.Floor(buffer[i].position) + 0.25f) stuck++;
+                }
+            }
+            return stuck;
+        }
+
         // ---- the script ---------------------------------------------------------------
         static IEnumerator Script()
         {
@@ -135,9 +153,11 @@ namespace FPSKit.EditorTools
 
             // Which parked cars there are.
             var parked = Object.FindObjectsByType<CarGlass>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Where(g => g.transform.parent != null && g.transform.parent.name.StartsWith("Cars_")).ToArray();
+            foreach (var g in parked.Where(g => g.transform.parent.name == "Cars_Pack").Take(4))
+                From(g.transform.position + g.transform.parent.forward * 6.5f + g.transform.parent.right * 1.5f + Vector3.up * 1.7f, g.transform.parent.position + Vector3.up * 0.7f, "pack_" + g.name);
             var byKind = parked.GroupBy(g => g.transform.parent.name.Substring(5)).ToDictionary(g => g.Key, g => g.ToArray());
             Note("parked: " + string.Join(", ", byKind.Select(k => $"{k.Key} {k.Value.Length}")));
-            Require(byKind.Count >= 6, "at least six kinds parked");
+            Require(byKind.Count >= 7, "our own kinds and the hand-made ones parked");
             var colours = parked.Select(g => g.GetComponentInChildren<MeshRenderer>().sharedMaterials[0].name).Distinct().ToArray();
             Note("colours: " + string.Join(", ", colours));
             Require(colours.Length >= 10, "at least ten colours parked");
@@ -194,6 +214,18 @@ namespace FPSKit.EditorTools
                 From(sideEye, sideAim, "side_1_falling", 32f);
                 yield return 2.5f;
                 From(sideEye, sideAim, "side_2_after", 32f);
+                // Nothing left hanging: every cube has fallen or is on the ground. Measured against the ground under the car, cars left out.
+                yield return 2f;
+                Require(HangingCubes() == 0, "no glass left in the air after a side window: " + HangingCubes());
+                // A later burst, long after the first, on a system that has been idle: it must fall as well.
+                yield return 4f;
+                Vector3 far = t.position + t.right * 4f + t.forward * -0.2f + Vector3.up * 1.3f;
+                GlassBreak.Ray(far, ((t.position + t.right * 0.8f - t.forward * 0.25f + Vector3.up * 1.12f) - far).normalized, 8f, GlassField.Blow.Round, _motor.gameObject);
+                yield return 0.1f;
+                From(far, t.position + Vector3.up * 1.1f, "side_3_second_falling", 32f);
+                yield return 4f;
+                From(far, t.position + Vector3.up * 0.7f, "side_4_second_after", 32f);
+                Require(HangingCubes() == 0, "no glass left in the air after a later burst: " + HangingCubes());
                 var windows = car.windows;
                 Require(windows != null && windows.Length >= 5, "merged car knows its windows: " + (windows != null ? windows.Length : 0));
 
@@ -314,6 +346,115 @@ namespace FPSKit.EditorTools
             Require(drive.Kmh > before * 0.5f, "a lane change does not stop it");
             MobileInput.Move = Vector2.zero;
             yield return 0.3f;
+            BackToStart();
+            yield return 1f;
+
+            // Backing up: Down and Left, the nose goes left, as it looks from the seat. Then the other way.
+            MobileInput.Move = new Vector2(0f, -1f);
+            for (int i = 0; i < 60 * 4 && drive.Kmh > 1f; i++) yield return null;
+            BackToStart();
+            yield return 0.6f;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                float y0 = carT.eulerAngles.y;
+                MobileInput.Move = new Vector2(side, -1f);
+                yield return 2f;
+                float turned = Mathf.DeltaAngle(y0, carT.eulerAngles.y);
+                Note($"reverse with {(side < 0f ? "left" : "right")} for 2 s: {drive.Kmh:0} km/h backwards (speed along the car {Vector3.Dot(body.linearVelocity, carT.forward):0.0} m/s), nose turned {turned:0} degrees");
+                Require(Vector3.Dot(body.linearVelocity, carT.forward) < -2f, "it goes backwards");
+                Require(Mathf.Sign(turned) == side && Mathf.Abs(turned) > 5f, "the nose goes the way the key says");
+                Require(Mathf.Abs(turned) < 85f, "backing up does not spin it");
+                if (side < 0f) Save(view, "reverse_left");
+                MobileInput.Move = Vector2.zero;
+                BackToStart();
+                yield return 0.8f;
+            }
+
+            // A drift: up to speed, handbrake and full lock, held, then let go and steered straight.
+            MobileInput.Move = new Vector2(0f, 1f);
+            yield return 5f;
+            float driftFromKmh = drive.Kmh, y1 = carT.eulerAngles.y, mostSlip = 0f, tiltDrift = 0f;
+            MobileInput.Handbrake = true;
+            MobileInput.Move = new Vector2(-1f, 0.7f);
+            for (int i = 0; i < 66; i++)
+            {
+                if (body.linearVelocity.magnitude > 2f)
+                    mostSlip = Mathf.Max(mostSlip, Vector3.Angle(Vector3.ProjectOnPlane(body.linearVelocity, Vector3.up), Vector3.ProjectOnPlane(carT.forward, Vector3.up)));
+                tiltDrift = Mathf.Max(tiltDrift, Vector3.Angle(carT.up, Vector3.up));
+                if (i == 40) Save(view, "drift_seat");
+                if (i == 50) { var from = carT.position + carT.right * 9f + Vector3.up * 3f; From(from, carT.position, "drift_outside"); }
+                yield return null;
+            }
+            float afterDrift = drive.Kmh, turnedDrift = Mathf.DeltaAngle(y1, carT.eulerAngles.y);
+            MobileInput.Handbrake = false;
+            MobileInput.Move = new Vector2(0f, 0.4f);
+            // Frame by frame while it is really moving: past that it has met the fence, the road being twenty metres wide and the car now across it.
+            float settled = 180f, settledAt = -1f; var curve = new StringBuilder();
+            for (int i = 0; i < 96; i++)
+            {
+                float v = Vector3.ProjectOnPlane(body.linearVelocity, Vector3.up).magnitude;
+                float off = Vector3.Angle(Vector3.ProjectOnPlane(body.linearVelocity, Vector3.up), Vector3.ProjectOnPlane(carT.forward, Vector3.up));
+                if (i % 12 == 0) curve.Append($" {i / 60f:0.0}s:{off:0}deg@{v:0.0}");
+                if (v > 3f && off < settled) { settled = off; settledAt = i / 60f; }
+                yield return null;
+            }
+            Note("after letting go:" + curve + $"; straightest {settled:0} degrees at {settledAt:0.0} s");
+            Note($"drift from {driftFromKmh:0} km/h: most angle {mostSlip:0} degrees, turned {turnedDrift:0}, {afterDrift:0} km/h at the end, tilt {tiltDrift:0.0}; 1.6 s after letting go, {settled:0} degrees off its heading");
+            Require(mostSlip > 20f, "the back steps out");
+            Require(mostSlip < 58f, "a slide, not a spin");
+            Require(afterDrift > driftFromKmh * 0.55f, "it keeps its speed through a slide");
+            Require(Mathf.Abs(turnedDrift) > 30f, "it goes round the corner");
+            Require(settled < 12f, "it straightens after");
+            Require(tiltDrift < 18f, "stays on its wheels in a drift");
+            MobileInput.Move = Vector2.zero;
+            BackToStart();
+            yield return 1f;
+
+            // A soldier walking into the car, with and without the rule (what threw the car over).
+            var soldiers = Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None).Where(e => e.TryGetComponent<Health>(out var eh) && !eh.IsDead && e.isActiveAndEnabled).ToArray();
+            Note("soldiers alive: " + soldiers.Length);
+            int vehicleLayer = LayerMask.NameToLayer("Vehicle"), enemyLayer = LayerMask.NameToLayer("Enemy");
+            for (int trial = 0; trial < 2; trial++)
+            {
+                if (soldiers.Length == 0) break;
+                bool rule = trial == 1;
+                Physics.IgnoreLayerCollision(vehicleLayer, enemyLayer, rule);
+                BackToStart();
+                yield return 1f;
+                float peakTilt = 0f, peakUp = 0f, peakSpin = 0f;
+                for (int i = 0; i < 60 * 3; i++)
+                {
+                    // Stood in the car's side and under its front wheel, as a man pressing against it is.
+                    var at = i % 40 < 20 ? carT.TransformPoint(new Vector3(0.75f, 0f, 1.3f)) : carT.TransformPoint(new Vector3(-0.2f, 0f, 0.4f));
+                    for (int k = 0; k < Mathf.Min(4, soldiers.Length); k++)
+                    {
+                        if (soldiers[k] == null) continue;
+                        var agent = soldiers[k].GetComponent<UnityEngine.AI.NavMeshAgent>();
+                        if (agent != null && agent.enabled) agent.Warp(at + carT.forward * (k * 0.5f));
+                        else soldiers[k].transform.position = at;
+                    }
+                    peakTilt = Mathf.Max(peakTilt, Vector3.Angle(carT.up, Vector3.up));
+                    peakUp = Mathf.Max(peakUp, body.linearVelocity.y);
+                    peakSpin = Mathf.Max(peakSpin, body.angularVelocity.magnitude);
+                    yield return null;
+                }
+                Note($"soldiers pressed into the car, {(rule ? "people do not collide" : "CONTROL, people collide")}: most tilt {peakTilt:0.0}, fastest upward {peakUp:0.0} m/s, fastest spin {peakSpin:0.0} rad/s");
+                if (rule) { Require(peakTilt < 6f, "soldiers do not tip the car"); Require(peakUp < 0.6f, "soldiers do not lift the car"); }
+            }
+            foreach (var sold in soldiers) if (sold != null && sold.TryGetComponent<Health>(out var sh)) { }
+            // A blast beside it.
+            BackToStart();
+            yield return 1f;
+            drive.Blasted(carT.TransformPoint(new Vector3(2f, 0.3f, 0f)), 6f);
+            float blastTilt = 0f;
+            for (int i = 0; i < 120; i++) { blastTilt = Mathf.Max(blastTilt, Vector3.Angle(carT.up, Vector3.up)); yield return null; }
+            Note($"a blast 2 m away: most tilt {blastTilt:0.0}");
+            Require(blastTilt < 30f, "a blast does not roll it");
+            // Tipped over by hand: it comes back onto its wheels.
+            body.rotation = Quaternion.Euler(0f, carT.eulerAngles.y, 175f); carT.rotation = body.rotation; body.position += Vector3.up * 1.2f;
+            yield return 4f;
+            Note($"turned on its roof: 4 s later, tilt {Vector3.Angle(carT.up, Vector3.up):0.0}");
+            Require(Vector3.Angle(carT.up, Vector3.up) < 20f, "back on its wheels");
             BackToStart();
             yield return 1f;
 

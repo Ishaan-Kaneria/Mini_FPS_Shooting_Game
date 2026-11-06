@@ -136,21 +136,21 @@ LODGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2002329002314522417}
   serializedVersion: 3
-  m_LocalReferencePoint: {x: 0, y: 0.95088035, z: -0.08499992}
-  m_Size: 5.42
+  m_LocalReferencePoint: {x: 0, y: 0.960884, z: -0.08499992}
+  m_Size: 5.49
   m_FadeMode: 0
   m_AnimateCrossFading: 0
   m_LastLODIsBillboard: 0
   m_LODs:
-  - screenRelativeHeight: 0.2
+  - screenRelativeHeight: 0.11
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 4346307114304500758}
-  - screenRelativeHeight: 0.05
+  - screenRelativeHeight: 0.022
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 7229509128657988840}
-  - screenRelativeHeight: 0.012
+  - screenRelativeHeight: 0.007
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 8977999163940520024}
@@ -188,28 +188,28 @@ MonoBehaviour:
     filter: {fileID: 4081425445972889689}
     submesh: 2
     start: 768
-    count: 1920
+    count: 2688
     windscreen: 1
   - name: Glass_Rear
     frame: {fileID: 5966787320734834376}
     filter: {fileID: 4081425445972889689}
     submesh: 2
-    start: 2688
-    count: 1536
+    start: 3456
+    count: 1920
     windscreen: 0
   - name: Glass_RL
     frame: {fileID: 5966787320734834376}
     filter: {fileID: 4081425445972889689}
     submesh: 2
-    start: 4224
-    count: 288
+    start: 5376
+    count: 384
     windscreen: 0
   - name: Glass_RR
     frame: {fileID: 5966787320734834376}
     filter: {fileID: 4081425445972889689}
     submesh: 2
-    start: 4512
-    count: 288
+    start: 5760
+    count: 384
     windscreen: 0
   farRenderers:
   - {fileID: 7229509128657988840}

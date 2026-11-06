@@ -334,9 +334,9 @@ namespace FPSKit.EditorTools
             var group = inst.AddComponent<LODGroup>();
             group.SetLODs(new[]
             {
-                new LOD(0.2f, near),
-                new LOD(0.05f, far1 != null ? (sign != null ? new[] { far1, sign.GetComponent<Renderer>() } : new[] { far1 }) : near),
-                new LOD(0.012f, far2 != null ? new[] { far2 } : near),
+                new LOD(0.11f, near),
+                new LOD(0.022f, far1 != null ? (sign != null ? new[] { far1, sign.GetComponent<Renderer>() } : new[] { far1 }) : near),
+                new LOD(0.007f, far2 != null ? new[] { far2 } : near),
             });
             group.RecalculateBounds();
 
@@ -504,7 +504,8 @@ namespace FPSKit.EditorTools
                 nearList.Add(sr);
             }
             var lod = root.AddComponent<LODGroup>();
-            lod.SetLODs(new[] { new LOD(0.2f, new Renderer[] { near }), new LOD(0.05f, nearList.ToArray()), new LOD(0.012f, new Renderer[] { far2 }) });
+            // Past where the shape can be told from the fine one at each step (his note: blocky at a distance, 2026-11-06).
+            lod.SetLODs(new[] { new LOD(0.11f, new Renderer[] { near }), new LOD(0.022f, nearList.ToArray()), new LOD(0.007f, new Renderer[] { far2 }) });
             lod.RecalculateBounds();
 
             var glass = root.AddComponent<CarGlass>();
@@ -549,6 +550,85 @@ namespace FPSKit.EditorTools
             return body;
         }
 
+        // ---- the hand-modelled pack cars, in the town's colours -----------------------------
+        /// <summary>The hand-made models already in the project (his pick 2026-11-06): parked and in traffic beside our own. No working doors or seat, so not to drive. Their paint is one material each.</summary>
+        static readonly (string prefab, int weight)[] PackCars = { ("Car_Sedan_A", 4), ("Car_Sedan_B", 3), ("Car_Sport", 2), ("Car_Touring", 2) };
+        static readonly string[] PackPaintSlots = { "RMCar26_Paint", "Body1", "M_Carbody666" };
+
+        static Material PackPaint(Material source, string colour)
+        {
+            string path = $"{Out}/PackPaint_{source.name}_{colour}.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            bool create = m == null;
+            if (create) m = new Material(source);
+            var entry = PaintTable.First(p => p.name == colour);
+            m.CopyPropertiesFromMaterial(source);
+            m.SetColor("_BaseColor", entry.c);
+            m.SetFloat("_Metallic", Mathf.Max(entry.metal, source.HasProperty("_Metallic") ? Mathf.Min(0.3f, source.GetFloat("_Metallic")) : 0f));
+            m.SetFloat("_Smoothness", entry.smooth);
+            if (create) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        static void RepaintPack(GameObject body, string colour)
+        {
+            foreach (var r in body.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = r.sharedMaterials; bool any = false;
+                for (int i = 0; i < mats.Length; i++)
+                    if (mats[i] != null && System.Array.IndexOf(PackPaintSlots, mats[i].name) >= 0) { mats[i] = PackPaint(mats[i], colour); any = true; }
+                if (any) r.sharedMaterials = mats;
+            }
+        }
+
+        static string PickPack(System.Random rng)
+        {
+            int total = PackCars.Sum(k => k.weight), roll = rng.Next(total);
+            foreach (var k in PackCars) { roll -= k.weight; if (roll < 0) return k.prefab; }
+            return PackCars[0].prefab;
+        }
+
+        static bool PlacePack(GameObject holder, string pack, string colour)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{FPSKitTownAssets.Out}/Parked/Parked_{pack}.prefab");
+            if (prefab == null) { Debug.LogWarning($"[FPSKit] cars: no parked {pack}"); return false; }
+            var body = (GameObject)PrefabUtility.InstantiatePrefab(prefab, holder.transform);
+            body.transform.localPosition = Vector3.zero; body.transform.localRotation = Quaternion.identity;
+            Bounds Size()
+            {
+                var b = new Bounds(); bool any = false;
+                foreach (var r in body.GetComponentsInChildren<MeshRenderer>(true)) { if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); }
+                return b;
+            }
+            // Laid along the holder and stood on its base, as the town's own placement does, with the holder squared for the measuring.
+            var savedRot = holder.transform.rotation; holder.transform.rotation = Quaternion.identity;
+            var w = Size();
+            if (w.size.x > w.size.z * 1.15f) { body.transform.localRotation = Quaternion.Euler(0f, -90f, 0f); w = Size(); }
+            body.transform.position += new Vector3(holder.transform.position.x - w.center.x, holder.transform.position.y - w.min.y, holder.transform.position.z - w.center.z);
+            w = Size();
+            var local = new Bounds(holder.transform.InverseTransformPoint(w.center), w.size);
+            holder.transform.rotation = savedRot;
+            Colliders(holder, local);
+            RepaintPack(body, colour);
+            return true;
+        }
+
+        static GameObject[] PackTraffic()
+        {
+            var list = new List<GameObject>();
+            foreach (var colour in new[] { "Sky", "White", "Maroon" })
+            {
+                string src = $"{FPSKitTownAssets.Out}/Traffic_Car_Sedan_A.prefab";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(src) == null) break;
+                var root = PrefabUtility.LoadPrefabContents(src);
+                RepaintPack(root, colour);
+                var saved = PrefabUtility.SaveAsPrefabAsset(root, $"{Out}/Traffic_Pack_{colour}.prefab");
+                PrefabUtility.UnloadPrefabContents(root);
+                list.Add(saved);
+            }
+            return list.ToArray();
+        }
+
         static float prefabWidth(GameObject prefab) => prefab.transform.Find("LOD0").GetComponent<MeshFilter>().sharedMesh.bounds.size.x;
         static float prefabLength(GameObject prefab) => prefab.transform.Find("LOD0").GetComponent<MeshFilter>().sharedMesh.bounds.size.z;
 
@@ -582,6 +662,17 @@ namespace FPSKit.EditorTools
             var puff = AssetDatabase.GetBuiltinExtraResource<Texture2D>("Default-Particle.psd");
             if (puff != null) m.SetTexture("_BaseMap", puff);
             if (create) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
+
+            // Tyre marks: black, a little see-through, on the road.
+            string skidPath = "Assets/Resources/Car/Skid.mat";
+            var skid = AssetDatabase.LoadAssetAtPath<Material>(skidPath);
+            bool makeSkid = skid == null;
+            if (makeSkid) skid = new Material(m);
+            skid.CopyPropertiesFromMaterial(m);
+            skid.SetTexture("_BaseMap", null);
+            skid.SetColor("_BaseColor", new Color(0.02f, 0.02f, 0.02f, 0.42f));
+            skid.renderQueue = (int)RenderQueue.Transparent - 10;
+            if (makeSkid) AssetDatabase.CreateAsset(skid, skidPath); else EditorUtility.SetDirty(skid);
         }
 
         // ------------------------------------------------------------------ into the saved scene, without a rebuild
@@ -602,7 +693,7 @@ namespace FPSKit.EditorTools
         public static void PatchDesert()
         {
             FPSKitSceneBuilder.MakeGlassMaterials();
-            var traffic = TrafficPrefabs();
+            var traffic = TrafficPrefabs().Concat(PackTraffic()).ToArray();
             var scene = EditorSceneManager.OpenScene(DesertScene, OpenSceneMode.Single);
             var rng = new System.Random(20261106);
 
@@ -620,9 +711,15 @@ namespace FPSKit.EditorTools
                         // A car stacked on another is junkyard: it is a wreck by this test too. What remains is at street level.
                         foreach (Transform child in holder.Cast<Transform>().ToArray()) Object.DestroyImmediate(child.gameObject);
                         foreach (var c in holder.GetComponents<Collider>()) Object.DestroyImmediate(c);
-                        var kind = Pick(rng);
-                        holder.name = "Cars_" + kind.name;
-                        PlaceParked(holder.gameObject, kind, PaintFor(kind, rng));
+                        // About one car in three is a hand-made one, in any colour.
+                        if (rng.NextDouble() < 0.34 && PlacePack(holder.gameObject, PickPack(rng), PaintTable[rng.Next(PaintTable.Length)].name))
+                            holder.name = "Cars_Pack";
+                        else
+                        {
+                            var kind = Pick(rng);
+                            holder.name = "Cars_" + kind.name;
+                            PlaceParked(holder.gameObject, kind, PaintFor(kind, rng));
+                        }
                         foreach (var tr in holder.GetComponentsInChildren<Transform>(true))
                         {
                             tr.gameObject.layer = LayerMask.NameToLayer("Environment");

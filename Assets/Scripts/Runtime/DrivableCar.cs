@@ -6,7 +6,7 @@ using UnityEngine;
 ///
 /// <b>Physics.</b> WheelColliders on a Rigidbody. WheelCollider tyres on their own are ice or glue, and a key is all or nothing, so the steering lock is whatever the speed can hold (a turn asks for at
 /// most <see cref="cornerGrip"/>), the yaw is led towards what the wheels ask for, and sideways slide is bled off, except under the handbrake. An engine with a torque curve and a gearbox, whose revs are the
-/// sound, the needle and the shifts.
+/// sound, the needle and the shifts. The handbrake at speed is a drift: the rear lets go, the key turns the car, the assists stand back and a slide runs out by itself.
 ///
 /// <b>The gun.</b> One man cannot aim with W held on a touchpad (a held key kills the pointer: disable-while-typing), and a car with nobody's foot down would stop dead in a fight. So bringing the gun up
 /// sets a cruise at the speed it was doing: the car carries on by itself, W and S nudge the speed up and down, A and D steer. The view, the aim and the hands are the same first-person view as on foot.
@@ -36,7 +36,7 @@ public class DrivableCar : MonoBehaviour
     [Tooltip("Metres a second it will not go past (the engine's pull falls away into it).")]
     public float topSpeed = 40f;
     [Tooltip("Metres a second in reverse.")]
-    public float reverseSpeed = 9f;
+    public float reverseSpeed = 12f;
     public float mass = 1350f;
 
     [Header("Brakes")]
@@ -61,6 +61,30 @@ public class DrivableCar : MonoBehaviour
     public float antiRoll = 5200f, downforce = 42f;
     [Tooltip("Wheel turn for one degree at the road: a real car's steering ratio.")]
     public float steerRatio = 14f;
+
+    [Tooltip("With S held, the car's nose turns the way the key says, as it looks from the seat. A real car does the opposite (its tail goes that way): his note on Down and Left, 2026-11-06. Off gives the real thing.")]
+    public bool reverseTurnsAsPressed = true;
+
+    [Tooltip("Steering lock going backwards, degrees.")]
+    public float reverseLock = 20f;
+
+    [Header("Drift (the handbrake)")]
+    [Tooltip("Slowest speed for a drift, metres a second. Under it the handbrake is only a handbrake.")]
+    public float driftFrom = 6f;
+    [Tooltip("Sideways grip of the rear and front tyres while drifting (normally 1.9 and 1.7). Low, so the slide below is what moves the car, not the tyres fighting it.")]
+    public float driftRearGrip = 0.25f, driftFrontGrip = 0.5f;
+    [Tooltip("Degrees the nose is held inside where the car is going, key held. The key says which side: pressing the other way flicks it across.")]
+    public float driftAngle = 38f;
+    [Tooltip("How hard the slide bends the car's path towards its nose, metres a second squared: the radius of the arc.")]
+    public float driftBend = 8f;
+    [Tooltip("Speed lost each second in a slide, metres a second: more with the foot off.")]
+    public float driftLoss = 3.2f, driftLossOnThrottle = 1.3f;
+
+    [Header("Staying on its wheels")]
+    [Tooltip("Degrees of lean (the town's slopes stop at 26) past which the car is pulled back, and how hard.")]
+    public float leanFrom = 30f, leanPull = 14f;
+    [Tooltip("Seconds lying over before it is put back on its wheels.")]
+    public float rightAfter = 1.2f;
 
     [Header("Seat and camera")]
     [Tooltip("Where the player stands after getting out, in the car's space (beside the driver's door).")]
@@ -155,7 +179,13 @@ public class DrivableCar : MonoBehaviour
     Vector3 _headLag, _headLagVel, _lastVelocity;
     float _bump;
     ParticleSystem _smoke, _dust;
-    float _shakeUntil;
+    float _driftSpeed, _frontGripNow = -1f;
+    float _drift, _overTime, _rightingT = -1f, _displaySteer;
+    Quaternion _rightFrom;
+    Vector3 _rightAt;
+    TrailRenderer _markL, _markR;
+    bool _peopleIgnored;
+    float _rearGripNow = -1f;
 
     /// <summary>The speed shown on the HUD, km/h, and the gear (0 is reverse).</summary>
     public float Kmh => Mathf.Abs(_speed) * 3.6f;
@@ -164,6 +194,8 @@ public class DrivableCar : MonoBehaviour
     public bool ChaseView => _chase;
     public float Rpm => _rpm;
     public float Steer => _steer;
+    /// <summary>0 gripping, 1 drifting.</summary>
+    public float Drift => _drift;
     public float CruiseSpeed => _cruise;
 
     void Awake()
@@ -180,6 +212,7 @@ public class DrivableCar : MonoBehaviour
         _rb.angularDamping = 0.25f;
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         TuneWheels();
+        PeopleDoNotCollide();
         // Finer wheel physics at a crawl: at the default the car shivers when stopped.
         if (frontLeft != null) frontLeft.ConfigureVehicleSubsteps(5f, 12, 15);
     }
@@ -208,6 +241,32 @@ public class DrivableCar : MonoBehaviour
             s.stiffness = w == rearLeft || w == rearRight ? 1.9f : 1.7f;       // the rear holds on: understeer is forgiving, a spin is not
             w.sidewaysFriction = s;
         }
+    }
+
+    /// <summary>
+    /// A car does not meet people as a solid: <see cref="VehicleStrike"/> deals with them by overlap and damage. A soldier walking up pushed his moved-by-hand capsule and hitboxes into the car, the physics engine threw the car
+    /// out of them, and it went over on its roof with him standing beside it (his note, 2026-11-06). The wheels' own sweep ran over bodies the same way. Layer-wide, so it reaches every part of every man.
+    /// </summary>
+    void PeopleDoNotCollide()
+    {
+        int vehicle = LayerMask.NameToLayer("Vehicle");
+        if (vehicle < 0) return;
+        foreach (var layer in new[] { "Enemy", "Civilian" })
+        {
+            int l = LayerMask.NameToLayer(layer);
+            if (l >= 0) Physics.IgnoreLayerCollision(vehicle, l, true);
+        }
+    }
+
+    /// <summary>A blast near the car: a shove it can take, through its middle so it does not turn it over, and the view shakes.</summary>
+    public void Blasted(Vector3 centre, float radius)
+    {
+        if (_rb == null || _rb.isKinematic) return;
+        Vector3 away = _rb.worldCenterOfMass - centre;
+        float near = Mathf.Clamp01(1f - away.magnitude / Mathf.Max(0.1f, radius));
+        away.y = Mathf.Abs(away.y) * 0.25f + 0.2f;
+        _rb.AddForce(away.normalized * 4f * near, ForceMode.VelocityChange);
+        if (Driving == this && _motor != null) _motor.AddShake(near);
     }
 
     void OnEnable() => _all.Add(this);
@@ -496,9 +555,18 @@ public class DrivableCar : MonoBehaviour
         }
         float dt = Time.fixedDeltaTime;
         Vector2 move = _phase == Phase.Seated && !_wantOut ? _move : Vector2.zero;      // read in Update, where the player's own movement reads it
-        bool handbrake = (_phase == Phase.Seated && GameInput.Held(GameAction.Jump)) || _phase != Phase.Seated;
+        bool handbrake = (_phase == Phase.Seated && (GameInput.Held(GameAction.Jump) || MobileInput.Handbrake)) || _phase != Phase.Seated;
         _speed = Vector3.Dot(_rb.linearVelocity, transform.forward);
         float planar = Mathf.Abs(_speed);
+        StayOnWheels(dt);
+
+        // A drift: the handbrake at speed. It starts quickly and lets go slowly, so a slide runs out rather than snapping straight.
+        float pace = Vector3.ProjectOnPlane(_rb.linearVelocity, transform.up).magnitude;
+        // It starts on the speed along the car, and goes on as long as the car is moving at all: sideways is most of a drift.
+        bool wantDrift = handbrake && _phase == Phase.Seated && (_drift > 0.2f ? pace > 3f : _speed > driftFrom);
+        if (wantDrift && _drift <= 0.001f) _driftSpeed = pace;
+        _drift = Mathf.MoveTowards(_drift, wantDrift ? 1f : 0f, dt / (wantDrift ? 0.12f : 0.65f));
+        SetGrip(Mathf.Lerp(1.9f, driftRearGrip, _drift), Mathf.Lerp(1.7f, driftFrontGrip, _drift));
 
         // ---- pedals -----------------------------------------------------------
         float throttle = 0f, brake = 0f;
@@ -555,7 +623,12 @@ public class DrivableCar : MonoBehaviour
         // ---- steering ------------------------------------------------------------
         float speedSq = Mathf.Max(1f, planar * planar);
         float lockAngle = Mathf.Min(maxSteer, Mathf.Atan(Wheelbase * cornerGrip / speedSq) * Mathf.Rad2Deg);
-        float wanted = move.x * lockAngle;
+        lockAngle = Mathf.Lerp(lockAngle, Mathf.Max(lockAngle, 20f), _drift);      // a slide wants the lock: the counter-steer is most of it
+        // Going backwards, the front wheels turn the other way for the nose to go the way the key says.
+        float steerSign = reverseTurnsAsPressed && (_speed < -0.4f || (_throttleNow < -0.05f && _speed < 0.8f)) ? -1f : 1f;
+        // Backing up the lock is less: the same 36 degrees spun it round on the spot.
+        if (steerSign < 0f || _speed < -0.4f) lockAngle = Mathf.Min(lockAngle, reverseLock);
+        float wanted = move.x * lockAngle * steerSign;
         float time = Mathf.Abs(move.x) < 0.05f ? steerBack : steerIn;
         _steer = Mathf.MoveTowards(_steer, wanted, Mathf.Max(lockAngle, 10f) / Mathf.Max(0.02f, time) * dt);
         // The inside wheel turns more than the outer (Ackermann): it keeps the tyres from fighting at a crawl.
@@ -571,7 +644,10 @@ public class DrivableCar : MonoBehaviour
         float idleBrake = 0f;
         if (Mathf.Abs(_move.y) <= 0.05f && !_gunWanted)
             idleBrake = planar < 0.8f ? 1f : engineBrake;      // the engine holds it back; under walking pace, it is held still
-        SetTorque(drive, Mathf.Max(_brakeNow, idleBrake) * brakeTorque, handbrake ? brakeTorque * 1.6f : 0f);
+        // In a drift the rear wheels are only dragged, or the car stops instead of sliding.
+        float handbrakeTorque = !handbrake ? 0f : brakeTorque * Mathf.Lerp(1.6f, 0.02f, _drift);
+        // A front-driven car still has its front wheels pulling, and all of them are free of the idle brake.
+        SetTorque(drive, Mathf.Max(_brakeNow, _drift > 0.1f ? 0f : idleBrake) * brakeTorque, handbrakeTorque);
 
         // Held still: wheel friction alone lets a stopped car creep.
         bool holdStill = (idleBrake >= 1f || (_gunWanted && _cruise < 0.2f)) && planar < 0.35f;
@@ -590,17 +666,90 @@ public class DrivableCar : MonoBehaviour
             scrub = Mathf.Max(scrub, Mathf.Abs(hit.sidewaysSlip) * 1.1f, Mathf.Abs(hit.forwardSlip) * 0.9f);
         }
         _scrub = Mathf.Clamp01((scrub - 0.3f) * 1.5f);
-        if (grounded >= 3 && !(handbrake && _phase == Phase.Seated))
+        if (grounded >= 3)
         {
-            // The turn the front wheels ask for.
+            Vector3 velocity = _rb.linearVelocity;
+            float sideways = Vector3.Dot(velocity, transform.right);
+            float now = Vector3.Dot(_rb.angularVelocity, transform.up);
+            // The turn the front wheels ask for; under the handbrake at a crawl nothing helps.
             float asked = _speed * tangent / Wheelbase;
             float most = cornerGrip / Mathf.Max(3f, planar);
             asked = Mathf.Clamp(asked, -most, most);
-            float now = Vector3.Dot(_rb.angularVelocity, transform.up);
-            _rb.AddTorque(transform.up * (asked - now) * yawAssist, ForceMode.Acceleration);
-            // A slide bled off.
-            float sideways = Vector3.Dot(_rb.linearVelocity, transform.right);
-            _rb.AddForce(-transform.right * sideways * slideAssist, ForceMode.Acceleration);
+            float yawGain = yawAssist, slideGain = slideAssist;
+            if (_drift > 0.01f)
+            {
+                // The slide itself. Tyres on their own either grip or spin, so it is flown: the nose held at an angle inside the path, the path bent towards the nose, the speed let down slowly.
+                                float along = Vector3.Dot(velocity, transform.forward);
+                float slip = pace > 1.5f ? Mathf.Atan2(sideways, Mathf.Max(0.1f, along)) * Mathf.Rad2Deg : 0f;
+                float aim = -move.x * driftAngle;
+                float bend = Mathf.Clamp(sideways * 1.8f, -driftBend, driftBend);
+                _rb.AddForce(-transform.right * bend * _drift, ForceMode.Acceleration);
+                float pathTurn = pace > 1f ? -bend / pace : 0f;
+                float flown = pathTurn - (aim - slip) * Mathf.Deg2Rad * 3f;
+                asked = Mathf.Lerp(asked, Mathf.Clamp(flown, -3f, 3f), _drift);
+                // The speed: only down, slowly.
+                _driftSpeed = Mathf.Max(0f, _driftSpeed - (move.y > 0.05f ? driftLossOnThrottle : driftLoss) * dt);
+                if (pace > 0.5f) _rb.AddForce(velocity / pace * Mathf.Clamp((_driftSpeed - pace) * 5f, -8f, 13f) * _drift, ForceMode.Acceleration);
+                yawGain = Mathf.Lerp(yawAssist, 9f, _drift);
+                slideGain = slideAssist * (1f - _drift);
+            }
+            if (!(handbrake && _drift < 0.05f && _phase == Phase.Seated))
+            {
+                _rb.AddTorque(transform.up * (asked - now) * yawGain, ForceMode.Acceleration);
+                // A slide bled off when gripping.
+                _rb.AddForce(-transform.right * sideways * slideGain, ForceMode.Acceleration);
+            }
+            // What it loses to the tyres in a slide it does not also lose to the road going straight.
+        }
+        _displaySteer = steerSign * _steer;
+        _scrub = Mathf.Max(_scrub, _drift * Mathf.Clamp01(planar / 12f));
+    }
+
+    void SetGrip(float rear, float front)
+    {
+        if (Mathf.Abs(rear - _rearGripNow) < 0.005f && Mathf.Abs(front - _frontGripNow) < 0.005f) return;
+        if (rearLeft == null || rearRight == null || frontLeft == null || frontRight == null) return;
+        _rearGripNow = rear; _frontGripNow = front;
+        var s = rearLeft.sidewaysFriction; s.stiffness = rear; rearLeft.sidewaysFriction = s;
+        s = rearRight.sidewaysFriction; s.stiffness = rear; rearRight.sidewaysFriction = s;
+        s = frontLeft.sidewaysFriction; s.stiffness = front; frontLeft.sidewaysFriction = s;
+        s = frontRight.sidewaysFriction; s.stiffness = front; frontRight.sidewaysFriction = s;
+    }
+
+    /// <summary>
+    /// Never on its roof. Leaning past what any slope in the town asks, it is pulled upright and its roll is calmed; lying over anyway (a ramp, a crash), it is put back on its wheels after a moment. Nobody can get out of a car on its roof, and that
+    /// is a death with nothing to do about it.
+    /// </summary>
+    void StayOnWheels(float dt)
+    {
+        if (_rightingT >= 0f)
+        {
+            _rightingT += dt / 0.55f;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_rightingT));
+            Quaternion upright = Quaternion.Euler(0f, _rightFrom.eulerAngles.y, 0f);
+            _rb.MoveRotation(Quaternion.Slerp(_rightFrom, upright, t));
+            _rb.MovePosition(Vector3.Lerp(_rightAt, _rightAt + Vector3.up * 1.1f, Mathf.Sin(t * Mathf.PI * 0.5f)));
+            if (_rightingT >= 1f) { _rightingT = -1f; _rb.isKinematic = false; _rb.linearVelocity = Vector3.zero; _rb.angularVelocity = Vector3.zero; }
+            return;
+        }
+        float lean = Vector3.Angle(transform.up, Vector3.up);
+        if (lean > leanFrom)
+        {
+            Vector3 axis = Vector3.Cross(transform.up, Vector3.up);
+            if (axis.sqrMagnitude > 1e-4f) _rb.AddTorque(axis.normalized * (lean - leanFrom) * Mathf.Deg2Rad * leanPull, ForceMode.Acceleration);
+            // Its rate of going over, taken away at any lean past the slopes.
+            Vector3 w = transform.InverseTransformDirection(_rb.angularVelocity);
+            w.x = Mathf.Clamp(w.x, -1.5f, 1.5f); w.z = Mathf.Clamp(w.z, -1.5f, 1.5f);
+            _rb.angularVelocity = transform.TransformDirection(w);
+        }
+        _overTime = lean > 65f ? _overTime + dt : 0f;
+        if (_overTime >= rightAfter && _rb.linearVelocity.magnitude < 4f)
+        {
+            _overTime = 0f;
+            _rightFrom = transform.rotation;
+            _rightAt = transform.position;
+            _rightingT = 0f;
+            _rb.isKinematic = true;
         }
     }
 
@@ -687,13 +836,15 @@ public class DrivableCar : MonoBehaviour
         // ---- the sound and the dash, from the physics --------------------------------
         bool inside = !_chase;
         if (_audio != null) _audio.Drive(_rpm, Mathf.Abs(_throttleNow), Mathf.Abs(_speed), _scrub, inside, dt);
-        float turn = _steer * steerRatio;
+        // The wheel in his hands goes the way the key says; only the road wheels swap, backing up.
+        float turn = _displaySteer * steerRatio;
         if (_look != null)
         {
             _look.Dash(turn, Kmh, _rpm);
             _look.Lamps(_brakeNow > 0.05f, _gear == 0 && _speed < 0.2f && Mathf.Abs(_throttleNow) > 0.01f, false);
         }
         Exhaust();
+        TyreMarks();
 
         if (_player != null) _player.position = transform.position + Vector3.up * 0.3f;
 
@@ -742,7 +893,7 @@ public class DrivableCar : MonoBehaviour
 
         Vector3 eye = transform.TransformPoint(eyeLocal);
         // Into the turn a little, as anyone looks where the car is going. Not with the gun up: the aim is his.
-        float into = _gunWanted ? 0f : _steer * 0.3f;
+        float into = _gunWanted ? 0f : _displaySteer * 0.3f;
         Quaternion view = seat * Quaternion.Euler(seatTilt + _lookPitchNow + kick.x, _lookYawNow + into + kick.y, kick.z);
 
         if (_phase == Phase.GettingIn)
@@ -789,14 +940,50 @@ public class DrivableCar : MonoBehaviour
             if (mat == null) return;
             _smoke = MakePuffs("Exhaust", mat, 18, 0.5f, new Color(0.45f, 0.45f, 0.45f, 0.08f), 0.08f, 0.5f);
             _smoke.transform.SetLocalPositionAndRotation(_look.exhaust, Quaternion.LookRotation(Vector3.back));
-            _dust = MakePuffs("Dust", mat, 40, 1.3f, new Color(0.72f, 0.6f, 0.44f, 0.16f), 0.5f, 2.2f);
+            _dust = MakePuffs("Dust", mat, 60, 1.5f, new Color(0.72f, 0.6f, 0.44f, 0.16f), 0.5f, 2.2f);
             _dust.transform.SetLocalPositionAndRotation(new Vector3(0f, 0.08f, -_look.wheelbase * 0.5f), Quaternion.LookRotation(Vector3.up));
         }
         var se = _smoke.emission;
         se.rateOverTime = Mathf.Abs(_throttleNow) * 16f + 2f;
         var de = _dust.emission;
-        float kick = Mathf.Clamp01(Mathf.Abs(_speed) / 18f) * 10f + _scrub * 28f;
+        float kick = Mathf.Clamp01(Mathf.Abs(_speed) / 18f) * 6f + _scrub * 34f;
         de.rateOverTime = kick;
+    }
+
+    /// <summary>Black lines where the rear tyres are scrubbing: a trail lying on the ground from each. They fade by themselves.</summary>
+    void TyreMarks()
+    {
+        if (_phase != Phase.Seated || rearLeft == null || rearRight == null) return;
+        if (_markL == null)
+        {
+            var mat = Resources.Load<Material>("Car/Skid");
+            if (mat == null) return;
+            _markL = MakeMark(rearLeft, mat); _markR = MakeMark(rearRight, mat);
+        }
+        Mark(_markL, rearLeft); Mark(_markR, rearRight);
+    }
+
+    TrailRenderer MakeMark(WheelCollider wheel, Material mat)
+    {
+        var go = new GameObject("TyreMark");
+        go.transform.SetParent(transform, false);
+        var t = go.AddComponent<TrailRenderer>();
+        t.sharedMaterial = mat; t.time = 16f; t.widthMultiplier = 0.2f; t.minVertexDistance = 0.18f; t.alignment = LineAlignment.TransformZ;
+        t.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; t.receiveShadows = false; t.emitting = false;
+        t.numCapVertices = 0; t.autodestruct = false;
+        return t;
+    }
+
+    void Mark(TrailRenderer t, WheelCollider wheel)
+    {
+        bool down = wheel.GetGroundHit(out var hit);
+        bool on = down && _scrub > 0.28f && Mathf.Abs(_speed) > 2f;
+        if (down)
+        {
+            t.transform.position = hit.point + hit.normal * 0.025f;
+            t.transform.rotation = Quaternion.LookRotation(hit.normal, transform.forward);
+        }
+        if (t.emitting != on) t.emitting = on;
     }
 
     ParticleSystem MakePuffs(string name, Material mat, int max, float life, Color colour, float size0, float size1)

@@ -1121,6 +1121,8 @@ public class EnemyAI : MonoBehaviour
 
     void TryMeleeHit()
     {
+        // Nobody punches a man through a car door: he has to be shot through the glass.
+        if (DrivableCar.SeatOf(target, out _)) return;
         // Re-check the range -- backing off during the wind-up should work. A shooter
         // swinging its rifle reaches only as far as the rifle, not as far as it shoots.
         float reach = ranged ? meleeRange : attackRange;

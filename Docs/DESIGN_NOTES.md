@@ -4260,3 +4260,10 @@ His touchpad decided the gun: disable-while-typing kills the pointer while a key
 Both hands go to the gun, as on foot; the wheel still answers A and D. One hand on the wheel and the rifle in the other was not done: the reload needs the left hand, and sights need both.
 Sound: `Tools/generate-car-audio.py`, synthesis: a four-cylinder's firing harmonics at three revs, crossfaded and pitched by `CarAudio`. Mirrors show a painted guess of sky and road: a real reflection is a second camera.
 
+Same day, after his first drive: "low poly", "wrong for reverse", "no drift", "a soldier attacks me then the car got upside up and I got killed", "the pieces then freeze".
+The flip: a soldier's moved-by-hand capsule and hitboxes pressed into the rigidbody, and the physics engine threw the car out of them. Measured with soldiers warped against it: people collide, 57-85 degrees of tilt and up to 9.5 m/s upward; layers ignored, 0.2 degrees and nothing. Rule: vehicles and people are not solids to each other.
+Reverse: real physics were right (tail goes the way of the key) and read as wrong from the seat, where what is seen is the nose. His answer named Down and Left, so the nose goes the way the key says, lock 20 degrees; `reverseTurnsAsPressed` off restores a real car.
+Drift: WheelColliders either grip or spin (63 km/h to nothing, 111 degrees, the first try). So a slide is flown: tyre grip low, nose held at 38 degrees inside the path by the key, path bent to the nose, speed let down slowly. Measured: 41 degrees at most, 63 to 38 km/h in 1.1 s of full lock, 8 degrees off heading 0.4 s after letting go.
+Frozen glass: the cubes collided with the car's box, whose top is under the windows, and came to rest on nothing visible; and a non-looping particle system that had stopped never moved what it was then given. Now a ground plane per burst, looping.
+Low poly: body shapes redone (lower noses, raked screens, shaped sides, wide arches), near detail to about 40 m and the middle level to about 200 m, its wheels 26-sided, and the hand-made pack cars recoloured alongside.
+

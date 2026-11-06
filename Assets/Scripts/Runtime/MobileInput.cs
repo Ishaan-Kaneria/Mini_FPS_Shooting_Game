@@ -16,6 +16,8 @@ public static class MobileInput
     public static Vector2 Move;      // -1..1 per axis, from the joystick
     public static bool Aim;
     public static bool Crouch;
+    /// <summary>The handbrake from the touch layer (the jump button in a car).</summary>
+    public static bool Handbrake;
 
     /// <summary>
     /// True while anything on screen is asking to sprint.
@@ -209,7 +211,7 @@ public static class MobileInput
     {
         Move = Vector2.zero;
         _lookDelta = Vector2.zero;
-        Aim = Crouch = BombAim = false;
+        Aim = Crouch = BombAim = Handbrake = false;
         _sprintButton = _sprintStick = false;
         _fireButton = _fireTap = _autoFire = false;
         _fireHolds = 0;

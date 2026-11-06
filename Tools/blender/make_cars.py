@@ -44,12 +44,13 @@ def spec(**k):
     return k
 
 CARS = {
-    # A modern family saloon: raked screen, high deck, the rounded shape of the last twenty years.
-    "Saloon": spec(L=4.56, W=1.80, tyre=0.325, tyre_w=0.215, fa=-1.36, ra=1.36, drive="front", spokes=5,
-        top=[(-2.28, 0.74), (-2.15, 0.80), (-0.86, 0.985), (-0.18, 1.395), (0.32, 1.44), (0.92, 1.405), (1.58, 1.035), (2.14, 1.00), (2.28, 0.90)],
-        belt=[(-2.28, 0.70), (-0.86, 0.905), (1.58, 0.975), (2.28, 0.88)], bottom=[(-2.28, 0.31), (-1.9, 0.20), (1.9, 0.21), (2.28, 0.36)],
-        halfw=[(-2.28, 0.78), (-1.7, 0.885), (-1.0, 0.90), (1.2, 0.90), (1.9, 0.875), (2.28, 0.78)], roofw=[(-2.28, 0.46), (-0.86, 0.72), (-0.18, 0.62), (0.32, 0.63), (0.92, 0.61), (1.58, 0.71), (2.28, 0.5)],
-        cowl=-0.86, roofF=-0.18, roofR=0.92, deck=1.58, door0=-0.70, doorB=0.40, door1=1.20, win0=-0.56, winC=0.98),
+    # A modern family saloon: long raked screen, high tail, the belt rising to the rear, big wheels filling wide arches.
+    "Saloon": spec(L=4.72, W=1.84, tyre=0.345, tyre_w=0.225, fa=-1.42, ra=1.42, drive="front", spokes=5, shoulder=0.965, grille=0.5,
+        top=[(-2.36, 0.66), (-2.24, 0.74), (-1.6, 0.86), (-1.02, 0.985), (-0.22, 1.39), (0.26, 1.435), (0.84, 1.395), (1.66, 1.075), (2.24, 1.045), (2.36, 0.93)],
+        belt=[(-2.36, 0.64), (-1.02, 0.905), (0.3, 0.98), (1.66, 1.03), (2.36, 0.93)], bottom=[(-2.36, 0.33), (-2.0, 0.22), (2.0, 0.24), (2.36, 0.42)],
+        halfw=[(-2.36, 0.74), (-1.9, 0.875), (-1.2, 0.915), (0.0, 0.92), (1.2, 0.915), (2.0, 0.885), (2.36, 0.76)], roofw=[(-2.36, 0.4), (-1.02, 0.72), (-0.22, 0.60), (0.26, 0.61), (0.84, 0.59), (1.66, 0.70), (2.36, 0.5)],
+        rows_front=[(0.0, 0.0), (0.34, 0.016), (0.62, 0.065), (0.80, 0.14), (0.93, 0.26), (1.0, 0.5)], rows_rear=[(0.0, 0.0), (0.40, 0.012), (0.70, 0.04), (0.88, 0.1), (0.97, 0.2), (1.0, 0.36)],
+        cowl=-1.02, roofF=-0.22, roofR=0.84, deck=1.66, door0=-0.84, doorB=0.34, door1=1.2, win0=-0.68, winC=1.04),
     # The boxy older saloon that does every taxi job in the town: upright screen, long bonnet, chrome, hubcaps.
     "OldSaloon": spec(L=4.72, W=1.74, tyre=0.315, tyre_w=0.185, fa=-1.42, ra=1.40, hubcap=True, wood=True, seat_tan=True, lamp="square",
         top=[(-2.36, 0.76), (-2.26, 0.85), (-0.80, 0.97), (-0.30, 1.375), (0.36, 1.41), (1.02, 1.385), (1.50, 1.01), (2.26, 0.985), (2.36, 0.87)],
@@ -57,34 +58,34 @@ CARS = {
         halfw=[(-2.36, 0.81), (-2.16, 0.86), (-1.0, 0.87), (1.3, 0.87), (2.12, 0.85), (2.36, 0.80)], roofw=[(-2.36, 0.52), (-0.80, 0.72), (-0.30, 0.655), (0.36, 0.665), (1.02, 0.655), (1.50, 0.72), (2.36, 0.56)],
         rows_front=[(0.0, 0.0), (0.45, 0.002), (0.75, 0.008), (0.92, 0.02), (0.98, 0.05), (1.0, 0.14)], rows_rear=[(0.0, 0.0), (0.5, 0.003), (0.8, 0.01), (0.94, 0.03), (0.99, 0.06), (1.0, 0.14)],
         cowl=-0.80, roofF=-0.30, roofR=1.02, deck=1.50, door0=-0.66, doorB=0.36, door1=1.26, win0=-0.56, winC=1.06, extras=["chrome_bumpers", "taxi_sign"]),
-    # A small hatchback: short, tall, nearly no tail.
-    "Hatch": spec(L=3.92, W=1.72, tyre=0.305, tyre_w=0.185, fa=-1.25, ra=1.21, drive="front", spokes=4,
-        top=[(-1.96, 0.72), (-1.84, 0.80), (-0.82, 0.985), (-0.24, 1.42), (0.28, 1.47), (1.12, 1.40), (1.76, 1.03), (1.96, 0.85)],
-        belt=[(-1.96, 0.70), (-0.82, 0.92), (1.76, 1.02), (1.96, 0.84)], bottom=[(-1.96, 0.31), (-1.66, 0.19), (1.64, 0.20), (1.96, 0.38)],
-        halfw=[(-1.96, 0.74), (-1.52, 0.85), (-1.0, 0.86), (1.1, 0.86), (1.62, 0.84), (1.96, 0.75)], roofw=[(-1.96, 0.44), (-0.82, 0.70), (-0.24, 0.625), (0.28, 0.635), (1.12, 0.60), (1.76, 0.68), (1.96, 0.55)],
-        rows_rear=[(0.0, 0.0), (0.42, 0.003), (0.74, 0.012), (0.91, 0.03), (0.98, 0.07), (1.0, 0.16)],
-        cowl=-0.82, roofF=-0.24, roofR=1.12, deck=1.76, door0=-0.66, doorB=0.28, door1=1.04, win0=-0.54, winC=1.14),
-    # A tall off-roader: square shoulders, roof rack, chunky tyres and black arches.
-    "OffRoader": spec(L=4.68, W=1.90, tyre=0.385, tyre_w=0.255, fa=-1.42, ra=1.42, spokes=6, lamp="square", seat_up=0.04,
-        top=[(-2.34, 0.92), (-2.20, 1.06), (-0.95, 1.20), (-0.52, 1.76), (0.40, 1.80), (1.96, 1.74), (2.28, 1.30), (2.34, 1.10)],
-        belt=[(-2.34, 0.92), (-0.95, 1.14), (2.28, 1.20), (2.34, 1.05)], bottom=[(-2.34, 0.46), (-2.0, 0.34), (2.0, 0.34), (2.34, 0.48)],
-        halfw=[(-2.34, 0.86), (-2.0, 0.93), (-1.0, 0.95), (1.5, 0.95), (2.12, 0.93), (2.34, 0.86)], roofw=[(-2.34, 0.6), (-0.95, 0.80), (-0.52, 0.72), (0.40, 0.74), (1.96, 0.72), (2.28, 0.79), (2.34, 0.66)],
-        rows_front=[(0.0, 0.0), (0.45, 0.002), (0.75, 0.01), (0.92, 0.03), (0.98, 0.06), (1.0, 0.16)], rows_rear=[(0.0, 0.0), (0.5, 0.002), (0.8, 0.008), (0.94, 0.025), (0.99, 0.05), (1.0, 0.12)],
-        cowl=-0.95, roofF=-0.52, roofR=1.96, deck=2.28, door0=-0.84, doorB=0.28, door1=1.12, win0=-0.72, winC=1.86, extras=["roof_rack", "side_steps"]),
+    # A small modern hatchback: short nose, tall cabin, raked tailgate, the wheels at the corners.
+    "Hatch": spec(L=3.98, W=1.76, tyre=0.32, tyre_w=0.205, fa=-1.28, ra=1.24, drive="front", spokes=4, shoulder=0.965, grille=0.48,
+        top=[(-1.99, 0.70), (-1.88, 0.78), (-1.4, 0.90), (-0.96, 1.02), (-0.28, 1.44), (0.26, 1.49), (0.98, 1.44), (1.72, 1.08), (1.99, 0.90)],
+        belt=[(-1.99, 0.68), (-0.96, 0.95), (0.4, 1.02), (1.72, 1.06), (1.99, 0.88)], bottom=[(-1.99, 0.33), (-1.7, 0.21), (1.68, 0.22), (1.99, 0.42)],
+        halfw=[(-1.99, 0.72), (-1.56, 0.85), (-1.0, 0.875), (1.1, 0.88), (1.66, 0.855), (1.99, 0.76)], roofw=[(-1.99, 0.42), (-0.96, 0.70), (-0.28, 0.60), (0.26, 0.615), (0.98, 0.585), (1.72, 0.68), (1.99, 0.55)],
+        rows_front=[(0.0, 0.0), (0.34, 0.014), (0.62, 0.055), (0.80, 0.12), (0.93, 0.22), (1.0, 0.4)], rows_rear=[(0.0, 0.0), (0.42, 0.006), (0.74, 0.024), (0.91, 0.06), (0.98, 0.12), (1.0, 0.24)],
+        cowl=-0.96, roofF=-0.28, roofR=0.98, deck=1.72, door0=-0.8, doorB=0.26, door1=1.04, win0=-0.64, winC=1.06),
+    # A modern off-roader: high but shaped, a rising belt, a roof falling to the rear, the arches clad in black.
+    "OffRoader": spec(L=4.76, W=1.94, tyre=0.39, tyre_w=0.265, fa=-1.44, ra=1.44, spokes=6, lamp="square", seat_up=0.04, shoulder=0.965, grille=0.58, clad=True,
+        top=[(-2.38, 0.96), (-2.26, 1.08), (-1.7, 1.2), (-1.14, 1.27), (-0.42, 1.74), (0.3, 1.79), (1.5, 1.73), (2.2, 1.40), (2.38, 1.14)],
+        belt=[(-2.38, 0.95), (-1.14, 1.17), (0.4, 1.23), (2.2, 1.30), (2.38, 1.08)], bottom=[(-2.38, 0.5), (-2.05, 0.36), (2.05, 0.37), (2.38, 0.54)],
+        halfw=[(-2.38, 0.84), (-1.95, 0.935), (-1.2, 0.965), (1.4, 0.97), (2.08, 0.945), (2.38, 0.84)], roofw=[(-2.38, 0.58), (-1.14, 0.80), (-0.42, 0.70), (0.3, 0.72), (1.5, 0.68), (2.2, 0.76), (2.38, 0.64)],
+        rows_front=[(0.0, 0.0), (0.4, 0.008), (0.7, 0.035), (0.88, 0.09), (0.96, 0.17), (1.0, 0.34)], rows_rear=[(0.0, 0.0), (0.45, 0.006), (0.75, 0.024), (0.91, 0.06), (0.98, 0.12), (1.0, 0.24)],
+        cowl=-1.14, roofF=-0.42, roofR=1.5, deck=2.2, door0=-0.98, doorB=0.26, door1=1.14, win0=-0.84, winC=1.6, extras=["roof_rack", "side_steps"]),
     # A double-cab pickup: the region's most common vehicle. The bed is really hollow.
-    "Pickup": spec(L=5.25, W=1.85, tyre=0.37, tyre_w=0.245, fa=-1.60, ra=1.52, spokes=6, lamp="square", seat_up=0.04,
-        top=[(-2.62, 0.90), (-2.50, 1.02), (-1.14, 1.18), (-0.66, 1.72), (0.0, 1.76), (0.72, 1.72), (0.86, 1.20), (2.62, 1.18)],
-        belt=[(-2.62, 0.90), (-1.14, 1.11), (0.86, 1.15), (2.62, 1.15)], bottom=[(-2.62, 0.44), (-2.3, 0.36), (2.3, 0.40), (2.62, 0.50)],
-        halfw=[(-2.62, 0.84), (-2.3, 0.90), (-1.2, 0.925), (2.4, 0.925), (2.62, 0.90)], roofw=[(-2.62, 0.6), (-1.14, 0.78), (-0.66, 0.72), (0.0, 0.73), (0.72, 0.72), (0.86, 0.84), (2.62, 0.84)],
-        rows_front=[(0.0, 0.0), (0.45, 0.002), (0.75, 0.01), (0.92, 0.03), (0.98, 0.06), (1.0, 0.16)], rows_rear=[(0.0, 0.0), (0.5, 0.0), (0.9, 0.002), (0.985, 0.005), (0.995, 0.01), (1.0, 0.03)],
-        cowl=-1.14, roofF=-0.66, roofR=0.72, deck=0.86, door0=-1.00, doorB=-0.04, door1=0.72, win0=-0.88, winC=0.64, bed=(0.92, 2.56, 0.80), extras=["tow_bar"]),
-    # A people-carrier: no bonnet to speak of, a high flat roof, a stripe down its side. Bus stop traffic.
-    "Minibus": spec(L=4.95, W=1.86, tyre=0.33, tyre_w=0.205, fa=-1.68, ra=1.56, hubcap=True, drive="rear", lamp="square", seat_tan=True, seat_up=0.26,
-        top=[(-2.48, 0.86), (-2.38, 1.02), (-1.90, 1.26), (-1.05, 2.02), (0.2, 2.10), (2.3, 2.02), (2.48, 1.3)],
-        belt=[(-2.48, 0.82), (-1.90, 1.18), (2.48, 1.24)], bottom=[(-2.48, 0.40), (-2.2, 0.26), (2.2, 0.27), (2.48, 0.42)],
-        halfw=[(-2.48, 0.82), (-2.1, 0.92), (-1.6, 0.93), (1.9, 0.93), (2.48, 0.86)], roofw=[(-2.48, 0.62), (-1.9, 0.82), (-1.05, 0.76), (0.2, 0.77), (2.3, 0.75), (2.48, 0.72)],
-        rows_front=[(0.0, 0.0), (0.45, 0.002), (0.75, 0.01), (0.92, 0.03), (0.98, 0.06), (1.0, 0.16)], rows_rear=[(0.0, 0.0), (0.5, 0.002), (0.8, 0.006), (0.94, 0.02), (0.99, 0.04), (1.0, 0.09)],
-        cowl=-1.90, roofF=-1.05, roofR=2.30, deck=2.47, door0=-1.70, doorB=-0.82, door1=0.20, win0=-1.46, winC=2.20, extras=["stripe"]),
+    "Pickup": spec(L=5.32, W=1.88, tyre=0.38, tyre_w=0.255, fa=-1.66, ra=1.56, spokes=6, lamp="square", seat_up=0.04, shoulder=0.97, grille=0.6,
+        top=[(-2.66, 0.94), (-2.54, 1.07), (-1.9, 1.17), (-1.28, 1.23), (-0.62, 1.74), (0.0, 1.79), (0.66, 1.74), (0.84, 1.24), (2.66, 1.22)],
+        belt=[(-2.66, 0.93), (-1.28, 1.14), (0.84, 1.19), (2.66, 1.2)], bottom=[(-2.66, 0.48), (-2.35, 0.38), (2.35, 0.42), (2.66, 0.54)],
+        halfw=[(-2.66, 0.82), (-2.3, 0.90), (-1.5, 0.94), (2.4, 0.94), (2.66, 0.90)], roofw=[(-2.66, 0.58), (-1.28, 0.78), (-0.62, 0.70), (0.0, 0.715), (0.66, 0.70), (0.84, 0.84), (2.66, 0.84)],
+        rows_front=[(0.0, 0.0), (0.4, 0.008), (0.7, 0.03), (0.88, 0.075), (0.96, 0.14), (1.0, 0.3)], rows_rear=[(0.0, 0.0), (0.5, 0.0), (0.9, 0.002), (0.985, 0.005), (0.995, 0.01), (1.0, 0.03)],
+        cowl=-1.28, roofF=-0.62, roofR=0.66, deck=0.84, door0=-1.12, doorB=-0.08, door1=0.68, win0=-0.98, winC=0.58, bed=(0.92, 2.6, 0.82), extras=["tow_bar"]),
+    # A people-carrier: a sloping nose running up into a long screen, a high curved roof.
+    "Minibus": spec(L=5.0, W=1.9, tyre=0.34, tyre_w=0.215, fa=-1.72, ra=1.58, hubcap=True, drive="rear", lamp="square", seat_tan=True, seat_up=0.26, shoulder=0.975, grille=0.5,
+        top=[(-2.5, 0.84), (-2.38, 1.0), (-2.0, 1.2), (-1.62, 1.36), (-0.82, 2.0), (0.3, 2.09), (1.9, 2.04), (2.42, 1.7), (2.5, 1.3)],
+        belt=[(-2.5, 0.8), (-1.62, 1.22), (0.3, 1.26), (2.5, 1.26)], bottom=[(-2.5, 0.42), (-2.2, 0.27), (2.2, 0.28), (2.5, 0.44)],
+        halfw=[(-2.5, 0.8), (-2.1, 0.91), (-1.6, 0.945), (1.9, 0.95), (2.5, 0.88)], roofw=[(-2.5, 0.6), (-1.62, 0.82), (-0.82, 0.72), (0.3, 0.74), (1.9, 0.72), (2.42, 0.74), (2.5, 0.68)],
+        rows_front=[(0.0, 0.0), (0.4, 0.008), (0.7, 0.03), (0.88, 0.08), (0.96, 0.15), (1.0, 0.3)], rows_rear=[(0.0, 0.0), (0.5, 0.002), (0.8, 0.012), (0.94, 0.04), (0.99, 0.08), (1.0, 0.16)],
+        cowl=-1.62, roofF=-0.82, roofR=1.9, deck=2.42, door0=-1.46, doorB=-0.56, door1=0.36, win0=-1.28, winC=1.86),
 }
 
 # ============================================================================ the grid
@@ -144,7 +145,7 @@ def section(s, y):
     h = max(0.0, top - belt)
     # Over a wheel the side swells a little: the arch's flare.
     near = min(abs(y - s["fa"]), abs(y - s["ra"]))
-    flare = 0.014 * max(0.0, 1.0 - near / (s["tyre"] + 0.25))
+    flare = 0.026 * max(0.0, 1.0 - (near / (s["tyre"] + 0.32)) ** 2)
     w += flare
     low = max(bottom, arch)
     pts = [None] * RINGS
@@ -152,13 +153,13 @@ def section(s, y):
     z_seam = max(bottom + 0.095, min(low + 0.03, belt - 0.14) if arch else bottom + 0.095)
     pts[R_BOTTOM] = (0.0, low + (0.02 if arch else 0.0))
     pts[R_FLOOR] = (w * 0.80, low + (0.01 if arch else 0.0))
-    pts[R_LIP] = (w * 0.985, low + 0.012)
-    pts[R_SEAMA] = (w, max(z_seam, low + 0.028))
-    pts[R_SEAMB] = (w, max(z_seam + 0.008, low + 0.036))
-    pts[R_DOOR] = (w * 1.0, max(bottom + side * 0.46, low + 0.05))
-    pts[R_CREASE] = (w * 1.002, max(bottom + side * 0.76, low + 0.065))
-    pts[R_BELT] = (w * 0.985, belt - 0.015)
-    xb = w * 0.955
+    pts[R_LIP] = (w * 0.955, low + 0.012)
+    pts[R_SEAMA] = (w * 0.972, max(z_seam, low + 0.028))
+    pts[R_SEAMB] = (w * 0.98, max(z_seam + 0.008, low + 0.036))
+    pts[R_DOOR] = (w * 0.996, max(bottom + side * 0.46, low + 0.05))
+    pts[R_CREASE] = (w * 1.004, max(bottom + side * 0.72, low + 0.065))
+    pts[R_BELT] = (w * s.get("shoulder", 0.975), belt - 0.015)
+    xb = w * s.get("shoulder", 0.975) * 0.965
     pts[R_WIN0] = (xb, belt + 0.004)
     rx = min(roof, xb)
     f9, f10 = (0.91, 0.985) if h > 0.12 else (0.55, 0.85)
@@ -175,7 +176,7 @@ def section(s, y):
     if close_now < 1.0:
         t = min(1.0, (1.0 - close_now) / 0.12)
         front = y < 0
-        marks = {R_SEAMA: 0.10, R_SEAMB: 0.27 if front else 0.16, R_DOOR: 0.44 if front else 0.34, R_CREASE: 0.60 if front else 0.54}
+        marks = {R_SEAMA: 0.10, R_SEAMB: 0.30 if front else 0.16, R_DOOR: 0.48 if front else 0.34, R_CREASE: 0.70 if front else 0.54}
         for k, f in marks.items():
             x, z = pts[k]
             pts[k] = (x, z + (bottom + side * f - z) * t)
@@ -201,6 +202,8 @@ def cell(s, y0, y1, k, xf):
     # Underneath and inside the arches.
     if k < R_LIP: return ("Body", "Under")
     if k == R_LIP: return ("Body", "Trim" if s.get("clad") or "side_steps" in s["extras"] else "Under")
+    # Black cladding round the arches and along the sills of an off-roader.
+    if s.get("clad") and k == R_SEAMB and front < mid < rear: return ("Body", "Trim")
     # The ends: bumpers, grille, lamps, plates, by height and width.
     if mid < front:
         chrome = "chrome_bumpers" in s["extras"]
@@ -210,8 +213,8 @@ def cell(s, y0, y1, k, xf):
             if xf < 0.20: return ("Body", "Plate")
             return ("Body", "Chrome" if chrome else "Paint")
         if k == R_CREASE:
-            if xf < 0.60: return ("Body", "Grille")
-            if xf < 0.97: return ("Body", "HeadLamp")
+            if xf < s.get("grille", 0.52): return ("Body", "Grille")
+            if xf < 0.985: return ("Body", "HeadLamp")
             return ("Body", "Paint")
         if k == R_BELT or k == R_WIN0: return ("Body", "Paint")
         return ("Body", "Paint")
@@ -482,7 +485,7 @@ def wheel(name, s, side, axle_y, simple=False):
     z = r
     x = curve(s["halfw"], axle_y) - w * 0.5 + 0.012
     part = Part(name, (x * side, axle_y, z), local=True)
-    seg = 14 if simple else 40
+    seg = 26 if simple else 44
     out = side
     # Tyre: tread with a rounded shoulder, then the wall in to the rim's lip.
     prof = [(rim, -w * 0.5), (r * 0.92, -w * 0.5), (r * 0.985, -w * 0.46), (r, -w * 0.38), (r, w * 0.38), (r * 0.985, w * 0.46), (r * 0.92, w * 0.5), (rim, w * 0.5)]
@@ -746,7 +749,7 @@ def build_car(name, s):
         parts[door].origin = Vector(hinge)
         _cards[door] = parts["Card_" + door[5:]] = Part("Card_" + door[5:], hinge)
     inner = Part("Interior")
-    add_shell(inner, v2, n2, f2, s)
+    add_shell(inner, v1, n1, f1, s)     # the inside of the skin needs no fine curve: most of the cost of a car was its lining
     ins = interior(s, inner)
     parts["Interior"] = inner
     outside(s, parts)
@@ -774,7 +777,7 @@ def build_car(name, s):
     for p in l2.values(): absorb(merged2, p)
     for k, (side, y) in wheel_at.items():
         w = Part("w", (0, 0, 0)); r = s["tyre"]; hw = s["tyre_w"] * 0.5; x = side * (curve(s["halfw"], y) - hw + 0.012)
-        lathe(w, [(0.0001, -hw), (r, -hw), (r, hw), (0.0001, hw)], ["Sidewall", "Tread", "Hubcap"], seg=10, offset=(x, y, r), rim_mirror=side)
+        lathe(w, [(0.0001, -hw), (r, -hw), (r, hw), (0.0001, hw)], ["Sidewall", "Tread", "Hubcap"], seg=14, offset=(x, y, r), rim_mirror=side)
         absorb(merged2, w)
 
     objects = {}

@@ -26,7 +26,7 @@ public static class GlassFX
     static void ResetStatics()
     {
         _shard = _pane = _line = null; _cube = null;
-        System.Array.Clear(_systems, 0, Systems);
+        System.Array.Clear(_systems, 0, Systems); System.Array.Clear(_floors, 0, Systems);
         _remains.Clear(); _cracks.Clear(); _flights.Clear(); _next = _nextRemain = _nextFlight = 0; _root = null;
     }
 
@@ -75,34 +75,67 @@ public static class GlassFX
         }
     }
 
-    static ParticleSystem System_()
+    static readonly Transform[] _floors = new Transform[Systems];
+    static readonly RaycastHit[] _down = new RaycastHit[16];
+
+    /// <summary>
+    /// The ground under a point, cars left out: a car's collision box is the shape of its body to the waist, not the car, and its top is right under the windows. Glass that fell on it stopped in
+    /// mid-air there, on nothing anyone could see, and stayed (his note 2026-11-06: "the pieces then freeze").
+    /// </summary>
+    public static float Floor(Vector3 at)
+    {
+        int n = Physics.RaycastNonAlloc(at + Vector3.up * 0.2f, Vector3.down, _down, 40f, LayerMask.GetMask("Environment", "Default"), QueryTriggerInteraction.Ignore);
+        float best = float.NegativeInfinity;
+        for (int i = 0; i < n; i++)
+        {
+            var c = _down[i].collider;
+            if (c == null || c.GetComponentInParent<CarGlass>() != null || c.GetComponentInChildren<CarGlass>() != null) continue;
+            if (_down[i].point.y > best) best = _down[i].point.y;
+        }
+        return best > float.NegativeInfinity ? best : at.y - 2f;
+    }
+
+    /// <summary>The next system, its floor where this burst will land. Always playing: a stopped system takes an Emit and then never moves it, which froze every burst after the first.</summary>
+    static ParticleSystem System_(Vector3 near)
     {
         var root = Root;
         int i = _next; _next = (_next + 1) % Systems;
-        if (_systems[i] != null) return _systems[i];
-        var go = new GameObject("Cubes");
-        go.transform.SetParent(root, false);
-        go.SetActive(false);
-        var ps = go.AddComponent<ParticleSystem>();
-        var main = ps.main;
-        main.playOnAwake = false; main.loop = false; main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 400; main.gravityModifier = 1.1f; main.startLifetime = 3.2f; main.startSpeed = 0f;
-        main.startRotation3D = true;
-        var emission = ps.emission; emission.enabled = false;
-        var shape = ps.shape; shape.enabled = false;
-        var col = ps.collision;
-        col.enabled = true; col.type = ParticleSystemCollisionType.World; col.quality = ParticleSystemCollisionQuality.Low;
-        col.bounce = 0.28f; col.dampen = 0.45f; col.lifetimeLoss = 0.03f; col.radiusScale = 0.3f;
-        col.collidesWith = LayerMask.GetMask("Environment", "Default", "Vehicle");
-        var rot = ps.rotationOverLifetime; rot.enabled = true; rot.separateAxes = true;
-        rot.x = new ParticleSystem.MinMaxCurve(-12f, 12f); rot.y = new ParticleSystem.MinMaxCurve(-12f, 12f); rot.z = new ParticleSystem.MinMaxCurve(-9f, 9f);
-        var r = go.GetComponent<ParticleSystemRenderer>();
-        r.renderMode = ParticleSystemRenderMode.Mesh; r.mesh = Cube;
-        r.sharedMaterial = Shard;
-        r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false; r.lightProbeUsage = LightProbeUsage.Off;
-        go.SetActive(true);
-        ps.Play();
-        return _systems[i] = ps;
+        if (_systems[i] == null)
+        {
+            var go = new GameObject("Cubes");
+            go.transform.SetParent(root, false);
+            go.SetActive(false);
+            var plane = new GameObject("Floor").transform;
+            plane.SetParent(root, false);
+            _floors[i] = plane;
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.playOnAwake = false; main.loop = true; main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 700; main.gravityModifier = 1.1f; main.startLifetime = 8f; main.startSpeed = 0f;
+            main.startRotation3D = true;
+            var emission = ps.emission; emission.enabled = false;
+            var shape = ps.shape; shape.enabled = false;
+            var col = ps.collision;
+            col.enabled = true; col.type = ParticleSystemCollisionType.Planes; col.SetPlane(0, plane);
+            col.bounce = 0.22f; col.dampen = 0.5f; col.lifetimeLoss = 0f; col.radiusScale = 0.3f;
+            // They tumble as they fall and lie still once down.
+            var settle = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.22f, 0f));
+            var settleNeg = new AnimationCurve(new Keyframe(0f, -1f), new Keyframe(0.22f, 0f));
+            var rot = ps.rotationOverLifetime; rot.enabled = true; rot.separateAxes = true;
+            rot.x = new ParticleSystem.MinMaxCurve(12f, settleNeg, settle); rot.y = new ParticleSystem.MinMaxCurve(12f, settleNeg, settle); rot.z = new ParticleSystem.MinMaxCurve(9f, settleNeg, settle);
+            // Swept up at the end of their time: gone by shrinking, not all at once.
+            var size = ps.sizeOverLifetime; size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.88f, 1f), new Keyframe(1f, 0f)));
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.renderMode = ParticleSystemRenderMode.Mesh; r.mesh = Cube;
+            r.sharedMaterial = Shard;
+            r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false; r.lightProbeUsage = LightProbeUsage.Off;
+            go.SetActive(true);
+            _systems[i] = ps;
+        }
+        _floors[i].position = new Vector3(near.x, Floor(near) + 0.01f, near.z);
+        if (!_systems[i].isPlaying) _systems[i].Play();
+        return _systems[i];
     }
 
     static void EmitCube(ParticleSystem ps, ref ParticleSystem.EmitParams e, Vector3 at, Vector3 push)
@@ -112,7 +145,7 @@ public static class GlassFX
         e.startSize = Random.value < 0.15f ? Random.Range(0.016f, 0.028f) : Random.Range(0.006f, 0.015f);
         e.rotation3D = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
         e.startColor = new Color32(255, 255, 255, 255);
-        e.startLifetime = Random.Range(1.4f, 3.2f);
+        e.startLifetime = Random.Range(5f, 9f);
         ps.Emit(e, 1);
     }
 
@@ -123,7 +156,7 @@ public static class GlassFX
         int n = Mathf.Clamp(Mathf.RoundToInt(area * 240f), 40, 300);
         if (QualityTiers.Current == GameSettings.Quality.Low) n /= 2;
         if (near > 40f) n /= 3;
-        var ps = System_();
+        var ps = System_(corner + (u + v) * 0.5f);
         var e = new ParticleSystem.EmitParams { applyShapeToPosition = false };
         for (int i = 0; i < n; i++)
             EmitCube(ps, ref e, corner + u * Random.value + v * Random.value, push);
@@ -134,7 +167,7 @@ public static class GlassFX
     {
         int n = Mathf.Clamp(Mathf.RoundToInt(sample.Area * 240f), 40, 300);
         if (QualityTiers.Current == GameSettings.Quality.Low) n /= 2;
-        var ps = System_();
+        var ps = System_(sample.Point());
         var e = new ParticleSystem.EmitParams { applyShapeToPosition = false };
         for (int i = 0; i < n; i++) EmitCube(ps, ref e, sample.Point(), push);
     }
@@ -180,15 +213,12 @@ public static class GlassFX
         }
         Remains(corner, ux, vy, normal, stay);
 
-        float floor = corner.y - 3f;
-        Vector3 under = corner + (u + v) * 0.5f;
-        if (Physics.Raycast(under + normal * 0.25f, Vector3.down, out var ground, 30f, LayerMask.GetMask("Environment", "Default"), QueryTriggerInteraction.Ignore))
-            floor = ground.point.y;
+        float floor = Floor(corner + (u + v) * 0.5f + normal * 0.25f);
         NextFlight().Launch(fall, corner, ux, vy, normal, blow, push, floor);
         // The dust of it: a little that a piece would not show.
-        var ps = System_();
-        var e = new ParticleSystem.EmitParams { applyShapeToPosition = false };
         Vector3 at = corner + ux * blow.x + vy * blow.y;
+        var ps = System_(at + normal * 0.25f);
+        var e = new ParticleSystem.EmitParams { applyShapeToPosition = false };
         for (int i = 0; i < 16; i++)
             EmitCube(ps, ref e, at + (ux * Random.Range(-1f, 1f) + vy * Random.Range(-1f, 1f)) * 0.08f, push + normal * 0.2f);
     }
@@ -360,7 +390,7 @@ public sealed class ShardFlight : MonoBehaviour
         Write();
         _mesh.SetTriangles(tris, 0, false);
         _mesh.bounds = new Bounds(_where, new Vector3(30f, 30f, 30f));
-        _ends = Time.time + 12f;
+        _ends = Time.time + 16f;
         enabled = true;
         gameObject.SetActive(_pieces.Count > 0);
     }
@@ -399,7 +429,7 @@ public sealed class ShardFlight : MonoBehaviour
             }
         }
         if (moving) Write();
-        else enabled = false;
+        // Swept up after a while. This stays on while they lie there, or the time would never be read and they would lie there for ever.
         if (Time.time > _ends) gameObject.SetActive(false);
     }
 }

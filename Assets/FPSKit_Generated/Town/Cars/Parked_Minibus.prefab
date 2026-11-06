@@ -136,21 +136,21 @@ LODGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1150245964567668050}
   serializedVersion: 3
-  m_LocalReferencePoint: {x: 0, y: 1.1008773, z: -0.00999999}
-  m_Size: 4.97
+  m_LocalReferencePoint: {x: 0, y: 1.110876, z: -0.00999999}
+  m_Size: 5.02
   m_FadeMode: 0
   m_AnimateCrossFading: 0
   m_LastLODIsBillboard: 0
   m_LODs:
-  - screenRelativeHeight: 0.2
+  - screenRelativeHeight: 0.11
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 8615233897541730224}
-  - screenRelativeHeight: 0.05
+  - screenRelativeHeight: 0.022
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 2372867713182045032}
-  - screenRelativeHeight: 0.012
+  - screenRelativeHeight: 0.007
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 8747761135190689888}
@@ -174,42 +174,42 @@ MonoBehaviour:
     filter: {fileID: 2907436729490454483}
     submesh: 2
     start: 0
-    count: 576
+    count: 384
     windscreen: 0
   - name: Glass_FR
     frame: {fileID: 7413389901545206751}
     filter: {fileID: 2907436729490454483}
     submesh: 2
-    start: 576
-    count: 576
+    start: 384
+    count: 384
     windscreen: 0
   - name: Glass_Front
     frame: {fileID: 7413389901545206751}
     filter: {fileID: 2907436729490454483}
     submesh: 2
-    start: 1152
-    count: 4608
+    start: 768
+    count: 4224
     windscreen: 1
   - name: Glass_Rear
     frame: {fileID: 7413389901545206751}
     filter: {fileID: 2907436729490454483}
     submesh: 2
-    start: 5760
-    count: 384
+    start: 4992
+    count: 1920
     windscreen: 0
   - name: Glass_RL
     frame: {fileID: 7413389901545206751}
     filter: {fileID: 2907436729490454483}
     submesh: 2
-    start: 6144
-    count: 1920
+    start: 6912
+    count: 1440
     windscreen: 0
   - name: Glass_RR
     frame: {fileID: 7413389901545206751}
     filter: {fileID: 2907436729490454483}
     submesh: 2
-    start: 8064
-    count: 1920
+    start: 8352
+    count: 1440
     windscreen: 0
   farRenderers:
   - {fileID: 2372867713182045032}

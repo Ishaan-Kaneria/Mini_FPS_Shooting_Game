@@ -280,6 +280,9 @@ public class ViewModelRig : MonoBehaviour
         // own narrower view they were drawn 1.4 times too big beside his face, and a fist landing on his jaw covered his
         // whole head (filmed, Build/PlayerShots/desert_video).
         float hold = _melee != null ? Smooth01(Mathf.Clamp01(_melee.GrabHold)) : 0f;
+        // So with the hands on a car's wheel: drawn as the world is, so the wheel and the dash are in front of what they should be.
+        var wheel = DrivableCar.Hands;
+        if (wheel.look != null) hold = Mathf.Max(hold, Smooth01(Mathf.Clamp01(wheel.hold)));
         var world = _weapon != null ? _weapon.fpsCamera : null;
         _armsCam.transform.localPosition = new Vector3(0f, 0f, -Body.eyeBack * (1f - aim) * (1f - hold));
         _armsCam.transform.localRotation = Quaternion.identity;
@@ -651,7 +654,8 @@ public class ViewModelRig : MonoBehaviour
         // Carried in the left hand it is seen; once the cross starts (both fists) it is on the back at
         // once, rather than drawn sliding from the hand to the sling across the view.
         bool shown = (s.gunAway < 0.97f || (_carry > 0.05f && _lastFists == MeleeStrike.Strike.Jab))
-                     && !(_weapon != null && _weapon.Disarmed);   // out of ammo it is on the ground, not in a hand
+                     && !(_weapon != null && _weapon.Disarmed)
+                     && !(DrivableCar.Hands.look != null && DrivableCar.Hands.hold > 0.55f);   // both hands on a car's wheel   // out of ammo it is on the ground, not in a hand
         if (_gunRenderers != null && _gunRenderers.Length > 0 && _gunRenderers[0] != null && _gunRenderers[0].enabled != shown)
             foreach (var r in _gunRenderers) if (r != null) r.enabled = shown;
 
@@ -972,6 +976,45 @@ public class ViewModelRig : MonoBehaviour
     }
 
     void PlaceArms(State s)
+    {
+        PlaceArmsOnGun(s);
+        var wheel = DrivableCar.Hands;
+        if (wheel.look != null && wheel.hold > 0.001f && _arms != null && _left != null && _right != null && Application.isPlaying) PlaceArmsOnWheel(wheel);
+    }
+
+    /// <summary>
+    /// The hands on a car's steering wheel, turning it: at ten and two, thumbs over the rim. The arms hang from the seat (the head can look away from them), and each hand goes from wherever the gun
+    /// had it to the rim as <see cref="DrivableCar.HandsOnWheel.hold"/> goes from 0 to 1.
+    /// </summary>
+    void PlaceArmsOnWheel(DrivableCar.HandsOnWheel w)
+    {
+        float t = Smooth01(Mathf.Clamp01(w.hold));
+        Vector3 fromL = _left.hand.position, fromR = _right.hand.position;
+        Quaternion rotL = _left.hand.rotation, rotR = _right.hand.rotation;
+        Vector3 armsAt = w.eye + w.car * (_spec.armsOffset - _headLocal);
+        _arms.SetPositionAndRotation(Vector3.Lerp(_arms.position, armsAt, t), Quaternion.Slerp(_arms.rotation, w.car, t));
+
+        Vector3 right = w.car * Vector3.right, up = w.car * Vector3.up, forward = w.car * Vector3.forward;
+        Vector3 gripL = w.look.GripPoint(-1f, w.turn, out Vector3 axis, out Vector3 hub), gripR = w.look.GripPoint(1f, w.turn, out _, out _);
+        Quaternion FrameAt(Vector3 grip, float side, out Vector3 wrist)
+        {
+            // Fingers over the top of the rim and round it towards the dash; the back of the hand up and out, towards the driver.
+            Vector3 inward = (hub - grip).normalized;
+            Vector3 fingers = (-axis * 0.72f + inward * 0.62f + up * 0.1f).normalized;
+            Vector3 back = (axis * 0.62f - inward * 0.58f + up * 0.35f).normalized;
+            back = Vector3.ProjectOnPlane(back, fingers).normalized;
+            wrist = grip - fingers * 0.07f + back * 0.012f;
+            return Quaternion.LookRotation(fingers, back);
+        }
+        Quaternion frameL = FrameAt(gripL, -1f, out Vector3 wristL), frameR = FrameAt(gripR, 1f, out Vector3 wristR);
+        Reset(_left); Reset(_right);
+        Vector3 toL = Vector3.Lerp(fromL, wristL, t), toR = Vector3.Lerp(fromR, wristR, t);
+        Vector3 elbowL = (-right * 0.75f - up * 0.65f - forward * 0.1f), elbowR = (right * 0.75f - up * 0.65f - forward * 0.1f);
+        Reach(_left, toL, Quaternion.Slerp(rotL * Quaternion.Inverse(_left.hand.rotation) * frameL, frameL, t), elbowL, t);
+        Reach(_right, toR, Quaternion.Slerp(rotR * Quaternion.Inverse(_right.hand.rotation) * frameR, frameR, t), elbowR, t);
+    }
+
+    void PlaceArmsOnGun(State s)
     {
         if (_arms == null || _left == null || _right == null) return;
 

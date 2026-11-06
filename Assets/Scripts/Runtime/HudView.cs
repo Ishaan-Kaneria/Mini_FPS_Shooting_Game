@@ -834,6 +834,8 @@ public class HudView : MonoBehaviour
             _pickup.CandidateChanged += OnPickUp;
             _pickUpDirty = true;
         }
+        // In a car the prompt is also the speedo: it changes all the time.
+        if (DrivableCar.Driving != null) _pickUpDirty = true;
         if (!_pickUpDirty && GameInput.Scheme == _pickUpScheme) return;
         _pickUpDirty = false;
         _pickUpScheme = GameInput.Scheme;
@@ -842,7 +844,18 @@ public class HudView : MonoBehaviour
         if ((gun == null || gun.data == null) && (DrivableCar.Offered != null || DrivableCar.Driving != null))
         {
             _pickUpPrompt.SetActive(true);
-            _pickUpText.text = $"{InputPrompts.For(GameAction.Interact)}  {(DrivableCar.Driving != null ? "GET OUT" : "DRIVE")}";
+            var driving = DrivableCar.Driving;
+            if (driving == null) _pickUpText.text = $"{InputPrompts.For(GameAction.Interact)}  DRIVE";
+            else
+            {
+                var keys = _health != null && _health.TryGetComponent<PlayerMotor>(out var mover) ? mover.controls : null;
+                string gunKey = keys != null ? keys.carGun.ToString() : "Q";
+                string view = keys != null ? keys.carView.ToString() : "C";
+                string speed = $"{Mathf.RoundToInt(driving.Kmh)} KM/H";
+                _pickUpText.text = driving.Cruising
+                    ? UIText.Row(speed + "  CRUISE", $"{gunKey}  GUN DOWN", "W S  SPEED", $"{InputPrompts.For(GameAction.Interact)}  GET OUT")
+                    : UIText.Row(speed, $"{gunKey}  GUN", $"{view}  VIEW", $"{InputPrompts.For(GameAction.Interact)}  GET OUT");
+            }
             _pickUpText.color = _t.textPrimary;
             return;
         }

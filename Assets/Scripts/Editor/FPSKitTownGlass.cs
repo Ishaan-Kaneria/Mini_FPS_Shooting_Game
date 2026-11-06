@@ -23,7 +23,7 @@ namespace FPSKit.EditorTools
         public static Material MakeGlassMaterials()
         {
             AssetDatabase.ImportAsset(GlassFolder, ImportAssetOptions.ImportRecursive);
-            foreach (var png in new[] { "Dust", "Crack", "Web" })
+            foreach (var png in new[] { "Dust" })
                 if (AssetImporter.GetAtPath($"{GlassFolder}/{png}.png") is TextureImporter t && (t.alphaSource != TextureImporterAlphaSource.FromInput || t.sRGBTexture == false || t.wrapMode != TextureWrapMode.Clamp))
                 {
                     t.alphaSource = TextureImporterAlphaSource.FromInput; t.wrapMode = TextureWrapMode.Clamp; t.sRGBTexture = true; t.maxTextureSize = 512; t.SaveAndReimport();
@@ -60,11 +60,34 @@ namespace FPSKit.EditorTools
             }
             var pane = Make("Pane", new Color(0.72f, 0.75f, 0.74f, 1f), 0.95f, "Dust");
             Make("Shard", new Color(0.62f, 0.68f, 0.68f, 0.55f), 0.92f, null);
-            Make("Crack", new Color(0.95f, 0.97f, 0.97f, 1f), 0.6f, "Crack");
-            Make("Web", new Color(0.95f, 0.97f, 0.97f, 1f), 0.6f, "Web");
+            MakeCrackLine();
             Make("Clear", new Color(0f, 0f, 0f, 0f), 0f, null);
             AssetDatabase.SaveAssets();
             return pane;
+        }
+
+        /// <summary>What crack lines are drawn in: unlit, vertex-coloured (each line says how brightly it catches the light), blended, seen from both sides, over the glass.</summary>
+        private static void MakeCrackLine()
+        {
+            string path = $"{GlassFolder}/CrackLine.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            bool create = m == null;
+            if (create) m = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            m.SetColor("_BaseColor", Color.white);
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_Cull", 0f);
+            m.SetFloat("_ZWrite", 0f);
+            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+            m.SetFloat("_DstBlendAlpha", (float)BlendMode.OneMinusSrcAlpha);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.renderQueue = (int)RenderQueue.Transparent + 10;
+            m.SetShaderPassEnabled("DepthOnly", false);
+            m.SetShaderPassEnabled("ShadowCaster", false);
+            if (create) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
         }
 
         /// <summary>

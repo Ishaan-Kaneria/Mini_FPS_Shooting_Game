@@ -133,12 +133,12 @@ public class Civilian : MonoBehaviour
     }
 
     /// <summary>What someone does while stood about: on the phone, talking, looking in at something. Only those a clip was made for.</summary>
-    static readonly LifeActivity[] StoodActivities = { LifeActivity.Phone, LifeActivity.Talk, LifeActivity.Talk, LifeActivity.Browse };
+    static LifeActivity StoodActivity() => Random.Range(0, 4) switch { 0 => LifeActivity.Phone, 3 => LifeActivity.Browse, _ => LifeActivity.Talk };
 
     void Stand()
     {
         if (_agent.isOnNavMesh) _agent.ResetPath();
-        if (animator != null && Random.value < 0.75f) animator.SetInteger(ActivityId, (int)StoodActivities[Random.Range(0, StoodActivities.Length)]);
+        if (animator != null && Random.value < 0.75f) animator.SetInteger(ActivityId, (int)StoodActivity());
         Current = State.Idle;
         _until = Time.time + Random.Range(idleTime.x, idleTime.y);
     }

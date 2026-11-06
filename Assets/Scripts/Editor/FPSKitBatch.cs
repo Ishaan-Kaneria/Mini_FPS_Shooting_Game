@@ -69,6 +69,9 @@ namespace FPSKit.EditorTools
         /// Rebuilds and saves one scene per theme, registering each in Build
         /// Settings. Destructive: it overwrites every generated scene.
         /// </summary>
+        /// <summary>The new cars into the saved desert, with no rebuild and no bake.</summary>
+        public static void PatchDesertCars() { FPSKitCars.PatchDesert(); AssetDatabase.SaveAssets(); if (Application.isBatchMode) EditorApplication.Exit(0); }
+
         public static void BuildAllThemes()
         {
             Run(() =>

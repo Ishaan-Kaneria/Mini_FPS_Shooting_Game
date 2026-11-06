@@ -4235,3 +4235,28 @@ with evidence images in `Build/Realism/<Arena>/` (not in git).
   6.5-7.5 ms (small props' 0.3-3.4 of it), SMAA 1.7-3.0, the arms camera 0.8-2.8, transparent 2.1, shadows 80 -> 50 m 1.1,
   post 0.4. `cost-bench` freezes the player while a board sensor is at its 75 C limit (its numbers are medians); the walk
   bench stops instead (a pause would count as one long frame).
+
+## Glass that breaks like glass
+
+2026-11-06, his note on a screenshot of a shot windscreen: "very artificial ... random and bad". The crack was a square picture on a quad, turned to face the shot and spun at random, so it stood proud of the curved
+glass and its corners hung over the bonnet. A shot also chose its window by the nearest of six bounding boxes, so it could break the wrong one, and falling glass came from the box of the window.
+
+Now: `GlassSurface` flattens a pane's own triangles to a plane and can say which point of the glass any flat position is. `GlassFracture.Crack` walks cracks across that: a crushed bull's-eye with a hole, radial cracks of varied length with branches, arcs between them.
+A crack ends at the frame (found to within a few millimetres) or on any crack already there, which is what makes a second round's web look like a second round's. The lines are ribbons on the surface in one mesh per pane, unlit, each with its own brightness in vertex colour (cracks glint unevenly).
+Ordinary panes come apart from the first blow by `GlassFracture.Pieces`, polar cells clipped to the rectangle with shared corners; pieces at the frame may stay, more at the sill; the rest let go outwards from the blow, one mesh moved by hand (`ShardFlight`), and lie flat where they land. Tempered goes in cubes sampled over its real triangles, so the falling cloud has the window's shape.
+Cost: nothing until struck; a few milliseconds on a blow at most. No colliders were added; the trigger round each car's cabin went (rays test every car's box in its own space, then its windows).
+
+## Cars of our own
+
+Same day: "all cars are same", "use blender", "unique real looking colorful cars". Docs/DESERT_VEHICLES.md section 4 said a script cannot make a real-looking car. It was too pessimistic about a grid: `Tools/blender/make_cars.py` lofts a body through cross-sections (stations along, rings round), smooths it with Catmull-Clark, then assigns each grid cell a part and a surface. So a window fits because it IS that piece of the surface, an arch is the body's lower edge following the wheel, and doors, pillars and seams come out of the same grid. A preview render is 17 s: judge shape in Blender before touching Unity.
+What it still is not: hand-modelled. Lamps and grilles are bands on the nose, not sculpted units.
+Unity numbers a mesh's submeshes by the first material it meets, not by slot: the first import had black bodies and colour on the trim. Faces are written in slot order.
+
+## Driving from the seat
+
+"Car controller is very bad", "no sound or other animation", "like this" (a picture of a cockpit view from a mobile game: only the idea, not its look), "shoot via the gun while driving ... the car has not to be stop".
+Keys are all or nothing, so WheelCollider steering went straight onto full lock and the car lurched or spun. The lock is now what the speed can hold, it takes a quarter of a second to wind on, the yaw is led to what the wheels ask and a slide is bled off; none of it under the handbrake. Measured: lane change at 77 km/h with keys' full lock: 0.6 m/s sideways, 13 degrees, no speed lost.
+His touchpad decided the gun: disable-while-typing kills the pointer while a key is held, so W held and aim is impossible. Bringing the gun up sets a cruise at the speed it was doing. Measured: 49 km/h held for 2.7 s with no key.
+Both hands go to the gun, as on foot; the wheel still answers A and D. One hand on the wheel and the rifle in the other was not done: the reload needs the left hand, and sights need both.
+Sound: `Tools/generate-car-audio.py`, synthesis: a four-cylinder's firing harmonics at three revs, crossfaded and pitched by `CarAudio`. Mirrors show a painted guess of sky and road: a real reflection is a second camera.
+

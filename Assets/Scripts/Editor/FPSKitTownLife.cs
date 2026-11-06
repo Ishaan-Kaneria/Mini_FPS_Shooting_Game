@@ -58,7 +58,8 @@ namespace FPSKit.EditorTools
             traffic.maxCars = _theme.townTrafficCars;
             traffic.routes = _routes.ToArray();
             traffic.signals = signals;
-            traffic.carPrefabs = SedanNames.Select(n => TrafficPrefab(n)).Where(p => p != null).ToArray();
+            traffic.carPrefabs = FPSKitCars.TrafficPrefabs();
+            traffic.paints = FPSKitCars.AllPaints();
             traffic.obstacleMask = LayerMask.GetMask("Vehicle", "Player", "Civilian", "Enemy");
             traffic.driverPrefabs = civ.prefabs;
 
@@ -164,6 +165,23 @@ namespace FPSKit.EditorTools
 
         private static GameObject PlaceCar(Transform parent, string packName, Vector3 pos, float yaw, Material overrideAll = null, bool wreck = false)
         {
+            // The town's own cars (FPSKitCars): prefab, paint per car, no static batching (a broken window takes its own copy of the mesh).
+            if (packName == OwnCar)
+            {
+                var holderOwn = new GameObject("Cars");
+                holderOwn.transform.SetParent(parent, false);
+                holderOwn.transform.position = pos;
+                holderOwn.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+                var kind = FPSKitCars.Pick(_carRng ??= new System.Random(20261106));
+                FPSKitCars.PlaceParked(holderOwn, kind, FPSKitCars.PaintFor(kind, _carRng));
+                holderOwn.name = "Cars_" + kind.name;
+                SetLayerRecursive(holderOwn, LayerMask.NameToLayer("Environment"));
+                SetTagRecursive(holderOwn, "Metal");
+                NoStanding(holderOwn);
+                var at = new Vector2(pos.x, pos.z);
+                _townSolids.Add(new Rect(at - Vector2.one * 2.3f, Vector2.one * 4.6f));
+                return holderOwn;
+            }
             var prefab = packName.StartsWith("PH:") ? Prop(packName.Substring(3)) : (ParkedCarPrefab(packName) ?? PackPrefab(packName));
             if (prefab == null) return null;
             var holder = new GameObject(packName.Replace("PH:", ""));
@@ -207,6 +225,9 @@ namespace FPSKit.EditorTools
             return holder;
         }
 
+        /// <summary>Asks PlaceCar for one of the town's own cars, a kind drawn from their own random stream: never the town's, or it reshuffles.</summary>
+        private const string OwnCar = "own";
+        private static System.Random _carRng;
         private static Material _wreckHole;
         private static Material WreckHole() => _wreckHole != null ? _wreckHole : (_wreckHole = TownFlat("WreckHole", new Color(0.03f, 0.028f, 0.026f), 0.05f));
         private static Material _burnt;
@@ -216,7 +237,9 @@ namespace FPSKit.EditorTools
         private static void PlaceParkedCars(Transform parked, System.Random rng)
         {
             int budget = _theme.townParkedCars, placed = 0;
-            string Pick() => rng.NextDouble() < 0.06 ? "PH:covered_car" : SedanNames[rng.Next(SedanNames.Length)];
+            _carRng = null;
+            // The same draws from the town's stream as ever (the rest of the town depends on it), only what they name has changed.
+            string Pick() { bool covered = rng.NextDouble() < 0.06; if (!covered) rng.Next(SedanNames.Length); return covered ? "PH:covered_car" : OwnCar; }
 
             // Kerbside, both sides of every street, boulevard and avenue, clear of junctions, the roundabout, the
             // checkpoint and the gas station's entrance.
@@ -251,17 +274,18 @@ namespace FPSKit.EditorTools
             foreach (var y in _yardCars)
             {
                 var p = new Vector3(y.x, GroundHeightAt(y.x, y.z), y.z);
-                PlaceCar(parked, SedanNames[rng.Next(SedanNames.Length)], p, y.w);
+                rng.Next(SedanNames.Length);
+                PlaceCar(parked, OwnCar, p, y.w);
             }
             if (_palaceCar != Vector4.zero) PlaceCar(parked, "Car_Sport", new Vector3(_palaceCar.x, GroundHeightAt(_palaceCar.x, _palaceCar.z), _palaceCar.z), _palaceCar.w);
             foreach (var g in _gasPumps)
-                if (rng.NextDouble() < 0.6) PlaceCar(parked, SedanNames[rng.Next(SedanNames.Length)], new Vector3(g.x, g.y, g.z), 0f);
+                if (rng.NextDouble() < 0.6) { rng.Next(SedanNames.Length); PlaceCar(parked, OwnCar, new Vector3(g.x, g.y, g.z), 0f); }
             if (_garageBay != Vector4.zero)
             {
                 PlaceCar(parked, "Car_Touring", new Vector3(_garageBay.x - 5f, _garageBay.y, _garageBay.z), _garageBay.w);
                 PlaceCar(parked, SedanNames[0], new Vector3(_garageBay.x + 5f, _garageBay.y, _garageBay.z), _garageBay.w + 8f, RustBody());
             }
-            if (_campSpot != Vector4.zero) PlaceCar(parked, SedanNames[2], new Vector3(_campSpot.x, GroundHeightAt(_campSpot.x, _campSpot.z), _campSpot.z), _campSpot.w);
+            if (_campSpot != Vector4.zero) PlaceCar(parked, OwnCar, new Vector3(_campSpot.x, GroundHeightAt(_campSpot.x, _campSpot.z), _campSpot.z), _campSpot.w);
             // Vacant lots: a wreck in some, a parked car or two in others.
             foreach (var v in _vacantLots)
             {
@@ -356,81 +380,17 @@ namespace FPSKit.EditorTools
                 new Vector4(GasStationRect.xMax - 10f, 0f, GasStationRect.yMin + 4f, 90f),
                 _garageBay != Vector4.zero ? new Vector4(_garageBay.x, 0f, _garageBay.z - 4f, 0f) : Vector4.zero,
             };
-            string[] kinds = { "Car_Sedan_B", "Car_Sedan_C", "Car_Sedan_D" };
+            string[] kinds = { "Saloon", "Pickup", "OffRoader" };
+            string[] colours = { "Red", "Teal", "Orange" };
             for (int i = 0; i < spots.Count; i++)
             {
                 if (spots[i] == Vector4.zero) continue;
                 var p = new Vector3(spots[i].x, 0f, spots[i].z);
                 p.y = RoadAt(new Vector2(p.x, p.z)) != null ? TownRoadY(p.x, p.z) + 0.02f : GroundHeightAt(p.x, p.z);
-                MakeDrivable(root, kinds[i % kinds.Length], p, spots[i].w);
+                var kind = System.Array.Find(FPSKitCars.Kinds, k => k.name == kinds[i % kinds.Length]);
+                var car = FPSKitCars.MakeDrivable(root, kind, FPSKitCars.Paint(colours[i % colours.Length]), p, spots[i].w);
+                if (car != null) DynamicLighting(car);
             }
-        }
-
-        private static GameObject MakeDrivable(Transform parent, string packName, Vector3 pos, float yaw)
-        {
-            var src = PackPrefab(packName);
-            if (src == null) return null;
-            var holder = new GameObject("Drivable_" + packName);
-            holder.transform.SetParent(parent, false);
-            var body = (GameObject)PrefabUtility.InstantiatePrefab(src, holder.transform);
-            var b = WorldBounds(body);
-            if (b.size.x > b.size.z * 1.15f) { body.transform.localRotation = Quaternion.Euler(0f, -90f, 0f); b = WorldBounds(body); }
-            body.transform.localPosition = new Vector3(-b.center.x, -b.min.y, -b.center.z);
-            b = WorldBounds(body);
-            foreach (var c in holder.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
-            var box = holder.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, b.size.y * 0.55f, 0f);
-            box.size = new Vector3(b.size.x * 0.95f, b.size.y * 0.7f, b.size.z * 0.97f);
-            var rb = holder.AddComponent<Rigidbody>();
-            var car = holder.AddComponent<DrivableCar>();
-            var strike = holder.AddComponent<VehicleStrike>();          // runs people over (VehicleStrike), credited to the player while he drives
-            strike.halfLength = b.size.z * 0.5f; strike.halfWidth = b.size.x * 0.5f;
-
-            // Wheels: the pack's named wheel roots, front-left, front-right, rear-left, rear-right.
-            string[] names = { "FrontLeft", "FrontRight", "RearLeft", "RearRight" };
-            var visuals = new Transform[4];
-            foreach (var t in body.GetComponentsInChildren<Transform>())
-                for (int k = 0; k < 4; k++)
-                    if (visuals[k] == null && t.name.Contains("Wheel" + names[k])) visuals[k] = t;
-            float radius = 0.34f;
-            var cols = new WheelCollider[4];
-            for (int k = 0; k < 4; k++)
-            {
-                Vector3 at;
-                if (visuals[k] != null)
-                {
-                    at = holder.transform.InverseTransformPoint(visuals[k].position);
-                    var r = visuals[k].GetComponentInChildren<Renderer>();
-                    if (r != null) radius = Mathf.Max(0.25f, r.bounds.extents.y);
-                }
-                else at = new Vector3((k % 2 == 0 ? -1f : 1f) * b.size.x * 0.4f, radius, (k < 2 ? 1f : -1f) * b.size.z * 0.33f);
-                var wgo = new GameObject("Wheel" + names[k]);
-                wgo.transform.SetParent(holder.transform, false);
-                wgo.transform.localPosition = at + Vector3.up * 0.12f;
-                var wc = wgo.AddComponent<WheelCollider>();
-                wc.radius = radius;
-                wc.mass = 22f;
-                wc.suspensionDistance = 0.22f;
-                var spring = wc.suspensionSpring; spring.spring = 32000f; spring.damper = 4200f; spring.targetPosition = 0.45f; wc.suspensionSpring = spring;
-                var fwd = wc.forwardFriction; fwd.stiffness = 1.4f; wc.forwardFriction = fwd;
-                var side = wc.sidewaysFriction; side.stiffness = 1.6f; wc.sidewaysFriction = side;
-                cols[k] = wc;
-            }
-            car.frontLeft = cols[0]; car.frontRight = cols[1]; car.rearLeft = cols[2]; car.rearRight = cols[3];
-            car.wheelVisuals = visuals;
-            car.exitOffset = new Vector3(-(b.size.x * 0.5f + 0.9f), 0f, 0.3f);
-
-            holder.transform.position = pos;
-            holder.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            SetLayerRecursive(holder, LayerMask.NameToLayer("Vehicle") >= 0 ? LayerMask.NameToLayer("Vehicle") : 0);
-            SetTagRecursive(holder, "Metal");
-            DynamicLighting(holder);
-            var obs = holder.AddComponent<NavMeshObstacle>();
-            obs.shape = NavMeshObstacleShape.Box; obs.center = box.center; obs.size = box.size; obs.carving = false;
-            var mod = holder.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
-            mod.ignoreFromBuild = true;
-            _ = rb;
-            return holder;
         }
 
         // ==================================================================

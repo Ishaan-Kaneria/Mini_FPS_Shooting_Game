@@ -571,6 +571,31 @@ public class PlayerMotor : MonoBehaviour
     }
 
     /// <summary>
+    /// In a car's seat (DrivableCar): the look is read the same way as on foot, so the same sensitivity and the same three ways of turning, and the car turns the head by it. Also the
+    /// recoil and shake: (pitch, yaw, roll) degrees on top. What this writes to the body and the holder is left to be overwritten when he gets out: the camera is not under them.
+    /// </summary>
+    public Vector2 SeatLook(out Vector3 kick)
+    {
+        HandleCursor();
+        HandleLook();
+        Vector3 shake = CurrentShake();
+        kick = new Vector3(-_recoilPitch + shake.x, _recoilYaw + shake.y, shake.z);
+        return LookDeltaDegrees;
+    }
+
+    /// <summary>Whether looking up and down is reversed (the seat turns the head itself).</summary>
+    public bool InvertLook => InvertY;
+
+    /// <summary>Out of a car: the view faces the way the car does.</summary>
+    public void FaceAfterSeat(float yaw)
+    {
+        _yaw = yaw;
+        _pitch = 0f;
+        transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
+        if (cameraHolder != null) cameraHolder.localRotation = Quaternion.identity;
+    }
+
+    /// <summary>
     /// Perlin rather than Random: consecutive frames stay correlated, so the view
     /// swims instead of buzzing. White-noise shake reads as a broken camera.
     /// </summary>

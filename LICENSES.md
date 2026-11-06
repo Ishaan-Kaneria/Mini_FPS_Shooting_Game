@@ -9,6 +9,7 @@ Unity Asset Store EULA and are not repeated here. Motion-capture tools have thei
 |---|---|---|---|
 | Human body, work suit, boots, hair, eyebrows, eyes, skin (generated in Blender by MPFB 2.0.18; `Tools/blender/human_body.py`) | `Assets/Characters/HumanSoldier/` | https://static.makehumancommunity.org/about/license.html (MakeHuman core and system assets; the add-on, GPL, is not shipped) | CC0 1.0 |
 | The town's civilians: bodies, clothes, shoes, hair, skins (generated in Blender by MPFB 2.0.18; `Tools/blender/make_civilians.sh`) | `Assets/Characters/Civilians/` | https://static.makehumancommunity.org/about/license.html | CC0 1.0 |
+| Town cars, their atlas and sounds (made here: `Tools/blender/make_cars.py`, `Tools/blender/car_atlas.py`, `Tools/generate-car-audio.py`; no brand's shape or badge) | `Assets/Models/Cars/`, `Assets/Resources/Audio/Car*` | This project | Own work |
 | World models, their textures, glass textures, horn, glass and prop sounds (made here: `Tools/blender/world_props.py`, `Tools/generate-world-textures.py`, `Tools/generate-glass-textures.py`, `Tools/generate-world-audio.py`) | `Assets/Models/World/`, `Assets/Resources/` | This project | Own work |
 | Models, textures, HDRIs | `Assets/ThirdParty/PolyHaven/` (manifest: `manifest.json`) | https://polyhaven.com | CC0 1.0 (public domain) |
 

@@ -32,6 +32,8 @@ public class TrafficDirector : MonoBehaviour
     [Header("Content (written by the builder)")]
     public Route[] routes;
     public GameObject[] carPrefabs;
+    [Tooltip("The town's car colours (FPSKitCars): each car takes one as it appears.")]
+    public Material[] paints;
     [Tooltip("The people who drive them (VehicleDriver): the civilian prefabs.")]
     public GameObject[] driverPrefabs;
     public TownSignals[] signals;
@@ -98,6 +100,7 @@ public class TrafficDirector : MonoBehaviour
             if (Physics.CheckSphere(p + Vector3.up, 4f, obstacleMask, QueryTriggerInteraction.Ignore)) continue;
             var dir = (r.points[at + 1] - p); dir.y = 0f;
             var go = Instantiate(carPrefabs[Random.Range(0, carPrefabs.Length)], p, Quaternion.LookRotation(dir.normalized), transform);
+            if (paints != null && paints.Length > 0 && go.TryGetComponent<CarLook>(out var look)) look.SetPaint(paints[Random.Range(0, paints.Length)]);
             var car = go.GetComponent<TrafficCar>();
             if (car == null) { Destroy(go); return; }
             car.director = this;

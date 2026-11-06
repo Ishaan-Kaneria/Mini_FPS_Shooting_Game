@@ -6,8 +6,9 @@ using UnityEngine;
 /// Every pane of glass in an arena (Docs/DESERT_GLASS.md), drawn by a small mesh per 64 m chunk and known here only as data: no collider, no
 /// object and no update per pane, so thousands cost nothing until one is hit. A shot asks along its line (<see cref="Ray"/>), a blow and a
 /// blast likewise. A round cracks ordinary glass and the next breaks it; a kick breaks it at once; a shop's display glass takes three; a
-/// tempered door goes whole, in cubes. States only get worse. Broken: its quad in the chunk mesh collapses, jagged teeth stay in the frame, shards
-/// fall, it is heard (enemies come, civilians run). Written by FPSKitTownGlass.
+/// tempered door goes whole, in cubes. States only get worse. Cracked: a web of real lines on the pane (GlassFracture), ended by its frame and earlier cracks. Broken: its
+/// quad in the chunk mesh collapses, the pane comes apart from where it was first struck, some pieces stay in the frame and the rest fall; it is heard (enemies come,
+/// civilians run). Written by FPSKitTownGlass.
 /// </summary>
 public class GlassField : MonoBehaviour
 {
@@ -42,6 +43,7 @@ public class GlassField : MonoBehaviour
     int _visit;
     readonly List<int> _found = new List<int>(8);
     Vector3[][] _verts;
+    Dictionary<int, (GlassSurface glass, CrackMesh mesh)> _cracked;
 
     void Awake()
     {
@@ -170,26 +172,42 @@ public class GlassField : MonoBehaviour
         if (!breaks)
         {
             _hits[i] = (byte)(hits + 1);
-            GlassFX.Crack(at, p.normal, Mathf.Clamp(Mathf.Min(p.u.magnitude, p.v.magnitude) * 0.9f, 0.3f, 1f), false);
+            _cracked ??= new Dictionary<int, (GlassSurface, CrackMesh)>();
+            if (!_cracked.TryGetValue(i, out var c))
+            {
+                c = (GlassSurface.FromRect(p.corner, p.u, p.v, p.normal), GlassFX.NewCracks(null));
+                _cracked[i] = c;
+            }
+            GlassFracture.Crack(c.glass, c.mesh, at, blow == Blow.Round ? 1f : 1.6f);
             GlassFX.Play(WorldSounds.GlassCrack(), at, 0.8f);
             NoiseSystem.Emit(at, 20f, NoiseKind.Violence, source);
             return;
         }
-        Shatter(i, dir, source);
+        Shatter(i, at, dir, source);
     }
 
-    void Shatter(int i, Vector3 dir, GameObject source)
+    void Shatter(int i, Vector3 at, Vector3 dir, GameObject source)
     {
         ref var p = ref panes[i];
         _hits[i] = byte.MaxValue;
         Collapse(ref p);
         Vector3 mid = p.corner + (p.u + p.v) * 0.5f;
-        GlassFX.ClearCracks(mid, Mathf.Max(p.u.magnitude, p.v.magnitude) * 0.6f);
-        bool cubes = p.kind == Kind.Tempered;
-        if (!cubes) GlassFX.Remains(p.corner, p.u, p.v, p.normal);
+        // It breaks from where it was first struck, along the lines it had.
+        Vector3 from = at;
+        if (_cracked != null && _cracked.TryGetValue(i, out var c))
+        {
+            GlassFX.Drop(c.mesh);
+            _cracked.Remove(i);
+            if (c.glass.Hit && c.glass.Locate(c.glass.FirstHit, out var first, out _)) from = first;
+        }
+        float w = p.u.magnitude, h = p.v.magnitude;
+        Vector2 blow = new Vector2(Vector3.Dot(from - p.corner, p.u) / Mathf.Max(1e-4f, w), Vector3.Dot(from - p.corner, p.v) / Mathf.Max(1e-4f, h));
+        blow = new Vector2(Mathf.Clamp(blow.x, 0.02f, w - 0.02f), Mathf.Clamp(blow.y, 0.02f, h - 0.02f));
         var cam = Camera.main;
         float near = cam != null ? Vector3.Distance(cam.transform.position, mid) : 0f;
-        GlassFX.Shards(p.corner, p.u, p.v, dir, cubes, near);
+        bool cubes = p.kind == Kind.Tempered;
+        if (cubes) GlassFX.Cubes(p.corner, p.u, p.v, dir, near);
+        else GlassFX.BreakPane(p.corner, p.u, p.v, p.normal, blow, dir, near);
         GlassFX.Play(cubes ? WorldSounds.GlassCubes() : WorldSounds.GlassShatter(p.kind == Kind.Display), mid, 1f);
         NoiseSystem.Emit(mid, 40f, NoiseKind.Violence, source);
     }

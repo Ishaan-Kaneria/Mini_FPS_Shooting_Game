@@ -79,7 +79,8 @@ public class TouchControls : MonoBehaviour
         // the glass, because that switches the scheme back to touch.
         if (group == null || !MobileInput.Active) return;
 
-        bool playable = PlayerMotor.InputEnabled && GameInput.Scheme != InputScheme.Gamepad;
+        // A car's seat keeps input off for the feet, not the thumbs: the same stick drives it and the same buttons fire.
+        bool playable = (PlayerMotor.InputEnabled || (DrivableCar.Driving != null && Time.timeScale > 0f)) && GameInput.Scheme != InputScheme.Gamepad;
         group.alpha = playable ? GameSettings.TouchOpacity : 0f;
         group.blocksRaycasts = playable;
 

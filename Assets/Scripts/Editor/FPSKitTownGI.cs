@@ -161,8 +161,6 @@ namespace FPSKit.EditorTools
                 matted++;
             }
             AssetDatabase.SaveAssets();
-            // The scene's cars carry the engine they were built with.
-            foreach (var car in Object.FindObjectsByType<DrivableCar>(FindObjectsInactive.Include, FindObjectsSortMode.None)) car.motorTorque = 620f;
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, DesertScene);
             Debug.Log($"[FPSKitBatch] covered places' reflections placed; {matted} masonry materials matted");

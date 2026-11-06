@@ -1,5 +1,7 @@
 # Desert: vehicles, drivers, running people over, and the bosses
 
+**2026-11-06:** V2, V7 (brake lamps), V8 and V11 are done, see `DESIGN_NOTES.md` "Cars of our own" and "Driving from the seat". The technical (V3) and wrecks are still the old models.
+
 2026-11-04. His notes: "no riders in a moving car, and the cars look very similar"; "custom cars, trucks and bikes in
 Blender with a driver moving in them"; "shoot through the windscreen and kill the driver"; "a fast car runs over a
 person walking in front of it"; "the bosses are very large and not special: make them mafia bosses, black shirts, dark

@@ -9,6 +9,7 @@ public static class WorldSounds
     static AudioClip Clip(string name) => Resources.Load<AudioClip>("Audio/" + name);
     static AudioClip Any(string name, int count) => Clip($"{name}_{Random.Range(0, count)}");
 
+    public static AudioClip Car(string name) => Clip(name);
     public static AudioClip Horn() => Clip(Random.value < 0.5f ? "CarHorn_A" : "CarHorn_B");
     public static AudioClip GlassCrack() => Any("GlassCrack", 3);
     public static AudioClip GlassShatter(bool big) => big ? Clip("GlassShatterBig") : Any("GlassShatter", 3);

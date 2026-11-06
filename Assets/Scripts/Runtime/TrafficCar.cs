@@ -42,6 +42,9 @@ public class TrafficCar : MonoBehaviour
     System.Action<NoiseSystem.Noise, float> _onNoise;
     Transform[] _wheels;
     float _wheelRadius = 0.33f;
+    CarLook _look;
+    CarAudio _audio;
+    float _steerNow, _pitchNow, _rollNow, _lastSpeed, _lastYaw;
     float _hornAt, _leaveAt = -1f;
     Vector3 _danger;
     AudioSource _horn;
@@ -62,6 +65,8 @@ public class TrafficCar : MonoBehaviour
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         _strike = GetComponent<VehicleStrike>();
         if (_strike != null) _strike.Struck += OnStruck;
+        _look = GetComponent<CarLook>();
+        _lastYaw = transform.eulerAngles.y;
         var list = new System.Collections.Generic.List<Transform>();
         foreach (var t in GetComponentsInChildren<Transform>())
         {
@@ -171,6 +176,37 @@ public class TrafficCar : MonoBehaviour
         }
 
         SpinWheels();
+        Weight();
+    }
+
+    /// <summary>
+    /// The car's body on its springs, its front wheels turning, its brake lamps and its engine: the route moves a rigid thing, and this is what makes it read as a car. Near the camera only.
+    /// </summary>
+    void Weight()
+    {
+        if (_look == null) return;
+        var cam = Camera.main;
+        float dt = Time.deltaTime;
+        if (dt <= 0f) return;
+        float accelNow = (_speed - _lastSpeed) / dt; _lastSpeed = _speed;
+        float yaw = transform.eulerAngles.y;
+        float yawRate = Mathf.DeltaAngle(_lastYaw, yaw) / dt; _lastYaw = yaw;
+        bool near = cam != null && (cam.transform.position - transform.position).sqrMagnitude < 90f * 90f;
+        _look.Lamps(accelNow < -1f || _speed < 0.2f, false, false);
+        if (near)
+        {
+            if (_audio == null) { _audio = GetComponent<CarAudio>(); if (_audio == null) _audio = gameObject.AddComponent<CarAudio>(); }
+            _audio.Switch(true);
+            _audio.Traffic(_speed);
+        }
+        else if (_audio != null) _audio.Switch(false);
+        if (!near) return;
+        float lat = yawRate * Mathf.Deg2Rad * _speed;
+        _pitchNow = Mathf.Lerp(_pitchNow, Mathf.Clamp(accelNow * 0.45f, -2.2f, 1.6f), 1f - Mathf.Exp(-5f * dt));     // nose down under brakes
+        _rollNow = Mathf.Lerp(_rollNow, Mathf.Clamp(lat * 0.5f, -2.5f, 2.5f), 1f - Mathf.Exp(-5f * dt));
+        _steerNow = Mathf.Lerp(_steerNow, Mathf.Clamp(yawRate * 0.42f, -32f, 32f), 1f - Mathf.Exp(-8f * dt));
+        if (_look.model != null) _look.model.localRotation = Quaternion.Euler(-_pitchNow * -1f, 0f, -_rollNow);
+        _look.Roll(_speed, _steerNow, dt);
     }
 
     /// <summary>
@@ -196,7 +232,7 @@ public class TrafficCar : MonoBehaviour
 
     void SpinWheels()
     {
-        if (_wheels == null) return;
+        if (_wheels == null || _look != null) return;
         float spin = _speed * Time.deltaTime / _wheelRadius * Mathf.Rad2Deg;
         foreach (var w in _wheels) w.Rotate(spin, 0f, 0f, Space.Self);
     }
@@ -265,6 +301,8 @@ public class TrafficCar : MonoBehaviour
             if (!UnityEngine.AI.NavMesh.SamplePosition(door, out var at, 1.6f, UnityEngine.AI.NavMesh.AllAreas)) continue;
             if (!people.Adopt(_driver.Source, at.position, transform.rotation, _danger)) return;
             _driver.Died -= OnDriverDied;
+            // His door swings open as he goes.
+            if (_look != null) _look.Door(side < 0f ? 0 : 1, 0.85f);
             Destroy(_driver.gameObject);
             _driver = null;
             _driverDead = true;

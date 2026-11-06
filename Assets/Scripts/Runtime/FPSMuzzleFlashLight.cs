@@ -95,7 +95,8 @@ public class FPSMuzzleFlashLight : MonoBehaviour
     {
         var l = FlashLight;
         float j = 1f + Random.Range(-jitter, jitter);
-        _peak = intensity * j;
+        // In a car's cabin the same flash has a small room to light from a hand's width away: it turned the whole interior orange.
+        _peak = intensity * j * (DrivableCar.Driving != null ? 0.08f : 1f);
         l.range = range * (1f + Random.Range(-jitter, jitter) * 0.5f);
         l.intensity = _peak;
         l.enabled = true;

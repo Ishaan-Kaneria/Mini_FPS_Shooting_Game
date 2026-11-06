@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Textures for real glass: Dust.png (dirty desert glass: alpha from a little in the middle to thick at the sill and corners),
-Crack.png (a star of radial cracks from a bullet), Web.png (a windscreen's spider web). Grey with coverage in alpha.
+"""Texture for real glass: Dust.png (dirty desert glass: alpha from a little in the middle to thick at the sill and corners). Grey with coverage in alpha.
+Cracks are not textures: they are lines on the glass itself (GlassFracture).
     python3 Tools/generate-glass-textures.py"""
 import math, os, random
 from PIL import Image, ImageDraw, ImageFilter
@@ -27,30 +27,4 @@ def dust():
             px[x, y] = (205, int(min(1, a + streak) * 255))
     out.convert("RGBA").save(os.path.join(OUT, "Dust.png"))
 
-def crack():
-    random.seed(11); im = Image.new("L", (S, S), 0); d = ImageDraw.Draw(im); c = S / 2
-    for _ in range(15):
-        ang = random.uniform(0, math.tau); x, y = c, c; L = random.uniform(.25, .95) * c; steps = 9
-        for i in range(steps):
-            ang += random.uniform(-.2, .2); nx = x + math.cos(ang) * L / steps; ny = y + math.sin(ang) * L / steps
-            d.line((x, y, nx, ny), fill=int(255 - 170 * i / steps), width=2 if i < 3 else 1); x, y = nx, ny
-    d.ellipse((c - 7, c - 7, c + 7, c + 7), fill=255)
-    a = im.filter(ImageFilter.GaussianBlur(0.6)); out = Image.new("RGBA", (S, S), (235, 240, 240, 0)); out.putalpha(a)
-    out.save(os.path.join(OUT, "Crack.png"))
-
-def web():
-    random.seed(13); im = Image.new("L", (S, S), 0); d = ImageDraw.Draw(im); c = S / 2; rays = []
-    for i in range(22):
-        ang = i * math.tau / 22 + random.uniform(-.1, .1); pts = [(c, c)]; 
-        for k in range(1, 9):
-            r = k / 8 * c * random.uniform(.92, 1.0); pts.append((c + math.cos(ang) * r, c + math.sin(ang) * r)); ang += random.uniform(-.03, .03)
-        rays.append(pts); d.line(pts, fill=220, width=1)
-    for ring in range(1, 8):
-        for i in range(22):
-            if random.random() < .72:
-                d.line((rays[i][ring], rays[(i + 1) % 22][ring + random.choice((0, 0, 0, 1)) if ring < 8 else ring]), fill=int(200 - ring * 12), width=1)
-    d.ellipse((c - 10, c - 10, c + 10, c + 10), fill=255)
-    out = Image.new("RGBA", (S, S), (235, 240, 240, 0)); out.putalpha(im.filter(ImageFilter.GaussianBlur(0.5)))
-    out.save(os.path.join(OUT, "Web.png"))
-
-os.makedirs(OUT, exist_ok=True); dust(); crack(); web()
+os.makedirs(OUT, exist_ok=True); dust()

@@ -55,6 +55,10 @@ public class ControlSettings : ScriptableObject
     [Tooltip("Picks up the gun on the ground in front of you (out of ammo, the gun is dropped and the fists come up). " +
              "E, beside the movement keys, where shooters put it.")]
     public KeyCode interact = KeyCode.E;
+    [Tooltip("In a car: brings the gun up (the car holds its speed by itself) and puts it down again. Firing brings it up as well.")]
+    public KeyCode carGun = KeyCode.Q;
+    [Tooltip("In a car: the seat or the view from behind.")]
+    public KeyCode carView = KeyCode.C;
 
     [Tooltip("Punches whoever is within arm's reach in front of you. A tap, never a hold, " +
              "and next to the movement keys so it can be thrown mid-strafe.")]

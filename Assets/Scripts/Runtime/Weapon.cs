@@ -437,7 +437,8 @@ public class Weapon : MonoBehaviour
         // would empty a magazine into the floor the player is placing a ring on.
         bool aimingBomb = _bombs != null && _bombs.IsAiming;
 
-        bool inputAllowed = PlayerMotor.InputEnabled && !aimingBomb && !IsLowered;
+        // In a car's seat input is off, except that the gun is up (DrivableCar).
+        bool inputAllowed = (PlayerMotor.InputEnabled || DrivableCar.GunUp) && !aimingBomb && !IsLowered;
 
         var controls = Controls;
 
@@ -604,7 +605,11 @@ public class Weapon : MonoBehaviour
         Vector3 direction = ApplySpread(cam.forward, cam);
         Vector3 origin = cam.position;
 
-        bool struck = Physics.Raycast(origin, direction, out RaycastHit hit, data.maxRange, hitMask, QueryTriggerInteraction.Ignore);
+        // Fired from a car's seat it starts inside the car, and goes out through it.
+        RaycastHit hit;
+        bool struck = DrivableCar.Driving != null
+            ? DrivableCar.Cast(origin, direction, data.maxRange, hitMask, out hit)
+            : Physics.Raycast(origin, direction, out hit, data.maxRange, hitMask, QueryTriggerInteraction.Ignore);
         // Glass on the way breaks and the round goes on: no pane stops a shot (GlassField, CarGlass).
         GlassBreak.Ray(origin, direction, struck ? hit.distance : data.maxRange,
                        data.damageClass == WeaponData.DamageClass.Heavy ? GlassField.Blow.Heavy : GlassField.Blow.Round, gameObject);

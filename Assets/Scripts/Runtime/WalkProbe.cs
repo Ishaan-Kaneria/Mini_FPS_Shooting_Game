@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -45,7 +46,7 @@ public class WalkProbe : MonoBehaviour
         if (s >= 0 && s + 1 < args.Length && float.TryParse(args[s + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sec)) probe._seconds = sec;
     }
 
-    struct Slow { public float ms, at, metres; public bool gc; }
+    struct Slow { public float ms, at, metres; public bool gc; public string why; }
 
     /// <summary>The power source: "battery" when running on it. Unity's battery status first; on Linux, where it may be
     /// Unknown, the kernel's power supplies (a mains or USB input online, else a discharging battery).</summary>
@@ -165,8 +166,41 @@ public class WalkProbe : MonoBehaviour
             scaled.renderScale = renderScale;
             sb.AppendLine($"render scale fixed at {renderScale:0.00} (-fpskitscale)");
         }
+        // -fpskitoff A,B,type:C: switched off for the walk -- every object of that name, or carrying a component of that type
+        // (what a part of the town costs: the walk without it).
+        string offArg = Arg("-fpskitoff");
+        if (offArg != null)
+        {
+            int n = 0;
+            foreach (var want in offArg.Split(','))
+            {
+                if (want.StartsWith("type:"))
+                {
+                    string type = want.Substring(5);
+                    foreach (var b in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
+                        if (b != null && b.GetType().Name == type && b.gameObject != player) { b.gameObject.SetActive(false); n++; }
+                }
+                else
+                    foreach (var t in FindObjectsByType<Transform>(FindObjectsSortMode.None))
+                        if (t != null && t.name == want) { t.gameObject.SetActive(false); n++; }
+            }
+            sb.AppendLine($"switched off for the walk: {offArg} ({n} objects)");
+        }
+        // -fpskitgrd off: the GPU Resident Drawer off (its jobs re-light every moving renderer each frame), for an A/B.
+        if (Arg("-fpskitgrd") == "off" && UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset grdAsset)
+        {
+            grdAsset.gpuResidentDrawerMode = UnityEngine.Rendering.GPUResidentDrawerMode.Disabled;
+            sb.AppendLine("GPU Resident Drawer off (-fpskitgrd off)");
+        }
         if (Array.IndexOf(cli, "-fpskitgpuocc") >= 0 && UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp)
             urp.gpuResidentDrawerEnableOcclusionCullingInCameras = true;
+        // -fpskitlegacy: the lighting as it was before 2026-11-07 (no shadow budget, the arms' own shadow pass, four cascades on
+        // High), for a before/after in one build.
+        bool legacy = Array.IndexOf(cli, "-fpskitlegacy") >= 0;
+        SetLighting(!legacy);
+        sb.AppendLine(legacy ? "lighting: as before 2026-11-07 (-fpskitlegacy)" : "lighting: shadow budget, no arms shadow pass, High on three cascades");
+        var budget = FindAnyObjectByType<ShadowBudget>();
+        if (budget != null) sb.AppendLine(budget.Summary);
         sb.AppendLine($"settings: cap {(cap > 0 ? cap.ToString() : "none")} | dynamic resolution {(dynamicRes != null && dynamicRes.enabled ? $"on, floor {dynamicRes.floor:0.00}" : "off")} | gpu occlusion {(UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset now && now.gpuResidentDrawerEnableOcclusionCullingInCameras ? "on" : "off")}");
         float scaleSum = 0f, scaleMin = 1f; int scaleN = 0;
         MobileInput.Reset();
@@ -174,6 +208,7 @@ public class WalkProbe : MonoBehaviour
         var dt = new List<float>(); var cpu = new List<float>(); var gpu = new List<float>();
         var main = new List<float>(); var render = new List<float>(); var presentWait = new List<float>();
         using var draws = new DrawCounters();
+        using var markers = new SpikeMarkers();
         var slow = new List<Slow>();
         var timings = new FrameTiming[1];
         int gcStart = GC.CollectionCount(0), stalls = 0, seg = 1;
@@ -184,6 +219,10 @@ public class WalkProbe : MonoBehaviour
         float[] shotAt = { 8f, 35f, 60f, 95f };
         int nextShot = 0; bool shotFrame = false;
         if (_shots != null) Directory.CreateDirectory(_shots);
+        // The renderers that move (their transform changed in a frame), counted at 30 s and 80 s: every one of them has its
+        // light probes worked out again each frame by the GPU Resident Drawer.
+        float[] censusAt = { 30f, 80f }; int nextCensus = 0; MeshRenderer[] censusSet = null; bool censusFrame = false;
+        var census = new List<string>();
         while (player != null && line.Count > 1 && Time.realtimeSinceStartup - start < _seconds)
         {
             var pos = player.transform.position;
@@ -213,6 +252,22 @@ public class WalkProbe : MonoBehaviour
             if (dynamicRes != null && dynamicRes.enabled) { scaleSum += dynamicRes.Scale; scaleMin = Mathf.Min(scaleMin, dynamicRes.Scale); scaleN++; }
             // The frame that wrote a screenshot is not a frame of play: left out of the timing.
             if (shotFrame) { shotFrame = false; continue; }
+            if (censusFrame) { censusFrame = false; continue; }
+            if (censusSet != null)
+            {
+                var moved = censusSet.Where(r => r != null && r.transform.hasChanged).ToList();
+                var groups = moved.GroupBy(r => { var t = r.transform; while (t.parent != null && t.parent.parent != null) t = t.parent; return t.name; })
+                                  .OrderByDescending(g => g.Count()).Take(12).Select(g => $"{g.Key} {g.Count()}");
+                census.Add($"at {Time.realtimeSinceStartup - start:0} s, {moved.Count} of {censusSet.Length} mesh renderers moved in a frame: {string.Join(", ", groups)}");
+                censusSet = null; censusFrame = true; continue;
+            }
+            if (nextCensus < censusAt.Length && Time.realtimeSinceStartup - start >= censusAt[nextCensus])
+            {
+                nextCensus++;
+                censusSet = FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None);
+                foreach (var r in censusSet) r.transform.hasChanged = false;
+                censusFrame = true; continue;
+            }
             if (_shots != null && nextShot < shotAt.Length && Time.realtimeSinceStartup - start >= shotAt[nextShot])
             {
                 ScreenCapture.CaptureScreenshot(Path.Combine(_shots, $"walk_{shotAt[nextShot++]:00}s.png"));
@@ -222,7 +277,11 @@ public class WalkProbe : MonoBehaviour
             lastPos = player.transform.position;
             int gcNow = GC.CollectionCount(0);
             dt.Add(ms);
-            if (ms > 25f) slow.Add(new Slow { ms = ms, at = Time.realtimeSinceStartup - start, metres = walked, gc = gcNow != lastGc });
+            string switched = RoomContents.Toggled + ShadowBudget.Toggled > 0 ? $"switched: {RoomContents.Toggled} room renderers, {ShadowBudget.Toggled} shadow casters" : null;
+            RoomContents.Toggled = 0; ShadowBudget.Toggled = 0;
+            if (ms > 25f && !markers.JustRefreshed) slow.Add(new Slow { ms = ms, at = Time.realtimeSinceStartup - start, metres = walked, gc = gcNow != lastGc,
+                why = string.Join(" | ", new[] { ms > 40f ? markers.Top() : null, switched }.Where(x => !string.IsNullOrEmpty(x))) });
+            markers.Refresh(Time.realtimeSinceStartup - start);
             lastGc = gcNow;
             FrameTimingManager.CaptureFrameTimings();
             if (FrameTimingManager.GetLatestTimings(1, timings) > 0)
@@ -252,20 +311,239 @@ public class WalkProbe : MonoBehaviour
             sb.AppendLine($"threads p50: main {Pc(main, 0.5f):0.0} ms (and waiting to present {Pc(presentWait, 0.5f):0.0} more), render thread {Pc(render, 0.5f):0.0} ms" +
                           (FrameTimingManager.IsFeatureEnabled() ? "" : " (frame timing stats off in this build)"));
             sb.AppendLine("drawn a frame: " + draws.Report());
+            foreach (var c in census) sb.AppendLine("moving: " + c);
             sb.AppendLine($"garbage collections: {GC.CollectionCount(0) - gcStart} | memory: allocated {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, reserved {UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / 1048576} MB, mono {UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() / 1048576} MB | {ProcessMemory()}");
             if (slow.Count > 0)
             {
-                sb.AppendLine("worst frames (time into the walk, metres walked, a garbage collection that frame):");
+                sb.AppendLine("worst frames (time into the walk, metres walked, a garbage collection that frame" + (markers.Count > 0 ? "; in a development build, the profiler markers that took the most of it" : "") + "):");
                 foreach (var w in slow.OrderByDescending(x => x.ms).Take(15))
-                    sb.AppendLine($"  {w.ms:0.0} ms at {w.at:0.0} s, {w.metres:0} m{(w.gc ? ", gc" : "")}");
+                    sb.AppendLine($"  {w.ms:0.0} ms at {w.at:0.0} s, {w.metres:0} m{(w.gc ? ", gc" : "")}{(string.IsNullOrEmpty(w.why) ? "" : " | " + w.why)}");
+                if (markers.Count > 0)
+                {
+                    // Every frame over 40 ms, by the marker that took the most of it: what the freezes are made of.
+                    var causes = slow.Where(x => x.ms > 40f && x.why != null && x.why.StartsWith("main: ")).GroupBy(x => x.why.Substring(6).Split(new[] { " (" }, StringSplitOptions.None)[0]).OrderByDescending(g => g.Count());
+                    sb.AppendLine($"frames over 40 ms by the main thread's biggest marker ({markers.Count} markers recorded):");
+                    int sw = slow.Count(x => x.ms > 40f && x.why != null && x.why.Contains("switched:"));
+                    sb.AppendLine($"  of {slow.Count(x => x.ms > 40f)} frames over 40 ms, {sw} switched renderers on or off that frame");
+                    foreach (var g in causes.Take(12)) sb.AppendLine($"  {g.Count()} x {g.Key} (worst frame {g.Max(x => x.ms):0} ms)");
+                }
             }
         }
         else sb.AppendLine("no frames measured: " + (player == null ? "no player" : $"route of {line.Count} point(s)"));
+
+        // -fpskitlightviews <dir>: after the walk, fixed views (gun and arms in sun, in shade and indoors; a long street) each
+        // taken with the lighting as before and as now (and on High, now without SSAO), to judge side by side.
+        string views = Arg("-fpskitlightviews");
+        if (views != null && player != null)
+        {
+            Directory.CreateDirectory(views);
+            var viewNotes = new List<string>();
+            yield return TakeViews(views, player, motor, health, viewNotes);
+            foreach (var n in viewNotes) sb.AppendLine("views: " + n);
+        }
+        SetLighting(!legacy);
 
         GameSettings.QualityTier = savedTier;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_out)));
         File.WriteAllText(_out, sb.ToString());
         Application.Quit();
+    }
+
+    /// <summary>The lighting of 2026-11-07 on (the shadow budget, no arms shadow pass, three cascades on High) or as before.</summary>
+    public static void SetLighting(bool now)
+    {
+        ShadowBudget.Active = now;
+        ViewModelRig.OwnShadows = !now;
+        if (QualityTiers.Current == GameSettings.Quality.High && GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp)
+        {
+            urp.shadowCascadeCount = now ? 3 : 4;
+            if (now) urp.cascade3Split = new Vector2(0.1f, 0.3f);
+            else urp.cascade4Split = new Vector3(0.05f, 0.15f, 0.4f);
+        }
+    }
+
+    /// <summary>Screen-space ambient occlusion on or off, on every renderer of the tier (High has it, Medium does not).</summary>
+    static bool SetSsao(bool on)
+    {
+        bool found = false;
+        if (GraphicsSettings.currentRenderPipeline is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp)
+            foreach (var d in urp.rendererDataList)
+                if (d != null)
+                    foreach (var f in d.rendererFeatures)
+                        if (f != null && f.GetType().Name.Contains("AmbientOcclusion")) { f.SetActive(on); found = true; }
+        return found;
+    }
+
+    /// <summary>The fixed views: places found along the walk's route (in sun, in a building's shade, inside a room, and a long
+    /// street look), each shot as before and as now. The player stands still, kept alive.</summary>
+    IEnumerator TakeViews(string dir, GameObject player, PlayerMotor motor, Health health, List<string> notes)
+    {
+        MobileInput.Reset();
+        var sun = RenderSettings.sun;
+        if (sun == null) foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) if (l.type == LightType.Directional) { sun = l; break; }
+        int mask = ~LayerMask.GetMask("Player", "FirstPerson", "PlayerBounds", "Ignore Raycast", "UI", "Enemy", "Civilian");
+        var route = WalkRoute.Line(player.transform.position, WalkRoute.Desert);
+        var places = new List<(string name, Vector3 at, Vector3 look)>();
+        bool Shaded(Vector3 p) => sun != null && Physics.Raycast(p + Vector3.up * 1.2f, -sun.transform.forward, 200f, mask, QueryTriggerInteraction.Ignore);
+        bool Roofed(Vector3 p) => Physics.Raycast(p + Vector3.up * 1.2f, Vector3.up, 30f, mask, QueryTriggerInteraction.Ignore);
+        // Along the route a metre at a time: the first place in full sun, the first in a building's shade (open sky above).
+        Vector3? sunAt = null, shadeAt = null; Vector3 sunLook = Vector3.forward, shadeLook = Vector3.forward;
+        for (int i = 1; i < route.Count && (sunAt == null || shadeAt == null); i++)
+        {
+            Vector3 a = route[i - 1], b = route[i], dirAB = Vector3.ProjectOnPlane(b - a, Vector3.up).normalized;
+            for (float m = 0f; m < Vector3.Distance(a, b); m += 1f)
+            {
+                var p = a + dirAB * m;
+                if (!Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out var ground, 8f, mask, QueryTriggerInteraction.Ignore)) continue;
+                p = ground.point;
+                if (Roofed(p)) continue;
+                if (sunAt == null && !Shaded(p) && Vector3.Distance(p, route[0]) > 10f) { sunAt = p; sunLook = dirAB; }
+                if (shadeAt == null && Shaded(p)) { shadeAt = p; shadeLook = dirAB; }
+            }
+        }
+        if (sunAt != null) places.Add(("sun", sunAt.Value, sunLook));
+        if (shadeAt != null) places.Add(("shade", shadeAt.Value, shadeLook));
+        // Indoors: the room nearest the start whose floor is found and that has a roof over it.
+        var rooms = FindAnyObjectByType<RoomContents>();
+        if (rooms != null)
+        {
+            var start = route.Count > 0 ? route[0] : player.transform.position;
+            foreach (var (box, _, _) in rooms.Rooms().OrderBy(r => (r.room.center - start).sqrMagnitude).Take(40))
+            {
+                if (box.size.x < 3f || box.size.z < 3f) continue;
+                var top = new Vector3(box.center.x, box.max.y - 0.3f, box.center.z);
+                if (!Physics.Raycast(top, Vector3.down, out var floor, box.size.y + 1f, mask, QueryTriggerInteraction.Ignore)) continue;
+                if (!Roofed(floor.point) || floor.point.y < box.min.y - 0.5f) continue;
+                var look = box.size.x > box.size.z ? Vector3.right : Vector3.forward;
+                places.Add(("indoor", floor.point - look * Mathf.Min(box.size.x, box.size.z) * 0.3f, look));
+                break;
+            }
+        }
+        // A long street: from the route's middle, along it (distant buildings' shadows).
+        if (route.Count > 4)
+        {
+            int k = route.Count / 2;
+            var look = Vector3.ProjectOnPlane(route[k + 1] - route[k], Vector3.up).normalized;
+            if (Physics.Raycast(route[k] + Vector3.up * 3f, Vector3.down, out var g, 8f, mask, QueryTriggerInteraction.Ignore)) places.Add(("street", g.point, look));
+        }
+        notes.Add($"{places.Count} places: " + string.Join(", ", places.Select(p => $"{p.name} {p.at.x:0},{p.at.z:0}")));
+        bool high = QualityTiers.Current == GameSettings.Quality.High;
+        var cc = player.GetComponent<CharacterController>();
+        foreach (var (name, at, look) in places)
+        {
+            if (cc != null) cc.enabled = false;
+            player.transform.position = at + Vector3.up * 0.05f;
+            if (cc != null) cc.enabled = true;
+            for (int f = 0; f < 90; f++)   // settle: the eye adapts, the room's contents come on, the body stands still
+            {
+                motor.TurnTowards(at + look * 20f + Vector3.up * 1.1f, 0.3f);
+                if (health != null) health.Heal(1000f);
+                yield return null;
+            }
+            // Each setting shot (the ones to judge by eye) and timed standing still: 90 frames, median frame and GPU time.
+            var configs = new List<(string tag, bool shot, Action set)>
+            {
+                ("before", true, () => SetLighting(false)),
+                ("after", true, () => SetLighting(true)),
+                ("after+arms_shadow_pass", false, () => { SetLighting(true); ViewModelRig.OwnShadows = true; }),
+                ("after-shadow_budget", false, () => { SetLighting(true); ShadowBudget.Active = false; }),
+            };
+            if (high)
+            {
+                configs.Add(("after+4_cascades", false, () => { SetLighting(false); ShadowBudget.Active = true; ViewModelRig.OwnShadows = false; }));
+                configs.Add(("after_noSSAO", true, () => { SetLighting(true); SetSsao(false); }));
+            }
+            var timing = new FrameTiming[1];
+            foreach (var (tag, shot, set) in configs)
+            {
+                set();
+                for (int f = 0; f < 20; f++) { motor.TurnTowards(at + look * 20f + Vector3.up * 1.1f, 1f); if (health != null) health.Heal(1000f); yield return null; }
+                if (shot)
+                {
+                    ScreenCapture.CaptureScreenshot(Path.Combine(dir, $"view_{name}_{QualityTiers.Current}_{tag}.png"));
+                    yield return null; yield return null;
+                }
+                var ft = new List<float>(); var gt = new List<float>();
+                for (int f = 0; f < 90; f++)
+                {
+                    motor.TurnTowards(at + look * 20f + Vector3.up * 1.1f, 1f);
+                    if (health != null) health.Heal(1000f);
+                    yield return null;
+                    ft.Add(Time.unscaledDeltaTime * 1000f);
+                    FrameTimingManager.CaptureFrameTimings();
+                    if (FrameTimingManager.GetLatestTimings(1, timing) > 0 && timing[0].gpuFrameTime > 0) gt.Add((float)timing[0].gpuFrameTime);
+                }
+                float Med(List<float> v) { if (v.Count == 0) return 0f; v.Sort(); return v[v.Count / 2]; }
+                notes.Add($"{name} {tag}: frame {Med(ft):0.0} ms, gpu {Med(gt):0.0} ms");
+                if (high) SetSsao(true);
+            }
+            if (high) SetSsao(true);
+        }
+    }
+
+    /// <summary>
+    /// In a development build, the profiler markers of the main, render and worker threads (scripts' updates, garbage
+    /// collection, shader and pipeline creation, loading and uploads, physics, animation, rendering), so a slow frame can be
+    /// put down to what took it. A release build records none (markers exist only in development players).
+    /// </summary>
+    sealed class SpikeMarkers : IDisposable
+    {
+        static readonly string[] Wanted = { "[Invoke]", "GC.", "Shader", "Pipeline", "PSO", "Program", "Loading.", "Upload", "Instantiate",
+            "Physics", "Animat", "NavMesh", "Cull", "Shadow", "Gfx.", "Awake", "Batch", "Mesh", "Texture", "Particle",
+            "Director", "Update.", "Render", "Camera", "Canvas", "Present", "Scene", "Destroy", "Light", "Probe", "Job", "Instance", "Complete" };
+        // Enclosing markers and the idle waits of other threads (a worker asleep fills its frame with them).
+        static readonly string[] Ignored = { "PlayerLoop", "Main Thread", "Render Thread", "Update.ScriptRunBehaviourUpdate", "BehaviourUpdate",
+            "Update.ScriptRunDelayedDynamicFrameRate", "CoroutinesDelayedCalls" };
+        static readonly string[] Idle = { "Semaphore", "Idle", "Audio.Thread", "WaitForCompleted", "WaitForSignal", "Gfx.WaitFor", "WaitForLastPresentation", "WaitForPresent" };
+        readonly List<(string name, Unity.Profiling.ProfilerRecorder rec)> _main = new List<(string, Unity.Profiling.ProfilerRecorder)>();
+        readonly List<(string name, Unity.Profiling.ProfilerRecorder rec)> _jobs = new List<(string, Unity.Profiling.ProfilerRecorder)>();
+        readonly HashSet<string> _have = new HashSet<string>();
+        int _refreshes;
+        public int Count => _main.Count + _jobs.Count;
+        /// <summary>The frame a refresh ran in (its own cost): left out of the slow frames.</summary>
+        public bool JustRefreshed { get; private set; }
+
+        public SpikeMarkers() { Refresh(0f); }
+
+        /// <summary>Markers appear as things first run: looked for at the start and again 20 and 60 s in.</summary>
+        public void Refresh(float seconds)
+        {
+            JustRefreshed = false;
+            if (!Debug.isDebugBuild) return;
+            float due = _refreshes == 0 ? 0f : _refreshes == 1 ? 20f : _refreshes == 2 ? 60f : float.MaxValue;
+            if (seconds < due) return;
+            _refreshes++;
+            JustRefreshed = true;
+            var handles = new List<Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle>();
+            Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle.GetAvailable(handles);
+            foreach (var h in handles)
+            {
+                var d = Unity.Profiling.LowLevel.Unsafe.ProfilerRecorderHandle.GetDescription(h);
+                if (d.UnitType != Unity.Profiling.ProfilerMarkerDataUnit.TimeNanoseconds) continue;
+                string n = d.Name;
+                if (_have.Contains(n) || Array.IndexOf(Ignored, n) >= 0 || !Wanted.Any(w => n.Contains(w))) continue;
+                _have.Add(n);
+                // On the main thread (this coroutine's): what held the frame up there.
+                _main.Add((n, Unity.Profiling.ProfilerRecorder.StartNew(d.Category, n, 1, Unity.Profiling.ProfilerRecorderOptions.Default | Unity.Profiling.ProfilerRecorderOptions.CollectOnlyOnCurrentThread)));
+                // Jobs on any thread (the main thread may be waiting for one): the busy ones, never the idle waits.
+                if ((n.Contains("Job") || n.Contains("(Burst)") || n.Contains("Instance") || n.Contains("Probe")) && !Idle.Any(w => n.Contains(w)))
+                    _jobs.Add((n, Unity.Profiling.ProfilerRecorder.StartNew(d.Category, n, 1)));
+            }
+        }
+
+        static string List(List<(string name, Unity.Profiling.ProfilerRecorder rec)> recs, float floor)
+            => string.Join(", ", recs.Where(r => r.rec.Valid).Select(r => (r.name, ms: r.rec.LastValue / 1e6f)).Where(r => r.ms >= floor && r.ms < 10000f)
+                                     .OrderByDescending(r => r.ms).Take(6).Select(r => $"{r.name} ({r.ms:0} ms)"));
+
+        /// <summary>The markers that took the most of the frame just ended: the main thread's, then the jobs'.</summary>
+        public string Top()
+        {
+            if (Count == 0) return null;
+            var scripts = _main.Where(r => r.name.Contains("[Invoke]")).ToList();
+            return $"main: {List(_main, 2f)} | scripts: {List(scripts, 1f)} | jobs: {List(_jobs, 5f)}";
+        }
+
+        public void Dispose() { foreach (var r in _main) r.rec.Dispose(); foreach (var r in _jobs) r.rec.Dispose(); }
     }
 
     /// <summary>The process's resident memory now and at its peak (Linux).</summary>

@@ -113,6 +113,8 @@ public class ViewProbe : MonoBehaviour
         LevelManager level = null;
         while (Time.realtimeSinceStartup < until && (level == null || level.IsBriefing || !level.IsRunning)) { level = FindAnyObjectByType<LevelManager>(); yield return null; }
         yield return new WaitForSecondsRealtime(3f);
+        // -fpskitlegacy: the lighting as before 2026-11-07 (WalkProbe.SetLighting), so one build shows before and after.
+        WalkProbe.SetLighting(Array.IndexOf(Environment.GetCommandLineArgs(), "-fpskitlegacy") < 0);
         var player = GameObject.FindWithTag("Player");
         var motor = player != null ? player.GetComponent<PlayerMotor>() : null;
         var health = player != null ? player.GetComponent<Health>() : null;

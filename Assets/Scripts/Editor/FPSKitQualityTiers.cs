@@ -19,7 +19,7 @@ namespace FPSKit.EditorTools
     ///   Medium -- Medium_RPAsset (made here from the PC asset): shadows to 80m on two
     ///             cascades, no MSAA (SMAA on the camera), full resolution, and the cheaper
     ///             renderer, with no ambient occlusion: its own copy of Low's, in Forward+ (MediumForwardPlus).
-    ///   High   -- PC_RPAsset: shadows to 150m on four cascades at 4096, adaptive probe volumes, 2x MSAA, rendered at 85% and upscaled with
+    ///   High   -- PC_RPAsset: shadows to 150m on three cascades at 4096, adaptive probe volumes, 2x MSAA, rendered at 85% and upscaled with
     ///             FSR 1, and ambient occlusion at half resolution with eight samples and a bilateral blur. Measured on
     ///             the Intel Arc laptop: MSAA 4x -> 2x and the SSAO settings are worth 1-2 ms each; the full SSAO pass
     ///             was ~4.7 ms.
@@ -69,11 +69,13 @@ namespace FPSKit.EditorTools
             // the nearest cascade still holds a texel under a centimetre. 2048 on Medium over 80 m.
             // Adaptive probe volumes on High and Medium (FPSKitTownGI): every pixel lit by the bounced light where it is.
             // Low -- the phones and the web build -- keeps the classic probes.
-            changed |= Configure(high, shadows: true, distance: 150f, cascades: 4, msaa: 2, hdr: true, scale: 0.85f, soft: true,
+            // Three cascades since 2026-11-07 (his option 2 of the lighting list): the fourth drew the town into the shadow map
+            // once more every frame. 15 / 45 / 150 m: the first still under 1 cm a texel at 4096.
+            changed |= Configure(high, shadows: true, distance: 150f, cascades: 3, msaa: 2, hdr: true, scale: 0.85f, soft: true,
                                  renderer: null, upscaling: 3, shadowResolution: 4096,        // 3 = FSR 1
                                  additionalShadows: true,                                     // the player's muzzle flash
                                  probeVolumes: true);
-            changed |= SetVector3(high, "m_Cascade4Split", new Vector3(0.05f, 0.15f, 0.4f));   // 7.5 / 22.5 / 60 / 150 m
+            changed |= SetVector2(high, "m_Cascade3Split", new Vector2(0.1f, 0.3f));            // 15 / 45 / 150 m
             changed |= Ssao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
             // No MSAA on Medium: 6.9 ms of a 38 ms frame on the Arc laptop at 1080p (FrameCostProbe, 2026-10-30); its edges are
@@ -309,6 +311,17 @@ namespace FPSKit.EditorTools
             so.FindProperty("m_CurrentQuality").intValue = 2;
             so.ApplyModifiedPropertiesWithoutUndo();
             Debug.Log("[FPSKit] quality tiers: Low, Medium, High.");
+            return true;
+        }
+
+        static bool SetVector2(UniversalRenderPipelineAsset asset, string name, Vector2 v)
+        {
+            var so = new SerializedObject(asset);
+            var p = so.FindProperty(name);
+            if (p == null || p.vector2Value == v) return false;
+            p.vector2Value = v;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
             return true;
         }
 

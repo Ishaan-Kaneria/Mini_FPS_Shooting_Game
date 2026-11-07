@@ -6,7 +6,7 @@ using UnityEngine;
 /// pixels through a door, 13,333 renderers and 72 million triangles in all, casting shadows. A room's contents are drawn
 /// while the eye is within <see cref="radius"/> of its box: inside it, at its door, or looking in through a window up
 /// close. The rooms and what is in each are found by the desert's generator (FPSKitTownGI, the same boxes as the rooms'
-/// reflection probes) and saved here, so the phone and web copy, which drops those probes, keeps this. Holds no static state.
+/// reflection probes) and saved here, so the phone and web copy, which drops those probes, keeps this. Its only static is the walk's counter.
 /// </summary>
 [DisallowMultipleComponent]
 public class RoomContents : MonoBehaviour
@@ -28,6 +28,11 @@ public class RoomContents : MonoBehaviour
 
     bool[] _on, _shellOn;
     float _next;
+
+    /// <summary>Renderers switched on or off since the walk last read it (its slow-frame report).</summary>
+    public static int Toggled;
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => Toggled = 0;
 
     public int RoomCount => _rooms.Length;
     public int RendererCount => _renderers.Length;
@@ -95,6 +100,6 @@ public class RoomContents : MonoBehaviour
         on = want;
         int end = i + 1 < starts.Length ? starts[i + 1] : list.Length;
         for (int k = starts[i]; k < end; k++)
-            if (list[k] != null) list[k].enabled = want;
+            if (list[k] != null) { list[k].enabled = want; Toggled++; }
     }
 }

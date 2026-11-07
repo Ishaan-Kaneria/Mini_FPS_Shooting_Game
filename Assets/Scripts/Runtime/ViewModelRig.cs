@@ -251,10 +251,11 @@ public class ViewModelRig : MonoBehaviour
         var data = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(_armsCam);
         _armsData = data;
         data.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
-        // Its own shadow pass: it sees only the FirstPerson layer and ten metres, so the sun's cascades are spent on
-        // the gun and hands alone and they shadow each other crisply (a hand over the receiver, the sight on the top).
-        // The town's shade on the gun comes from FirstPersonShade, which dims the sun for this camera in shadow.
-        data.renderShadows = true;
+        // No shadow pass of its own (2026-11-07, his option 3): a second set of sun cascades every frame for the gun and
+        // hands alone. They still go dark in the town's shade and indoors: that never came from this pass but from
+        // FirstPersonShade, which asks the world with rays and dims the sun for this camera. Only their shadows on each
+        // other are given up. OwnShadows puts the pass back (the walk's before/after).
+        data.renderShadows = OwnShadows;
         if (go.GetComponent<FirstPersonShade>() == null) go.AddComponent<FirstPersonShade>();
         // Its volumes as the world's, plus the FirstPerson layer's, which only this camera answers to (FirstPersonShade).
         var worldData = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(main);
@@ -926,7 +927,21 @@ public class ViewModelRig : MonoBehaviour
     static bool s_clearDepthLooked;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { s_clearDepth = null; s_clearDepthLooked = false; }
+    static void ResetStatics() { s_clearDepth = null; s_clearDepthLooked = false; s_ownShadows = false; }
+
+    static bool s_ownShadows;
+    /// <summary>Whether the arms camera renders its own sun shadow pass (the gun and hands shadowing each other). Off since
+    /// 2026-11-07; setting it applies to arms cameras already built.</summary>
+    public static bool OwnShadows
+    {
+        get => s_ownShadows;
+        set
+        {
+            s_ownShadows = value;
+            foreach (var rig in FindObjectsByType<ViewModelRig>(FindObjectsSortMode.None))
+                if (rig._armsData != null) rig._armsData.renderShadows = value;
+        }
+    }
 
     /// <summary>
     /// An overlay camera's "clear depth" (URP 17 shows it in the inspector but gives scripts only a getter; the renderer reads

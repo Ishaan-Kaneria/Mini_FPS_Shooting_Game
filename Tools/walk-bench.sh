@@ -10,7 +10,7 @@ heat_log_start "walk-bench $*"
 trap 'heat_log_stop; power_restore' EXIT
 TAG="${1:?tag (e.g. before, step1)}"; shift
 TIERS=("${@:-Medium}"); [ $# -eq 0 ] && TIERS=(Medium High)
-BIN="Build/Perf/smooth/FPSKitSmooth.x86_64"
+BIN="${WALK_BIN:-Build/Perf/smooth/FPSKitSmooth.x86_64}"
 [ -x "$BIN" ] || { echo "no build at $BIN: run Tools/unity-batch.sh FPSKitBatch.BuildSmoothPlayer"; exit 1; }
 mkdir -p Build/Perf/walk
 cpu_temp() { sensors 2>/dev/null | grep 'Package id' | grep -o '+[0-9]*' | head -1 | tr -d + || true; }

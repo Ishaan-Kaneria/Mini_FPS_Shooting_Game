@@ -74,7 +74,7 @@ namespace FPSKit.EditorTools
             changed |= Configure(high, shadows: true, distance: 150f, cascades: 3, msaa: 2, hdr: true, scale: 0.85f, soft: true,
                                  renderer: null, upscaling: 3, shadowResolution: 4096,        // 3 = FSR 1
                                  additionalShadows: true,                                     // the player's muzzle flash
-                                 probeVolumes: true);
+                                 probeVolumes: true);    // kept on (2026-11-08): turning it off made the build recompile every shader (hours with heat pauses); with no probe data in the desert the sky ambient is used
             changed |= SetVector2(high, "m_Cascade3Split", new Vector2(0.1f, 0.3f));            // 15 / 45 / 150 m
             changed |= Ssao(high);
             changed |= Configure(low, shadows: false, distance: 0f, cascades: 1, msaa: 1, hdr: false, scale: 1f, soft: false, renderer: null);
@@ -83,7 +83,7 @@ namespace FPSKit.EditorTools
             var mediumRenderer = MediumRendererData(ref changed);   // before the |=, which reads changed first
             changed |= Configure(medium, shadows: true, distance: 80f, cascades: 2, msaa: 1, hdr: true, scale: 1f, soft: false,
                                  renderer: mediumRenderer, shadowResolution: 2048,
-                                 probeVolumes: true);
+                                 probeVolumes: true);    // kept on (2026-11-08): turning it off made the build recompile every shader (hours with heat pauses); with no probe data in the desert the sky ambient is used
             changed |= Levels(low, medium, high);
             changed |= LevelLodBias();
             if (changed) AssetDatabase.SaveAssets();
@@ -180,6 +180,9 @@ namespace FPSKit.EditorTools
         /// normals. The feature keeps its settings in an internal class, so they are written through the serialized
         /// path, which also re-runs the feature's Create().
         /// </summary>
+        /// <summary>SSAO on High: off until the lighting rebuild adds it back as its own layer.</summary>
+        const bool SsaoInRebuild = false;
+
         static bool Ssao(UniversalRenderPipelineAsset high)
         {
             var list = new SerializedObject(high).FindProperty("m_RendererDataList");
@@ -191,6 +194,8 @@ namespace FPSKit.EditorTools
                 foreach (var f in data.rendererFeatures)
                 {
                     if (f == null || f.name.IndexOf("Occlusion", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    // Off while the lighting is rebuilt layer by layer (FPSKitDesertLighting, 2026-11-08): it comes back as its own layer.
+                    if (f.isActive != SsaoInRebuild) { f.SetActive(SsaoInRebuild); EditorUtility.SetDirty(f); changed = true; }
                     var so = new SerializedObject(f);
                     var m = so.FindProperty("m_Settings");
                     if (m == null) continue;

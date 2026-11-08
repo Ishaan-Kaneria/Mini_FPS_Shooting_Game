@@ -313,6 +313,9 @@ namespace FPSKit.EditorTools
         /// <summary>Bakes the saved desert scene's adaptive probe volumes (FPSKitTownGI); needs UNITY_GRAPHICS=1 for the GPU.</summary>
         public static void BakeDesertLight() => FPSKitTownGI.BatchBakeSaved();
 
+        /// <summary>The desert's lighting stripped and rebuilt from FPSKitDesertLighting's layers, on the saved scenes (no rebuild).</summary>
+        public static void RelightDesert() => Run(FPSKitDesertLighting.BatchRelight);
+
         /// <summary>The saved desert scene's whole light baked again: the people's light probes, then the adaptive probe
         /// volumes (FPSKitSceneBuilder.BakeSavedTownProbes). UNITY_GRAPHICS=1 and -force-vulkan, about ten minutes.</summary>
         public static void BakeDesertProbes() => Run(FPSKitSceneBuilder.BakeSavedTownProbes);

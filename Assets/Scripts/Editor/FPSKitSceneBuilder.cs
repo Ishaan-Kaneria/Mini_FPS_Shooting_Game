@@ -4301,7 +4301,8 @@ namespace FPSKit.EditorTools
             string path = $"{SceneFolder}/{SafeName(themeName)}.unity";
             EditorSceneManager.SaveScene(scene, path);
             // The town's light probes are baked on the saved scene (probes only: FPSKitTownProbes), then saved again.
-            if (_theme != null && _theme.desertTownZone) BakeTownProbes(scene, path);
+            // The desert's lighting is FPSKitDesertLighting's alone (2026-11-08): the old probe bake is no longer run.
+            if (_theme != null && _theme.desertTownZone) FPSKitDesertLighting.Relight(path);
 
             // Register in Build Settings so the in-game restart can reload it.
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);

@@ -465,6 +465,36 @@ namespace FPSKit.EditorTools
             {
                 var tc = moving[0].transform;
                 From(tc.position + tc.right * 6f + tc.forward * 3f + Vector3.up * 1.6f, tc.position + Vector3.up * 0.9f, "traffic");
+                // Its driver close to, through the side window: hands on the wheel, head on the road (2026-11-09).
+                var car0 = moving[0];
+                traffic.recycleDistance = 100000f;      // the test's player is far away: the watched car must stay
+                var driver0 = car0.GetComponentInChildren<VehicleDriver>();
+                Require(driver0 != null, "the traffic car has a driver");
+                if (driver0 != null)
+                {
+                    // The test's own camera is not the player's: his pose is forced on, as the player's view would have it.
+                    var anim0 = driver0.GetComponentInChildren<Animator>();
+                    if (anim0 != null) anim0.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                    VehicleDriver.AlwaysPose = true;
+                    yield return 0.8f;
+                    var head0 = driver0.GetComponentInChildren<Animator>()?.GetBoneTransform(HumanBodyBones.Head);
+                    Vector3 face = head0 != null ? head0.position : driver0.transform.position + Vector3.up * 1f;
+                    From(face - tc.right * 1.6f + tc.forward * 0.5f + Vector3.up * 0.15f, face - Vector3.up * 0.25f, "driver_1_window");
+                    From(face + tc.forward * 2.6f + Vector3.up * 0.3f, face - Vector3.up * 0.2f, "driver_2_windscreen");
+                    // Getting out: stopped by gunfire, the door, the turn, standing up out of the car.
+                    typeof(TrafficCar).GetField("_panicUntil", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(car0, Time.time + 60f);
+                    typeof(TrafficCar).GetField("_danger", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(car0, tc.position + tc.forward * 30f);
+                    for (int i = 0; i < 60 * 5 && car0.Speed > 0.5f; i++) yield return null;
+                    Private(typeof(TrafficCar), "LeaveCar").Invoke(car0, null);
+                    Vector3 watch = tc.position - tc.right * 5f + tc.forward * 1.5f + Vector3.up * 1.7f;
+                    int Near() { int n = 0; foreach (var c in Object.FindObjectsByType<Civilian>(FindObjectsSortMode.None)) if ((c.transform.position - tc.position).magnitude < 4f) n++; return n; }
+                    yield return 0.3f; From(watch, tc.position + Vector3.up * 0.9f, "exit_1_door");
+                    yield return 0.4f; From(watch, tc.position + Vector3.up * 0.9f, "exit_2_turning");
+                    yield return 0.3f; From(watch, tc.position + Vector3.up * 0.9f, "exit_3_stepping");
+                    Note($"people within 4 m of the car just after he got out: {Near()}");
+                    yield return 0.6f; From(watch, tc.position + Vector3.up * 0.9f, "exit_4_out");
+                    Note($"driver got out: driver left in the seat {car0.GetComponentInChildren<VehicleDriver>() != null}, abandoned {car0.Abandoned}");
+                }
             }
             // The gun: up by firing, the car keeps going with no key down.
             MobileInput.Move = new Vector2(0f, 1f);

@@ -227,10 +227,12 @@ public class DrivableCar : MonoBehaviour
             const float frequency = 1.55f;
             var spring = w.suspensionSpring;
             spring.spring = corner * Mathf.Pow(frequency * 2f * Mathf.PI, 2f);
-            spring.damper = 2f * 0.36f * Mathf.Sqrt(spring.spring * corner);
-            spring.targetPosition = 0.45f;
+            // Half of critical damping and 30 cm of travel (2026-11-09, his "flips, bounces, sticks"): at a third and 20 cm a kerb
+            // (15-20 cm) bottomed the springs out, the hard stop threw the car up and it bounced on, or over.
+            spring.damper = 2f * 0.5f * Mathf.Sqrt(spring.spring * corner);
+            spring.targetPosition = 0.5f;
             w.suspensionSpring = spring;
-            w.suspensionDistance = 0.2f;
+            w.suspensionDistance = 0.3f;
             w.forceAppPointDistance = 0.14f;
             w.wheelDampingRate = 0.4f;
             var f = w.forwardFriction;
@@ -559,6 +561,8 @@ public class DrivableCar : MonoBehaviour
         _speed = Vector3.Dot(_rb.linearVelocity, transform.forward);
         float planar = Mathf.Abs(_speed);
         StayOnWheels(dt);
+        NoKick();
+        WakeAhead();
 
         // A drift: the handbrake at speed. It starts quickly and lets go slowly, so a slide runs out rather than snapping straight.
         float pace = Vector3.ProjectOnPlane(_rb.linearVelocity, transform.up).magnitude;
@@ -752,6 +756,47 @@ public class DrivableCar : MonoBehaviour
             _rb.isKinematic = true;
         }
     }
+
+    /// <summary>
+    /// A wheel's one ray meeting the sharp edge of a kerb or a road's draped mesh hands the spring a step, and the car is flung up off a
+    /// bump no bigger than a brick (his "bounces"). With three wheels or more on the ground, the car may not rise faster than a real one
+    /// taking a kerb at speed: the rest of the kick is taken away. A jump (wheels in the air) is left alone.
+    /// </summary>
+    void NoKick()
+    {
+        if (_rb.isKinematic) return;
+        int grounded = 0;
+        foreach (var w in Wheels) if (w != null && w.isGrounded) grounded++;
+        if (grounded < 3) return;
+        Vector3 v = _rb.linearVelocity;
+        float up = Vector3.Dot(v, transform.up);
+        if (up > MaxRise) _rb.linearVelocity = v - transform.up * (up - MaxRise);
+    }
+
+    static readonly Collider[] Ahead = new Collider[16];
+
+    /// <summary>
+    /// Loose props (drums, crates, chairs) rest kinematic until struck, and a car meeting one at rest met an immovable body for that
+    /// step: it stopped dead, then the prop woke and moved (his "sticks"). Those just ahead of the car's path are woken a moment before it arrives.
+    /// </summary>
+    void WakeAhead()
+    {
+        Vector3 v = _rb.linearVelocity;
+        float speed = v.magnitude;
+        if (speed < 1f) return;
+        Vector3 at = _rb.position + transform.up * 0.6f + v / speed * (CarLength * 0.5f + speed * 0.12f);
+        int n = Physics.OverlapSphereNonAlloc(at, 1.6f, Ahead, ~0, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            var prop = Ahead[i] != null ? Ahead[i].GetComponentInParent<LooseProp>() : null;
+            if (prop != null) prop.Wake();
+        }
+    }
+
+    float CarLength => _look != null && _look.wheelbase > 0.5f ? _look.wheelbase + 1.6f : 4.4f;
+
+    /// <summary>Metres a second the body may rise while on its wheels.</summary>
+    const float MaxRise = 1.6f;
 
     float Wheelbase => _look != null && _look.wheelbase > 0.5f ? _look.wheelbase : 2.7f;
 

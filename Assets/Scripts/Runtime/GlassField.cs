@@ -35,7 +35,7 @@ public class GlassField : MonoBehaviour
     public static GlassField Instance { get; private set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => Instance = null;
+    static void ResetStatics() { Instance = null; DrawDistance = 150f; }
 
     Dictionary<long, List<int>> _cells;
     byte[] _hits;
@@ -57,6 +57,33 @@ public class GlassField : MonoBehaviour
     }
 
     void OnDestroy() { if (Instance == this) Instance = null; }
+
+    /// <summary>Metres past which a chunk's glass is not drawn: twenty thousand panes drawn as see-through surfaces at any distance,
+    /// where a window is a few pixels and its dark backing reads the same (2026-11-09, his "make the glass faster").</summary>
+    public static float DrawDistance = 150f;
+    MeshRenderer[] _chunkRenderers;
+    float _nextCull;
+
+    void Update()
+    {
+        if (chunks == null || Time.unscaledTime < _nextCull) return;
+        _nextCull = Time.unscaledTime + 0.5f;
+        var cam = Camera.main;
+        if (cam == null) return;
+        if (_chunkRenderers == null || _chunkRenderers.Length != chunks.Length)
+        {
+            _chunkRenderers = new MeshRenderer[chunks.Length];
+            for (int i = 0; i < chunks.Length; i++) if (chunks[i] != null) _chunkRenderers[i] = chunks[i].GetComponent<MeshRenderer>();
+        }
+        Vector3 eye = cam.transform.position;
+        float d2 = DrawDistance * DrawDistance;
+        foreach (var r in _chunkRenderers)
+        {
+            if (r == null) continue;
+            bool on = (r.bounds.ClosestPoint(eye) - eye).sqrMagnitude <= d2;
+            if (r.enabled != on) r.enabled = on;
+        }
+    }
 
     static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
 

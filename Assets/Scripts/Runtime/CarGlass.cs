@@ -51,6 +51,17 @@ public class CarGlass : MonoBehaviour
     void OnEnable() => _all.Add(this);
     void OnDisable() => _all.Remove(this);
 
+    /// <summary>Whether any of its glass is cracked or gone (such a car is not put back in the traffic's pool).</summary>
+    public bool AnyBroken
+    {
+        get
+        {
+            if (_mergedGone) return true;
+            if (windows != null) foreach (var w in windows) if (w != null && (w.gone || w.hits > 0)) return true;
+            return false;
+        }
+    }
+
     static bool IsGlass(Material m)
     {
         if (m == null) return false;

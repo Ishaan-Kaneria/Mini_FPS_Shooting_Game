@@ -39,6 +39,9 @@ public class TrafficDirector : MonoBehaviour
     public TownSignals[] signals;
 
     readonly List<TrafficCar> _cars = new List<TrafficCar>();
+    /// <summary>Cars off the road, ready to go out again, by prefab: a car with its driver was made in play every time one was needed
+    /// (a person's whole body and animator instantiated mid-game), which is a hitch each time (2026-11-09).</summary>
+    readonly Dictionary<int, Stack<TrafficCar>> _pool = new Dictionary<int, Stack<TrafficCar>>();
     Transform _player;
     Camera _cam;
     int _budget;
@@ -56,6 +59,38 @@ public class TrafficDirector : MonoBehaviour
         };
         _budget = Mathf.RoundToInt(maxCars * share);
         for (int i = 0; i < _budget; i++) TrySpawn(true);
+        StartCoroutine(Prewarm(Mathf.Max(2, _budget / 2)));
+    }
+
+    /// <summary>A few spare cars made while the level starts, driven by nobody, put straight in the pool once their drivers are seated.</summary>
+    System.Collections.IEnumerator Prewarm(int count)
+    {
+        if (carPrefabs == null || carPrefabs.Length == 0) yield break;
+        var made = new List<TrafficCar>();
+        for (int i = 0; i < count; i++)
+        {
+            int k = Random.Range(0, carPrefabs.Length);
+            var go = Instantiate(carPrefabs[k], new Vector3(0f, -500f, 0f), Quaternion.identity, transform);
+            var car = go.GetComponent<TrafficCar>();
+            if (car == null) { Destroy(go); continue; }
+            car.director = this;
+            car.route = -1;               // no route: it waits (Update does nothing without one), its driver seated by Start
+            car.prefabIndex = k;
+            made.Add(car);
+        }
+        yield return null;                // Start has run: the drivers are seated
+        yield return null;
+        foreach (var car in made) if (car != null) Release(car, true);
+    }
+
+    /// <summary>Off the road: back in its pool, or destroyed if it cannot go out again as it is.</summary>
+    void Release(TrafficCar car, bool spare = false)
+    {
+        if (car == null) return;
+        if (!spare && !car.Reusable) { Destroy(car.gameObject); return; }
+        car.gameObject.SetActive(false);
+        if (!_pool.TryGetValue(car.prefabIndex, out var stack)) _pool[car.prefabIndex] = stack = new Stack<TrafficCar>();
+        stack.Push(car);
     }
 
     void Update()
@@ -70,8 +105,8 @@ public class TrafficDirector : MonoBehaviour
             float far = c.Abandoned ? recycleDistance * 0.5f : recycleDistance;   // a car whose driver was shot stays where it stopped while near
             if (Vector3.Distance(c.transform.position, _player.position) > far && !InView(c.transform.position, 600f))
             {
-                Destroy(c.gameObject);
                 _cars.RemoveAt(i);
+                Release(c);
             }
         }
         if (_cars.Count < _budget) TrySpawn(false);
@@ -99,11 +134,28 @@ public class TrafficDirector : MonoBehaviour
             if (!anywhere && InView(p, 400f)) continue;
             if (Physics.CheckSphere(p + Vector3.up, 4f, obstacleMask, QueryTriggerInteraction.Ignore)) continue;
             var dir = (r.points[at + 1] - p); dir.y = 0f;
-            var go = Instantiate(carPrefabs[Random.Range(0, carPrefabs.Length)], p, Quaternion.LookRotation(dir.normalized), transform);
+            var rot = Quaternion.LookRotation(dir.normalized);
+            int k = Random.Range(0, carPrefabs.Length);
+            // From the pool when one of that kind is waiting (any kind, if not): made new only when the pool is empty.
+            TrafficCar car = null;
+            if (_pool.TryGetValue(k, out var stack) && stack.Count > 0) car = stack.Pop();
+            else foreach (var kv in _pool) if (kv.Value.Count > 0) { car = kv.Value.Pop(); break; }
+            while (car == null && stack != null && stack.Count > 0) car = stack.Pop();
+            if (car != null)
+            {
+                car.transform.SetPositionAndRotation(p, rot);
+                car.gameObject.SetActive(true);
+                car.director = this;
+                car.Reuse(ri, at);
+                _cars.Add(car);
+                return;
+            }
+            var go = Instantiate(carPrefabs[k], p, rot, transform);
             if (paints != null && paints.Length > 0 && go.TryGetComponent<CarLook>(out var look)) look.SetPaint(paints[Random.Range(0, paints.Length)]);
-            var car = go.GetComponent<TrafficCar>();
+            car = go.GetComponent<TrafficCar>();
             if (car == null) { Destroy(go); return; }
             car.director = this;
+            car.prefabIndex = k;
             car.route = ri;
             car.index = at;
             _cars.Add(car);
@@ -119,7 +171,7 @@ public class TrafficDirector : MonoBehaviour
     {
         // Driven off the end of its route (often off the map on the highway): gone, and another arrives.
         _cars.Remove(car);
-        Destroy(car.gameObject);
+        Release(car);
     }
 
     public TownSignals Signal(int i) => signals != null && i >= 0 && i < signals.Length ? signals[i] : null;

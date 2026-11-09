@@ -33,6 +33,8 @@ public class TrafficCar : MonoBehaviour
 
     internal TrafficDirector director;
     internal int route, index;
+    /// <summary>Which of the director's prefabs it was made from (its pool).</summary>
+    internal int prefabIndex;
 
     float _speed, _waitUntil, _panicUntil, _stopClearedAt = -1f, _personSince = -1f, _reaction;
     int _heard, _clearedStop = -1;
@@ -55,13 +57,7 @@ public class TrafficCar : MonoBehaviour
     {
         _heard = NoiseSystem.Latest;
         _reaction = Random.Range(reactionTime.x, reactionTime.y);
-        // Somebody at the wheel (VehicleDriver): one of the town's people, seated, and shot through the glass like anyone.
-        var people = director != null ? director.driverPrefabs : null;
-        if (people != null && people.Length > 0)
-        {
-            _driver = VehicleDriver.Seat(transform, people[Random.Range(0, people.Length)], seatLocal);
-            if (_driver != null) _driver.Died += OnDriverDied;
-        }
+        SeatDriver();
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         _strike = GetComponent<VehicleStrike>();
         if (_strike != null) _strike.Struck += OnStruck;
@@ -83,7 +79,7 @@ public class TrafficCar : MonoBehaviour
 
     void Update()
     {
-        if (director == null) return;
+        if (director == null || route < 0) return;
         if (_driverDead) { Coast(); return; }
         if (_leaveAt >= 0f && Time.time >= _leaveAt && _speed < 1f) LeaveCar();
         var r = director.routes[route];
@@ -207,6 +203,10 @@ public class TrafficCar : MonoBehaviour
         _steerNow = Mathf.Lerp(_steerNow, Mathf.Clamp(yawRate * 0.42f, -32f, 32f), 1f - Mathf.Exp(-8f * dt));
         if (_look.model != null) _look.model.localRotation = Quaternion.Euler(-_pitchNow * -1f, 0f, -_rollNow);
         _look.Roll(_speed, _steerNow, dt);
+        // The steering wheel turned with the front wheels (a car's ratio, about twelve to one), and the driver's hands with it.
+        float wheelTurn = Mathf.Clamp(_steerNow * 12f, -200f, 200f);
+        _look.Dash(wheelTurn, _speed * 3.6f, 850f + _speed * 110f);
+        if (_driver != null) _driver.WheelTurn = wheelTurn;
     }
 
     /// <summary>
@@ -288,30 +288,99 @@ public class TrafficCar : MonoBehaviour
         if (clip != null) _horn.PlayOneShot(clip);
     }
 
-    /// <summary>Out of the door side and running, as one of the town's people. Left in the road, the car stays where it stopped.</summary>
+    /// <summary>
+    /// Out of the door side and running, as one of the town's people. Left in the road, the car stays where it stopped. Not a swap any more
+    /// (his note 2026-11-09: the driver popped out beside a door already open): the door swings open, he turns in the seat towards it,
+    /// stands up out of the car onto the road, and only then is he one of the running people.
+    /// </summary>
     void LeaveCar()
     {
         _leaveAt = Time.time + 2f;       // nowhere to step out (a wall at the door): another try in a moment
-        if (_driver == null || _driver.Dead || director == null) return;
-        var people = director.Civilians;
-        if (people == null) return;
+        if (_leaving || _driver == null || _driver.Dead || director == null || director.Civilians == null) return;
         foreach (float side in new[] { -1f, 1f })
         {
             Vector3 door = transform.TransformPoint(new Vector3(side * (halfWidth + 0.7f), 0f, seatLocal.z));
             if (!UnityEngine.AI.NavMesh.SamplePosition(door, out var at, 1.6f, UnityEngine.AI.NavMesh.AllAreas)) continue;
-            if (!people.Adopt(_driver.Source, at.position, transform.rotation, _danger)) return;
-            _driver.Died -= OnDriverDied;
-            // His door swings open as he goes.
-            if (_look != null) _look.Door(side < 0f ? 0 : 1, 0.85f);
-            Destroy(_driver.gameObject);
-            _driver = null;
-            _driverDead = true;
             _leaveAt = -1f;
+            StartCoroutine(GetOut(side, at.position));
             return;
         }
     }
 
+    bool _leaving;
+
+    System.Collections.IEnumerator GetOut(float side, Vector3 outside)
+    {
+        _leaving = true;
+        var d = _driver;
+        d.Died -= OnDriverDied;
+        d.Died += OnLeavingDied;
+        var body = d.transform;
+        Vector3 seat = body.position;
+        Quaternion seated = body.rotation;
+        // Facing away from the danger once out, and running that way.
+        Vector3 away = Vector3.ProjectOnPlane(outside - _danger, Vector3.up);
+        if (away.sqrMagnitude < 0.01f) away = transform.right * side;
+        Quaternion turned = Quaternion.LookRotation(Quaternion.AngleAxis(side * 75f, transform.up) * transform.forward, Vector3.up);
+        Quaternion standing = Quaternion.LookRotation(away.normalized, Vector3.up);
+        int doorIndex = side < 0f ? 0 : 1;
+        // The door (0.35 s), and over it and after it the turn in the seat towards it (0.8 s in all).
+        for (float t = 0f; t < 0.8f; t += Time.deltaTime)
+        {
+            if (d == null || d.Dead) yield break;
+            if (_look != null) _look.Door(doorIndex, Mathf.SmoothStep(0f, 0.9f, Mathf.Clamp01(t / 0.35f)));
+            body.rotation = Quaternion.Slerp(seated, turned, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 0.15f) / 0.65f)));
+            yield return null;
+        }
+        if (_look != null) _look.Door(doorIndex, 0.9f);
+        // Out: standing in the open door, facing away, and running. (Moved out in the sitting pose, he floated beside the car: the
+        // clip does not stand him up that fast, 2026-11-09.) He stands where his feet would land, just outside the sill.
+        d.StartLeaving();
+        Vector3 door = transform.TransformPoint(new Vector3(side * (halfWidth + 0.35f), 0f, seatLocal.z));
+        if (UnityEngine.AI.NavMesh.SamplePosition(door, out var near, 0.8f, UnityEngine.AI.NavMesh.AllAreas)) outside = near.position;
+        yield return null;
+        if (d == null || d.Dead) yield break;
+        // Now one of the town's people, running.
+        var people = director != null ? director.Civilians : null;
+        if (people != null) people.Adopt(d.Source, outside, standing, _danger);
+        Destroy(d.gameObject);
+        if (_driver == d) _driver = null;
+        _driverDead = true;
+    }
+
+    // Shot on the way out: he falls where he is; the car stays abandoned.
+    void OnLeavingDied(VehicleDriver d) => _driverDead = true;
+
     void OnDriverDied(VehicleDriver d) => _driverDead = true;
+
+    /// <summary>Somebody at the wheel (VehicleDriver): one of the town's people, seated, and shot through the glass like anyone.</summary>
+    void SeatDriver()
+    {
+        if (_driver != null) return;
+        var people = director != null ? director.driverPrefabs : null;
+        if (people == null || people.Length == 0) return;
+        _driver = VehicleDriver.Seat(transform, people[Random.Range(0, people.Length)], seatLocal);
+        if (_driver != null) _driver.Died += OnDriverDied;
+    }
+
+    /// <summary>Whether it can go back in the pool as it is: its driver alive at the wheel and its glass whole.</summary>
+    internal bool Reusable => !_driverDead && _driver != null && !_driver.Dead && (!TryGetComponent<CarGlass>(out var g) || !g.AnyBroken);
+
+    /// <summary>Taken out of the pool onto a route: everything about its last drive forgotten, its driver kept.</summary>
+    internal void Reuse(int newRoute, int newIndex)
+    {
+        route = newRoute; index = newIndex;
+        _speed = _lastSpeed = 0f;
+        _waitUntil = _panicUntil = 0f;
+        _stopClearedAt = -1f; _personSince = -1f; _leaveAt = -1f;
+        _clearedStop = -1;
+        _heard = NoiseSystem.Latest;
+        _pitchNow = _rollNow = _steerNow = 0f;
+        _lastYaw = transform.eulerAngles.y;
+        _reaction = Random.Range(reactionTime.x, reactionTime.y);
+        if (_look != null) { _look.Door(0, 0f); _look.Door(1, 0f); if (_look.model != null) _look.model.localRotation = Quaternion.identity; }
+        SeatDriver();
+    }
 
     // Hit someone: a hard stop, then the shock of it.
     void OnStruck(VehicleStrike s, float speed) => _panicUntil = Time.time + 25f;

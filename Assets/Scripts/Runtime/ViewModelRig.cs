@@ -1001,6 +1001,9 @@ public class ViewModelRig : MonoBehaviour
     /// The hands on a car's steering wheel, turning it: at ten and two, thumbs over the rim. The arms hang from the seat (the head can look away from them), and each hand goes from wherever the gun
     /// had it to the rim as <see cref="DrivableCar.HandsOnWheel.hold"/> goes from 0 to 1.
     /// </summary>
+    /// <summary>A seated driver's shoulders: this far under the eye and behind it, metres.</summary>
+    const float SeatShoulderDrop = 0.22f, SeatShoulderBack = -0.04f;   // the first try (0.26 under, 0.1 back) left the left hand short of the rim
+
     void PlaceArmsOnWheel(DrivableCar.HandsOnWheel w)
     {
         float t = Smooth01(Mathf.Clamp01(w.hold));
@@ -1008,6 +1011,14 @@ public class ViewModelRig : MonoBehaviour
         Quaternion rotL = _left.hand.rotation, rotR = _right.hand.rotation;
         Vector3 armsAt = w.eye + w.car * (_spec.armsOffset - _headLocal);
         _arms.SetPositionAndRotation(Vector3.Lerp(_arms.position, armsAt, t), Quaternion.Slerp(_arms.rotation, w.car, t));
+        // The shoulders where a seated driver's are, under and a little behind the eye (his note 2026-11-09, "artificial"): placed as for the
+        // gun, the right shoulder was almost at the camera, and the sleeve filled the bottom right of the screen.
+        if (_left.upper != null && _right.upper != null)
+        {
+            Vector3 mid = (_left.upper.position + _right.upper.position) * 0.5f;
+            Vector3 want = w.eye + w.car * new Vector3(0f, -SeatShoulderDrop, -SeatShoulderBack);
+            _arms.position += (want - mid) * t;
+        }
 
         Vector3 right = w.car * Vector3.right, up = w.car * Vector3.up, forward = w.car * Vector3.forward;
         Vector3 gripL = w.look.GripPoint(-1f, w.turn, out Vector3 axis, out Vector3 hub), gripR = w.look.GripPoint(1f, w.turn, out _, out _);

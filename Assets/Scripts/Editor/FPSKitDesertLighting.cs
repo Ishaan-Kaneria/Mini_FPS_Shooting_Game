@@ -209,7 +209,7 @@ namespace FPSKit.EditorTools
         /// <summary>Layer 2: a real light at every lamp and tube fitting (found by material in the room meshes), the fittings glowing.</summary>
         static void Lamps(List<Scene> scenes, StringBuilder sb)
         {
-            int lamps = 0, tubes = 0, unreadable = 0;
+            int lamps = 0, tubes = 0, unreadable = 0, fans = 0;
             foreach (var scene in scenes)
             {
                 var lights = new List<Light>();
@@ -236,7 +236,8 @@ namespace FPSKit.EditorTools
                         {
                             var go = new GameObject(lamp ? "Lamp" : "Tube");
                             go.transform.SetParent(holder, false);
-                            go.transform.position = centre - Vector3.up * (lamp ? 0.12f : 0.08f);
+                            // A little under the fitting: closer, the ceiling over it burned white (the first pictures, 2026-11-09).
+                            go.transform.position = centre - Vector3.up * (lamp ? 0.3f : 0.2f);
                             var l = go.AddComponent<Light>();
                             l.type = LightType.Point;
                             l.color = lamp ? LampColour : TubeColour;
@@ -250,6 +251,21 @@ namespace FPSKit.EditorTools
                         }
                     }
                 }
+                // The ceiling fans' lamps (a living room or majlis has a fan with a light in its middle, FPSKitTownInterior.Ceiling).
+                foreach (var fan in scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Transform>(true)).Where(t => t.name.StartsWith("ceiling_fan") && (t.parent == null || !t.parent.name.StartsWith("ceiling_fan"))).ToList())
+                {
+                    var rs = fan.GetComponentsInChildren<Renderer>(true);
+                    if (rs.Length == 0) continue;
+                    var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
+                    if (holder == null) { var h = new GameObject("Lamps"); SceneManager.MoveGameObjectToScene(h, scene); holder = h.transform; }
+                    var go = new GameObject("FanLamp");
+                    go.transform.SetParent(holder, false);
+                    go.transform.position = new Vector3(b.center.x, b.min.y - 0.15f, b.center.z);
+                    var l = go.AddComponent<Light>();
+                    l.type = LightType.Point; l.color = LampColour; l.intensity = LampIntensity; l.range = LampRange;
+                    l.shadows = LightShadows.None; l.lightmapBakeType = LightmapBakeType.Realtime; l.enabled = false;
+                    lights.Add(l); fans++;
+                }
                 if (holder != null) holder.gameObject.AddComponent<LampSet>().Set(lights.ToArray());
             }
             // The fittings glow, as lit lamps do (the "off" shade was a lamp that lit nothing).
@@ -261,7 +277,7 @@ namespace FPSKit.EditorTools
                 shade.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
                 EditorUtility.SetDirty(shade);
             }
-            sb.AppendLine($"layer 2, real lamps: {lamps} round ceiling lamps ({LampIntensity} warm, {LampRange} m), {tubes} shop tubes ({TubeIntensity} cool, {TubeRange} m), " +
+            sb.AppendLine($"layer 2, real lamps: {fans} ceiling fans' lamps, {lamps} round ceiling lamps ({LampIntensity} warm, {LampRange} m), {tubes} shop tubes ({TubeIntensity} cool, {TubeRange} m), " +
                           $"no shadows; at most {LampSet.MaxOn} lit at once within {LampSet.Radius:0} m" +
                           (unreadable > 0 ? $"; {unreadable} lamp meshes NOT READABLE (no lights for them)" : ""));
             if (lamps + tubes == 0) sb.AppendLine("layer 2: NO LAMPS FOUND -- check the fittings' material names");

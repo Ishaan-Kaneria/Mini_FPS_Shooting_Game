@@ -23,10 +23,12 @@ namespace FPSKit.EditorTools
     ///
     ///   1. <b>Sun and sky</b>: one sun (the theme's colour, strength and angle, shadows at full strength), the sky's ambient
     ///      (the theme's three colours), the sky's reflection and nothing else, the theme's fog, a fixed exposure. Real time:
-    ///      nothing is baked.
+    ///      nothing is baked. (Approved 2026-11-08.)
+    ///   2. <b>Real lamps</b> (his order, 2026-11-09: lamps and tubes only, rooms not darkened): a light at every round ceiling lamp (warm) and every shop tube (cool), found by their materials
+    ///      in the room meshes; the nearest few lit at a time (LampSet). The fittings glow.
     ///
-    /// Later layers (each added only once he has seen the one before): rooms darker than the street, real lamps (shop tube
-    /// lights, round room lamps) that light what is around them, a gentle eye, matte materials; the bake comes last.
+    /// Not built, set aside on branch wip/lighting-layers-2-3: rooms darker than the street (RoomAmbient). Later, each only once
+    /// he has seen the one before: a gentle eye, matte materials; the bake comes last.
     ///
     /// Run on the saved scenes, no rebuild: <c>Tools/unity-batch.sh FPSKitBatch.RelightDesert</c>. The desert's build calls it
     /// too, so a rebuilt desert comes out the same. Its report is Build/Lighting/relight.txt.
@@ -34,7 +36,7 @@ namespace FPSKit.EditorTools
     public static class FPSKitDesertLighting
     {
         /// <summary>The layers built so far (1 = sun and sky).</summary>
-        public const int Layers = 1;
+        public const int Layers = 2;
 
         /// <summary>
         /// The fixed exposure, in stops, for the whole desert (layer 1 has no eye: what the light gives is what is seen).
@@ -71,6 +73,7 @@ namespace FPSKit.EditorTools
             Strip(scenes, sb);
             SunAndSky(main, sb);
             Post(sb);
+            Lamps(scenes, sb);
             ReportLights(scenes, sb);
 
             foreach (var s in scenes) { EditorSceneManager.MarkSceneDirty(s); EditorSceneManager.SaveScene(s); }
@@ -100,7 +103,9 @@ namespace FPSKit.EditorTools
                 if (alone) Object.DestroyImmediate(go); else Object.DestroyImmediate(c);
             }
 
-            foreach (var l in All<Light>()) if (l != null && l.name == "Bounce Light") Remove(l, "bounce light");
+            foreach (var l in All<Light>()) if (l != null && l.name == "Bounce Light") { Count("bounce light"); Object.DestroyImmediate(l.gameObject); }
+            // This file's own layers from an earlier run (they are made again below).
+            foreach (var a in All<LampSet>()) if (a != null) { Count("lamp sets (earlier run)"); Object.DestroyImmediate(a.gameObject); }
             foreach (var c in All<CloudShadows>()) Remove(c, "cloud shadows");
             foreach (var e in All<EyeAdaptation>()) if (e != null) { Count("eye adaptation"); Object.DestroyImmediate(e.gameObject); }
             foreach (var r in All<IndoorReflections>()) Remove(r, "indoor reflections");
@@ -190,6 +195,115 @@ namespace FPSKit.EditorTools
             foreach (var c in profile.components) { c.name = c.GetType().Name; if (!AssetDatabase.IsSubAsset(c)) AssetDatabase.AddObjectToAsset(c, profile); }
             EditorUtility.SetDirty(profile);
             sb.AppendLine($"post: tonemapping ACES, exposure fixed at {Exposure:0.0}, bloom 0.3 over 1.1; grade, vignette and grain removed");
+        }
+
+        // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        /// <summary>A house's round ceiling lamp: a warm bulb under an opal shade.</summary>
+        static readonly Color LampColour = new Color(1f, 0.82f, 0.62f);
+        const float LampIntensity = 2.2f, LampRange = 5f;
+        /// <summary>A shop's tube: cool white, a little brighter, reaching the floor and the back wall.</summary>
+        static readonly Color TubeColour = new Color(0.92f, 0.96f, 1f);
+        const float TubeIntensity = 2.0f, TubeRange = 5.5f;
+
+        /// <summary>Layer 2: a real light at every lamp and tube fitting (found by material in the room meshes), the fittings glowing.</summary>
+        static void Lamps(List<Scene> scenes, StringBuilder sb)
+        {
+            int lamps = 0, tubes = 0, unreadable = 0;
+            foreach (var scene in scenes)
+            {
+                var lights = new List<Light>();
+                Transform holder = null;
+                foreach (var mr in scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<MeshRenderer>(true)))
+                {
+                    var mf = mr.GetComponent<MeshFilter>();
+                    var mesh = mf != null ? mf.sharedMesh : null;
+                    if (mesh == null) continue;
+                    var mats = mr.sharedMaterials;
+                    if (!mesh.isReadable)
+                    {
+                        if (mats.Any(m => m != null && (m.name.EndsWith("CeilingLampOff") || m.name.EndsWith("ShopTube")))) unreadable++;
+                        continue;
+                    }
+                    for (int s = 0; s < mats.Length && s < mesh.subMeshCount; s++)
+                    {
+                        if (mats[s] == null) continue;
+                        // The town's materials are saved as Town_<name> (FPSKitTownGround.TownFlat): matched by the end of the name.
+                        bool lamp = mats[s].name.EndsWith("CeilingLampOff"), tube = mats[s].name.EndsWith("ShopTube");
+                        if (!lamp && !tube) continue;
+                        if (holder == null) { var h = new GameObject("Lamps"); SceneManager.MoveGameObjectToScene(h, scene); holder = h.transform; }
+                        foreach (var (centre, size) in Fittings(mesh, s, mr.transform, lamp ? 0.5f : 0.9f))
+                        {
+                            var go = new GameObject(lamp ? "Lamp" : "Tube");
+                            go.transform.SetParent(holder, false);
+                            go.transform.position = centre - Vector3.up * (lamp ? 0.12f : 0.08f);
+                            var l = go.AddComponent<Light>();
+                            l.type = LightType.Point;
+                            l.color = lamp ? LampColour : TubeColour;
+                            l.intensity = lamp ? LampIntensity : TubeIntensity;
+                            l.range = lamp ? LampRange : TubeRange;
+                            l.shadows = LightShadows.None;
+                            l.lightmapBakeType = LightmapBakeType.Realtime;
+                            l.enabled = false;           // LampSet lights the nearest
+                            lights.Add(l);
+                            if (lamp) lamps++; else tubes++;
+                        }
+                    }
+                }
+                if (holder != null) holder.gameObject.AddComponent<LampSet>().Set(lights.ToArray());
+            }
+            // The fittings glow, as lit lamps do (the "off" shade was a lamp that lit nothing).
+            var shade = AssetDatabase.FindAssets("CeilingLampOff t:Material").Select(g => AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(g))).FirstOrDefault(m => m != null && m.name.EndsWith("CeilingLampOff"));
+            if (shade != null)
+            {
+                shade.EnableKeyword("_EMISSION");
+                shade.SetColor("_EmissionColor", LampColour * 1.6f);
+                shade.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                EditorUtility.SetDirty(shade);
+            }
+            sb.AppendLine($"layer 2, real lamps: {lamps} round ceiling lamps ({LampIntensity} warm, {LampRange} m), {tubes} shop tubes ({TubeIntensity} cool, {TubeRange} m), " +
+                          $"no shadows; at most {LampSet.MaxOn} lit at once within {LampSet.Radius:0} m" +
+                          (unreadable > 0 ? $"; {unreadable} lamp meshes NOT READABLE (no lights for them)" : ""));
+            if (lamps + tubes == 0) sb.AppendLine("layer 2: NO LAMPS FOUND -- check the fittings' material names");
+        }
+
+        /// <summary>The fittings drawn by one submesh: its triangles grouped by nearness (within <paramref name="join"/> m), each group's
+        /// middle and size, in world space.</summary>
+        static List<(Vector3 centre, Vector3 size)> Fittings(Mesh mesh, int sub, Transform t, float join)
+        {
+            var verts = mesh.vertices;
+            var tris = mesh.GetTriangles(sub);
+            var cells = new Dictionary<Vector3Int, List<Vector3>>();
+            for (int i = 0; i + 2 < tris.Length; i += 3)
+            {
+                var c = t.TransformPoint((verts[tris[i]] + verts[tris[i + 1]] + verts[tris[i + 2]]) / 3f);
+                var key = new Vector3Int(Mathf.FloorToInt(c.x / join), Mathf.FloorToInt(c.y / join), Mathf.FloorToInt(c.z / join));
+                if (!cells.TryGetValue(key, out var l)) cells[key] = l = new List<Vector3>();
+                l.Add(c);
+            }
+            // Cells touching each other are one fitting (a tube runs across several).
+            var seen = new HashSet<Vector3Int>();
+            var result = new List<(Vector3, Vector3)>();
+            foreach (var start in cells.Keys)
+            {
+                if (!seen.Add(start)) continue;
+                var points = new List<Vector3>();
+                var stack = new Stack<Vector3Int>(); stack.Push(start);
+                while (stack.Count > 0)
+                {
+                    var k = stack.Pop();
+                    points.AddRange(cells[k]);
+                    for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++)
+                    {
+                        var n = new Vector3Int(k.x + x, k.y + y, k.z + z);
+                        if (cells.ContainsKey(n) && seen.Add(n)) stack.Push(n);
+                    }
+                }
+                var b = new Bounds(points[0], Vector3.zero);
+                foreach (var p in points) b.Encapsulate(p);
+                result.Add((b.center, b.size));
+            }
+            return result;
         }
 
         /// <summary>Every light still in the desert (lamps, signs, fires): the next layers are planned from this list.</summary>

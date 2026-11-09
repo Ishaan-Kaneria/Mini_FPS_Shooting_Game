@@ -115,6 +115,8 @@ public class ViewProbe : MonoBehaviour
         yield return new WaitForSecondsRealtime(3f);
         // -fpskitlegacy: the lighting as before 2026-11-07 (WalkProbe.SetLighting), so one build shows before and after.
         WalkProbe.SetLighting(Array.IndexOf(Environment.GetCommandLineArgs(), "-fpskitlegacy") < 0);
+        // -fpskitlampsoff: every lamp dark (the lighting's layer 2 alone, beside layer 3).
+        if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fpskitlampsoff") >= 0) LampSet.Active = false;
         var player = GameObject.FindWithTag("Player");
         var motor = player != null ? player.GetComponent<PlayerMotor>() : null;
         var health = player != null ? player.GetComponent<Health>() : null;

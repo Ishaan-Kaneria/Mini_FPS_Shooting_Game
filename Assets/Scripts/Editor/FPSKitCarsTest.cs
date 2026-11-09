@@ -481,6 +481,9 @@ namespace FPSKit.EditorTools
                     Vector3 face = head0 != null ? head0.position : driver0.transform.position + Vector3.up * 1f;
                     From(face - tc.right * 1.6f + tc.forward * 0.5f + Vector3.up * 0.15f, face - Vector3.up * 0.25f, "driver_1_window");
                     From(face + tc.forward * 2.6f + Vector3.up * 0.3f, face - Vector3.up * 0.2f, "driver_2_windscreen");
+                    // Low at his side and from the front corner: nothing of him through the doors or the floor.
+                    From(tc.position - tc.right * 3.2f + tc.forward * 0.4f + Vector3.up * 0.7f, tc.position + Vector3.up * 0.5f, "driver_3_side_low");
+                    From(tc.position + tc.forward * 3.5f - tc.right * 2.5f + Vector3.up * 0.6f, tc.position + Vector3.up * 0.5f, "driver_4_front_corner");
                     // Getting out: stopped by gunfire, the door, the turn, standing up out of the car.
                     typeof(TrafficCar).GetField("_panicUntil", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(car0, Time.time + 60f);
                     typeof(TrafficCar).GetField("_danger", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(car0, tc.position + tc.forward * 30f);

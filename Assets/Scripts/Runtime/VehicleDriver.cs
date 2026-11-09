@@ -67,6 +67,22 @@ public class VehicleDriver : MonoBehaviour
         if (_animator != null) _animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
         _skins = GetComponentsInChildren<SkinnedMeshRenderer>(true);
         _look = GetComponentInParent<CarLook>();
+        Legs(false);
+    }
+
+    /// <summary>
+    /// His legs while he sits: folded away into his hips. The sitting clip stretches them further than a car's footwell, and they came out
+    /// through the doors and the floor (his note 2026-11-09, "the people legs are outside the car"); the doors and the dash hide where they
+    /// would be. Back the moment he gets out.
+    /// </summary>
+    void Legs(bool shown)
+    {
+        if (_animator == null || !_animator.isHuman) return;
+        foreach (var b in new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg })
+        {
+            var t = _animator.GetBoneTransform(b);
+            if (t != null) t.localScale = shown ? Vector3.one : Vector3.one * 0.001f;
+        }
     }
 
     SkinnedMeshRenderer[] _skins;
@@ -80,6 +96,7 @@ public class VehicleDriver : MonoBehaviour
     public void StartLeaving()
     {
         Leaving = true;
+        Legs(true);
         if (_animator == null) return;
         _animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         _animator.SetInteger(ActivityId, (int)LifeActivity.None);

@@ -72,6 +72,15 @@ public class Hitbox : MonoBehaviour
             info.coreCapped = true;
             info.coreCap = _wounds.CoreCapFor(info.amount);
         }
+        // A body with no EnemyWounds (the town's people, 2026-11-09) keeps the same rule from its profile: a limb takes its share of the
+        // round into the core and never below the floor. Rounds to the arms and legs hurt and lame; the head, neck and chest kill.
+        else if (_wounds == null && profile != null && owner != null && !info.fromBlast && !info.fromMelee
+                 && (BodyParts.IsLeg(Part) || BodyParts.IsArm(Part)))
+        {
+            float pool = owner.Current + owner.Shield, floor = profile.limbCoreFloor * owner.maxHealth;
+            info.coreCapped = true;
+            info.coreCap = Mathf.Clamp(info.amount * profile.limbCoreShare, 0f, Mathf.Max(0f, pool - floor));
+        }
 
         // A round through the neck opens it: he lives to clutch it and bleeds out (EnemyNeckWound; the bleeding is what kills,
         // credited to the same shooter), unless it was a heavy round, or armour is up, or he is a boss.

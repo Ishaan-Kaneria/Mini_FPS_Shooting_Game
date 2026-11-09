@@ -213,9 +213,25 @@ public class DrivableCar : MonoBehaviour
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         if (GetComponent<CarDents>() == null) gameObject.AddComponent<CarDents>();
         TuneWheels();
+        Weight();
         PeopleDoNotCollide();
         // Finer wheel physics at a crawl: at the default the car shivers when stopped.
         if (frontLeft != null) frontLeft.ConfigureVehicleSubsteps(5f, 12, 15);
+    }
+
+    /// <summary>A real car's lean, metres of anti-roll force per unit of travel difference (the saved scene's value was 5200: 1.1 degrees in a
+    /// lane change at 77 km/h, stiff and light; a saloon leans 2-4 degrees at that. Set here, not in the scene, so it holds without a patch).</summary>
+    const float AntiRollStiffness = 2600f;
+    /// <summary>The body's resistance to turning, against what its box colliders alone give: the weight of the engine, the people and the
+    /// doors sits far out from the middle of a car, and with the box's own it swung into turns like an empty shell.</summary>
+    const float YawInertia = 1.35f, RollInertia = 1.2f;
+
+    /// <summary>The car's weight as it is felt (2026-11-09, "heavier, real feel, same as in GTA"): softer lean, more inertia.</summary>
+    void Weight()
+    {
+        antiRoll = AntiRollStiffness;
+        // More inertia (YawInertia, RollInertia) was tried here and taken out the same day: set in Awake, while the car is parked
+        // kinematic, it left reversing dead (0 km/h, the nose not turning: the car test). Not used until that is understood.
     }
 
     /// <summary>Tyres and springs from the car's weight, so a minibus sits as a minibus does. About 1.5 bounces a second, damped by a third.</summary>

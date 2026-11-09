@@ -396,7 +396,7 @@ public class TrafficCar : MonoBehaviour
 
     static PhysicsMaterial _sliding;
     static PhysicsMaterial SlidingTyres => _sliding != null ? _sliding : _sliding = new PhysicsMaterial("SlidingTyres")
-        { dynamicFriction = 0.75f, staticFriction = 0.9f, frictionCombine = PhysicsMaterialCombine.Average, bounciness = 0.05f };
+        { dynamicFriction = 0.55f, staticFriction = 0.7f, frictionCombine = PhysicsMaterialCombine.Average, bounciness = 0.05f };   // GTA's slide, a little past a real car's (0.75 moved it 0.8 m from a 40 km/h side hit)
 
     void AfterCrash()
     {

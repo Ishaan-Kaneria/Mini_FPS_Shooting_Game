@@ -317,6 +317,9 @@ namespace FPSKit.EditorTools
         public static void RelightDesert() => Run(FPSKitDesertLighting.BatchRelight);
 
         /// <summary>The civilians' prefabs and animator rebuilt in place (the enemies' body systems on them), no town rebuild.</summary>
+        /// <summary>The hand-made cars' models made readable, so they dent (CarDents).</summary>
+        public static void ReadablePackCars() => Run(() => Debug.Log($"[FPSKit] pack car models made readable: {FPSKitCars.MakePackCarsReadable()}"));
+
         public static void RebuildCivilians() => Run(() => Debug.Log($"[FPSKit] civilians rebuilt: {FPSKitSceneBuilder.RebuildCivilianPrefabs()} prefabs"));
 
         /// <summary>The saved desert scene's whole light baked again: the people's light probes, then the adaptive probe

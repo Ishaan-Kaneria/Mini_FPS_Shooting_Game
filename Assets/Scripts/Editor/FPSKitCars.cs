@@ -613,8 +613,30 @@ namespace FPSKit.EditorTools
             return true;
         }
 
+        /// <summary>
+        /// The hand-made cars' models made readable (2026-11-09): a dent (CarDents) moves a car's own copy of its mesh, and their importers
+        /// kept no copy to read, so a hand-made traffic car never dented while ours did. Every model the pack cars' prefabs use.
+        /// </summary>
+        public static int MakePackCarsReadable()
+        {
+            var prefabs = AssetDatabase.FindAssets("t:Prefab", new[] { Out, FPSKitTownAssets.Out })
+                                       .Select(AssetDatabase.GUIDToAssetPath).Where(p => p.Contains("Pack") || p.Contains("Car_Sedan") || p.Contains("Car_Touring") || p.Contains("Car_Sport"));
+            int changed = 0;
+            foreach (var model in prefabs.SelectMany(p => AssetDatabase.GetDependencies(p, true)).Distinct())
+            {
+                if (!model.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase) && !model.EndsWith(".obj", System.StringComparison.OrdinalIgnoreCase)) continue;
+                if (!(AssetImporter.GetAtPath(model) is ModelImporter mi) || mi.isReadable) continue;
+                mi.isReadable = true;
+                mi.SaveAndReimport();
+                changed++;
+                Debug.Log("[FPSKit] readable for dents: " + model);
+            }
+            return changed;
+        }
+
         static GameObject[] PackTraffic()
         {
+            MakePackCarsReadable();
             var list = new List<GameObject>();
             foreach (var colour in new[] { "Sky", "White", "Maroon" })
             {

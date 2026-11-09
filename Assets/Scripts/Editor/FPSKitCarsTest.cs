@@ -469,6 +469,19 @@ namespace FPSKit.EditorTools
                 Note($"a civilian's hitboxes: {boxes}, ragdoll {(probe.GetComponent<RagdollController>() != null)}");
                 Require(boxes >= 10, "a civilian has the enemies' hitboxes");
                 Require(probe.GetComponent<RagdollController>() != null, "a civilian has a ragdoll");
+                // Shot in the leg, again and again: lamed, never killed (the enemies' rule, BodyDamageProfile.limbCoreFloor).
+                var probeHealth = probe.GetComponent<Health>();
+                var leg = probe.GetComponentsInChildren<Hitbox>().FirstOrDefault(h => BodyParts.IsLeg(h.Part));
+                probe.SetActive(true);
+                if (leg != null && probeHealth != null)
+                {
+                    for (int i = 0; i < 12; i++)
+                        leg.Receive(new DamageInfo(40f, leg.transform.position, Vector3.up, Vector3.forward, null));
+                    Note($"twelve 40-point rounds into a civilian's leg: health {probeHealth.Current:0} of {probeHealth.maxHealth:0}, dead {probeHealth.IsDead}");
+                    Require(!probeHealth.IsDead, "a leg wound never kills a civilian");
+                    var chest = probe.GetComponentsInChildren<Hitbox>().FirstOrDefault(h => h.Part == BodyPart.Torso);
+                    if (chest != null) { chest.Receive(new DamageInfo(200f, chest.transform.position, Vector3.up, Vector3.forward, null)); Require(probeHealth.IsDead, "a round to the chest does"); }
+                }
                 Object.Destroy(probe);
                 foreach (float kmh in new[] { 15f, 35f, 70f })
                 {
@@ -525,12 +538,18 @@ namespace FPSKit.EditorTools
                 yield return 0.6f;
                 Vector3 vFrom = vt.position; float yawFrom = vt.eulerAngles.y;
                 Vector3 flat2 = new Vector3(runDir.x, 0f, runDir.z).normalized;
-                float myBefore = 0f, closest = float.MaxValue;
+                float myBefore = 0f, closest = float.MaxValue, crashAt = -1f;
                 var vCols = victim.GetComponentsInChildren<Collider>().Where(c => c.enabled && !c.isTrigger).ToArray();
                 Note($"crash setup: victim at {vt.position}, layer {LayerMask.LayerToName(victim.gameObject.layer)}, colliders {vCols.Length} ({string.Join(",", vCols.Select(c => LayerMask.LayerToName(c.gameObject.layer)).Distinct())}), kinematic {victim.GetComponent<Rigidbody>()?.isKinematic}; my car at {carT.position}");
                 for (int i = 0; i < 60 * 5; i++)
                 {
-                    if (!victim.Crashed) { body.linearVelocity = flat2 * 40f / 3.6f + Vector3.up * body.linearVelocity.y; myBefore = drive.Kmh; }
+                    // Held at 40 until it meets the other car: the traffic car turns physical a moment before contact (TrafficCar.Crash),
+                    // and braking from then on made a softer crash each run (4.2, 2.7, 1.4, 0.8 m).
+                    if (!victim.Crashed || Time.time - crashAt < 0.35f)
+                    {
+                        if (victim.Crashed && crashAt < 0f) crashAt = Time.time;
+                        if (crashAt < 0f || closest > 3.6f) { body.linearVelocity = flat2 * 40f / 3.6f + Vector3.up * body.linearVelocity.y; myBefore = drive.Kmh; }
+                    }
                     else MobileInput.Move = new Vector2(0f, -1f);
                     closest = Mathf.Min(closest, Vector3.ProjectOnPlane(carT.position - vt.position, Vector3.up).magnitude);
                     yield return null;
@@ -621,10 +640,12 @@ namespace FPSKit.EditorTools
             Note("windows on the driven car: " + (glass != null && glass.windows != null ? glass.windows.Length : 0));
             // Brakes.
             MobileInput.Move = new Vector2(0f, -1f);
-            float brakeFrom = drive.Kmh, stopT = Time.time; Vector3 stopP = carT.position;
-            for (int i = 0; i < 60 * 8 && drive.CruiseSpeed > 0.1f; i++) yield return null;
-            for (int i = 0; i < 60 * 4 && drive.Kmh > 2f; i++) yield return null;
-            Note($"from {brakeFrom:0} km/h to a stop in {Time.time - stopT:0.0} s, {(carT.position - stopP).magnitude:0} m");
+            float brakeFrom = drive.Kmh, stopT = Time.time; Vector3 stopP = carT.position; float dip = 0f;
+            float Pitch() => Vector3.SignedAngle(Vector3.ProjectOnPlane(carT.forward, Vector3.up), carT.forward, carT.right);
+            float pitch0 = Pitch();
+            for (int i = 0; i < 60 * 8 && drive.CruiseSpeed > 0.1f; i++) { dip = Mathf.Max(dip, Mathf.Abs(Mathf.DeltaAngle(pitch0, Pitch()))); yield return null; }
+            for (int i = 0; i < 60 * 4 && drive.Kmh > 2f; i++) { dip = Mathf.Max(dip, Mathf.Abs(Mathf.DeltaAngle(pitch0, Pitch()))); yield return null; }
+            Note($"from {brakeFrom:0} km/h to a stop in {Time.time - stopT:0.0} s, {(carT.position - stopP).magnitude:0} m, the nose dipped {dip:0.0} degrees");
             MobileInput.Move = Vector2.zero;
             yield return 0.5f;
             typeof(DrivableCar).GetMethod("SetGun", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(drive, new object[] { false });

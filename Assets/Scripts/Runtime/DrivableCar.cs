@@ -211,6 +211,7 @@ public class DrivableCar : MonoBehaviour
         _rb.linearDamping = 0.02f;
         _rb.angularDamping = 0.25f;
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
+        if (GetComponent<CarDents>() == null) gameObject.AddComponent<CarDents>();
         TuneWheels();
         PeopleDoNotCollide();
         // Finer wheel physics at a crawl: at the default the car shivers when stopped.
@@ -784,6 +785,9 @@ public class DrivableCar : MonoBehaviour
         Vector3 v = _rb.linearVelocity;
         float speed = v.magnitude;
         if (speed < 1f) return;
+        // A traffic car about to be hit becomes a physics car the step before: hit as it rode its route, it was a wall (TrafficCar.Crash).
+        if (_rb.SweepTest(v / speed, out var ahead, speed * Time.fixedDeltaTime * 3f + 0.3f, QueryTriggerInteraction.Ignore)
+            && ahead.collider.GetComponentInParent<TrafficCar>() is TrafficCar traffic) traffic.Crash();
         Vector3 at = _rb.position + transform.up * 0.6f + v / speed * (CarLength * 0.5f + speed * 0.12f);
         int n = Physics.OverlapSphereNonAlloc(at, 1.6f, Ahead, ~0, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < n; i++)

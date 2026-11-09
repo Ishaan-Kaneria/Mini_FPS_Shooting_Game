@@ -316,6 +316,9 @@ namespace FPSKit.EditorTools
         /// <summary>The desert's lighting stripped and rebuilt from FPSKitDesertLighting's layers, on the saved scenes (no rebuild).</summary>
         public static void RelightDesert() => Run(FPSKitDesertLighting.BatchRelight);
 
+        /// <summary>The civilians' prefabs and animator rebuilt in place (the enemies' body systems on them), no town rebuild.</summary>
+        public static void RebuildCivilians() => Run(() => Debug.Log($"[FPSKit] civilians rebuilt: {FPSKitSceneBuilder.RebuildCivilianPrefabs()} prefabs"));
+
         /// <summary>The saved desert scene's whole light baked again: the people's light probes, then the adaptive probe
         /// volumes (FPSKitSceneBuilder.BakeSavedTownProbes). UNITY_GRAPHICS=1 and -force-vulkan, about ten minutes.</summary>
         public static void BakeDesertProbes() => Run(FPSKitSceneBuilder.BakeSavedTownProbes);

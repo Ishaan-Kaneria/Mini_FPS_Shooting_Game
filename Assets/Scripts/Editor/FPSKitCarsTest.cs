@@ -458,8 +458,99 @@ namespace FPSKit.EditorTools
             BackToStart();
             yield return 1f;
 
+            // People and cars (2026-11-09): the town's people have the enemies' bodies; a car hits a person by its speed.
+            var civDir = Object.FindAnyObjectByType<CivilianDirector>();
+            var civPrefab = civDir != null && civDir.prefabs != null && civDir.prefabs.Length > 0 ? civDir.prefabs[0] : null;
+            Require(civPrefab != null, "a civilian prefab to test with");
+            if (civPrefab != null)
+            {
+                var probe = Object.Instantiate(civPrefab, new Vector3(0f, -300f, 0f), Quaternion.identity);
+                int boxes = probe.GetComponentsInChildren<Hitbox>().Length;
+                Note($"a civilian's hitboxes: {boxes}, ragdoll {(probe.GetComponent<RagdollController>() != null)}");
+                Require(boxes >= 10, "a civilian has the enemies' hitboxes");
+                Require(probe.GetComponent<RagdollController>() != null, "a civilian has a ragdoll");
+                Object.Destroy(probe);
+                foreach (float kmh in new[] { 15f, 35f, 70f })
+                {
+                    BackToStart();
+                    yield return 0.6f;
+                    traffic.recycleDistance = 100000f;      // the test's player stands far off: nothing here may be put away
+                    Vector3 spot = runFrom + runDir * 22f;
+                    if (UnityEngine.AI.NavMesh.SamplePosition(spot, out var onMesh, 3f, UnityEngine.AI.NavMesh.AllAreas)) spot = onMesh.position;
+                    var man = Object.Instantiate(civPrefab, spot, Quaternion.LookRotation(-runDir));
+                    var mc = man.GetComponent<Civilian>(); var mh = man.GetComponent<Health>();
+                    var hips = man.GetComponentInChildren<Animator>().GetBoneTransform(HumanBodyBones.Hips);
+                    yield return 0.5f;
+                    Vector3 flatDir = new Vector3(runDir.x, 0f, runDir.z).normalized;
+                    float hitAt = -1f, maxUp = 0f, maxFar = 0f; bool shot = false;
+                    for (int i = 0; i < 60 * 10; i++)
+                    {
+                        if (hitAt < 0f)
+                        {
+                            body.linearVelocity = flatDir * kmh / 3.6f + Vector3.up * body.linearVelocity.y;
+                            if (mh.IsDead || mh.Current < mh.maxHealth || mc.Current == Civilian.State.Down) { hitAt = Time.time; MobileInput.Move = new Vector2(0f, -1f); }
+                        }
+                        else if (hips != null)
+                        {
+                            maxUp = Mathf.Max(maxUp, hips.position.y - spot.y);
+                            maxFar = Mathf.Max(maxFar, Vector3.ProjectOnPlane(hips.position - spot, Vector3.up).magnitude);
+                            if (!shot && Time.time - hitAt > 0.3f) { shot = true; From(spot - Vector3.Cross(Vector3.up, flatDir) * 9f + flatDir * 4f + Vector3.up * 1.6f, spot + flatDir * 4f + Vector3.up * 0.8f, $"hit_{kmh:0}kmh"); }
+                        }
+                        yield return null;
+                    }
+                    MobileInput.Move = Vector2.zero;
+                    Note($"hit at {kmh:0} km/h: {(hitAt > 0f ? "hit" : "MISSED")}, health {mh.Current:0}, {(mh.IsDead ? "dead" : mc.Current.ToString())}, thrown {maxFar:0.0} m, hips up to {maxUp:0.0} m, limping {mc.Limping}");
+                    Require(hitAt > 0f, $"the car hit him at {kmh:0} km/h");
+                    if (kmh <= 15f) Require(!mh.IsDead && mc.Current != Civilian.State.Down, "slow: knocked down and up again");
+                    if (kmh >= 70f) Require(mh.IsDead && maxFar > 6f, "fast: thrown and dead");
+                    if (hitAt > 0f && !mh.IsDead && mc.Current != Civilian.State.Down) From(hips.position - Vector3.Cross(Vector3.up, flatDir) * 4f + Vector3.up * 1.2f, hips.position, $"hit_{kmh:0}kmh_after");
+                    Object.Destroy(man);
+                }
+            }
+
+            // A traffic car hit side on at 40 km/h: shoved, turned and dented, not a wall.
+            var victim = Object.FindObjectsByType<TrafficCar>(FindObjectsSortMode.None).FirstOrDefault(c => c.isActiveAndEnabled && !c.Crashed);
+            Require(victim != null, "a traffic car to hit");
+            if (victim != null)
+            {
+                traffic.recycleDistance = 100000f;
+                BackToStart();
+                typeof(TrafficCar).GetField("route", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(victim, -1);     // off its route: it stands
+                var vt = victim.transform;
+                Vector3 at = runFrom + new Vector3(runDir.x, 0f, runDir.z).normalized * 30f;
+                vt.SetPositionAndRotation(at, Quaternion.LookRotation(Vector3.Cross(Vector3.up, new Vector3(runDir.x, 0f, runDir.z))));
+                yield return 0.6f;
+                Vector3 vFrom = vt.position; float yawFrom = vt.eulerAngles.y;
+                Vector3 flat2 = new Vector3(runDir.x, 0f, runDir.z).normalized;
+                float myBefore = 0f, closest = float.MaxValue;
+                var vCols = victim.GetComponentsInChildren<Collider>().Where(c => c.enabled && !c.isTrigger).ToArray();
+                Note($"crash setup: victim at {vt.position}, layer {LayerMask.LayerToName(victim.gameObject.layer)}, colliders {vCols.Length} ({string.Join(",", vCols.Select(c => LayerMask.LayerToName(c.gameObject.layer)).Distinct())}), kinematic {victim.GetComponent<Rigidbody>()?.isKinematic}; my car at {carT.position}");
+                for (int i = 0; i < 60 * 5; i++)
+                {
+                    if (!victim.Crashed) { body.linearVelocity = flat2 * 40f / 3.6f + Vector3.up * body.linearVelocity.y; myBefore = drive.Kmh; }
+                    else MobileInput.Move = new Vector2(0f, -1f);
+                    closest = Mathf.Min(closest, Vector3.ProjectOnPlane(carT.position - vt.position, Vector3.up).magnitude);
+                    yield return null;
+                }
+                Note($"closest the two cars came: {closest:0.0} m; my car now at {carT.position}");
+                MobileInput.Move = Vector2.zero;
+                var dents = victim.GetComponent<CarDents>();
+                var own = dents != null ? (System.Collections.IDictionary)typeof(CarDents).GetField("_own", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(dents) : null;
+                Note($"traffic car hit at {myBefore:0} km/h: crashed {victim.Crashed}, moved {(vt.position - vFrom).magnitude:0.0} m, turned {Mathf.Abs(Mathf.DeltaAngle(yawFrom, vt.eulerAngles.y)):0} degrees, dented meshes {(own != null ? own.Count : 0)}, tilt {Vector3.Angle(vt.up, Vector3.up):0}");
+                Require(victim.Crashed, "the traffic car became a physics car");
+                Require((vt.position - vFrom).magnitude > 1f, "it was shoved");
+                Require(own != null && own.Count > 0, "it was dented");
+                From(vt.position - Vector3.Cross(Vector3.up, flat2) * 0.1f - flat2 * 6f + Vector3.up * 1.8f, vt.position + Vector3.up * 0.6f, "crash_traffic");
+                From(carT.position + flat2 * 6f + Vector3.up * 1.6f, carT.position + Vector3.up * 0.6f, "crash_mine");
+            }
+
+            // Parked cars are cut out of the navmesh: people walk round them.
+            int parkedObstacles = Object.FindObjectsByType<UnityEngine.AI.NavMeshObstacle>(FindObjectsSortMode.None).Count(o => o.carving && o.transform.parent != null && o.transform.parent.name == "ParkedCars");
+            Note($"parked cars cut out of the navmesh: {parkedObstacles}");
+            Require(parkedObstacles > 50, "parked cars are obstacles");
+
             // The town's traffic, close to.
-            var moving = Object.FindObjectsByType<TrafficCar>(FindObjectsSortMode.None);
+            var moving = Object.FindObjectsByType<TrafficCar>(FindObjectsSortMode.None).Where(c => !c.Crashed).ToArray();
             Note("traffic cars: " + moving.Length);
             if (moving.Length > 0)
             {

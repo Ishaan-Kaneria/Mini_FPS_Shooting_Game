@@ -786,9 +786,21 @@ namespace FPSKit.EditorTools
                 agent.avoidancePriority = 60;
                 var cap = go.AddComponent<CapsuleCollider>();
                 cap.radius = 0.28f; cap.height = 1.72f; cap.center = new Vector3(0f, 0.86f, 0f);
+                // A trigger: the body is its bones' hitboxes, as a soldier's is, so a round finds the part it went through (his note
+                // 2026-11-09: the town's people as real as the enemies). Kept for what asks for the whole person (a seat's fit).
+                cap.isTrigger = true;
                 var hp = go.AddComponent<Health>();
                 hp.maxHealth = 100f;
                 hp.destroyOnDeath = false;
+                // The enemies' body: a collider and a hitbox on each bone that matters (head, neck, chest, arms, legs), the same
+                // damage rules by part, and a ragdoll that takes over at death and when a car throws them.
+                int civLayer = LayerMask.NameToLayer("Civilian") >= 0 ? LayerMask.NameToLayer("Civilian") : 0;
+                var profile = AssetDatabase.LoadAssetAtPath<BodyDamageProfile>(FPSKitRiggedSoldier.ProfilePath);
+                FPSKitRiggedSoldier.Hitboxes(anim, hp, profile, civLayer, out _);
+                FPSKitRiggedSoldier.Ragdoll(anim);
+                var ragdoll = go.AddComponent<RagdollController>();
+                ragdoll.animator = anim;
+                ragdoll.mainCollider = null;
                 // Culled past about a hundred metres: a person further off is a few pixels, and a body is 40-120k triangles.
                 var rends = go.GetComponentsInChildren<Renderer>();
                 var lodg = go.AddComponent<LODGroup>();
@@ -852,9 +864,73 @@ namespace FPSKit.EditorTools
                 tr.duration = 0.12f;
                 tr.canTransitionToSelf = false;
             }
+            AddBodyStates(ctrl, loco);
             EditorUtility.SetDirty(ctrl);
             return ctrl;
         }
+
+        /// <summary>
+        /// A hurt body's states (2026-11-09, the town's people as real as the enemies): a limp when a leg is hit (Limp, on until it heals,
+        /// which it does not), a flinch at each hit that does not kill (Hit, two clips by HitVariant), and getting up off the road after a
+        /// car or a blast has thrown them (GetUp, by GetUpFace: 0 on the back, 1 face down).
+        /// </summary>
+        private static void AddBodyStates(AnimatorController ctrl, AnimatorState loco)
+        {
+            var sm = ctrl.layers[0].stateMachine;
+            ctrl.AddParameter("Limp", AnimatorControllerParameterType.Bool);
+            ctrl.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
+            ctrl.AddParameter("HitVariant", AnimatorControllerParameterType.Int);
+            ctrl.AddParameter("GetUp", AnimatorControllerParameterType.Trigger);
+            ctrl.AddParameter("GetUpFace", AnimatorControllerParameterType.Int);
+
+            var limpIdle = MixamoClip("Injured/Injured_Idle");
+            var limpWalk = MixamoClip("Injured/Limp_Walk");
+            var limpRun = MixamoClip("Injured/Limp_Run");
+            AnimatorState limping = null;
+            if (limpWalk != null)
+            {
+                limping = ctrl.CreateBlendTreeInController("Limping", out var tree, 0);
+                tree.blendType = BlendTreeType.Simple1D;
+                tree.blendParameter = "Speed";
+                tree.useAutomaticThresholds = false;
+                if (limpIdle != null) tree.AddChild(limpIdle, 0f);
+                tree.AddChild(limpWalk, 1.0f);
+                if (limpRun != null) tree.AddChild(limpRun, 2.4f);
+                var into = loco.AddTransition(limping); into.AddCondition(AnimatorConditionMode.If, 0f, "Limp"); into.hasExitTime = false; into.duration = 0.3f;
+                var back = limping.AddTransition(loco); back.AddCondition(AnimatorConditionMode.IfNot, 0f, "Limp"); back.hasExitTime = false; back.duration = 0.3f;
+            }
+            var after = limping ?? loco;
+            string[] hits = { "Hits/Hit_Stomach", "Hits/Hit_Side_Big" };
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var clip = MixamoClip(hits[i]);
+                if (clip == null) continue;
+                var st = sm.AddState("Flinch" + i);
+                st.motion = clip;
+                var tr = sm.AddAnyStateTransition(st);
+                tr.AddCondition(AnimatorConditionMode.If, 0f, "Hit");
+                tr.AddCondition(AnimatorConditionMode.Equals, i, "HitVariant");
+                tr.duration = 0.08f; tr.canTransitionToSelf = false; tr.hasExitTime = false;
+                var outTr = st.AddTransition(loco); outTr.hasExitTime = true; outTr.exitTime = 0.85f; outTr.duration = 0.2f;
+            }
+            string[] ups = { "GetUp/GetUp_Back", "GetUp/GetUp_Stomach" };
+            for (int i = 0; i < ups.Length; i++)
+            {
+                var clip = MixamoClip(ups[i]);
+                if (clip == null) continue;
+                var st = sm.AddState("GetUp" + i);
+                st.motion = clip;
+                var tr = sm.AddAnyStateTransition(st);
+                tr.AddCondition(AnimatorConditionMode.If, 0f, "GetUp");
+                tr.AddCondition(AnimatorConditionMode.Equals, i, "GetUpFace");
+                tr.duration = 0.05f; tr.canTransitionToSelf = false; tr.hasExitTime = false;
+                var outTr = st.AddTransition(loco); outTr.hasExitTime = true; outTr.exitTime = 0.95f; outTr.duration = 0.25f;
+            }
+        }
+
+        /// <summary>The town's people's prefabs and animator made again in place (same paths, so the scene's references hold), without
+        /// building the town. <c>Tools/unity-batch.sh FPSKitBatch.RebuildCivilians</c>.</summary>
+        public static int RebuildCivilianPrefabs() => CivilianPrefabs().Length;
 
         /// <summary>Where people go: shop fronts, the souk, squares, the plazas, pavements of the main roads, the bus stop.</summary>
         private static List<Vector3> CivilianSpots()

@@ -89,13 +89,53 @@ public class VehicleStrike : MonoBehaviour
                 heavy = true,
                 fromMelee = true,
             };
+            // The body goes with the car (his choice 2026-11-09: real physics, by speed): taken along at a little over the car's own speed and
+            // lifted with it -- slow, knocked off their feet and up again hurt; at town speed thrown; fast, thrown far and dead. The side of a
+            // car going by takes them less far.
+            Vector3 carVelocity = _body != null && !_body.isKinematic ? _body.linearVelocity : transform.forward * Speed;
+            Vector3 flatCar = Vector3.ProjectOnPlane(carVelocity, Vector3.up);
+            Vector3 thrown = flatCar * (share < 1f ? 0.6f : 1.0f);
+            float lift = Mathf.Min(speed * 0.3f, 5f);
+            bool lethal = damage >= health.Current + health.Shield;
+            var ragdoll = health.GetComponent<RagdollController>();
+            // A death by a car is the throw itself, never a death clip first.
+            if (lethal && ragdoll != null && !ragdoll.IsRagdolled) ragdoll.SetRagdollActive(true);
             health.ApplyDamage(info);
-            var body = c.attachedRigidbody;
-            if (body != null && !body.isKinematic) body.AddForce(push * speed * 60f, ForceMode.Impulse);
+            if (health.IsDead)
+            {
+                Throw(health.GetComponentsInChildren<Rigidbody>(), thrown, lift);
+            }
+            else if (health.TryGetComponent<Civilian>(out var civilian)) civilian.KnockDown(thrown, lift, transform.position);
+            else if (health.TryGetComponent<EnemyAI>(out var enemy)) enemy.Knock(thrown + Vector3.up * lift, 1.2f, Mathf.Min(4f, speed * 0.4f));
             PassThrough(health);
             NoiseSystem.Emit(c.transform.position, 30f, NoiseKind.Violence, Driver != null ? Driver : gameObject);
             Struck?.Invoke(this, speed);
         }
+    }
+
+    /// <summary>
+    /// A body taken by a car: the bumper sweeps the legs, so the lower a part the faster it goes (a quarter over the car's speed at the
+    /// feet, a little over half at the head), and it tips over the bonnet and turns as it flies, not off stiff and upright as a plank
+    /// (the first pictures, 2026-11-09). <paramref name="lift"/> is the upward speed at the hips.
+    /// </summary>
+    public static void Throw(Rigidbody[] bones, Vector3 flat, float lift)
+    {
+        float low = float.MaxValue, high = float.MinValue;
+        foreach (var b in bones) if (b != null) { low = Mathf.Min(low, b.worldCenterOfMass.y); high = Mathf.Max(high, b.worldCenterOfMass.y); }
+        float span = Mathf.Max(0.5f, high - low);
+        foreach (var b in bones)
+        {
+            if (b == null || b.isKinematic) continue;
+            float t = Mathf.Clamp01((b.worldCenterOfMass.y - low) / span);
+            b.linearVelocity = flat * Mathf.Lerp(1.25f, 0.55f, t) + Vector3.up * lift * Mathf.Lerp(0.7f, 1.1f, t) + Random.insideUnitSphere * 0.3f;
+        }
+    }
+
+    static float BodyMass(Health h)
+    {
+        float m = 0f;
+        foreach (var b in h.GetComponentsInChildren<Rigidbody>()) if (b != null) m += b.mass;
+        return m > 1f ? m : 70f;
     }
 
     /// <summary>A car driven by physics rolls on through a man it has knocked aside; against his collider it stopped as if at a wall.</summary>

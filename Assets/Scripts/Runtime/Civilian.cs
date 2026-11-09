@@ -31,7 +31,7 @@ public class Civilian : MonoBehaviour
     public Animator animator;
     public Health health;
 
-    public enum State { Idle, Walk, Flee, Dead }
+    public enum State { Idle, Walk, Flee, Down, Dead }
     public State Current { get; private set; }
 
     /// <summary>True while running from danger: the director does not recycle a fleeing civilian in view.</summary>
@@ -51,30 +51,118 @@ public class Civilian : MonoBehaviour
     static readonly int DieId = Animator.StringToHash("Die");
     static readonly int DieVariantId = Animator.StringToHash("DieVariant");
     static readonly int ActivityId = Animator.StringToHash("Activity");
+    static readonly int LimpId = Animator.StringToHash("Limp");
+    static readonly int HitId = Animator.StringToHash("Hit");
+    static readonly int HitVariantId = Animator.StringToHash("HitVariant");
+    static readonly int GetUpId = Animator.StringToHash("GetUp");
+    static readonly int GetUpFaceId = Animator.StringToHash("GetUpFace");
+
+    RagdollController _ragdoll;
+    bool _limping;
+
+    /// <summary>A leg has been hit: they limp for good, at about half pace (as a wounded soldier does).</summary>
+    public bool Limping => _limping;
 
     void Awake()
     {
         _agent = GetComponent<NavMeshAgent>();
         if (health == null) health = GetComponent<Health>();
+        _ragdoll = GetComponent<RagdollController>();
     }
 
     void OnEnable()
     {
         _heard = NoiseSystem.Latest;
         _nextSense = Time.time + Random.value * 0.3f;
-        if (health != null) health.Died += OnDied;
+        if (health != null) { health.Died += OnDied; health.Damaged += OnDamaged; }
         Current = State.Idle;
         _until = Time.time + Random.Range(1f, idleTime.y);
     }
 
     void OnDisable()
     {
-        if (health != null) health.Died -= OnDied;
+        if (health != null) { health.Died -= OnDied; health.Damaged -= OnDamaged; }
+    }
+
+    /// <summary>
+    /// Hurt and still alive (2026-11-09: the town's people as real as the enemies): a flinch at every hit, a limp for good from a hit in
+    /// the leg, and running from whoever did it. A body thrown by a car or a blast is handled by <see cref="KnockDown"/>.
+    /// </summary>
+    void OnDamaged(Health h, DamageInfo info)
+    {
+        if (Current == State.Dead || Current == State.Down || h.IsDead) return;
+        if (animator != null && animator.enabled)
+        {
+            animator.SetInteger(HitVariantId, info.amount > h.maxHealth * 0.3f ? 1 : 0);
+            animator.SetTrigger(HitId);
+        }
+        if (BodyParts.IsLeg(info.part)) Limp();
+        Alarm(info.source != null ? info.source.transform.position : transform.position - transform.forward * 5f);
+    }
+
+    void Limp()
+    {
+        if (_limping) return;
+        _limping = true;
+        if (animator != null) animator.SetBool(LimpId, true);
+    }
+
+    float Pace(float speed) => _limping ? speed * 0.45f : speed;
+
+    /// <summary>
+    /// Thrown off their feet (a car, a blast): the ragdoll takes them at <paramref name="thrown"/> (VehicleStrike.Throw), and if
+    /// they live they get up off the road, from the back or the front as they lie, hurt and limping, and run.
+    /// </summary>
+    public void KnockDown(Vector3 thrown, float lift, Vector3 danger)
+    {
+        if (Current == State.Dead || _ragdoll == null) return;
+        if (_agent.isOnNavMesh) _agent.ResetPath();
+        _agent.enabled = false;
+        Current = State.Down;
+        _ragdoll.SetRagdollActive(true);
+        VehicleStrike.Throw(GetComponentsInChildren<Rigidbody>(), thrown, lift);
+        StopAllCoroutines();
+        StartCoroutine(GetUpAfter(danger));
+    }
+
+    System.Collections.IEnumerator GetUpAfter(Vector3 danger)
+    {
+        var hips = animator != null && animator.isHuman ? animator.GetBoneTransform(HumanBodyBones.Hips) : null;
+        var hipsBody = hips != null ? hips.GetComponent<Rigidbody>() : null;
+        float from = Time.time;
+        // Down until the body has come to rest (or four seconds), then a moment lying there.
+        yield return new WaitForSeconds(0.8f);
+        while (Time.time - from < 4f && hipsBody != null && hipsBody.linearVelocity.magnitude > 0.25f) yield return null;
+        yield return new WaitForSeconds(Random.Range(0.6f, 1.4f));
+        if (Current == State.Dead || health == null || health.IsDead || hips == null) yield break;
+        // The person stands where the hips lie, facing along the body; face up or face down picks the clip.
+        bool faceUp = Vector3.Dot(hips.forward, Vector3.up) > 0f;
+        Vector3 along = Vector3.ProjectOnPlane(hips.up, Vector3.up);
+        if (along.sqrMagnitude < 0.01f) along = transform.forward;
+        Vector3 at = hips.position;
+        if (NavMesh.SamplePosition(at, out var ground, 2f, NavMesh.AllAreas)) at = ground.position;
+        else if (Physics.Raycast(hips.position + Vector3.up, Vector3.down, out var hit, 4f, ~LayerMask.GetMask("Civilian", "Enemy", "Player"), QueryTriggerInteraction.Ignore)) at = hit.point;
+        _ragdoll.SetRagdollActive(false);
+        transform.SetPositionAndRotation(at, Quaternion.LookRotation(faceUp ? -along.normalized : along.normalized, Vector3.up));
+        if (animator != null)
+        {
+            animator.Rebind();
+            animator.Update(0f);
+            animator.SetInteger(GetUpFaceId, faceUp ? 0 : 1);
+            animator.SetTrigger(GetUpId);
+        }
+        Limp();
+        yield return new WaitForSeconds(2.3f);
+        if (Current == State.Dead || health == null || health.IsDead) yield break;
+        _agent.enabled = true;
+        if (_agent.isOnNavMesh) _agent.Warp(transform.position);
+        Current = State.Idle;
+        Alarm(danger);
     }
 
     void Update()
     {
-        if (Current == State.Dead) return;
+        if (Current == State.Dead || Current == State.Down) return;
 
         if (Time.time >= _nextSense)
         {
@@ -112,12 +200,12 @@ public class Civilian : MonoBehaviour
     /// <summary>Run from <paramref name="danger"/>: to a doorway if one is near and not towards it, else away.</summary>
     public void Alarm(Vector3 danger)
     {
-        if (Current == State.Dead || director == null || !_agent.isOnNavMesh) return;
+        if (Current == State.Dead || Current == State.Down || director == null || !_agent.isOnNavMesh) return;
         if (Current == State.Flee && Time.time < _until) return;
         if (animator != null) animator.SetInteger(ActivityId, 0);
         var (target, door) = director.HideFrom(danger, transform.position);
         _toDoor = door;
-        _agent.speed = runSpeed;
+        _agent.speed = Pace(runSpeed);
         _agent.SetDestination(target);
         Current = State.Flee;
         _until = Time.time + 2f;
@@ -127,7 +215,7 @@ public class Civilian : MonoBehaviour
     {
         if (!_agent.isOnNavMesh) return;
         if (animator != null) animator.SetInteger(ActivityId, 0);
-        _agent.speed = walkSpeed;
+        _agent.speed = Pace(walkSpeed);
         _agent.SetDestination(to);
         Current = State.Walk;
     }
@@ -148,9 +236,11 @@ public class Civilian : MonoBehaviour
     void OnDied(Health h)
     {
         Current = State.Dead;
+        StopAllCoroutines();
         if (_agent.isOnNavMesh) _agent.ResetPath();
         _agent.enabled = false;
-        if (animator != null)
+        // A body with a ragdoll falls as the enemies do (RagdollController, on the same death); the old death clips only without one.
+        if (animator != null && _ragdoll == null)
         {
             animator.SetInteger(DieVariantId, Random.Range(0, 3));
             animator.SetTrigger(DieId);

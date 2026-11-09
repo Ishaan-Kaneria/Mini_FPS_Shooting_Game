@@ -921,7 +921,7 @@ namespace FPSKit.EditorTools
         /// A collider on each bone that matters, laid along the bone to the next joint, with a
         /// Hitbox naming the part. The head is a sphere and the only headshot.
         /// </summary>
-        static int Hitboxes(Animator animator, Health owner, BodyDamageProfile profile, int layer, out Transform head)
+        internal static int Hitboxes(Animator animator, Health owner, BodyDamageProfile profile, int layer, out Transform head)
         {
             head = animator.GetBoneTransform(HumanBodyBones.Head);
             int built = 0;
@@ -999,7 +999,7 @@ namespace FPSKit.EditorTools
         /// until the RagdollController lets go. The limits are a body's, roughly: the spine
         /// and neck bend a little, shoulders and hips a lot, elbows and knees one way.
         /// </summary>
-        static void Ragdoll(Animator animator)
+        internal static void Ragdoll(Animator animator)
         {
             var bodies = new Dictionary<Transform, Rigidbody>();
             foreach (var (boneId, _, _, mass) in Parts)

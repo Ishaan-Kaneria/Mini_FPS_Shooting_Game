@@ -59,6 +59,10 @@ public class TrafficCar : MonoBehaviour
         _reaction = Random.Range(reactionTime.x, reactionTime.y);
         SeatDriver();
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
+        // People walk round it, never through it: cut out of the navmesh whenever it stands (the prefab's obstacle did not cut).
+        if (TryGetComponent<UnityEngine.AI.NavMeshObstacle>(out var obstacle)) { obstacle.carving = true; obstacle.carveOnlyStationary = true; }
+        else CarObstacles.Add(gameObject, true);
+        if (GetComponent<CarDents>() == null) gameObject.AddComponent<CarDents>();
         _strike = GetComponent<VehicleStrike>();
         if (_strike != null) _strike.Struck += OnStruck;
         _look = GetComponent<CarLook>();
@@ -80,6 +84,7 @@ public class TrafficCar : MonoBehaviour
     void Update()
     {
         if (director == null || route < 0) return;
+        if (_crashed) { AfterCrash(); return; }
         if (_driverDead) { Coast(); return; }
         if (_leaveAt >= 0f && Time.time >= _leaveAt && _speed < 1f) LeaveCar();
         var r = director.routes[route];
@@ -353,6 +358,58 @@ public class TrafficCar : MonoBehaviour
 
     void OnDriverDied(VehicleDriver d) => _driverDead = true;
 
+    // ------------------------------------------------------------------ crashes
+    bool _crashed;
+    Rigidbody _rb;
+
+    /// <summary>Hit by a car driven by physics: it is one too from here on (shoved, spun, slid to a stop).</summary>
+    public bool Crashed => _crashed;
+
+    /// <summary>
+    /// A traffic car rides its route as a kinematic body, which met the player's car as a wall: it did not move and the player's car
+    /// stopped dead (his note 2026-11-09, "same as in GTA"). Hit, it becomes a car of 1.3 tonnes on locked, sliding wheels: shoved and
+    /// spun by the blow, it slides to a stop where it ends up. Its driver, shaken, gets out and runs, or sits on with his hazards on.
+    /// </summary>
+    public void Crash()
+    {
+        if (_crashed) return;
+        _crashed = true;
+        _rb ??= GetComponent<Rigidbody>();
+        if (_rb == null) return;
+        // Its body's box starts at the sills (a kerb is for the wheels); with no wheels now, a box down to the road for it to slide on.
+        var skid = gameObject.AddComponent<BoxCollider>();
+        skid.center = new Vector3(0f, 0.25f, 0f);
+        skid.size = new Vector3(halfWidth * 1.9f, 0.5f, halfLength * 1.9f);
+        skid.sharedMaterial = SlidingTyres;
+        _rb.isKinematic = false;
+        _rb.mass = 1300f;
+        _rb.centerOfMass = new Vector3(0f, 0.45f, 0f);
+        _rb.linearDamping = 0.1f;
+        _rb.angularDamping = 0.6f;
+        _rb.interpolation = RigidbodyInterpolation.Interpolate;
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        _rb.linearVelocity = transform.forward * _speed;
+        _speed = 0f;
+        _panicUntil = Time.time + 60f;
+        if (_driver != null && !_driver.Dead && Random.value < 0.7f) { _danger = transform.position - transform.forward * 4f; _leaveAt = Time.time + Random.Range(1.2f, 2.5f); }
+    }
+
+    static PhysicsMaterial _sliding;
+    static PhysicsMaterial SlidingTyres => _sliding != null ? _sliding : _sliding = new PhysicsMaterial("SlidingTyres")
+        { dynamicFriction = 0.75f, staticFriction = 0.9f, frictionCombine = PhysicsMaterialCombine.Average, bounciness = 0.05f };
+
+    void AfterCrash()
+    {
+        if (_rb == null) return;
+        if (_leaveAt >= 0f && Time.time >= _leaveAt && _rb.linearVelocity.magnitude < 0.8f) LeaveCar();
+    }
+
+    void OnCollisionEnter(Collision c)
+    {
+        if (_crashed || c.rigidbody == null || c.rigidbody.isKinematic || c.relativeVelocity.magnitude < 1.5f) return;
+        Crash();
+    }
+
     /// <summary>Somebody at the wheel (VehicleDriver): one of the town's people, seated, and shot through the glass like anyone.</summary>
     void SeatDriver()
     {
@@ -364,7 +421,7 @@ public class TrafficCar : MonoBehaviour
     }
 
     /// <summary>Whether it can go back in the pool as it is: its driver alive at the wheel and its glass whole.</summary>
-    internal bool Reusable => !_driverDead && _driver != null && !_driver.Dead && (!TryGetComponent<CarGlass>(out var g) || !g.AnyBroken);
+    internal bool Reusable => !_crashed && !_driverDead && _driver != null && !_driver.Dead && (!TryGetComponent<CarGlass>(out var g) || !g.AnyBroken);
 
     /// <summary>Taken out of the pool onto a route: everything about its last drive forgotten, its driver kept.</summary>
     internal void Reuse(int newRoute, int newIndex)

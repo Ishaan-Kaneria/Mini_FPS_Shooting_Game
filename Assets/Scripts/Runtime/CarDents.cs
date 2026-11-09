@@ -85,7 +85,8 @@ public class CarDents : MonoBehaviour
             string n = mf.name.ToLowerInvariant();
             if (n.Contains("wheel") || n.Contains("tyre") || n.Contains("tire")) continue;
             var r = mf.GetComponent<Renderer>();
-            if (r == null || far.Contains(r) || r.GetComponentInParent<Health>() != null) continue;
+            // Not the person at the wheel (the car itself may carry a Health of its own: it is still its body).
+            if (r == null || far.Contains(r) || r.GetComponentInParent<VehicleDriver>() != null) continue;
             list.Add(mf);
         }
         return list.ToArray();

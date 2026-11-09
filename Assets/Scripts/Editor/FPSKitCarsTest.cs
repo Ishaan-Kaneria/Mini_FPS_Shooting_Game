@@ -518,7 +518,10 @@ namespace FPSKit.EditorTools
                 typeof(TrafficCar).GetField("route", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(victim, -1);     // off its route: it stands
                 var vt = victim.transform;
                 Vector3 at = runFrom + new Vector3(runDir.x, 0f, runDir.z).normalized * 30f;
-                vt.SetPositionAndRotation(at, Quaternion.LookRotation(Vector3.Cross(Vector3.up, new Vector3(runDir.x, 0f, runDir.z))));
+                var side = Quaternion.LookRotation(Vector3.Cross(Vector3.up, new Vector3(runDir.x, 0f, runDir.z)));
+                vt.SetPositionAndRotation(at, side);
+                // The physics body too: an interpolated kinematic body put its own pose back over the transform's (the first try left it 100 m off).
+                if (victim.TryGetComponent<Rigidbody>(out var vrb)) { vrb.position = at; vrb.rotation = side; }
                 yield return 0.6f;
                 Vector3 vFrom = vt.position; float yawFrom = vt.eulerAngles.y;
                 Vector3 flat2 = new Vector3(runDir.x, 0f, runDir.z).normalized;
@@ -542,6 +545,12 @@ namespace FPSKit.EditorTools
                 Require(own != null && own.Count > 0, "it was dented");
                 From(vt.position - Vector3.Cross(Vector3.up, flat2) * 0.1f - flat2 * 6f + Vector3.up * 1.8f, vt.position + Vector3.up * 0.6f, "crash_traffic");
                 From(carT.position + flat2 * 6f + Vector3.up * 1.6f, carT.position + Vector3.up * 0.6f, "crash_mine");
+                var myDents = drive.GetComponent<CarDents>();
+                var mine = myDents != null ? (System.Collections.IDictionary)typeof(CarDents).GetField("_own", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(myDents) : null;
+                Note($"my car's dented meshes: {(mine != null ? mine.Count : 0)}");
+                Object.Destroy(victim.gameObject);      // the wreck lay across the road the rest of the drive takes
+                BackToStart();
+                yield return 0.5f;
             }
 
             // Parked cars are cut out of the navmesh: people walk round them.

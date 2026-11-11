@@ -1168,6 +1168,24 @@ public class LevelManager : MonoBehaviour
         return SpawnTypeAt(type, position, boss);
     }
 
+    /// <summary>
+    /// Someone who fights the player but is not this level's (the town's police, PoliceDirector): the arena's first ordinary
+    /// soldier, set up as the level sets its own, and then left alone: not tracked, leashed, counted, scored or put on the map,
+    /// so no objective, clock or star changes for him.
+    /// </summary>
+    public GameObject SpawnOutsider(Vector3 position)
+    {
+        if (enemyTypes == null) return null;
+        EnemyType type = null;
+        foreach (var t in enemyTypes) if (t != null && !t.IsBoss) { type = t; break; }
+        if (type == null) return null;
+        var prefab = type.prefab != null ? type.prefab : baseEnemyPrefab;
+        if (prefab == null) return null;
+        var enemy = Instantiate(prefab, position, FacePlayerFrom(position));
+        Configure(enemy, type, false);
+        return enemy;
+    }
+
     /// <summary>Puts an enemy of <paramref name="type"/> down at <paramref name="position"/> and tracks it like any other.</summary>
     GameObject SpawnTypeAt(EnemyType type, Vector3 position, bool boss)
     {

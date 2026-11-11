@@ -277,6 +277,10 @@ namespace FPSKit.EditorTools
             cc.enabled = false; _motor.transform.position = carT.TransformPoint(drive.exitOffset) + Vector3.up * 0.1f; cc.enabled = true;
             yield return 0.3f;
             From(carT.TransformPoint(new Vector3(-5f, 1.4f, 3.5f)), carT.position + Vector3.up * 0.8f, "drive_car_outside");
+            // The handling checks need the car whole and the player alive: no wreck, no police, until their own checks at the end.
+            if (drive.TryGetComponent<CarWreck>(out var whole)) whole.indestructible = true;
+            var police = Object.FindAnyObjectByType<PoliceDirector>();
+            if (police != null) police.enabled = false;
             Private(typeof(DrivableCar), "GetIn").Invoke(drive, null);
             yield return 0.25f;
             From(carT.TransformPoint(new Vector3(-4.5f, 1.5f, 1f)), carT.position + Vector3.up * 0.8f, "drive_door_open");
@@ -492,6 +496,7 @@ namespace FPSKit.EditorTools
                     if (UnityEngine.AI.NavMesh.SamplePosition(spot, out var onMesh, 3f, UnityEngine.AI.NavMesh.AllAreas)) spot = onMesh.position;
                     var man = Object.Instantiate(civPrefab, spot, Quaternion.LookRotation(-runDir));
                     var mc = man.GetComponent<Civilian>(); var mh = man.GetComponent<Health>();
+                    mc.dodges = false;      // this measures the blow, not whether he gets out of its way
                     var hips = man.GetComponentInChildren<Animator>().GetBoneTransform(HumanBodyBones.Hips);
                     yield return 0.5f;
                     Vector3 flatDir = new Vector3(runDir.x, 0f, runDir.z).normalized;
@@ -618,6 +623,18 @@ namespace FPSKit.EditorTools
                     Note($"driver got out: driver left in the seat {car0.GetComponentInChildren<VehicleDriver>() != null}, abandoned {car0.Abandoned}");
                 }
             }
+            // The road ahead kept empty for the cruise and the brakes: traffic drives on through gunfire now (it used to stop dead for 18 s
+            // at every shot), so a car can be on this stretch, and a cruise holds its speed into whatever is there.
+            var budgetField = typeof(TrafficDirector).GetField("_budget", BindingFlags.Instance | BindingFlags.NonPublic);
+            int budgetWas = traffic != null ? (int)budgetField.GetValue(traffic) : 0;
+            if (traffic != null) budgetField.SetValue(traffic, 0);
+            foreach (var t in TrafficCar.All.ToArray())
+            {
+                Vector3 off = t.transform.position - carT.position;
+                float ahead = Vector3.Dot(off, carT.forward);
+                if (ahead > -10f && ahead < 260f && Mathf.Abs(Vector3.Dot(off, carT.right)) < 14f) Object.Destroy(t.gameObject);
+            }
+            yield return 0.2f;
             // The gun: up by firing, the car keeps going with no key down.
             MobileInput.Move = new Vector2(0f, 1f);
             yield return 3f;
@@ -635,6 +652,15 @@ namespace FPSKit.EditorTools
             Note($"gun up, no key down: {cruiseFrom:0} km/h then, {drive.Kmh:0} km/h 2.7 s later, cruise set at {drive.CruiseSpeed * 3.6f:0}");
             Require(cruiseFrom > 15f, "it was moving when the gun came up: " + cruiseFrom.ToString("0"));
             Require(drive.Kmh > cruiseFrom * 0.8f, "the car kept going");
+            {
+                var ph = _motor.GetComponent<Health>();
+                Note($"cruise diagnostics: timeScale {Time.timeScale}, player health {(ph != null ? ph.Current : -1f):0} dead {(ph != null && ph.IsDead)}, wrecked {drive.Wrecked}, body {body.linearVelocity.magnitude:0.0} m/s kinematic {body.isKinematic}, at {carT.position}");
+                foreach (var t in TrafficCar.All)
+                    if (t != null && (t.transform.position - carT.position).magnitude < 14f)
+                        Note($"  traffic {(t.transform.position - carT.position).magnitude:0.0} m off: speed {t.Speed:0.0}, crashed {t.Crashed}, abandoned {t.Abandoned}, ahead of me {Vector3.Dot(t.transform.position - carT.position, carT.forward):0.0}");
+                foreach (var c in Physics.OverlapSphere(carT.position + carT.forward * 3f + Vector3.up, 2.2f, ~0, QueryTriggerInteraction.Ignore))
+                    if (!c.transform.IsChildOf(carT)) Note($"  in front of the car: {c.name} (layer {LayerMask.LayerToName(c.gameObject.layer)}, root {c.transform.root.name})");
+            }
             Save(view, "gun_2_cruising");
             var glass = drive.GetComponent<CarGlass>();
             Note("windows on the driven car: " + (glass != null && glass.windows != null ? glass.windows.Length : 0));
@@ -659,6 +685,106 @@ namespace FPSKit.EditorTools
             Require(PlayerMotor.InputEnabled, "walking again");
             Require(Vector3.Distance(_motor.transform.position, carT.position) < 7f, "stood beside the car");
             Note("drive done");
+            if (traffic != null) budgetField.SetValue(traffic, budgetWas);
+
+            // ---- any car can be taken (2026-11-11) ----------------------------------------------------------------
+            WantedLevel.Clear();
+            var steal = typeof(DrivableCar).GetMethod("Steal", BindingFlags.Static | BindingFlags.NonPublic);
+            var stealParked = typeof(DrivableCar).GetMethod("StealParked", BindingFlags.Static | BindingFlags.NonPublic);
+            // One driving along an open road: a car in a queue behind a wreck has nowhere to go when taken.
+            TrafficCar occupied = null;
+            for (int i = 0; i < 60 * 20 && occupied == null; i++) { occupied = TrafficCar.All.FirstOrDefault(t => t != null && t.HasLiveDriver && !t.Crashed && t.Speed > 5f); yield return null; }
+            Require(occupied != null, "a traffic car with a driver to take");
+            if (occupied != null)
+            {
+                var taken = steal.Invoke(null, new object[] { occupied, occupied.transform.position - occupied.transform.right * 2f }) as DrivableCar;
+                Require(taken != null, "a traffic car became a car to drive");
+                yield return 0.2f;
+                if (taken != null)
+                {
+                    Require(taken.GetComponent<TrafficCar>() == null, "it is the traffic's no longer");
+                    Require(taken.GetComponentInChildren<VehicleDriver>() == null, "its driver is out of it");
+                    Require(WantedLevel.Stars >= 1, "taking it from a driver is a crime: stars " + WantedLevel.Stars);
+                    if (taken.TryGetComponent<CarWreck>(out var takenWhole)) takenWhole.indestructible = true;
+                    Private(typeof(DrivableCar), "GetIn").Invoke(taken, null);
+                    yield return 1f;
+                    Require(DrivableCar.Driving == taken, "in the taken car");
+                    MobileInput.Move = new Vector2(0f, 1f);
+                    yield return 3f;
+                    MobileInput.Move = Vector2.zero;
+                    Note($"the taken car after 3 s of throttle: {taken.Kmh:0} km/h, tilt {Vector3.Angle(taken.transform.up, Vector3.up):0.0}");
+                    Require(taken.Kmh > 15f, "the taken car drives");
+                    {
+                        var tb = taken.GetComponent<Rigidbody>();
+                        int down = taken.GetComponentsInChildren<WheelCollider>().Count(w => w.isGrounded);
+                        Note($"taken car diagnostics: timeScale {Time.timeScale}, kinematic {tb.isKinematic}, body {tb.linearVelocity.magnitude:0.0} m/s, mass {tb.mass:0}, wheels down {down}, rear torque {taken.rearLeft.motorTorque:0} brake {taken.rearLeft.brakeTorque:0}, gear {taken.Gear}, rpm {taken.Rpm:0}");
+                        foreach (var c in Physics.OverlapSphere(taken.transform.position + taken.transform.forward * 3f + Vector3.up, 2.2f, ~0, QueryTriggerInteraction.Ignore))
+                            if (!c.transform.IsChildOf(taken.transform)) Note($"  in front of the taken car: {c.name} (layer {LayerMask.LayerToName(c.gameObject.layer)}, root {c.transform.root.name})");
+                    }
+                    From(taken.transform.TransformPoint(new Vector3(-4f, 1.6f, -5f)), taken.transform.position + Vector3.up * 0.8f, "taken_car");
+                    Private(typeof(DrivableCar), "AskOut").Invoke(taken, null);
+                    yield return 3f;
+                    Require(DrivableCar.Driving == null, "out of the taken car");
+                }
+            }
+            var parkedList = typeof(DrivableCar).GetField("_parked", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null) as System.Collections.Generic.List<Transform>;
+            Note("parked cars that can be taken: " + (parkedList != null ? parkedList.Count : 0));
+            Require(parkedList != null && parkedList.Count > 0, "parked cars can be taken");
+            DrivableCar fromParked = null;
+            if (parkedList != null && parkedList.Count > 0)
+            {
+                var holder = parkedList.OrderBy(t => t == null ? float.MaxValue : (t.position - _motor.transform.position).sqrMagnitude).First();
+                string was = holder.name;
+                fromParked = stealParked.Invoke(null, new object[] { holder }) as DrivableCar;
+                Require(fromParked != null, "a parked " + was + " became a car to drive");
+                yield return 0.3f;
+            }
+            // ---- a car can be destroyed -----------------------------------------------------------------------------
+            if (fromParked != null && fromParked.TryGetComponent<CarWreck>(out var wreck))
+            {
+                var wt = fromParked.transform;
+                wreck.Hurt(wreck.strength * 0.6f, null);
+                yield return 1f;
+                Require(!wreck.Burning && wreck.Left01 < 0.5f, "hurt past half it smokes and does not yet burn");
+                From(wt.TransformPoint(new Vector3(-4f, 1.8f, 5f)), wt.position + Vector3.up * 0.8f, "wreck_1_smoking");
+                wreck.Hurt(wreck.strength, null);
+                Require(wreck.Burning, "all its strength gone, it is on fire");
+                yield return 1.5f;
+                From(wt.TransformPoint(new Vector3(-4f, 1.8f, 5f)), wt.position + Vector3.up * 0.8f, "wreck_2_burning");
+                yield return 5f;
+                Require(wreck.Burnt, "the tank went up");
+                Require(fromParked.Wrecked, "a burnt car cannot be driven");
+                From(wt.TransformPoint(new Vector3(-4f, 1.8f, 5f)), wt.position + Vector3.up * 0.8f, "wreck_3_burnt");
+            }
+            // ---- the police come ------------------------------------------------------------------------------------
+            if (police != null)
+            {
+                police.enabled = true;
+                WantedLevel.Clear();
+                WantedLevel.Report(WantedLevel.Crime.KilledCivilian, _motor.transform.position);
+                Require(WantedLevel.Stars == 2, "a civilian killed is two stars: " + WantedLevel.Stars);
+                TrafficCar patrol = null;
+                for (int i = 0; i < 60 * 20 && patrol == null; i++) { patrol = TrafficCar.All.FirstOrDefault(t => t != null && t.IsPolice); yield return null; }
+                Require(patrol != null, "a police car was sent");
+                if (patrol != null)
+                {
+                    float from = Vector3.Distance(patrol.transform.position, _motor.transform.position);
+                    for (int i = 0; i < 60 * 40 && !patrol.Arrived; i++) yield return null;
+                    float to = Vector3.Distance(patrol.transform.position, _motor.transform.position);
+                    yield return 1.5f;
+                    int officers = Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None).Count(e => e.name == "PoliceOfficer");
+                    Note($"police car diagnostics: speed {patrol.Speed:0.0}, crashed {patrol.Crashed}, abandoned {patrol.Abandoned}, timeScale {Time.timeScale}");
+                    foreach (var c in Physics.OverlapSphere(patrol.transform.position + patrol.transform.forward * 4f + Vector3.up, 2.5f, ~0, QueryTriggerInteraction.Ignore))
+                        if (!c.transform.IsChildOf(patrol.transform)) Note($"  in front of the police car: {c.name} (layer {LayerMask.LayerToName(c.gameObject.layer)}, root {c.transform.root.name})");
+                    Note($"police car: sent from {from:0} m, arrived {patrol.Arrived}, stopped {to:0} m from the player, officers out {officers}");
+                    Require(patrol.Arrived, "the police car arrived");
+                    Require(officers > 0, "officers got out");
+                    From(patrol.transform.TransformPoint(new Vector3(-5f, 2f, 6f)), patrol.transform.position + Vector3.up * 0.9f, "police_car");
+                }
+                police.enabled = false;
+                WantedLevel.Clear();
+            }
+            Note("world done");
         }
     }
 }

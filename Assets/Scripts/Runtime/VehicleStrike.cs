@@ -47,26 +47,45 @@ public class VehicleStrike : MonoBehaviour
         _mask = LayerMask.GetMask("Civilian", "Enemy", "Player");
     }
 
+    /// <summary>What a blow from a car does to the player, against what it does to anyone else: he is knocked along and hurt, and
+    /// town speed (about 124 on a pool of 100, whole) was a death every time he stepped off a kerb.</summary>
+    const float PlayerShare = 0.4f;
+
     void FixedUpdate()
     {
-        // The vehicle's own speed. Worked out here from the position, a traffic car (moved each frame, read each physics step) read 12 m/s
-        // as 20 at 30 fps, and the blow grows with its square.
+        // The vehicle's own velocity. Traffic on its route is moved each frame, so its speed is the route's (worked out from the
+        // position it read 12 m/s as 20 at 30 fps, and the blow grows with its square). Anything on physics, a driven car and a traffic
+        // car after a crash alike, is taken from its body: a wreck shoved into a crowd read as standing still on the route's speed, and
+        // a car sliding sideways read as slow on its speed along its nose, and both went through people as if they were not there.
         if (_traffic == null && _body == null) { _traffic = GetComponent<TrafficCar>(); _body = GetComponent<Rigidbody>(); }
-        Speed = _traffic != null ? _traffic.Speed : _body != null && !_body.isKinematic ? Vector3.Dot(_body.linearVelocity, transform.forward) : 0f;
-        float speed = Mathf.Abs(Speed);
+        Vector3 velocity = _traffic != null && !_traffic.Crashed ? transform.forward * _traffic.Speed
+                         : _body != null && !_body.isKinematic ? _body.linearVelocity : Vector3.zero;
+        Speed = Vector3.Dot(velocity, transform.forward);
+        Vector3 flat = Vector3.ProjectOnPlane(velocity, Vector3.up);
+        float speed = flat.magnitude;
         RestoreCollisions();
         if (speed < minSpeed || _mask == 0) return;
+        Vector3 travel = flat / speed;
+        float along = Vector3.Dot(travel, transform.forward), across = Vector3.Dot(travel, transform.right);
 
-        // The bumper's box: across the front (or the back, reversing), knee to chest high.
-        float dir = Speed >= 0f ? 1f : -1f;
-        Vector3 centre = transform.TransformPoint(new Vector3(0f, 0.8f, dir * (halfLength + 0.35f)));
-        Vector3 half = new Vector3(halfWidth * 0.95f, 0.7f, 0.45f);
-        Strike(centre, half, speed, dir, 1f);
-        // Then its sides, as it goes by: someone already struck by the bumper is not struck again.
-        Strike(transform.TransformPoint(new Vector3(0f, 0.8f, 0f)), new Vector3(halfWidth + 0.08f, 0.7f, halfLength), speed, dir, sideShare);
+        // The face it leads with, knee to chest high: the bumper, the tail when reversing, or a flank when it slides.
+        Vector3 centre, half;
+        if (Mathf.Abs(along) >= Mathf.Abs(across))
+        {
+            centre = transform.TransformPoint(new Vector3(0f, 0.8f, Mathf.Sign(along) * (halfLength + 0.35f)));
+            half = new Vector3(halfWidth * 0.95f, 0.7f, 0.45f);
+        }
+        else
+        {
+            centre = transform.TransformPoint(new Vector3(Mathf.Sign(across) * (halfWidth + 0.35f), 0.8f, 0f));
+            half = new Vector3(0.45f, 0.7f, halfLength * 0.95f);
+        }
+        Strike(centre, half, speed, travel, flat, 1f);
+        // Then the rest of it, as it goes by: someone already struck by the leading face is not struck again.
+        Strike(transform.TransformPoint(new Vector3(0f, 0.8f, 0f)), new Vector3(halfWidth + 0.08f, 0.7f, halfLength), speed, travel, flat, sideShare);
     }
 
-    void Strike(Vector3 centre, Vector3 half, float speed, float dir, float share)
+    void Strike(Vector3 centre, Vector3 half, float speed, Vector3 travel, Vector3 flatCar, float share)
     {
         _hits ??= new Collider[16];
         int n = Physics.OverlapBoxNonAlloc(centre, half, _hits, transform.rotation, _mask, QueryTriggerInteraction.Ignore);
@@ -83,7 +102,9 @@ public class VehicleStrike : MonoBehaviour
 
             float over = speed - minSpeed * 0.6f;
             float damage = share * damageAt10 * (over * over) / (10f * 10f);
-            Vector3 push = (transform.forward * dir + Vector3.up * 0.3f).normalized;
+            var onFoot = health.GetComponent<PlayerMotor>();
+            if (onFoot != null) damage *= PlayerShare;
+            Vector3 push = (travel + Vector3.up * 0.3f).normalized;
             var info = new DamageInfo(damage, c.ClosestPoint(centre), -push, push, Driver != null ? Driver : gameObject)
             {
                 heavy = true,
@@ -92,8 +113,6 @@ public class VehicleStrike : MonoBehaviour
             // The body goes with the car (his choice 2026-11-09: real physics, by speed): taken along at a little over the car's own speed and
             // lifted with it -- slow, knocked off their feet and up again hurt; at town speed thrown; fast, thrown far and dead. The side of a
             // car going by takes them less far.
-            Vector3 carVelocity = _body != null && !_body.isKinematic ? _body.linearVelocity : transform.forward * Speed;
-            Vector3 flatCar = Vector3.ProjectOnPlane(carVelocity, Vector3.up);
             Vector3 thrown = flatCar * (share < 1f ? 0.6f : 1.0f);
             float lift = Mathf.Min(speed * 0.3f, 5f);
             bool lethal = damage >= health.Current + health.Shield;
@@ -107,6 +126,8 @@ public class VehicleStrike : MonoBehaviour
             }
             else if (health.TryGetComponent<Civilian>(out var civilian)) civilian.KnockDown(thrown, lift, transform.position);
             else if (health.TryGetComponent<EnemyAI>(out var enemy)) enemy.Knock(thrown + Vector3.up * lift, 1.2f, Mathf.Min(4f, speed * 0.4f));
+            // The player on foot: carried off his feet along the car's way, so the car does not go on through where he stands.
+            else if (onFoot != null) onFoot.Shove(thrown * 1.1f + Vector3.up * lift * 0.6f);
             PassThrough(health);
             NoiseSystem.Emit(c.transform.position, 30f, NoiseKind.Violence, Driver != null ? Driver : gameObject);
             Struck?.Invoke(this, speed);

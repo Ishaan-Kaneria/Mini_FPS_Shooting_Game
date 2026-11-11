@@ -53,8 +53,32 @@ public class TrafficCar : MonoBehaviour
 
     public float Speed => _speed;
 
+    /// <summary>Every traffic car on the road (what the player can take, DrivableCar.Steal).</summary>
+    public static readonly System.Collections.Generic.List<TrafficCar> All = new System.Collections.Generic.List<TrafficCar>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() { All.Clear(); _sliding = null; }
+
+    void OnEnable() => All.Add(this);
+    void OnDisable() => All.Remove(this);
+
+    // Where it is on its route, and how far to the side of it the car itself is (pulling out round something stood in the lane).
+    Vector3 _routePos;
+    bool _routeSet;
+    float _offset, _offsetWant, _passLeft, _blockedSince = -1f, _carSince = -1f, _fleeUntil;
+
+    /// <summary>A police car (PoliceDirector): it runs the lights at speed to <see cref="policeStop"/> on its route and stands there.</summary>
+    internal bool police;
+    internal int policeStop;
+    /// <summary>One of the police's cars.</summary>
+    public bool IsPolice => police;
+    /// <summary>A police car that has reached its stop and stands.</summary>
+    public bool Arrived { get; private set; }
+    public float WheelRadius => _look != null ? _look.wheelRadius : _wheelRadius;
+
     void Start()
     {
+        if (!_routeSet) { _routePos = transform.position; _routeSet = true; }
         _heard = NoiseSystem.Latest;
         _reaction = Random.Range(reactionTime.x, reactionTime.y);
         SeatDriver();
@@ -63,6 +87,7 @@ public class TrafficCar : MonoBehaviour
         if (TryGetComponent<UnityEngine.AI.NavMeshObstacle>(out var obstacle)) { obstacle.carving = true; obstacle.carveOnlyStationary = true; }
         else CarObstacles.Add(gameObject, true);
         if (GetComponent<CarDents>() == null) gameObject.AddComponent<CarDents>();
+        if (GetComponent<CarWreck>() == null) gameObject.AddComponent<CarWreck>();
         _strike = GetComponent<VehicleStrike>();
         if (_strike != null) _strike.Struck += OnStruck;
         _look = GetComponent<CarLook>();
@@ -90,13 +115,16 @@ public class TrafficCar : MonoBehaviour
         var r = director.routes[route];
         if (index >= r.points.Length - 1) { director.Finished(this); return; }
 
-        // Danger: stop with the hazards on.
+        // Danger: the driver gets away from it, in the car or out of it.
         _onNoise ??= OnNoise;
         _heard = NoiseSystem.Listen(transform.position, 1f, _heard, _onNoise);
 
         Vector3 target = r.points[index + 1];
-        Vector3 to = target - transform.position;
+        Vector3 to = target - _routePos;
         float limit = r.speeds != null && index < r.speeds.Length ? r.speeds[index] : 9f;
+        // In a hurry: a frightened driver and a police car go well over the street's pace, and run its lights and signs.
+        bool hurry = police || Time.time < _fleeUntil;
+        if (hurry) limit *= police ? 1.8f : 1.6f;
 
         // Corners ahead: slow so the turn is taken at walking-car pace.
         if (index + 2 < r.points.Length)
@@ -109,10 +137,11 @@ public class TrafficCar : MonoBehaviour
         float want = limit;
         if (Time.time < _panicUntil) want = 0f;
         if (Time.time < _waitUntil) want = 0f;
+        if (police && index >= policeStop) { want = 0f; if (_speed < 0.3f) Arrived = true; }
 
         // Stop lines: the next one within reach decides whether we may pass.
         int stop = NextStop(r, out float stopDist);
-        if (stop >= 0 && stop != _clearedStop)
+        if (stop >= 0 && stop != _clearedStop && !hurry)
         {
             bool go = true;
             int rule = r.stopRule[stop];
@@ -140,7 +169,8 @@ public class TrafficCar : MonoBehaviour
 
         // Whatever is in front.
         float look = halfLength + gap + _speed * 1.2f;
-        bool person = false;
+        bool person = false, stood = false, playersCar = false;
+        float stoodAt = 0f;
         if (Physics.SphereCast(transform.position + Vector3.up * 0.8f + transform.forward * (halfLength - 0.6f), halfWidth * 0.8f, transform.forward,
                                out var hit, look, director.obstacleMask, QueryTriggerInteraction.Ignore))
         {
@@ -151,28 +181,62 @@ public class TrafficCar : MonoBehaviour
                 person = layer == LayerMask.NameToLayer("Civilian") || layer == LayerMask.NameToLayer("Enemy") || layer == LayerMask.NameToLayer("Player");
                 if (person && _personSince < 0f) _personSince = Time.time;
                 if (layer == LayerMask.NameToLayer("Player") && Time.time - _personSince > 0.25f) Honk();
-                if (!person || Time.time - _personSince >= _reaction)
+                // A car stood in the lane for good (its driver gone or dead, a wreck, one the player left there) is driven round, not
+                // queued behind for ever; a car only waiting its turn is waited for.
+                if (!person)
+                {
+                    var other = hit.collider.GetComponentInParent<TrafficCar>();
+                    var body = hit.collider.attachedRigidbody;
+                    playersCar = body != null && DrivableCar.Driving != null && body.gameObject == DrivableCar.Driving.gameObject;
+                    // (A police car and a frightened driver do not wait in a queue either: they go round it.)
+                    stood = other != null ? other.Abandoned || other.Crashed || other.Arrived || (hurry && other.Speed < 1f)
+                          : body == null || body.isKinematic || body.linearVelocity.sqrMagnitude < 0.25f;
+                    stoodAt = hit.distance;
+                }
+                bool pullingOut = _offsetWant != 0f && stood && hit.distance > 1.2f;
+                if ((!person || Time.time - _personSince >= _reaction) && !pullingOut)
                     want = Mathf.Min(want, Mathf.Max(0f, (hit.distance - gap) * 0.8f));
             }
         }
         if (!person) _personSince = -1f;
+        // The player's car across the road: the horn, as at a man stood there.
+        if (playersCar && _speed < 1f) { if (_carSince < 0f) _carSince = Time.time; else if (Time.time - _carSince > 0.8f) Honk(); }
+        else _carSince = -1f;
+        if (stood && _speed < 0.5f && _offsetWant == 0f)
+        {
+            if (_blockedSince < 0f) _blockedSince = Time.time;
+            else if (Time.time - _blockedSince > (hurry ? 0.4f : 2f)) TryPass(stoodAt);
+        }
+        else if (!stood) _blockedSince = -1f;
+        // Out of the lane: slowly while pulling out, at a careful pace alongside.
+        if (_offsetWant != 0f || Mathf.Abs(_offset) > 0.05f)
+            want = Mathf.Min(want, Mathf.Abs(_offset - _offsetWant) > 0.4f ? 1.8f : hurry ? 9f : 5f);
 
         _speed = Mathf.MoveTowards(_speed, want, (want < _speed ? brake : accel) * Time.deltaTime);
 
         // Move along the route, turning towards the next point.
         float step = _speed * Time.deltaTime;
+        if (_offsetWant != 0f) { _passLeft -= step; if (_passLeft <= 0f) _offsetWant = 0f; }
         while (step > 0f && index < r.points.Length - 1)
         {
             target = r.points[index + 1];
-            to = target - transform.position;
+            to = target - _routePos;
             float d = to.magnitude;
-            if (d <= step) { transform.position = target; step -= d; index++; continue; }
-            transform.position += to / d * step;
+            if (d <= step) { _routePos = target; step -= d; index++; continue; }
+            _routePos += to / d * step;
             step = 0f;
         }
+        // To the side of the route only as fast as a car can go sideways: by turning, so by its speed.
+        Vector3 along = to; along.y = 0f;
+        Vector3 right = along.sqrMagnitude > 0.0001f ? Vector3.Cross(Vector3.up, along.normalized) : transform.right;
+        float before = _offset;
+        _offset = Mathf.MoveTowards(_offset, _offsetWant, _speed * 1.1f * Time.deltaTime);
+        float sideways = Time.deltaTime > 0f ? (_offset - before) / Time.deltaTime : 0f;
+        transform.position = _routePos + right * _offset;
         if (to.sqrMagnitude > 0.0001f)
         {
             var flat = to; flat.y *= 0.5f;
+            flat = flat.normalized * Mathf.Max(_speed, 0.5f) + right * sideways;
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(flat.normalized, Vector3.up), Mathf.Clamp01(Time.deltaTime * 6f));
         }
 
@@ -265,15 +329,88 @@ public class TrafficCar : MonoBehaviour
 
     /// <summary>Whether its driver has been killed (it rolls to a stop and stays; the director leaves it).</summary>
     public bool Abandoned => _driverDead;
+    /// <summary>Someone alive at its wheel (taking it from him is a theft; an empty one is only a car).</summary>
+    public bool HasLiveDriver => _driver != null && !_driver.Dead;
 
+    /// <summary>Of the drivers who hear shooting close by, the share who stop and run on foot; the rest put their foot down.</summary>
+    const float BailShare = 0.25f;
+
+    /// <summary>
+    /// Shooting or a blast close by. Every driver in earshot used to stop dead, and every one within <see cref="fleeFrom"/> got out
+    /// and ran: one shot left the street full of empty cars with the rest queued behind them for good. Now most drive away from it,
+    /// fast and through the lights, as in GTA; a few leave the car and run. Farther off than that, they drive on.
+    /// </summary>
     void OnNoise(NoiseSystem.Noise n, float d)
     {
         if (n.kind != NoiseKind.Gunfire && n.kind != NoiseKind.Blast) return;
-        _panicUntil = Time.time + 18f;
-        if (_driver == null || _leaveAt >= 0f || Vector3.Distance(n.position, transform.position) > fleeFrom) return;
+        if (police || _driver == null || _leaveAt >= 0f || Time.time < _fleeUntil) return;
+        if (Vector3.Distance(n.position, transform.position) > fleeFrom) return;
         _danger = n.position;
-        _leaveAt = Time.time + Random.Range(0.5f, 2f);   // the time it takes to take in, then the door
+        _fleeUntil = Time.time + 20f;                        // one decision a scare, not one a shot
+        if (Random.value >= BailShare) return;
+        _panicUntil = Time.time + 8f;
+        _leaveAt = Time.time + Random.Range(0.5f, 2f);       // the time it takes to take in, then the door
     }
+
+    /// <summary>
+    /// Round something stood in the lane, <paramref name="ahead"/> metres off: out to the left (the other lane) if that is empty far
+    /// enough on, else to the right, and back in once past it. Both sides blocked, it waits and asks again.
+    /// </summary>
+    void TryPass(float ahead)
+    {
+        _blockedSince = Time.time;
+        float reach = ahead + halfLength * 4f + 12f;
+        int mask = director.obstacleMask | LayerMask.GetMask("Environment");
+        Vector3 right = transform.right;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            float off = side * (halfWidth * 2f + 0.9f);
+            Vector3 from = transform.position + Vector3.up * 1.1f + right * off;
+            if (Physics.CheckSphere(from, 0.6f, mask, QueryTriggerInteraction.Ignore)) continue;
+            if (Physics.SphereCast(from - transform.forward * halfLength, 0.6f, transform.forward, out _, reach + halfLength, mask, QueryTriggerInteraction.Ignore)) continue;
+            _offsetWant = off;
+            _passLeft = ahead + halfLength * 4f + 5f;
+            _blockedSince = -1f;
+            return;
+        }
+    }
+
+    /// <summary>
+    /// The driver out of the car because the player is taking it (DrivableCar.Steal): alive, he is put out of his door and runs; dead,
+    /// he is taken off the seat.
+    /// </summary>
+    internal void Eject(Vector3 danger)
+    {
+        StopAllCoroutines();
+        var d = _driver;
+        _driver = null;
+        if (d == null) return;
+        d.Died -= OnDriverDied; d.Died -= OnLeavingDied;
+        var people = director != null ? director.Civilians : null;
+        if (!d.Dead && people != null)
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Vector3 door = transform.TransformPoint(new Vector3(side * (halfWidth + 0.7f), 0f, seatLocal.z));
+                if (!UnityEngine.AI.NavMesh.SamplePosition(door, out var at, 2f, UnityEngine.AI.NavMesh.AllAreas)) continue;
+                Vector3 away = Vector3.ProjectOnPlane(at.position - danger, Vector3.up);
+                if (away.sqrMagnitude < 0.01f) away = transform.right * side;
+                people.Adopt(d.Source, at.position, Quaternion.LookRotation(away.normalized, Vector3.up), danger);
+                break;
+            }
+        Destroy(d.gameObject);
+    }
+
+    /// <summary>The car is on fire (CarWreck): whoever is driving stops and gets out now.</summary>
+    internal void Bail(Vector3 danger)
+    {
+        if (_driver == null || _driver.Dead || police) return;
+        _danger = danger;
+        _panicUntil = Time.time + 30f;
+        if (_leaveAt < 0f) _leaveAt = Time.time + 0.4f;
+    }
+
+    /// <summary>The box a crashed car slides on (taken off again if the car is driven away).</summary>
+    internal BoxCollider SkidBox { get; private set; }
 
     /// <summary>The horn, at someone standing in front of the car. One blast, then another while he stays there.</summary>
     void Honk()
@@ -377,7 +514,7 @@ public class TrafficCar : MonoBehaviour
         _rb ??= GetComponent<Rigidbody>();
         if (_rb == null) return;
         // Its body's box starts at the sills (a kerb is for the wheels); with no wheels now, a box down to the road for it to slide on.
-        var skid = gameObject.AddComponent<BoxCollider>();
+        var skid = SkidBox = gameObject.AddComponent<BoxCollider>();
         skid.center = new Vector3(0f, 0.25f, 0f);
         skid.size = new Vector3(halfWidth * 1.9f, 0.5f, halfLength * 1.9f);
         skid.sharedMaterial = SlidingTyres;
@@ -407,8 +544,13 @@ public class TrafficCar : MonoBehaviour
     void OnCollisionEnter(Collision c)
     {
         if (_crashed || c.rigidbody == null || c.rigidbody.isKinematic || c.relativeVelocity.magnitude < 1.5f) return;
+        // Only something with a car's weight: a kicked drum, a dropped rifle or a chair met at 1.5 m/s made a wreck of it for good.
+        if (c.rigidbody.mass < CrashMass) return;
         Crash();
     }
+
+    /// <summary>Kilograms under which what hit a traffic car is a thing in the road, not a crash.</summary>
+    const float CrashMass = 400f;
 
     /// <summary>Somebody at the wheel (VehicleDriver): one of the town's people, seated, and shot through the glass like anyone.</summary>
     void SeatDriver()
@@ -421,12 +563,14 @@ public class TrafficCar : MonoBehaviour
     }
 
     /// <summary>Whether it can go back in the pool as it is: its driver alive at the wheel and its glass whole.</summary>
-    internal bool Reusable => !_crashed && !_driverDead && _driver != null && !_driver.Dead && (!TryGetComponent<CarGlass>(out var g) || !g.AnyBroken);
+    internal bool Reusable => !_crashed && !police && !_driverDead && _driver != null && !_driver.Dead && (!TryGetComponent<CarGlass>(out var g) || !g.AnyBroken);
 
     /// <summary>Taken out of the pool onto a route: everything about its last drive forgotten, its driver kept.</summary>
     internal void Reuse(int newRoute, int newIndex)
     {
         route = newRoute; index = newIndex;
+        _routePos = transform.position; _routeSet = true;
+        _offset = _offsetWant = _passLeft = 0f; _blockedSince = _carSince = -1f; _fleeUntil = 0f;
         _speed = _lastSpeed = 0f;
         _waitUntil = _panicUntil = 0f;
         _stopClearedAt = -1f; _personSince = -1f; _leaveAt = -1f;

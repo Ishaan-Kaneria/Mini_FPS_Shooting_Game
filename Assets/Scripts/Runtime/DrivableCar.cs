@@ -133,6 +133,144 @@ public class DrivableCar : MonoBehaviour
 
     static readonly System.Collections.Generic.List<DrivableCar> _all = new System.Collections.Generic.List<DrivableCar>();
 
+    // ---- any car in the town can be taken ("steal any car", 2026-11-11) --------------------------------------------------
+    // Only the builder's three cars could be driven. A traffic car, or a parked one of our own makes, is made a car to drive the
+    // moment the player takes it: the same body on four wheel colliders put where its wheels are. The hand-made pack cars have
+    // no seat or doors of their own and stay scenery.
+    static readonly System.Collections.Generic.List<Transform> _parked = new System.Collections.Generic.List<Transform>();
+    static TrafficCar _takeTraffic;
+    static Transform _takeParked;
+    static TrafficDirector _town;
+
+    /// <summary>A car is in reach that interact would get into: one made to drive, one in traffic, or one parked.</summary>
+    public static bool CanTake => Offered != null || _takeTraffic != null || _takeParked != null;
+
+    /// <summary>A parked car the player may take (CarObstacles finds them when a scene loads).</summary>
+    public static void RegisterParked(Transform holder)
+    {
+        if (holder != null && holder.name.StartsWith("Cars_") && holder.name != "Cars_Pack" && !_parked.Contains(holder)) _parked.Add(holder);
+    }
+
+    /// <summary>Burnt out (CarWreck): its engine is dead and nobody gets into it.</summary>
+    public bool Wrecked { get; set; }
+
+    /// <summary>The car's velocity when it is being driven or rolling, zero while parked.</summary>
+    public Vector3 Velocity => _rb != null && !_rb.isKinematic ? _rb.linearVelocity : Vector3.zero;
+
+    /// <summary>A traffic car into a car to drive: its driver out of his door and running, the town's traffic told to forget it.</summary>
+    static DrivableCar Steal(TrafficCar t, Vector3 thief)
+    {
+        if (t == null || t.GetComponent<CarLook>() == null) return null;
+        bool occupied = t.HasLiveDriver;
+        t.Eject(thief);
+        if (t.director != null) t.director.Forget(t);
+        if (t.SkidBox != null) Destroy(t.SkidBox);
+        float halfLength = t.halfLength, halfWidth = t.halfWidth;
+        t.enabled = false;
+        Destroy(t);
+        var car = Make(t.gameObject, halfLength, halfWidth);
+        if (car != null && occupied) WantedLevel.Report(WantedLevel.Crime.CarTheft, car.transform.position);
+        return car;
+    }
+
+    /// <summary>A parked car (one merged mesh, no parts) swapped for the same make in the same paint with its doors, seat and wheels.</summary>
+    static DrivableCar StealParked(Transform holder)
+    {
+        if (holder == null) return null;
+        if (_town == null) _town = FindAnyObjectByType<TrafficDirector>();
+        if (_town == null || _town.carPrefabs == null) return null;
+        string want = "Traffic_" + holder.name.Substring("Cars_".Length);
+        GameObject prefab = null;
+        foreach (var candidate in _town.carPrefabs) if (candidate != null && candidate.name == want) { prefab = candidate; break; }
+        if (prefab == null || prefab.GetComponent<CarLook>() == null) return null;
+        var shown = holder.GetComponentInChildren<MeshRenderer>();
+        var paint = shown != null && shown.sharedMaterials.Length > 0 ? shown.sharedMaterials[0] : null;
+        var go = Instantiate(prefab, holder.position, holder.rotation);
+        float halfLength = 2.2f, halfWidth = 0.9f;
+        if (go.TryGetComponent<TrafficCar>(out var traffic))
+        {
+            halfLength = traffic.halfLength; halfWidth = traffic.halfWidth;
+            traffic.enabled = false;       // never started: no driver is seated in it
+            Destroy(traffic);
+        }
+        if (go.TryGetComponent<CarLook>(out var look)) look.SetPaint(paint);
+        var car = Make(go, halfLength, halfWidth);
+        if (car == null) { Destroy(go); return null; }
+        _parked.Remove(holder);
+        Destroy(holder.gameObject);
+        return car;
+    }
+
+    /// <summary>What the builder does for a car to drive (FPSKitCars.MakeDrivable), done in play on a car already in the world.</summary>
+    static DrivableCar Make(GameObject go, float halfLength, float halfWidth)
+    {
+        var look = go.GetComponent<CarLook>();
+        if (look == null || look.wheels == null || look.wheels.Length < 4) return null;
+        foreach (var w in look.wheels) if (w == null) return null;
+        if (look.model != null) look.model.localRotation = Quaternion.identity;      // the lean traffic gave its body
+        if (go.GetComponent<Rigidbody>() == null) go.AddComponent<Rigidbody>();
+        var car = go.AddComponent<DrivableCar>();
+        car.mass = Mathf.Clamp(1300f * (halfLength * halfWidth) / (2.2f * 0.9f), 1000f, 2100f);
+        string[] names = { "FrontLeft", "FrontRight", "RearLeft", "RearRight" };
+        var cols = new WheelCollider[4];
+        for (int k = 0; k < 4; k++)
+        {
+            var holder = new GameObject("Wheel" + names[k]) { layer = go.layer };
+            holder.transform.SetParent(go.transform, false);
+            holder.transform.localPosition = go.transform.InverseTransformPoint(look.wheels[k].position) + Vector3.up * 0.09f;
+            var wc = holder.AddComponent<WheelCollider>();
+            wc.radius = Mathf.Max(0.2f, look.wheelRadius);
+            wc.mass = car.mass * 0.015f;
+            cols[k] = wc;
+        }
+        car.frontLeft = cols[0]; car.frontRight = cols[1]; car.rearLeft = cols[2]; car.rearRight = cols[3];
+        car.wheelVisuals = (Transform[])look.wheels.Clone();
+        car.exitOffset = new Vector3(-(halfWidth + 0.9f), 0f, 0.3f);
+        if (!go.TryGetComponent<VehicleStrike>(out var strike)) strike = go.AddComponent<VehicleStrike>();
+        strike.halfLength = halfLength; strike.halfWidth = halfWidth;
+        car.Setup();
+        return car;
+    }
+
+    /// <summary>After the wheels and the weight are given to a car made in play (Awake ran before it had any).</summary>
+    void Setup()
+    {
+        _wheels = null;
+        _rb.mass = mass;
+        _rb.centerOfMass = new Vector3(0f, CarHeight * 0.26f, 0.05f);
+        TuneWheels();
+        if (frontLeft != null) frontLeft.ConfigureVehicleSubsteps(5f, 12, 15);
+    }
+
+    /// <summary>The traffic or parked car in reach to take, when no car made to drive is nearer than its own reach.</summary>
+    static void FindToTake(Transform player)
+    {
+        TrafficCar traffic = null; Transform parked = null;
+        if (player != null && Driving == null && Offered == null)
+        {
+            float best = 3.4f;
+            foreach (var t in TrafficCar.All)
+            {
+                if (t == null || t.police || Mathf.Abs(t.Speed) > 5f) continue;
+                if (t.TryGetComponent<CarWreck>(out var wreck) && wreck.Burnt) continue;
+                float d = Vector3.Distance(t.transform.position, player.position);
+                if (d < best) { best = d; traffic = t; }
+            }
+            for (int i = _parked.Count - 1; i >= 0; i--)
+            {
+                var holder = _parked[i];
+                if (holder == null) { _parked.RemoveAt(i); continue; }
+                float d = (holder.position - player.position).sqrMagnitude;
+                if (d >= best * best) continue;
+                if (holder.TryGetComponent<CarWreck>(out var wreck) && wreck.Burnt) continue;
+                best = Mathf.Sqrt(d); parked = holder; traffic = null;
+            }
+        }
+        if (traffic == _takeTraffic && parked == _takeParked) return;
+        _takeTraffic = traffic; _takeParked = parked;
+        Changed?.Invoke();
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
     {
@@ -141,6 +279,8 @@ public class DrivableCar : MonoBehaviour
         Changed = null;
         Hands = default;
         _all.Clear();
+        _parked.Clear();
+        _takeTraffic = null; _takeParked = null; _town = null;
     }
 
     enum Phase { Out, GettingIn, Seated, GettingOut }
@@ -212,6 +352,7 @@ public class DrivableCar : MonoBehaviour
         _rb.angularDamping = 0.25f;
         if (GetComponent<CarGlass>() == null) gameObject.AddComponent<CarGlass>();
         if (GetComponent<CarDents>() == null) gameObject.AddComponent<CarDents>();
+        if (GetComponent<CarWreck>() == null) gameObject.AddComponent<CarWreck>();
         TuneWheels();
         Weight();
         PeopleDoNotCollide();
@@ -299,9 +440,23 @@ public class DrivableCar : MonoBehaviour
             _nextLook = Time.time + 0.15f;
             var found = Driving != null ? null : Nearest();
             if (found != Offered) { Offered = found; Changed?.Invoke(); }
+            var onFoot = GameObject.FindWithTag("Player");
+            FindToTake(onFoot != null ? onFoot.transform : null);
         }
         if (_all.Count > 0 && _all[0] == this)
-            MobileInput.DriveLabel = Driving != null ? "GET OUT" : Offered != null ? "DRIVE" : null;
+        {
+            MobileInput.DriveLabel = Driving != null ? "GET OUT" : CanTake ? "DRIVE" : null;
+            // Someone else's car: the press takes it, and it is a car to drive from then on.
+            if (Driving == null && Offered == null && (_takeTraffic != null || _takeParked != null) && PlayerMotor.InputEnabled && InteractPressed())
+            {
+                var thief = GameObject.FindWithTag("Player");
+                var got = _takeTraffic != null ? Steal(_takeTraffic, thief != null ? thief.transform.position : transform.position) : StealParked(_takeParked);
+                _takeTraffic = null; _takeParked = null;
+                if (got != null) got.GetIn();
+                Changed?.Invoke();
+                return;
+            }
+        }
 
         if (Offered != this && Driving != this) return;
         if (Driving == this)
@@ -351,10 +506,34 @@ public class DrivableCar : MonoBehaviour
         {
             _camYaw = transform.eulerAngles.y; _camYawVel = 0f; _camDistance = cameraOffset.magnitude;
         }
+        Figure(chase);
         // The arms are in the seat's view only.
         if (_stacked != null)
             for (int i = 0; i < _stacked.Length; i++) if (_stacked[i] != null) _stacked[i].cullingMask = chase ? 0 : _stackedMasks[i];
         Changed?.Invoke();
+    }
+
+    VehicleDriver _figure;
+
+    /// <summary>
+    /// Someone at the wheel in the chase view. The player's own body is not drawn while he drives (it is legs and a shadow), so from
+    /// behind the car drove itself. One of the town's people is seated as his stand-in, hands on the wheel, seen only from outside
+    /// and touched by nothing (no colliders: rounds reach the player through DrivableCar.TakeRound as before).
+    /// </summary>
+    void Figure(bool shown)
+    {
+        if (shown && _figure == null && _look != null)
+        {
+            if (_town == null) _town = FindAnyObjectByType<TrafficDirector>();
+            var people = _town != null ? _town.driverPrefabs : null;
+            if (people != null && people.Length > 0 && people[0] != null)
+            {
+                _figure = VehicleDriver.Seat(transform, people[0], _look.seatEye - new Vector3(0f, 1.14f, 0.05f));
+                if (_figure != null)
+                    foreach (var c in _figure.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+            }
+        }
+        if (_figure != null) _figure.gameObject.SetActive(shown);
     }
 
     bool InteractPressed()
@@ -376,7 +555,7 @@ public class DrivableCar : MonoBehaviour
         DrivableCar best = null; float bestD = float.MaxValue;
         foreach (var c in _all)
         {
-            if (c == null) continue;
+            if (c == null || c.Wrecked) continue;
             float d = Vector3.Distance(c.transform.position, p.transform.position);
             if (d < c.reach && d < bestD) { best = c; bestD = d; }
         }
@@ -540,6 +719,7 @@ public class DrivableCar : MonoBehaviour
         Driving = null;
         Hands = default;
         _phase = Phase.Out;
+        Figure(false);
         if (TryGetComponent<VehicleStrike>(out var strike)) strike.Driver = null;
         SetTorque(0f, brakeTorque * 2f, 0f);
         if (_player != null)
@@ -569,7 +749,11 @@ public class DrivableCar : MonoBehaviour
     {
         if (Driving != this)
         {
-            if (!_rb.isKinematic && _rb.linearVelocity.sqrMagnitude < 0.05f && _phase == Phase.Out) _rb.isKinematic = true;
+            // Left while it was being put back on its wheels, it hung half-turned in the air until someone got in again: nothing ran
+            // here for a car with nobody in it. It is finished off, and a car left on its side is righted as a driven one is.
+            if (_rightingT >= 0f || !_rb.isKinematic) StayOnWheels(Time.fixedDeltaTime);
+            // Parked again only once it has stopped on its wheels: standing still for a moment in the air (dropped from the righting) is not parked.
+            if (_rightingT < 0f && !_rb.isKinematic && _rb.linearVelocity.sqrMagnitude < 0.05f && _phase == Phase.Out && OnItsWheels()) _rb.isKinematic = true;
             return;
         }
         float dt = Time.fixedDeltaTime;
@@ -608,6 +792,7 @@ public class DrivableCar : MonoBehaviour
         }
         else if (move.y > 0.05f) { if (_speed < -0.5f) brake = move.y; else throttle = move.y; }
         else if (move.y < -0.05f) { if (_speed > 0.8f) brake = -move.y; else throttle = move.y; }
+        if (Wrecked) { throttle = 0f; _cruise = 0f; }       // burnt out: it only rolls
         // A key is all or nothing: the foot takes a moment.
         _throttleNow = Mathf.MoveTowards(_throttleNow, throttle, dt * (Mathf.Abs(throttle) > Mathf.Abs(_throttleNow) ? 3.2f : 7f));
         _brakeNow = Mathf.MoveTowards(_brakeNow, brake, dt * 5f);
@@ -724,6 +909,13 @@ public class DrivableCar : MonoBehaviour
         }
         _displaySteer = steerSign * _steer;
         _scrub = Mathf.Max(_scrub, _drift * Mathf.Clamp01(planar / 12f));
+    }
+
+    bool OnItsWheels()
+    {
+        int grounded = 0;
+        foreach (var w in Wheels) if (w != null && w.isGrounded) grounded++;
+        return grounded >= 3;
     }
 
     void SetGrip(float rear, float front)
@@ -903,6 +1095,7 @@ public class DrivableCar : MonoBehaviour
         if (_audio != null) _audio.Drive(_rpm, Mathf.Abs(_throttleNow), Mathf.Abs(_speed), _scrub, inside, dt);
         // The wheel in his hands goes the way the key says; only the road wheels swap, backing up.
         float turn = _displaySteer * steerRatio;
+        if (_figure != null) _figure.WheelTurn = turn;
         if (_look != null)
         {
             _look.Dash(turn, Kmh, _rpm);

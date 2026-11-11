@@ -27,6 +27,9 @@ public class Civilian : MonoBehaviour
     [Tooltip("Seconds stood at a spot before walking on: a range, picked fresh each time.")]
     public Vector2 idleTime = new Vector2(5f, 16f);
 
+    [Tooltip("Gets out of the way of a car the player drives at them. They see it late (about a second), so slow cars are dodged and fast ones often are not.")]
+    public bool dodges = true;
+
     [Header("Parts")]
     public Animator animator;
     public Health health;
@@ -97,6 +100,7 @@ public class Civilian : MonoBehaviour
             animator.SetTrigger(HitId);
         }
         if (BodyParts.IsLeg(info.part)) Limp();
+        if (CivilianCasualties.ByPlayer(info.source)) WantedLevel.Report(WantedLevel.Crime.HurtCivilian, transform.position);
         Alarm(info.source != null ? info.source.transform.position : transform.position - transform.forward * 5f);
     }
 
@@ -181,14 +185,66 @@ public class Civilian : MonoBehaviour
             case State.Flee:
                 if (Arrived())
                 {
-                    if (_toDoor) Hidden = true;
-                    else Stand();
+                    // At the doorway: gone inside, if nobody is looking (the director takes them away). Watched, they stood frozen
+                    // at the door for as long as the player looked; now, after a moment, they run on away from it instead.
+                    if (!_toDoor) Stand();
+                    else if (!Hidden) { Hidden = true; _hiddenAt = Time.time; }
+                    else if (Time.time - _hiddenAt > 1.2f) RunOn();
                 }
                 break;
         }
 
+        if (Time.time >= _nextDodge) { _nextDodge = Time.time + 0.2f; Dodge(); }
+
         if (animator != null && _agent.enabled)
             animator.SetFloat(SpeedId, _agent.velocity.magnitude, 0.12f, Time.deltaTime);
+    }
+
+    float _hiddenAt, _nextDodge, _dodgeUntil;
+    Vector3 _danger;
+
+    /// <summary>On from a doorway they could not vanish into: away from what they ran from, down the street.</summary>
+    void RunOn()
+    {
+        Hidden = false;
+        _toDoor = false;
+        if (director == null || !_agent.isOnNavMesh) { Stand(); return; }
+        Vector3 away = transform.position - _danger; away.y = 0f;
+        if (away.sqrMagnitude < 0.01f) away = transform.forward;
+        Vector3 far = transform.position + away.normalized * 60f;
+        if (NavMesh.SamplePosition(far, out var hit, 20f, NavMesh.AllAreas)) far = hit.position;
+        _agent.speed = Pace(runSpeed);
+        _agent.SetDestination(far);
+        _until = Time.time + 2f;
+    }
+
+    /// <summary>
+    /// Out of the way of the car the player is driving at them: a dash to whichever side of its path they are already on. People
+    /// walked on under the bumper without a look (traffic brakes for them; the player does not).
+    /// </summary>
+    void Dodge()
+    {
+        var car = DrivableCar.Driving;
+        if (!dodges || car == null || Time.time < _dodgeUntil || !_agent.enabled || !_agent.isOnNavMesh) return;
+        Vector3 v = car.Velocity; v.y = 0f;
+        float speed = v.magnitude;
+        if (speed < 4f) return;
+        Vector3 dir = v / speed, to = transform.position - car.transform.position; to.y = 0f;
+        float ahead = Vector3.Dot(to, dir);
+        if (ahead < 0f || ahead > speed * 0.9f + 3f) return;       // seen about a second off: at 70 km/h that is not enough
+        Vector3 side = to - dir * ahead;
+        if (side.magnitude > 2.6f) return;
+        Vector3 out_ = side.sqrMagnitude > 0.01f ? side.normalized : Vector3.Cross(Vector3.up, dir);
+        Vector3 clear = transform.position + out_ * 4.5f + dir * 1.5f;
+        if (!NavMesh.SamplePosition(clear, out var hit, 3f, NavMesh.AllAreas)) return;
+        if (animator != null) animator.SetInteger(ActivityId, 0);
+        _danger = car.transform.position;
+        _toDoor = false; Hidden = false;
+        _agent.speed = Pace(runSpeed) * 1.25f;
+        _agent.SetDestination(hit.position);
+        Current = State.Flee;
+        _until = Time.time + 1.5f;
+        _dodgeUntil = Time.time + 1.5f;
     }
 
     void Heard(NoiseSystem.Noise n, float distance)
@@ -204,6 +260,8 @@ public class Civilian : MonoBehaviour
         if (Current == State.Flee && Time.time < _until) return;
         if (animator != null) animator.SetInteger(ActivityId, 0);
         var (target, door) = director.HideFrom(danger, transform.position);
+        _danger = danger;
+        Hidden = false;
         _toDoor = door;
         _agent.speed = Pace(runSpeed);
         _agent.SetDestination(target);
@@ -245,6 +303,7 @@ public class Civilian : MonoBehaviour
             animator.SetInteger(DieVariantId, Random.Range(0, 3));
             animator.SetTrigger(DieId);
         }
+        if (CivilianCasualties.ByPlayer(h.LastDamage.source)) WantedLevel.Report(WantedLevel.Crime.KilledCivilian, transform.position);
         if (CivilianCasualties.ByPlayer(h.LastDamage.source)) CivilianCasualties.Report();   // an enemy's round, the truck's or a charge is not his to answer for
         director?.Died(this);
     }

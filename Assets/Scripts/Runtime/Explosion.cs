@@ -239,6 +239,7 @@ public class Explosion : MonoBehaviour
             }
 
             collider.GetComponentInParent<LooseProp>()?.Wake();
+            collider.GetComponentInParent<CarWreck>()?.Blasted(centre, spec, attacker);     // a car takes the blast as damage, and may go up itself
             var body = collider.attachedRigidbody;
             if (body != null && !body.isKinematic && pushed.Add(body))
             {

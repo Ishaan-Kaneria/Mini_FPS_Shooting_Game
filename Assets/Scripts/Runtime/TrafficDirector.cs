@@ -59,6 +59,8 @@ public class TrafficDirector : MonoBehaviour
         };
         _budget = Mathf.RoundToInt(maxCars * share);
         for (int i = 0; i < _budget; i++) TrySpawn(true);
+        // Where there is traffic there are police to call.
+        if (GetComponent<PoliceDirector>() == null) gameObject.AddComponent<PoliceDirector>();
         StartCoroutine(Prewarm(Mathf.Max(2, _budget / 2)));
     }
 
@@ -73,6 +75,8 @@ public class TrafficDirector : MonoBehaviour
             var go = Instantiate(carPrefabs[k], new Vector3(0f, -500f, 0f), Quaternion.identity, transform);
             var car = go.GetComponent<TrafficCar>();
             if (car == null) { Destroy(go); continue; }
+            // A colour, as a car made on the road gets: the spares all came out in the prefab's own.
+            if (paints != null && paints.Length > 0 && go.TryGetComponent<CarLook>(out var look)) look.SetPaint(paints[Random.Range(0, paints.Length)]);
             car.director = this;
             car.route = -1;               // no route: it waits (Update does nothing without one), its driver seated by Start
             car.prefabIndex = k;
@@ -161,6 +165,51 @@ public class TrafficDirector : MonoBehaviour
             _cars.Add(car);
             return;
         }
+    }
+
+    /// <summary>A car no longer the traffic's (the player has taken it): not driven, recycled or counted from here on.</summary>
+    internal void Forget(TrafficCar car) => _cars.Remove(car);
+
+    /// <summary>
+    /// A car of the town's put on the road for someone else to run (PoliceDirector): on a route that passes within
+    /// <paramref name="within"/> metres of <paramref name="near"/>, far enough up it to arrive from out of sight, with the point on the
+    /// route nearest <paramref name="near"/> as its stop. Null when no route passes that way or the place is taken.
+    /// </summary>
+    internal TrafficCar SpawnToward(Vector3 near, float within, float fromFar, out int stopIndex)
+    {
+        stopIndex = -1;
+        if (routes == null || carPrefabs == null || carPrefabs.Length == 0) return null;
+        for (int tries = 0; tries < 12; tries++)
+        {
+            int ri = Random.Range(0, routes.Length);
+            var r = routes[ri];
+            if (r.points == null || r.points.Length < 4) continue;
+            int stop = -1; float best = within * within;
+            for (int i = 1; i < r.points.Length - 1; i++)
+            {
+                float sq = (r.points[i] - near).sqrMagnitude;
+                if (sq < best) { best = sq; stop = i; }
+            }
+            if (stop < 0) continue;
+            // Back up the route until it is far enough along the road.
+            int at = stop; float back = 0f;
+            while (at > 0 && back < fromFar) { back += Vector3.Distance(r.points[at], r.points[at - 1]); at--; }
+            if (back < fromFar * 0.5f) continue;
+            var p = r.points[at];
+            if (InView(p, 400f) && Vector3.Distance(p, near) < 60f) continue;
+            if (Physics.CheckSphere(p + Vector3.up, 4f, obstacleMask, QueryTriggerInteraction.Ignore)) continue;
+            var dir = r.points[at + 1] - p; dir.y = 0f;
+            var go = Instantiate(carPrefabs[Random.Range(0, carPrefabs.Length)], p, Quaternion.LookRotation(dir.normalized), transform);
+            var car = go.GetComponent<TrafficCar>();
+            if (car == null) { Destroy(go); return null; }
+            car.director = this;
+            car.prefabIndex = -1;
+            car.route = ri;
+            car.index = at;
+            stopIndex = stop;
+            return car;
+        }
+        return null;
     }
 
     CivilianDirector _civilians;

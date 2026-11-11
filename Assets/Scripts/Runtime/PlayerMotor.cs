@@ -724,6 +724,20 @@ public class PlayerMotor : MonoBehaviour
     /// Adds a camera shake impulse, 0 to 1. Impulses take the strongest rather than
     /// summing, so a burst of fire cannot stack into an unplayable screen.
     /// </summary>
+    Vector3 _shove;
+
+    /// <summary>
+    /// Thrown by something that hit him (a car on the road): carried along the ground at <paramref name="velocity"/>, which dies away
+    /// in about a second, and lifted by its upward part. His own keys still work underneath it. A car going through him as if he
+    /// were not there was the bug this answers (VehicleStrike).
+    /// </summary>
+    public void Shove(Vector3 velocity)
+    {
+        _shove = new Vector3(velocity.x, 0f, velocity.z);
+        if (velocity.y > 0f) _velocity.y = Mathf.Max(_velocity.y, velocity.y);
+        AddShake(Mathf.Clamp01(velocity.magnitude / 10f));
+    }
+
     public void AddShake(float amount) => _shake = Mathf.Clamp01(Mathf.Max(_shake, amount * GameSettings.CameraShake));
 
     /// <summary>
@@ -1001,7 +1015,8 @@ public class PlayerMotor : MonoBehaviour
 
         // Only the player's own movement moves the player: nothing is added here for a strike
         // or a shot (the melee lunge that was is gone; VerifyMeleeMotion holds the rule).
-        CollisionFlags flags = _cc.Move(_velocity * Time.deltaTime);
+        CollisionFlags flags = _cc.Move((_velocity + _shove) * Time.deltaTime);
+        _shove = Vector3.MoveTowards(_shove, Vector3.zero, 14f * Time.deltaTime);
 
         // Clipping the head on an overhang has to kill the upward velocity, or you
         // hang under the ceiling for the rest of the arc still travelling up.

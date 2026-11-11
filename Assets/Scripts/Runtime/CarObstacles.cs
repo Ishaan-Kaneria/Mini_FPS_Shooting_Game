@@ -35,7 +35,12 @@ public static class CarObstacles
         {
             foreach (var t in root.GetComponentsInChildren<Transform>(true))
                 if (t.name == "ParkedCars")
-                    foreach (Transform car in t) Add(car.gameObject, false);
+                    foreach (Transform car in t)
+                    {
+                        Add(car.gameObject, false);
+                        DrivableCar.RegisterParked(car);                      // any of them can be taken and driven
+                        if (car.GetComponent<CarWreck>() == null) car.gameObject.AddComponent<CarWreck>();   // and shot up and burnt
+                    }
             foreach (var d in root.GetComponentsInChildren<DrivableCar>(true)) Add(d.gameObject, true);
         }
     }

@@ -841,7 +841,7 @@ public class HudView : MonoBehaviour
         _pickUpScheme = GameInput.Scheme;
         var gun = _pickup != null ? _pickup.Candidate : null;
         // A car in reach, or the one being driven (DrivableCar), when there is no gun on offer.
-        if ((gun == null || gun.data == null) && (DrivableCar.Offered != null || DrivableCar.Driving != null))
+        if ((gun == null || gun.data == null) && (DrivableCar.CanTake || DrivableCar.Driving != null))
         {
             _pickUpPrompt.SetActive(true);
             var driving = DrivableCar.Driving;

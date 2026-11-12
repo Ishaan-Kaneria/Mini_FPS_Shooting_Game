@@ -34,7 +34,10 @@ public static class CivilianCasualties
 
     /// <summary>Whether a death is the player's: his gun, bomb, blow, car, or a barrel he set off. Only those cost him (an enemy's stray round did, and capped his stars).</summary>
     public static bool ByPlayer(GameObject source) =>
-        source != null && (source.CompareTag("Player") || source.GetComponentInParent<PlayerMotor>() != null);
+        source != null && (source.CompareTag("Player") || source.GetComponentInParent<PlayerMotor>() != null
+                           // His gun while he drives: the camera it hangs from is off his body then, so nothing above it said it was his,
+                           // and shooting people from the seat cost nothing.
+                           || (DrivableCar.Driving != null && source.GetComponentInParent<Weapon>() != null));
 
     /// <summary>The star cap for this many civilian deaths: 3 for none, 2 for one or two, 1 for three or more.</summary>
     public static int StarCap(int count) => count <= 0 ? 3 : count < 3 ? 2 : 1;

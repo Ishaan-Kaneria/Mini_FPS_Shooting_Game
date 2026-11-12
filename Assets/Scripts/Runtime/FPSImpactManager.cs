@@ -180,15 +180,16 @@ public class FPSImpactManager : MonoBehaviour
     // The impact
     // ------------------------------------------------------------------
     /// <summary>A round struck <paramref name="hit"/>: its mark, and what the surface throws up.</summary>
-    public void HandleImpact(RaycastHit hit) => HandleImpact(hit, SurfaceOf(hit));
+    public void HandleImpact(RaycastHit hit, GameObject source = null) => HandleImpact(hit, SurfaceOf(hit), source);
 
     /// <summary>As <see cref="HandleImpact(RaycastHit)"/>, the surface already known.</summary>
-    public void HandleImpact(RaycastHit hit, ImpactSurface surface)
+    /// <param name="source">Who fired: what the round sets off (a car shot until it burns) is theirs to answer for.</param>
+    public void HandleImpact(RaycastHit hit, ImpactSurface surface, GameObject source = null)
     {
         if (hit.collider == null || surface == ImpactSurface.Flesh || !Built) return;
         Vector3 p = hit.point, n = hit.normal.sqrMagnitude > 0.5f ? hit.normal : Vector3.up;
         // The thing struck answers too (a door shudders, a bin jumps, glass breaks): every gun comes through here.
-        WorldHit.Send(hit.collider, new WorldHitInfo { kind = WorldHitKind.Bullet, point = p, normal = n, direction = -n, impulse = WorldHit.BulletImpulse });
+        WorldHit.Send(hit.collider, new WorldHitInfo { kind = WorldHitKind.Bullet, point = p, normal = n, direction = -n, impulse = WorldHit.BulletImpulse, source = source });
         bool mark = hit.rigidbody == null;
         var s = _s;
         switch (surface)

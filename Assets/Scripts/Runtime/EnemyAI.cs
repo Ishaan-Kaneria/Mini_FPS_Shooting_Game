@@ -1214,7 +1214,7 @@ public class EnemyAI : MonoBehaviour
             var health = hit.collider.GetComponentInParent<Health>();
             if (health != null && health != _health) health.ApplyDamage(info);
             // A round into the wall, the car or the crates beside the player: its mark and dust or sparks.
-            else if (health == null) FPSImpactManager.Instance.HandleImpact(hit);
+            else if (health == null) FPSImpactManager.Instance.HandleImpact(hit, gameObject);
         }
     }
 

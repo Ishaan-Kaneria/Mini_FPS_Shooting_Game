@@ -386,6 +386,16 @@ public class TrafficCar : MonoBehaviour
         _driver = null;
         if (d == null) return;
         d.Died -= OnDriverDied; d.Died -= OnLeavingDied;
+        if (d.Dead)
+        {
+            // A dead man at the wheel is pulled out and left in the road beside his door, limp (he used to vanish).
+            d.StartLeaving();
+            d.transform.SetParent(null, true);
+            d.transform.position = transform.TransformPoint(new Vector3(-(halfWidth + 0.55f), 0.5f, seatLocal.z));
+            if (d.TryGetComponent<RagdollController>(out var limp)) limp.SetRagdollActive(true);
+            Destroy(d.gameObject, 90f);
+            return;
+        }
         var people = director != null ? director.Civilians : null;
         if (!d.Dead && people != null)
             foreach (float side in new[] { -1f, 1f })

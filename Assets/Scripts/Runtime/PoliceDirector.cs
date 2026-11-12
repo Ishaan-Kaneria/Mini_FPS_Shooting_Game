@@ -114,7 +114,7 @@ public class PoliceDirector : MonoBehaviour
 
     void Dispatch()
     {
-        var car = _traffic.SpawnToward(_player.position, 32f, arriveFrom, out int stop);
+        var car = _traffic.SpawnToward(_player.position, 32f, arriveFrom, out int stop, "Traffic_Saloon");
         if (car == null) return;
         car.police = true;
         car.policeStop = stop;

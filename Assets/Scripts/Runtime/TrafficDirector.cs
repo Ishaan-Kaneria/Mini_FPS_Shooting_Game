@@ -175,7 +175,7 @@ public class TrafficDirector : MonoBehaviour
     /// <paramref name="within"/> metres of <paramref name="near"/>, far enough up it to arrive from out of sight, with the point on the
     /// route nearest <paramref name="near"/> as its stop. Null when no route passes that way or the place is taken.
     /// </summary>
-    internal TrafficCar SpawnToward(Vector3 near, float within, float fromFar, out int stopIndex)
+    internal TrafficCar SpawnToward(Vector3 near, float within, float fromFar, out int stopIndex, string prefer = null)
     {
         stopIndex = -1;
         if (routes == null || carPrefabs == null || carPrefabs.Length == 0) return null;
@@ -199,7 +199,11 @@ public class TrafficDirector : MonoBehaviour
             if (InView(p, 400f) && Vector3.Distance(p, near) < 60f) continue;
             if (Physics.CheckSphere(p + Vector3.up, 4f, obstacleMask, QueryTriggerInteraction.Ignore)) continue;
             var dir = r.points[at + 1] - p; dir.y = 0f;
-            var go = Instantiate(carPrefabs[Random.Range(0, carPrefabs.Length)], p, Quaternion.LookRotation(dir.normalized), transform);
+            // The make asked for if the town has it (a police car is a saloon, not a taxi or a minibus), else any.
+            GameObject prefab = null;
+            if (prefer != null) foreach (var c in carPrefabs) if (c != null && c.name == prefer) { prefab = c; break; }
+            if (prefab == null) prefab = carPrefabs[Random.Range(0, carPrefabs.Length)];
+            var go = Instantiate(prefab, p, Quaternion.LookRotation(dir.normalized), transform);
             var car = go.GetComponent<TrafficCar>();
             if (car == null) { Destroy(go); return null; }
             car.director = this;

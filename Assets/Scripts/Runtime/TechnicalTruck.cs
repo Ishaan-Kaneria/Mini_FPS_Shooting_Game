@@ -165,7 +165,7 @@ public class TechnicalTruck : MonoBehaviour
             var round = new DamageInfo(damage, hit.point, hit.normal, shotDir, gameObject);
             if (DrivableCar.TakeRound(hit, round)) { }
             else if (h != null && h != gunner) h.ApplyDamage(round);
-            else if (h == null && !hit.collider.transform.IsChildOf(transform)) FPSImpactManager.Instance.HandleImpact(hit);
+            else if (h == null && !hit.collider.transform.IsChildOf(transform)) FPSImpactManager.Instance.HandleImpact(hit, gameObject);
         }
         if (audioSource != null && shot != null) audioSource.PlayOneShot(shot, 0.9f);
         NoiseSystem.Emit(muzzle.position, 90f, NoiseKind.Gunfire, gameObject);

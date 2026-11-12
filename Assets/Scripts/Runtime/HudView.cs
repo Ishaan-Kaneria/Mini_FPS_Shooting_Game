@@ -97,7 +97,7 @@ public class HudView : MonoBehaviour
     {
         public FlatRect face;
         public Image icon;
-        public TMP_Text count, key, name;
+        public TMP_Text count, key;
     }
 
     // ======================================================================
@@ -835,7 +835,14 @@ public class HudView : MonoBehaviour
             _pickUpDirty = true;
         }
         // In a car the prompt is also the speedo: it changes all the time.
-        if (DrivableCar.Driving != null) _pickUpDirty = true;
+        // Redrawn when what it says changes, not every frame: a new string and a text rebuild sixty times a second for a number that moves a few times.
+        if (DrivableCar.Driving != null)
+        {
+            int kmh = Mathf.RoundToInt(DrivableCar.Driving.Kmh);
+            bool cruising = DrivableCar.Driving.Cruising;
+            if (kmh != _shownKmh || cruising != _shownCruising) { _shownKmh = kmh; _shownCruising = cruising; _pickUpDirty = true; }
+        }
+        else _shownKmh = -1;
         if (!_pickUpDirty && GameInput.Scheme == _pickUpScheme) return;
         _pickUpDirty = false;
         _pickUpScheme = GameInput.Scheme;
@@ -867,6 +874,9 @@ public class HudView : MonoBehaviour
         bool disarmed = _weapon != null && _weapon.Disarmed;
         _pickUpText.color = disarmed ? _t.accent : _t.textPrimary;
     }
+
+    int _shownKmh = -1;
+    bool _shownCruising;
 
     GameObject _briefCard;
     bool _editing;

@@ -93,6 +93,6 @@ public class LooseProp : MonoBehaviour, IWorldHit
         if (speed < heardFrom || Time.time < _soundAt) return;
         _soundAt = Time.time + 0.12f;
         var clip = WorldSounds.Prop(stuff);
-        if (clip != null) AudioSource.PlayClipAtPoint(clip, transform.position, Mathf.Clamp01(speed / 6f));
+        if (clip != null) OneShotAudio.Play(clip, transform.position, Mathf.Clamp01(speed / 6f));
     }
 }

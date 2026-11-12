@@ -172,6 +172,7 @@ public class VehicleDriver : MonoBehaviour
     }
 
     const float HeadTop = 0.16f, RoofGap = 0.06f;
+    static readonly float[] BothSides = { -1f, 1f };
 
     /// <summary>
     /// At the wheel, not just sitting (his note 2026-11-09, "the person sitting in it is artificial"): both hands on the rim at ten and
@@ -189,7 +190,7 @@ public class VehicleDriver : MonoBehaviour
         Vector3 chest = lS != null && rS != null ? (lS.position + rS.position) * 0.5f : transform.position + car.up * 1.1f;
         Vector3 fakeHub = chest + car.forward * 0.42f - car.up * 0.2f;
         Vector3 fakeAxis = (car.forward * 0.85f - car.up * 0.5f).normalized;
-        foreach (float side in new[] { -1f, 1f })
+        foreach (float side in BothSides)       // every frame he is seen: not a new array each time
         {
             var upper = _animator.GetBoneTransform(side < 0f ? HumanBodyBones.LeftUpperArm : HumanBodyBones.RightUpperArm);
             var lower = _animator.GetBoneTransform(side < 0f ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);

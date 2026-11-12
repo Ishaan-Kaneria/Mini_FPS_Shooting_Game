@@ -34,7 +34,7 @@ public class CarLook : MonoBehaviour
     Quaternion _steerRest, _needleSpeedRest, _needleRpmRest;
     bool _rested;
     float[] _spin;
-    float _lastSteer = float.NaN, _lastDoor0;
+    float _lastSteer = float.NaN;
 
     void Rest()
     {
@@ -90,7 +90,6 @@ public class CarLook : MonoBehaviour
         Rest();
         if (doors == null || which >= doors.Length || doors[which] == null) return;
         doors[which].localRotation = Quaternion.Euler(0f, doorOpen[which] * Mathf.SmoothStep(0f, 1f, open), 0f) * _doorRest[which];
-        if (which == 0) _lastDoor0 = open;
     }
 
     /// <summary>A car that moves itself along a route (no wheel colliders): the wheels roll and the front ones turn. All four, every frame: only while near.</summary>

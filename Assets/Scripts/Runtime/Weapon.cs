@@ -334,7 +334,6 @@ public class Weapon : MonoBehaviour
     /// <summary>The forearms (and their cuffs), which stay pointing back at the shoulders while the gun turns.</summary>
     Transform[] _forearms;
     Quaternion[] _forearmRest;
-    float _baseFieldOfView;
     float _nextFireTime;
     float _spreadBonus;
     float _kickback;
@@ -376,7 +375,6 @@ public class Weapon : MonoBehaviour
         _forearms = arms.ToArray();
         _forearmRest = new Quaternion[_forearms.Length];
         for (int i = 0; i < _forearms.Length; i++) _forearmRest[i] = _forearms[i].localRotation;
-        _baseFieldOfView = fpsCamera != null ? fpsCamera.fieldOfView : 75f;
 
         if (muzzleLight != null) muzzleLight.enabled = false;
 

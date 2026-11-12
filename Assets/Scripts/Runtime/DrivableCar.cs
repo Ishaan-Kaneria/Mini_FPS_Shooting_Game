@@ -317,14 +317,12 @@ public class DrivableCar : MonoBehaviour
     int _gear = 1;   // 0 reverse; 1.. forward gears
     float _rpm, _shiftUntil, _throttleNow, _brakeNow, _scrub;
     Vector3 _headLag, _headLagVel, _lastVelocity;
-    float _bump;
     ParticleSystem _smoke, _dust;
     float _driftSpeed, _frontGripNow = -1f;
     float _drift, _overTime, _rightingT = -1f, _displaySteer;
     Quaternion _rightFrom;
     Vector3 _rightAt;
     TrailRenderer _markL, _markR;
-    bool _peopleIgnored;
     float _rearGripNow = -1f;
 
     /// <summary>The speed shown on the HUD, km/h, and the gear (0 is reverse).</summary>

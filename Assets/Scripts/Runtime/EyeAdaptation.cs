@@ -103,8 +103,15 @@ public class EyeAdaptation : MonoBehaviour
 
     static bool ProbeVolumesOn => GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp && urp.lightProbeSystem == LightProbeSystem.ProbeVolumes;
 
+    /// <summary>The one in the scene, if any (FirstPersonShade asks every frame; searching for it was a scene-wide look-up a second, for ever, in every arena that has none).</summary>
+    public static EyeAdaptation Current { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => Current = null;
+
     void OnEnable()
     {
+        Current = this;
         _mask = ~LayerMask.GetMask("Player", "FirstPerson", "Enemy", "Ignore Raycast", "UI", "Civilian", "PlayerBounds");
         _base = SceneExposure();
         if (_volume == null)
@@ -129,6 +136,7 @@ public class EyeAdaptation : MonoBehaviour
     void OnDisable()
     {
         RenderPipelineManager.beginCameraRendering -= AddMeterPass;
+        if (Current == this) Current = null;
         _reading = false;
     }
 

@@ -24,7 +24,6 @@ public class PlayerCondition : MonoBehaviour
 {
     Health _health;
     PlayerMotor _motor;
-    Transform _listener;
 
     GameObject _volumeObject;
     VolumeProfile _profile;
@@ -127,7 +126,6 @@ public class PlayerCondition : MonoBehaviour
         var listener = FindAnyObjectByType<AudioListener>();
         if (listener != null)
         {
-            _listener = listener.transform;
             _muffle = listener.GetComponent<AudioLowPassFilter>();
             if (_muffle == null) _muffle = listener.gameObject.AddComponent<AudioLowPassFilter>();
             _muffle.cutoffFrequency = 22000f;

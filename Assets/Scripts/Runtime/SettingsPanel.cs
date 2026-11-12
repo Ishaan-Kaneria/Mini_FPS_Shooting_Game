@@ -474,7 +474,6 @@ public class SettingsPanel : OverlayPanel
     // ---- keys ------------------------------------------------------------------
 
     string _listening;
-    FlatButton _listeningButton;
 
     /// <summary>One action and the key it is on. Pressing the button listens for the next key.</summary>
     void AddKey(RectTransform page, KeyBindings.Binding b, UITheme t)
@@ -486,7 +485,6 @@ public class SettingsPanel : OverlayPanel
         button.onClick.AddListener(() =>
         {
             _listening = id;
-            _listeningButton = button;
             button.label.text = "PRESS A KEY";
         });
         _refreshers.Add(() => button.label.text = UIText.KeyLabel(KeyBindings.Current(id)).ToUpperInvariant());
@@ -502,7 +500,6 @@ public class SettingsPanel : OverlayPanel
             if (key == KeyCode.None) return;
             if (key != KeyCode.Escape) KeyBindings.Set(_listening, key);
             _listening = null;
-            _listeningButton = null;
             foreach (var r in _refreshers) r();
             return;
         }

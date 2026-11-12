@@ -14,6 +14,8 @@ public class BloodStream : MonoBehaviour
     readonly Vector3[] _at = new Vector3[MaxPoints], _speed = new Vector3[MaxPoints];
     readonly float[] _born = new float[MaxPoints], _width = new float[MaxPoints];
     readonly Keyframe[] _keys = new Keyframe[MaxPoints];
+    Keyframe[] _curveKeys;
+    readonly AnimationCurve _curve = new AnimationCurve();
     int _first, _count;
     float _nextPoint;
     LineRenderer _line;
@@ -86,8 +88,10 @@ public class BloodStream : MonoBehaviour
         _line.positionCount = _count;
         _line.SetPositions(_drawn);
         _line.widthMultiplier = 1f;
-        var keys = new Keyframe[_count];
-        System.Array.Copy(_keys, keys, _count);
-        _line.widthCurve = new AnimationCurve(keys);
+        // One array for each length and one curve, kept: a new array and a new curve every frame of every stream was garbage.
+        if (_curveKeys == null || _curveKeys.Length != _count) _curveKeys = new Keyframe[_count];
+        System.Array.Copy(_keys, _curveKeys, _count);
+        _curve.keys = _curveKeys;
+        _line.widthCurve = _curve;
     }
 }

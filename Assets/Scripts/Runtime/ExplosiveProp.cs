@@ -64,7 +64,7 @@ public class ExplosiveProp : MonoBehaviour
 
     Health _health;
     GameObject _source;
-    float _burstAt = -1f, _nextBurn;
+    float _burstAt = -1f;
     FuelFire _fire;
 
     void Awake()

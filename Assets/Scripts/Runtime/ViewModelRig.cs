@@ -773,7 +773,7 @@ public class ViewModelRig : MonoBehaviour
 
     // The magazine: carried in the left hand from the moment it leaves the well until it is seated again.
     bool _magHeld, _magRestKnown;
-    Vector3 _magInHand, _magRest;
+    Vector3 _magRest;
     Quaternion _magInHandRot, _magRestRot;
 
     /// <summary>

@@ -42,7 +42,7 @@ public class FirstPersonShade : MonoBehaviour
 
     Light _sun;
     EyeAdaptation _eyeAdaptation;
-    float _shade, _target, _next, _saved, _nextFind, _roomShare = 1f;
+    float _shade, _target, _next, _saved, _roomShare = 1f;
     bool _dimmed;
     Quaternion _savedRotation;
     LightShadows _savedShadows;
@@ -121,7 +121,7 @@ public class FirstPersonShade : MonoBehaviour
             _target = blocked / 3f;
         }
         _shade = Mathf.MoveTowards(_shade, _target, ease * Time.deltaTime);
-        if (_eyeAdaptation == null && Time.time >= _nextFind) { _nextFind = Time.time + 1f; _eyeAdaptation = FindAnyObjectByType<EyeAdaptation>(); }
+        _eyeAdaptation = EyeAdaptation.Current;
         // The probes' light on the arms is not to be multiplied up by the eye opening: in a room whose walls hold almost no
         // light the eye opens all the way, and the probes (which see more than the lightmapped walls do) burned the hands
         // white. Under a roof they keep the level they would have in the street's shade.

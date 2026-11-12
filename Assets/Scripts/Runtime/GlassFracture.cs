@@ -130,6 +130,7 @@ public sealed class CrackMesh
         _mesh = new Mesh { name = "Cracks" };
         _mesh.MarkDynamic();
         Object.AddComponent<MeshFilter>().sharedMesh = _mesh;
+        Object.AddComponent<OwnedMesh>().mesh = _mesh;      // freed with the pane: a mesh made in play outlives its object otherwise
         var r = Object.AddComponent<MeshRenderer>();
         r.sharedMaterial = material;
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -403,4 +404,11 @@ public static class GlassFracture
     }
 
     static float Side(Vector2 p, int edge, float w, float h) => edge switch { 0 => p.x, 1 => w - p.x, 2 => p.y, _ => h - p.y };
+}
+
+/// <summary>Destroys a mesh made in play when the object that shows it goes: Unity does not free one by itself until the scene unloads.</summary>
+public class OwnedMesh : MonoBehaviour
+{
+    [System.NonSerialized] public Mesh mesh;
+    void OnDestroy() { if (mesh != null) Destroy(mesh); }
 }

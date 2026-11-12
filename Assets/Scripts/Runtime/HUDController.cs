@@ -217,6 +217,7 @@ public class HUDController : MonoBehaviour
              "loud about running out or it reads as unfair rather than as tight.")]
     [Min(0f)] public float clockWarningTime = 10f;
 
+    [Tooltip("Not read: the clock's warning colour comes from UITheme. Kept so saved scenes still load.")]
     public Color clockWarningColor = new Color(1f, 0.35f, 0.3f);
 
     [Header("Boss Bar")]

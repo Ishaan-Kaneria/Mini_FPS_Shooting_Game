@@ -98,6 +98,8 @@ public class VehicleStrike : MonoBehaviour
             if (Driver != null && health.gameObject == Driver) continue;          // the player at the wheel
             if (health.GetComponent<VehicleDriver>() != null) continue;           // a driver in another car: the cars meet, not him
             if (Recent.TryGetValue(health, out float until) && Time.time < until) continue;
+            // Forgotten once their time is up: every person a car ever touched was kept for the life of the car.
+            if (Recent.Count > 24) Prune();
             Recent[health] = Time.time + 1.5f;
 
             float over = speed - minSpeed * 0.6f;
@@ -152,13 +154,6 @@ public class VehicleStrike : MonoBehaviour
         }
     }
 
-    static float BodyMass(Health h)
-    {
-        float m = 0f;
-        foreach (var b in h.GetComponentsInChildren<Rigidbody>()) if (b != null) m += b.mass;
-        return m > 1f ? m : 70f;
-    }
-
     /// <summary>A car driven by physics rolls on through a man it has knocked aside; against his collider it stopped as if at a wall.</summary>
     void PassThrough(Health health)
     {
@@ -170,6 +165,17 @@ public class VehicleStrike : MonoBehaviour
                 Physics.IgnoreCollision(part, mine, true);
                 Passing.Add((part, mine, Time.time + 1.5f));
             }
+    }
+
+    List<Health> _stale;
+    List<Health> Stale => _stale ??= new List<Health>();
+
+    void Prune()
+    {
+        Stale.Clear();
+        foreach (var kv in Recent) if (kv.Key == null || Time.time >= kv.Value) Stale.Add(kv.Key);
+        foreach (var h in Stale) Recent.Remove(h);
+        Stale.Clear();
     }
 
     void RestoreCollisions()

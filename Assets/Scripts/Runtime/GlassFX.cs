@@ -281,7 +281,8 @@ public static class GlassFX
 
     public static void Play(AudioClip clip, Vector3 at, float volume)
     {
-        if (clip != null) AudioSource.PlayClipAtPoint(clip, at, volume);
+        // Pooled (OneShotAudio): PlayClipAtPoint makes and destroys a GameObject for every pane that breaks.
+        if (clip != null) OneShotAudio.Play(clip, at, volume);
     }
 }
 

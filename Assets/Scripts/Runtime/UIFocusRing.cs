@@ -54,6 +54,8 @@ public class UIFocusRing : MonoBehaviour
         }
     }
 
+    static readonly Vector3[] Corners = new Vector3[4];
+
     void LateUpdate()
     {
         var es = EventSystem.current;
@@ -70,7 +72,7 @@ public class UIFocusRing : MonoBehaviour
 
         // Where the selection is, in this canvas's own units.
         var rt = (RectTransform)sel.transform;
-        var corners = new Vector3[4];
+        var corners = Corners;       // one array, kept: this runs every frame something is selected
         rt.GetWorldCorners(corners);
         Vector2 a = _canvasRect.InverseTransformPoint(corners[0]);
         Vector2 b = _canvasRect.InverseTransformPoint(corners[2]);

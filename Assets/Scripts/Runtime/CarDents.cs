@@ -40,11 +40,12 @@ public class CarDents : MonoBehaviour
             if (!_own.TryGetValue(mf, out var verts))
             {
                 if (!mf.sharedMesh.isReadable) continue;
-                var copy = Instantiate(mf.sharedMesh);
-                copy.name = mf.sharedMesh.name + " (dented)";
+                var whole = mf.sharedMesh;
+                var copy = Instantiate(whole);
+                copy.name = whole.name + " (dented)";
                 mf.sharedMesh = copy;
-                // A collider that drew the same mesh follows it.
-                if (mf.TryGetComponent<MeshCollider>(out var mc) && mc.sharedMesh == copy) mc.sharedMesh = copy;
+                // A collider that drew the same mesh follows it. (This compared the collider's mesh with the copy, which it never is.)
+                if (mf.TryGetComponent<MeshCollider>(out var mc) && mc.sharedMesh == whole) mc.sharedMesh = copy;
                 verts = copy.vertices;
                 _own[mf] = verts;
             }
@@ -67,6 +68,12 @@ public class CarDents : MonoBehaviour
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
         }
+    }
+
+    /// <summary>The dented copies go with the car: each crashed car that was put away left its meshes behind until the level ended.</summary>
+    void OnDestroy()
+    {
+        foreach (var mf in _own.Keys) if (mf != null && mf.sharedMesh != null) Destroy(mf.sharedMesh);
     }
 
     /// <summary>The body's meshes: every readable mesh of the car but its wheels and the first level of detail only.</summary>

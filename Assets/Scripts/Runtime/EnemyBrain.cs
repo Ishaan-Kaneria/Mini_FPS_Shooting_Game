@@ -114,7 +114,6 @@ public class EnemyBrain : MonoBehaviour
     int _searchLeg;
     Vector3 _cover;
     bool _hasCover;
-    float _nextCoverPick;
     float _flankSide;
     bool _fellBack;
     bool _crawlCoverTried, _limpCoverTried;

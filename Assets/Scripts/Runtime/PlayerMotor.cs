@@ -115,17 +115,14 @@ public class PlayerMotor : MonoBehaviour
     public float sprintSpeed = 8.2f;
     public float crouchSpeed = 2.8f;
 
-    [Tooltip("Metres per second squared, as a real acceleration. 55 reaches walking " +
-             "speed in about a tenth of a second -- the near-instant starts of " +
-             "Valorant/CS with just enough ramp to feel like weight. Drop toward 18 " +
-             "for a heavier, Battlefield-style push-off.")]
+    [Tooltip("Not read: MovementSettings.acceleration and sprintAcceleration are what the motor uses. Kept so saved scenes still load.")]
     public float groundAcceleration = 55f;
 
     [Tooltip("Air control. Well below ground acceleration on purpose: being able to " +
              "change direction freely mid-jump is what makes a shooter feel floaty.")]
     public float airAcceleration = 16f;
 
-    [Tooltip("Metres per second squared of braking when you let go of the stick.")]
+    [Tooltip("Not read: MovementSettings.stopping is the braking the motor uses. Kept so saved scenes still load.")]
     public float friction = 50f;
 
     [Header("Jump and Gravity")]
@@ -184,6 +181,7 @@ public class PlayerMotor : MonoBehaviour
     public AudioSource footstepSource;
     public AudioClip[] footstepClips;
     public AudioClip landClip;
+    [Tooltip("Not read: steps are counted off the legs' clips (PlayerBody.StrideCycles) or MovementSettings.stepLength.")]
     public float stepDistance = 2.4f;
     [Range(0f, 1f)] public float footstepVolume = 0.5f;
 
@@ -257,7 +255,7 @@ public class PlayerMotor : MonoBehaviour
     bool _padSprint;
     bool _padCrouch;
     float _nextCursorAttempt;
-    float _stepAccumulator, _stepPhase, _lastCycles;
+    float _stepPhase, _lastCycles;
     PlayerBody _body;
     bool _blown;
     Weapon _weapon;
@@ -1054,7 +1052,6 @@ public class PlayerMotor : MonoBehaviour
     {
         if (impactSpeed < landImpactThreshold) return;
 
-        _stepAccumulator = 0f;
 
         if (landClip != null && footstepSource != null)
             footstepSource.PlayOneShot(landClip, footstepVolume);

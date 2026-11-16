@@ -166,3 +166,50 @@ InitTestScene*.unity*
 
 # Python bytecode
 __pycache__/
+
+# Unity Asset Store packs. Their licence (the Asset Store EULA) allows shipping them inside the game but not
+# publishing them, so they stay on the machines that bought them; README "Building it yourself" lists them.
+/Assets/Adventure_Character/
+/Assets/Adventure_Character.meta
+/Assets/AllSkyFree/
+/Assets/AllSkyFree.meta
+/Assets/AnimationStaging/
+/Assets/AnimationStaging.meta
+/Assets/EEJANAI_Team/
+/Assets/EEJANAI_Team.meta
+/Assets/EmbersStorm*
+/Assets/LowPolySoldiers_demo/
+/Assets/LowPolySoldiers_demo.meta
+/Assets/Low Poly Weapons VOL.1/
+/Assets/Low Poly Weapons VOL.1.meta
+/Assets/Procedural Water Shader/
+/Assets/Procedural Water Shader.meta
+/Assets/Rowlan/
+/Assets/Rowlan.meta
+/Assets/Simple Bone Physics/
+/Assets/Simple Bone Physics.meta
+/Assets/SportCar/
+/Assets/SportCar.meta
+/Assets/Survivalist/
+/Assets/Survivalist.meta
+/Assets/Tourung Car Pack/
+/Assets/Tourung Car Pack.meta
+/Assets/Yughues Free Palm Trees/
+/Assets/Yughues Free Palm Trees.meta
+# RealisticMobileCars: only the few files already tracked are kept; the rest of the pack stays local.
+/Assets/RealisticMobileCars - Pro3DModels/**
+!/Assets/RealisticMobileCars - Pro3DModels/**/
+# Editor screenshots taken while playing.
+/Assets/Screenshots/
+/Assets/Screenshots.meta
+/Assets/RealisticMobileCars - Pro3DModels.meta
+# The rest of the free lava/fire shader pack; Lava/ (used by Mars) is tracked.
+/Assets/Shaders/Fire/
+/Assets/Shaders/Fire.meta
+/Assets/Shaders/Magma/
+/Assets/Shaders/Magma.meta
+/Assets/Shaders/Scenes/
+/Assets/Shaders/Scenes.meta
+/Assets/Shaders/ShaderPack.txt*
+/Assets/Shaders/TerrainTex(Delete)*
+/Assets/Shaders/Lava/LavaRiver.prefab*

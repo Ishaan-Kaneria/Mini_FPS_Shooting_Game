@@ -24,16 +24,12 @@
 # Expect the first run or two to need adjusting. Unity in CI usually does.
 name: Deploy WebGL to Netlify
 
+# Manual only (2026-11-16). The game now uses Asset Store packs that cannot be
+# published in this repository, so a build here would ship without them (enemy
+# soldiers, some cars, guns and palms missing or pink). The live site is built on
+# a machine that has the packs: Tools/deploy-web.sh. Run this by hand only once
+# the build no longer needs them.
 on:
-  push:
-    branches: [main]
-    # Only what can change the game. Without this a README typo costs an hour of
-    # CI and republishes a byte-identical build.
-    paths:
-      - 'Assets/**'
-      - 'Packages/**'
-      - 'ProjectSettings/**'
-      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 # A queued build is always more current than a running one.

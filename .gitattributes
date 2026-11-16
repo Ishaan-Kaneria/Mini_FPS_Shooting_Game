@@ -206,3 +206,6 @@ Assets/FPSKit_Generated/Town/TownTerrain.asset filter=lfs diff=lfs merge=lfs -te
 Assets/FPSKit_Generated/Scenes/*_APV*.bytes filter=lfs diff=lfs merge=lfs -text
 # Baked occlusion culling (FPSKitTownOcclusion): ~22 MB of serialized Umbra data for the desert town.
 Assets/FPSKit_Generated/Scenes/*/OcclusionCullingData.asset filter=lfs diff=lfs merge=lfs -text
+
+# README pictures stay out of LFS: GitHub shows them inline and a clone without LFS still has them.
+Docs/images/** -filter -diff -merge binary

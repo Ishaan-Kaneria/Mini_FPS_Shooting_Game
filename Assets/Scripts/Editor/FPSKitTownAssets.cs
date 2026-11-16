@@ -716,15 +716,57 @@ namespace FPSKit.EditorTools
             ["portable_searchlight"] = (15f, LooseProp.Stuff.Metal), ["vintage_suitcase"] = (6f, LooseProp.Stuff.Wood), ["WoodenTable_01"] = (20f, LooseProp.Stuff.Wood),
             ["painted_wooden_table"] = (20f, LooseProp.Stuff.Wood), ["wooden_picnic_table"] = (45f, LooseProp.Stuff.Wood), ["wooden_barrels_01"] = (40f, LooseProp.Stuff.Wood),
             ["painted_wooden_bench"] = (18f, LooseProp.Stuff.Wood), ["plastic_jerrycan_steel"] = (5f, LooseProp.Stuff.Metal),
+            // The street bin: an empty steel one, shoved along by a car instead of stopping it (his note 2026-11-16).
+            ["metal_trash_can"] = (55f, LooseProp.Stuff.Metal),
         };
 
         /// <summary>
         /// Everything under about 60 kg can be moved: a rigidbody of its weight, kinematic until struck (LooseProp), colliders a body can have
         /// (convex), never static batching (a batched mesh does not move). Idempotent; prefabs are kept between builds.
         /// </summary>
+        /// <summary>
+        /// Props bolted down, by prop: kilograms and the speed (m/s) a car must be doing to knock one down (LooseProp.breakSpeed).
+        /// They collide on a box per post and one round the head (FPSKitPoles.AddBoxes), not a convex hull, which took in the space under the arm.
+        /// </summary>
+        static readonly Dictionary<string, (float kg, float breakSpeed)> Anchored = new Dictionary<string, (float, float)>
+        {
+            ["street_lamp_01"] = (120f, FPSKitPoles.LampBreak),
+        };
+
         public static int MakeLooseProps()
         {
             int done = 0;
+            foreach (var kv in Anchored)
+            {
+                string path = $"{PropFolder}/{kv.Key}.prefab";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) continue;
+                var root = PrefabUtility.LoadPrefabContents(path);
+                var pts = new List<Vector3>();
+                var edges = new List<(Vector3, Vector3)>();
+                foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (mf.sharedMesh == null) continue;
+                    var w = mf.sharedMesh.vertices.Select(v => mf.transform.TransformPoint(v)).ToArray();
+                    pts.AddRange(w);
+                    var t = mf.sharedMesh.triangles;
+                    for (int i = 0; i < t.Length; i += 3) { edges.Add((w[t[i]], w[t[i + 1]])); edges.Add((w[t[i + 1]], w[t[i + 2]])); edges.Add((w[t[i + 2]], w[t[i]])); }
+                }
+                float minY = pts.Count > 0 ? pts.Min(p => p.y) : 0f;
+                var posts = pts.Count > 0 ? FPSKitPoles.PostsOf(edges, minY) : null;
+                if (posts != null)
+                {
+                    var first = root.GetComponentInChildren<Collider>(true);
+                    var host = first != null ? first.gameObject : root;      // the object the scene's instances tagged for impacts
+                    foreach (var c in root.GetComponentsInChildren<MeshCollider>(true)) Object.DestroyImmediate(c);
+                    foreach (var c in root.GetComponentsInChildren<BoxCollider>(true)) Object.DestroyImmediate(c);
+                    FPSKitPoles.AddBoxes(host, pts, posts, minY);
+                    FPSKitPoles.MakeKnockable(root, kv.Value.kg, kv.Value.breakSpeed);
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                    done++;
+                }
+                else Debug.LogWarning($"[FPSKit] {kv.Key}: no post found, left as it was");
+                PrefabUtility.UnloadPrefabContents(root);
+            }
             foreach (var kv in Loose)
             {
                 string path = $"{PropFolder}/{kv.Key}.prefab";

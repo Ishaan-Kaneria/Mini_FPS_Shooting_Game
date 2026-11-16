@@ -71,6 +71,8 @@ namespace FPSKit.EditorTools
         /// </summary>
         /// <summary>The new cars into the saved desert, with no rebuild and no bake.</summary>
         public static void PatchDesertCars() { FPSKitCars.PatchDesert(); AssetDatabase.SaveAssets(); if (Application.isBatchMode) EditorApplication.Exit(0); }
+        /// <summary>The saved desert's lamp, signal and sign poles knockable by a car, its bins loose, with no rebuild and no bake (FPSKitPoles).</summary>
+        public static void PatchDesertPoles() { FPSKitPoles.PatchDesert(); AssetDatabase.SaveAssets(); if (Application.isBatchMode) EditorApplication.Exit(0); }
 
         public static void BuildAllThemes()
         {

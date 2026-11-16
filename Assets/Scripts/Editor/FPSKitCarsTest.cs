@@ -29,6 +29,8 @@ namespace FPSKit.EditorTools
         static float _deadline;
         static Camera _shotCam;
         static string _only;
+        static LevelSet.Level _tunedLevel;
+        static float _clockBackup = -1f;
 
         public static void Batch()
         {
@@ -53,6 +55,15 @@ namespace FPSKit.EditorTools
             if (!EditorApplication.isPlaying) return;
             try
             {
+                // The whole drive is longer than a level's clock: run out, the level ended mid-test and froze time (police, 2026-11-16).
+                var level = Object.FindAnyObjectByType<LevelManager>();
+                if (level != null && level.Level != null && _tunedLevel == null && !level.IsRunning)
+                {
+                    _tunedLevel = level.Level;
+                    _clockBackup = level.Level.timeLimit;
+                    level.Level.timeLimit = 1800f;
+                    level.ResolveLevel();
+                }
                 if (_motor == null)
                 {
                     _motor = Object.FindAnyObjectByType<PlayerMotor>();
@@ -82,6 +93,8 @@ namespace FPSKit.EditorTools
             File.WriteAllText($"{Folder}/report.txt", Log.ToString());
             Time.captureDeltaTime = 0f;
             MobileInput.Active = false;
+            if (_tunedLevel != null && _clockBackup > 0f) _tunedLevel.timeLimit = _clockBackup;
+            _tunedLevel = null; _clockBackup = -1f;
             FPSKitPlayMode.RestoreStartScene();
             EditorApplication.Exit(code);
         }
@@ -426,6 +439,7 @@ namespace FPSKit.EditorTools
                 BackToStart();
                 yield return 1f;
                 float peakTilt = 0f, peakUp = 0f, peakSpin = 0f;
+                Note($"trial start: tilt {Vector3.Angle(carT.up, Vector3.up):0.0}, spin {body.angularVelocity.magnitude:0.0} rad/s, kinematic {body.isKinematic}, at {carT.position}");
                 for (int i = 0; i < 60 * 3; i++)
                 {
                     // Stood in the car's side and under its front wheel, as a man pressing against it is.
@@ -443,6 +457,13 @@ namespace FPSKit.EditorTools
                     yield return null;
                 }
                 Note($"soldiers pressed into the car, {(rule ? "people do not collide" : "CONTROL, people collide")}: most tilt {peakTilt:0.0}, fastest upward {peakUp:0.0} m/s, fastest spin {peakSpin:0.0} rad/s");
+                if (rule)
+                {
+                    // What else is by the car: a prop it can now move (a bin, a pole) was a fixed one until 2026-11-16.
+                    var near = Object.FindObjectsByType<LooseProp>(FindObjectsSortMode.None).Where(l => (l.transform.position - carT.position).sqrMagnitude < 64f)
+                                     .Select(l => $"{l.name} {(l.transform.position - carT.position).magnitude:0.0} m{(l.enabled ? " awake" : "")}").ToArray();
+                    Note($"loose props within 8 m of the car: {(near.Length > 0 ? string.Join(", ", near) : "none")}");
+                }
                 if (rule) { Require(peakTilt < 6f, "soldiers do not tip the car"); Require(peakUp < 0.6f, "soldiers do not lift the car"); }
             }
             foreach (var sold in soldiers) if (sold != null && sold.TryGetComponent<Health>(out var sh)) { }
@@ -573,6 +594,72 @@ namespace FPSKit.EditorTools
                 var mine = myDents != null ? (System.Collections.IDictionary)typeof(CarDents).GetField("_own", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(myDents) : null;
                 Note($"my car's dented meshes: {(mine != null ? mine.Count : 0)}");
                 Object.Destroy(victim.gameObject);      // the wreck lay across the road the rest of the drive takes
+                BackToStart();
+                yield return 0.5f;
+            }
+
+            // Poles and bins give way to a car (his note 2026-11-16: they "act as a fixed object"): a lamp post stands to a car
+            // creeping into it and goes over at 40 km/h, a sign pole goes over, a bin is shoved along; the car is not stopped dead.
+            // The car is brought up to speed, then let go 12 m short with the throttle held (held at a set speed into the pole, it
+            // pushed the pole along forever; let go at the pole, its wheels were still at rest and braked it to half on their own),
+            // and each run is set against the same run with nothing in the way.
+            {
+                var loose = Object.FindObjectsByType<LooseProp>(FindObjectsSortMode.None);
+                var lamp = loose.Where(l => l.name == "LampPost").OrderBy(l => (l.transform.position - runFrom).sqrMagnitude).FirstOrDefault();
+                var sign = loose.Where(l => l.name == "SignPole").OrderBy(l => (l.transform.position - runFrom).sqrMagnitude).FirstOrDefault();
+                var bin = loose.Where(l => l.name.StartsWith("metal_trash_can")).OrderBy(l => (l.transform.position - runFrom).sqrMagnitude).FirstOrDefault();
+                Note($"knockable: lamp posts {loose.Count(l => l.name == "LampPost")}, signal poles {loose.Count(l => l.name == "SignalPole")}, sign poles {loose.Count(l => l.name == "SignPole")}, bins {loose.Count(l => l.name.StartsWith("metal_trash_can"))}");
+                Require(lamp != null && lamp.Anchored, "lamp posts are their own, bolted down");
+                Require(sign != null, "sign poles are their own");
+                Require(bin != null && !bin.Anchored, "bins are loose");
+                Vector3 flat3 = new Vector3(runDir.x, 0f, runDir.z).normalized;
+                var control = new Dictionary<float, float>();
+                foreach (var (prop, kmh, down, label) in new[] { ((LooseProp)null, 40f, false, "nothing40"), ((LooseProp)null, 30f, false, "nothing30"), (lamp, 8f, false, "lamp_slow"),
+                                                                 (lamp, 40f, true, "lamp_fast"), (sign, 40f, true, "sign_fast"), (bin, 30f, true, "bin") })
+                {
+                    if (prop == null && !label.StartsWith("nothing")) continue;
+                    BackToStart();
+                    yield return 0.5f;
+                    float ahead = kmh < 15f ? 7f : 30f;      // a creeping car is given a short way to it
+                    Vector3 mark = runFrom + flat3 * ahead;
+                    Transform pt = prop != null ? prop.transform : null;
+                    if (prop != null)
+                    {
+                        var prb = prop.GetComponent<Rigidbody>();
+                        float lowest = prop.GetComponentsInChildren<Renderer>().Min(r => r.bounds.min.y);
+                        float road = mark.y;
+                        foreach (var h in Physics.RaycastAll(mark + Vector3.up * 3f, Vector3.down, 8f, ~0, QueryTriggerInteraction.Ignore).OrderBy(h => h.distance))
+                            if (h.collider.attachedRigidbody != body && !h.collider.transform.IsChildOf(pt)) { road = h.point.y; break; }
+                        // A pole's pivot is its foot on the ground (FPSKitPoles); a bin stands on its lowest point.
+                        var place = new Vector3(mark.x, prop == bin ? road + (pt.position.y - lowest) : road, mark.z);
+                        pt.SetPositionAndRotation(place, Quaternion.Euler(0f, pt.eulerAngles.y, 0f)); prb.position = place; prb.rotation = pt.rotation;
+                    }
+                    yield return 0.3f;
+                    Vector3 from = pt != null ? pt.position : mark;
+                    float closest = float.MaxValue, metAt = -1f, atMet = -1f, kept = -1f;
+                    bool letGo = false;
+                    for (int i = 0; i < 60 * 8; i++)
+                    {
+                        float d = Vector3.ProjectOnPlane(mark - carT.position, Vector3.up).magnitude;       // to where it stood: a pushed prop moves on
+                        closest = Mathf.Min(closest, pt != null ? Vector3.ProjectOnPlane(pt.position - carT.position, Vector3.up).magnitude : d);
+                        if (!letGo && (d < 12f || kmh < 15f && d < 5f)) { letGo = true; MobileInput.Move = new Vector2(0f, 1f); }
+                        if (!letGo) body.linearVelocity = flat3 * kmh / 3.6f + Vector3.up * body.linearVelocity.y;
+                        if (metAt < 0f && d < 3.2f) { metAt = Time.time; atMet = drive.Kmh; }
+                        if (metAt > 0f && kept < 0f && Time.time - metAt > 0.5f) kept = drive.Kmh;
+                        if (metAt > 0f && Time.time - metAt > 2.5f) break;
+                        yield return null;
+                    }
+                    MobileInput.Move = Vector2.zero;
+                    if (prop == null) { control[kmh] = kept; Note($"{label}: {atMet:0} km/h at the mark, {kept:0} km/h 0.5 s on"); continue; }
+                    float tilt = Vector3.Angle(pt.up, Vector3.up), moved = Vector3.ProjectOnPlane(pt.position - from, Vector3.up).magnitude;
+                    float free = control.TryGetValue(kmh, out var cf) && cf > 0f ? cf : kmh;
+                    Note($"{label}: {atMet:0} km/h at it (closest {closest:0.0} m), {kept:0} km/h 0.5 s on (nothing in the way: {free:0}), prop tilted {tilt:0} degrees, moved {moved:0.0} m, anchored {prop.Anchored}");
+                    From(pt.position - Vector3.Cross(Vector3.up, flat3) * 7f + Vector3.up * 2.5f, pt.position + Vector3.up * 1f, "knock_" + label);
+                    if (!down) Require(metAt > 0f && tilt < 3f && moved < 0.1f, "a lamp post stands to a car creeping into it");
+                    else if (prop == bin) { Require(moved > 1f, "a bin is shoved along"); Require(kept > free * 0.6f, $"a bin does not stop the car ({kept:0} of {free:0} km/h)"); }
+                    else { Require(tilt > 30f || moved > 1f, label + ": knocked down"); Require(kept > free * 0.5f, $"{label}: the car is not stopped dead ({kept:0} of {free:0} km/h)"); }
+                    if (down) Object.Destroy(prop.gameObject);      // off the road the rest of the drive takes
+                }
                 BackToStart();
                 yield return 0.5f;
             }
@@ -773,7 +860,8 @@ namespace FPSKit.EditorTools
                     float to = Vector3.Distance(patrol.transform.position, _motor.transform.position);
                     yield return 1.5f;
                     int officers = Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None).Count(e => e.name == "PoliceOfficer");
-                    Note($"police car diagnostics: speed {patrol.Speed:0.0}, crashed {patrol.Crashed}, abandoned {patrol.Abandoned}, timeScale {Time.timeScale}");
+                    var lm = Object.FindAnyObjectByType<LevelManager>();
+                    Note($"police car diagnostics: speed {patrol.Speed:0.0}, crashed {patrol.Crashed}, abandoned {patrol.Abandoned}, timeScale {Time.timeScale}, level finished {(lm != null && lm.IsFinished)}, clock {(lm != null ? lm.TimeRemaining : -1f):0} s");
                     foreach (var c in Physics.OverlapSphere(patrol.transform.position + patrol.transform.forward * 4f + Vector3.up, 2.5f, ~0, QueryTriggerInteraction.Ignore))
                         if (!c.transform.IsChildOf(patrol.transform)) Note($"  in front of the police car: {c.name} (layer {LayerMask.LayerToName(c.gameObject.layer)}, root {c.transform.root.name})");
                     Note($"police car: sent from {from:0} m, arrived {patrol.Arrived}, stopped {to:0} m from the player, officers out {officers}");

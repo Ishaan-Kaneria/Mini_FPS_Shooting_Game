@@ -119,6 +119,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LooseProp
   stuff: 0
   heardFrom: 1.2
+  breakSpeed: 0
 --- !u!1001 &8690738409407373980
 PrefabInstance:
   m_ObjectHideFlags: 0

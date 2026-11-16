@@ -43,7 +43,7 @@ namespace FPSKit.EditorTools
             BuildStreetFurniture(group, layer, props, rng);
 
             var go = SignMesh().Build(group, "Signs", layer, "Metal");
-            if (go != null) Hide(go);
+            if (go != null) { Hide(go); FPSKitPoles.Split(go); }       // the poles out of it again, each its own and knockable
             _signMesh = null;
         }
 

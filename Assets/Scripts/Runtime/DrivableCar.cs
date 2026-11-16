@@ -984,7 +984,8 @@ public class DrivableCar : MonoBehaviour
 
     /// <summary>
     /// Loose props (drums, crates, chairs) rest kinematic until struck, and a car meeting one at rest met an immovable body for that
-    /// step: it stopped dead, then the prop woke and moved (his "sticks"). Those just ahead of the car's path are woken a moment before it arrives.
+    /// step: it stopped dead, then the prop woke and moved (his "sticks"). Those just ahead of the car's path are woken a moment before it arrives;
+    /// a lamp or sign pole only when the car is closing on it at its break speed (LooseProp.StruckBy), or it stands.
     /// </summary>
     void WakeAhead()
     {
@@ -999,7 +1000,7 @@ public class DrivableCar : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             var prop = Ahead[i] != null ? Ahead[i].GetComponentInParent<LooseProp>() : null;
-            if (prop != null) prop.Wake();
+            if (prop != null) prop.StruckBy(Vector3.Dot(v, (prop.transform.position - _rb.position).normalized));
         }
     }
 

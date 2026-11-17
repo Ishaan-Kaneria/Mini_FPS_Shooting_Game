@@ -433,8 +433,10 @@ public class SettingsPanel : OverlayPanel
                   () => GameSettings.Blood, v => GameSettings.Blood = v, t);
 
         Heading(page, "Performance", t);
-        AddChoice(page, "Quality", "Low turns off shadows and post-processing.", new[] { "Low", "Medium", "High" },
-                  () => (int)QualityTiers.Current, i => GameSettings.QualityTier = i, t);
+        // The browser build carries only the Low tier (FPSKitBatch.BuildWebGL: compiling the others' shaders for the web took hours).
+        if (Application.platform != RuntimePlatform.WebGLPlayer)
+            AddChoice(page, "Quality", "Low turns off shadows and post-processing.", new[] { "Low", "Medium", "High" },
+                      () => (int)QualityTiers.Current, i => GameSettings.QualityTier = i, t);
         if (desktop)
             AddSlider(page, "Render scale", "Below 100% draws fewer pixels and stretches them: faster, softer. High starts at 85%.", 0.6f, 1f,
                       () => GameSettings.RenderScale > 0f ? GameSettings.RenderScale : QualityTiers.TierRenderScale,

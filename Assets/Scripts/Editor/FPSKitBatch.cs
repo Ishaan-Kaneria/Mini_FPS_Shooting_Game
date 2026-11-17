@@ -938,6 +938,7 @@ namespace FPSKit.EditorTools
                 // The dashboard first: index 0 is what the player boots into.
                 var staged = new List<string>();
                 var scenes = StageTouchScenes(menu, WebStagingTag, staged);
+                var restoreTiers = WebShipsLowTierOnly();
 
                 try
                 {
@@ -969,11 +970,57 @@ namespace FPSKit.EditorTools
                 }
                 finally
                 {
+                    restoreTiers();
                     RestoreCatalog();
 
                     foreach (string copy in staged) AssetDatabase.DeleteAsset(copy);
                 }
             });
+        }
+
+        /// <summary>
+        /// Leaves the Medium and High quality tiers out of the browser build, for the length of the build; returns what puts them
+        /// back. A browser always runs Low (QualityTiers.Current), but every tier in a build has its pipeline features' shader
+        /// variants compiled: with High's probe volumes, SSAO and the rest, URP's Lit alone came to 4,536 variants for WebGL and
+        /// the build was still compiling shaders after two and a half hours (2026-11-16). Desktop and Android builds keep all three.
+        /// </summary>
+        private static Action WebShipsLowTierOnly()
+        {
+            var found = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset");
+            var settings = found.Length > 0 ? found[0] : null;
+            if (settings == null) return () => { };
+            var excluded = new List<string>();
+            var so = new SerializedObject(settings);
+            var levels = so.FindProperty("m_QualitySettings");
+            for (int i = 0; i < levels.arraySize; i++)
+            {
+                var level = levels.GetArrayElementAtIndex(i);
+                string name = level.FindPropertyRelative("name").stringValue;
+                if (string.Equals(name, "Low", StringComparison.OrdinalIgnoreCase)) continue;
+                var platforms = level.FindPropertyRelative("excludedTargetPlatforms");
+                bool already = false;
+                for (int j = 0; j < platforms.arraySize; j++) already |= platforms.GetArrayElementAtIndex(j).stringValue == "WebGL";
+                if (already) continue;
+                platforms.arraySize++;
+                platforms.GetArrayElementAtIndex(platforms.arraySize - 1).stringValue = "WebGL";
+                excluded.Add(name);
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log($"[FPSKitBatch] WebGL ships the Low tier only (left out: {string.Join(", ", excluded)})");
+            return () =>
+            {
+                var back = new SerializedObject(settings);
+                var all = back.FindProperty("m_QualitySettings");
+                for (int i = 0; i < all.arraySize; i++)
+                {
+                    var level = all.GetArrayElementAtIndex(i);
+                    if (!excluded.Contains(level.FindPropertyRelative("name").stringValue)) continue;
+                    var platforms = level.FindPropertyRelative("excludedTargetPlatforms");
+                    for (int j = platforms.arraySize - 1; j >= 0; j--)
+                        if (platforms.GetArrayElementAtIndex(j).stringValue == "WebGL") platforms.DeleteArrayElementAtIndex(j);
+                }
+                back.ApplyModifiedPropertiesWithoutUndo();
+            };
         }
 
         /// <summary>

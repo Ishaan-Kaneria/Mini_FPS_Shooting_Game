@@ -132,7 +132,7 @@ The full guide to the systems, and how to extend them, is the **[handbook](Docs/
    forbids redistributing them. Without them the project still opens and plays, but soldiers, some cars, guns and palms are missing.
 3. Open the project, open `Assets/FPSKit_Generated/Scenes/Menu.unity` and press Play.
 
-Browser build and upload: `Tools/deploy-web.sh` (needs `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID`). Headless checks:
+Publishing the browser build: **Actions → Deploy WebGL to Netlify → Run workflow** builds on GitHub and uploads to Netlify (the packs come from a private repository; see the [handbook](Docs/HANDBOOK.md#continuous-deployment)). `Tools/deploy-web.sh` does the same from your own machine. Headless checks:
 `Tools/unity-batch.sh FPSKitBatch.VerifyCombat` and the others listed in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 <details>

@@ -24,11 +24,14 @@
 # Expect the first run or two to need adjusting. Unity in CI usually does.
 name: Deploy WebGL to Netlify
 
-# Manual only (2026-11-16). The game now uses Asset Store packs that cannot be
-# published in this repository, so a build here would ship without them (enemy
-# soldiers, some cars, guns and palms missing or pink). The live site is built on
-# a machine that has the packs: Tools/deploy-web.sh. Run this by hand only once
-# the build no longer needs them.
+# Run by hand: Actions > Deploy WebGL to Netlify > Run workflow (or
+# `gh workflow run deploy-web.yml`). Not on push: a publish is his call.
+#
+# The Asset Store packs the game uses (soldiers, cars, guns, palms, the fairground)
+# cannot be published here, so they live in the private repo
+# Ishaan-Kaneria/Mini_FPS_Packs as one split zstd tar. This job clones it with a
+# read-only deploy key (secret PACKS_DEPLOY_KEY) and unpacks it into Assets/
+# before building. Without them the build ships with those models missing.
 on:
   workflow_dispatch:
 
@@ -41,7 +44,8 @@ jobs:
   build:
     name: Build and publish
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # A cold WebGL build compiles every shader variant; GitHub stops any job at 6 h.
+    timeout-minutes: 350
 
     steps:
       # The runner has ~14 GB free and the Unity WebGL image alone eats most of
@@ -66,6 +70,26 @@ jobs:
         with:
           lfs: true
           fetch-depth: 1
+
+      - name: Fetch the Asset Store packs (private repo)
+        env:
+          PACKS_KEY: ${{ secrets.PACKS_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          : "${PACKS_KEY:?missing repository secret PACKS_DEPLOY_KEY}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PACKS_KEY" > ~/.ssh/packs_key
+          chmod 600 ~/.ssh/packs_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          GIT_SSH_COMMAND="ssh -i $HOME/.ssh/packs_key -o IdentitiesOnly=yes" \
+            git clone -q --depth 1 git@github.com:Ishaan-Kaneria/Mini_FPS_Packs.git "$RUNNER_TEMP/packs"
+          rm -f ~/.ssh/packs_key
+          cat "$RUNNER_TEMP"/packs/packs.tar.zst.part* | zstd -d | tar -x
+          rm -rf "$RUNNER_TEMP/packs"
+          for pack in Survivalist Adventure_Character "Low Poly Weapons VOL.1" "Tourung Car Pack" Fairground/ThirdParty/FloodedGrounds; do
+            [ -d "Assets/$pack" ] || { echo "::error::pack Assets/$pack missing after unpacking"; exit 1; }
+          done
+          echo "Assets is $(du -sh Assets | cut -f1); $(df -h . | tail -1 | awk '{print $4}') free"
 
       # There is deliberately no Library cache here.
       #

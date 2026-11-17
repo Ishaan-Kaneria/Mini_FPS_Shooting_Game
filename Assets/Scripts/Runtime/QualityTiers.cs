@@ -77,8 +77,10 @@ public static class QualityTiers
          : IntegratedGpu ? GameSettings.Quality.Medium
          : GameSettings.Quality.High;
 
+    /// <summary>The tier in use. Always Low in a browser: the web build ships no other (FPSKitBatch.BuildWebGL).</summary>
     public static GameSettings.Quality Current
-        => (GameSettings.Quality)(GameSettings.QualityTier < 0 ? (int)DefaultTier : GameSettings.QualityTier);
+        => Web ? GameSettings.Quality.Low
+         : (GameSettings.Quality)(GameSettings.QualityTier < 0 ? (int)DefaultTier : GameSettings.QualityTier);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()

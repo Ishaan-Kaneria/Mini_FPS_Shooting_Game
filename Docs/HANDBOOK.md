@@ -413,7 +413,7 @@ There is no content-only update: Unity bakes every asset into `WebGL.data.br`, s
 
 ### Continuous deployment
 
-`.github/workflows/deploy-web.yml` does the same thing on GitHub's machines. Since November 2026 it runs only by hand from the Actions tab, not on every push: the game now uses Asset Store packs that are not in the repository, so a build there would be missing them. The live site is built locally with `Tools/deploy-web.sh`.
+`.github/workflows/deploy-web.yml` does the same thing on GitHub's machines, and is how the live site is published: run it by hand from the Actions tab (**Deploy WebGL to Netlify → Run workflow**) or with `gh workflow run deploy-web.yml`. It does not run on push. The Asset Store packs the game uses cannot be in this public repository, so they live in the private repository `Ishaan-Kaneria/Mini_FPS_Packs` as one zstd tar split into 95 MB parts; the job clones it with a read-only deploy key (secret `PACKS_DEPLOY_KEY`) and unpacks it into `Assets/` before building. After adding or updating a pack, rebuild those parts from the git-ignored files under `Assets/` (`git ls-files -oi --exclude-standard -- Assets`, minus `Screenshots`, `Resources` and `_TerrainAutoUpgrade`) and push them there, at most 2 GB per push. The browser build ships the Low quality tier only (`WebShipsLowTierOnly`): the other tiers' shaders made the build run for hours.
 
 Netlify cannot be pointed at this repository directly. Its build images carry Node, Python, and Ruby, not a licensed Unity Editor, so the build has to happen in Actions, and Netlify is handed the finished folder.
 
